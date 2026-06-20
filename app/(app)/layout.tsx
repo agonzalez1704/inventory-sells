@@ -1,6 +1,7 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { ensureProfile } from "@/lib/auth/profile";
+import { isAllowedEmail } from "@/lib/auth/allowlist";
 
 export default async function AppLayout({
   children,
@@ -11,6 +12,10 @@ export default async function AppLayout({
   if (!userId) redirect("/");
 
   const user = await currentUser();
+  const email = user?.primaryEmailAddress?.emailAddress ?? null;
+  // Only allow-listed emails may use the app.
+  if (!isAllowedEmail(email)) redirect("/sin-acceso");
+
   const fullName =
     user && (user.firstName || user.lastName)
       ? [user.firstName, user.lastName].filter(Boolean).join(" ")
