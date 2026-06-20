@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Search, Plus, Minus, ShoppingCart } from "lucide-react";
+import { Search, Plus, Minus, Package } from "lucide-react";
 import { formatMXN } from "@/lib/money";
 import type { PaymentMethod, Product } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -25,6 +25,49 @@ const PAYMENT_METHODS: [PaymentMethod, string][] = [
   ["transferencia", "Transferencia"],
   ["otro", "Otro"],
 ];
+
+function Thumb() {
+  return (
+    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+      <Package className="h-5 w-5" />
+    </span>
+  );
+}
+
+function Stepper({
+  value,
+  onDec,
+  onInc,
+  canInc,
+}: {
+  value: number;
+  onDec: () => void;
+  onInc: () => void;
+  canInc: boolean;
+}) {
+  return (
+    <div className="flex items-center rounded-lg border border-border">
+      <button
+        onClick={onDec}
+        aria-label="Quitar uno"
+        className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-l-lg text-muted-foreground transition-colors hover:bg-muted"
+      >
+        <Minus className="h-4 w-4" />
+      </button>
+      <div className="flex h-9 w-10 items-center justify-center border-x border-border text-sm tabular-nums">
+        {value}
+      </div>
+      <button
+        onClick={onInc}
+        disabled={!canInc}
+        aria-label="Agregar uno"
+        className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-r-lg text-muted-foreground transition-colors hover:bg-muted disabled:opacity-40"
+      >
+        <Plus className="h-4 w-4" />
+      </button>
+    </div>
+  );
+}
 
 export function SalesScreen({ products }: { products: SalesProduct[] }) {
   const router = useRouter();
@@ -49,7 +92,7 @@ export function SalesScreen({ products }: { products: SalesProduct[] }) {
             p.sku.toLowerCase().includes(q) || p.name.toLowerCase().includes(q),
         )
       : products;
-    return base.slice(0, 10);
+    return base.slice(0, 12);
   }, [query, products]);
 
   const lines = Object.entries(cart)
@@ -77,7 +120,11 @@ export function SalesScreen({ products }: { products: SalesProduct[] }) {
     });
   }
 
+  const canSubmit =
+    lines.length > 0 && !(mode === "prestamo" && note.trim() === "");
+
   function submit() {
+    if (!canSubmit) return;
     const items = lines.map((l) => ({ product_id: l.product.id, qty: l.qty }));
     startTransition(async () => {
       try {
@@ -99,199 +146,239 @@ export function SalesScreen({ products }: { products: SalesProduct[] }) {
     });
   }
 
-  return (
-    <div className="grid gap-5 lg:grid-cols-5">
-      {/* Picker */}
-      <div className="lg:col-span-3">
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Buscar producto por SKU o nombre…"
-            className="h-11 pl-9"
-            autoFocus
-          />
-        </div>
+  const cta = mode === "prestamo" ? "Registrar fiado" : "Cobrar";
 
-        <div className="mt-3 space-y-1.5">
-          {results.length === 0 ? (
-            <p className="px-1 py-6 text-center text-sm text-muted-foreground">
-              Sin resultados.
-            </p>
-          ) : (
-            results.map((p) => {
-              const inCart = cart[p.id] ?? 0;
-              const soldOut = p.quantity === 0;
-              const maxed = inCart >= p.quantity;
-              return (
-                <div
-                  key={p.id}
-                  className={cn(
-                    "flex items-center justify-between gap-3 rounded-lg border border-border bg-background px-3 py-2.5 transition-colors",
-                    !soldOut && "hover:border-ring/30 hover:bg-muted/40",
-                  )}
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{p.name}</p>
-                    <p className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
-                      <span className="font-mono">{p.sku}</span>
-                      {p.size && <span>· {p.size}</span>}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-3">
-                    <div className="text-right leading-tight">
-                      <p className="font-mono text-base font-semibold tabular-nums text-foreground">
+  return (
+    <>
+      <div className="gap-5 pb-24 lg:grid lg:grid-cols-5 lg:pb-0">
+        {/* Picker */}
+        <div className="lg:col-span-3">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Buscar producto por SKU o nombre…"
+              className="h-12 pl-9 text-base"
+            />
+          </div>
+
+          <div className="mt-3 space-y-2">
+            {results.length === 0 ? (
+              <p className="px-1 py-6 text-center text-sm text-muted-foreground">
+                Sin resultados.
+              </p>
+            ) : (
+              results.map((p) => {
+                const inCart = cart[p.id] ?? 0;
+                const soldOut = p.quantity === 0;
+                const maxed = inCart >= p.quantity;
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => add(p)}
+                    disabled={soldOut || maxed}
+                    className={cn(
+                      "flex w-full items-center gap-3 rounded-xl border border-border bg-background p-2.5 text-left transition-colors",
+                      soldOut || maxed
+                        ? "opacity-60"
+                        : "cursor-pointer hover:border-ring/30 hover:bg-muted/40 active:bg-muted",
+                    )}
+                  >
+                    <Thumb />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{p.name}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        <span className="font-mono">{p.sku}</span>
+                        {p.size ? ` · ${p.size}` : ""}
+                      </p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p className="font-mono text-sm font-semibold tabular-nums">
                         {formatMXN(p.price_cents)}
                       </p>
                       {soldOut ? (
                         <Badge tone="danger">Agotado</Badge>
+                      ) : inCart > 0 ? (
+                        <span className="text-xs font-medium text-accent">
+                          {inCart} en venta
+                        </span>
                       ) : (
-                        <p className="mt-0.5 text-xs text-muted-foreground">
+                        <span className="text-xs text-muted-foreground">
                           {p.quantity} disp.
-                        </p>
+                        </span>
                       )}
                     </div>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => add(p)}
-                      disabled={soldOut || maxed}
+                    <span
+                      className={cn(
+                        "flex h-7 w-7 shrink-0 items-center justify-center rounded-full",
+                        soldOut || maxed
+                          ? "bg-muted text-muted-foreground"
+                          : "bg-primary text-primary-foreground",
+                      )}
                     >
-                      <Plus className="h-3.5 w-3.5" />
-                      {inCart > 0 ? inCart : "Agregar"}
-                    </Button>
+                      <Plus className="h-4 w-4" />
+                    </span>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        {/* Cart */}
+        <div className="mt-5 lg:col-span-2 lg:mt-0">
+          <Card className="overflow-hidden lg:sticky lg:top-20">
+            <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+              <div className="inline-flex rounded-lg bg-muted p-0.5 text-xs">
+                {(["venta", "prestamo"] as const).map((m) => (
+                  <button
+                    key={m}
+                    onClick={() => setMode(m)}
+                    className={cn(
+                      "cursor-pointer rounded-md px-3 py-1 font-medium transition-colors",
+                      mode === m
+                        ? "bg-background text-foreground shadow-xs"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {m === "venta" ? "Venta" : "Fiado"}
+                  </button>
+                ))}
+              </div>
+              {count > 0 && (
+                <Badge
+                  tone={mode === "prestamo" ? "warning" : "accent"}
+                  className="ml-auto"
+                >
+                  {count}
+                </Badge>
+              )}
+            </div>
+
+            {lines.length === 0 ? (
+              <div className="p-4">
+                <EmptyState
+                  icon={Package}
+                  title="Carrito vacío"
+                  description="Busca y toca un producto para agregarlo."
+                  className="border-0 py-10"
+                />
+              </div>
+            ) : (
+              <>
+                <ul className="max-h-[19rem] divide-y divide-border overflow-auto">
+                  {lines.map((l) => (
+                    <li
+                      key={l.product.id}
+                      className="flex items-center gap-3 px-4 py-3"
+                    >
+                      <Thumb />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">
+                          {l.product.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatMXN(l.product.price_cents)} c/u
+                        </p>
+                      </div>
+                      <div className="flex flex-col items-end gap-1.5">
+                        <Stepper
+                          value={l.qty}
+                          onDec={() => setQty(l.product.id, l.qty - 1)}
+                          onInc={() => setQty(l.product.id, l.qty + 1)}
+                          canInc={l.qty < l.product.quantity}
+                        />
+                        <span className="font-mono text-xs font-semibold tabular-nums">
+                          {formatMXN(l.product.price_cents * l.qty)}
+                        </span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+
+                <div className="space-y-3 border-t border-border p-4">
+                  {mode === "venta" ? (
+                    <div className="grid grid-cols-2 gap-2">
+                      <Select
+                        value={payment}
+                        onChange={(e) =>
+                          setPayment(e.target.value as PaymentMethod)
+                        }
+                      >
+                        {PAYMENT_METHODS.map(([v, label]) => (
+                          <option key={v} value={v}>
+                            {label}
+                          </option>
+                        ))}
+                      </Select>
+                      <Input
+                        value={customer}
+                        onChange={(e) => setCustomer(e.target.value)}
+                        placeholder="Cliente (opcional)"
+                      />
+                    </div>
+                  ) : (
+                    <Input
+                      value={note}
+                      onChange={(e) => setNote(e.target.value)}
+                      placeholder="¿A quién? Ej: Ernesto · Local 87"
+                    />
+                  )}
+
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-sm text-muted-foreground">Total</span>
+                    <span className="font-mono text-2xl font-semibold tabular-nums tracking-tight">
+                      {formatMXN(total)}
+                    </span>
                   </div>
+
+                  {/* Desktop action — mobile uses the fixed bottom bar */}
+                  <Button
+                    variant="accent"
+                    size="lg"
+                    className="hidden w-full lg:flex"
+                    onClick={submit}
+                    loading={pending}
+                    disabled={!canSubmit}
+                  >
+                    {cta} {formatMXN(total)}
+                  </Button>
                 </div>
-              );
-            })
-          )}
+              </>
+            )}
+          </Card>
         </div>
       </div>
 
-      {/* Cart */}
-      <div className="lg:col-span-2">
-        <Card className="sticky top-20 overflow-hidden">
-          <div className="flex items-center gap-2 border-b border-border px-4 py-3">
-            <div className="inline-flex rounded-lg bg-muted p-0.5 text-xs">
-              {(["venta", "prestamo"] as const).map((m) => (
-                <button
-                  key={m}
-                  onClick={() => setMode(m)}
-                  className={cn(
-                    "cursor-pointer rounded-md px-3 py-1 font-medium transition-colors",
-                    mode === m
-                      ? "bg-background text-foreground shadow-xs"
-                      : "text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {m === "venta" ? "Venta" : "Fiado"}
-                </button>
-              ))}
+      {/* Fixed mobile checkout bar */}
+      {lines.length > 0 && (
+        <div
+          className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 px-4 py-3 backdrop-blur lg:hidden"
+          style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+        >
+          <div className="mx-auto flex max-w-6xl items-center gap-3">
+            <div className="leading-tight">
+              <p className="text-xs text-muted-foreground">
+                {count} art. · {mode === "prestamo" ? "Fiado" : "Total"}
+              </p>
+              <p className="font-mono text-lg font-semibold tabular-nums">
+                {formatMXN(total)}
+              </p>
             </div>
-            {count > 0 && (
-              <Badge tone={mode === "prestamo" ? "warning" : "accent"} className="ml-auto">
-                {count}
-              </Badge>
-            )}
+            <Button
+              variant="accent"
+              size="lg"
+              className="ml-auto h-12 flex-1 text-base"
+              onClick={submit}
+              loading={pending}
+              disabled={!canSubmit}
+            >
+              {cta}
+            </Button>
           </div>
-
-          {lines.length === 0 ? (
-            <div className="p-4">
-              <EmptyState
-                icon={ShoppingCart}
-                title="Carrito vacío"
-                description="Busca y agrega productos para registrar una venta."
-                className="border-0 py-10"
-              />
-            </div>
-          ) : (
-            <>
-              <ul className="max-h-72 divide-y divide-border overflow-auto">
-                {lines.map((l) => (
-                  <li key={l.product.id} className="flex items-center gap-2 px-4 py-2.5">
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm">{l.product.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatMXN(l.product.price_cents)} c/u
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => setQty(l.product.id, l.qty - 1)}
-                        aria-label="Quitar uno"
-                        className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted"
-                      >
-                        <Minus className="h-3.5 w-3.5" />
-                      </button>
-                      <span className="w-7 text-center text-sm tabular-nums">
-                        {l.qty}
-                      </span>
-                      <button
-                        onClick={() => setQty(l.product.id, l.qty + 1)}
-                        disabled={l.qty >= l.product.quantity}
-                        aria-label="Agregar uno"
-                        className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted disabled:opacity-40"
-                      >
-                        <Plus className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                    <span className="w-20 text-right font-mono text-sm tabular-nums">
-                      {formatMXN(l.product.price_cents * l.qty)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-
-              <div className="space-y-3 border-t border-border p-4">
-                <div className="flex items-baseline justify-between">
-                  <span className="text-sm text-muted-foreground">Total</span>
-                  <span className="font-mono text-2xl font-semibold tabular-nums tracking-tight">
-                    {formatMXN(total)}
-                  </span>
-                </div>
-                {mode === "venta" ? (
-                  <div className="grid grid-cols-2 gap-2">
-                    <Select
-                      value={payment}
-                      onChange={(e) => setPayment(e.target.value as PaymentMethod)}
-                    >
-                      {PAYMENT_METHODS.map(([v, label]) => (
-                        <option key={v} value={v}>
-                          {label}
-                        </option>
-                      ))}
-                    </Select>
-                    <Input
-                      value={customer}
-                      onChange={(e) => setCustomer(e.target.value)}
-                      placeholder="Cliente (opcional)"
-                    />
-                  </div>
-                ) : (
-                  <Input
-                    value={note}
-                    onChange={(e) => setNote(e.target.value)}
-                    placeholder="¿A quién? Ej: Ernesto · Local 87"
-                  />
-                )}
-                <Button
-                  variant="accent"
-                  size="lg"
-                  className="w-full"
-                  onClick={submit}
-                  loading={pending}
-                  disabled={mode === "prestamo" && note.trim() === ""}
-                >
-                  {mode === "prestamo"
-                    ? `Registrar fiado · ${formatMXN(total)}`
-                    : `Cobrar ${formatMXN(total)}`}
-                </Button>
-              </div>
-            </>
-          )}
-        </Card>
-      </div>
-    </div>
+        </div>
+      )}
+    </>
   );
 }
