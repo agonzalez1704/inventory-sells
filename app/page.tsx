@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { SignInButton, SignUpButton } from "@clerk/nextjs";
 import { Camera, Boxes, ShoppingCart, ArrowRight } from "lucide-react";
+import { Logo } from "@/components/logo";
 
 const features = [
   {
@@ -28,6 +29,7 @@ export default async function Home() {
   return (
     <div className="mx-auto max-w-5xl px-4 sm:px-6">
       <section className="flex flex-col items-center py-20 text-center sm:py-28">
+        <Logo className="mb-6 h-10 w-auto text-foreground" />
         <span className="mb-5 inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1 text-xs font-medium text-muted-foreground shadow-xs">
           <span className="h-1.5 w-1.5 rounded-full bg-accent" />
           Inventario + punto de venta

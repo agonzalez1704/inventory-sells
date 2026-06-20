@@ -13,8 +13,8 @@ const mono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Inventory POS",
-  description: "Inventario y punto de venta",
+  title: "Fiable",
+  description: "Inventario, ventas y fiados",
 };
 
 export default function RootLayout({
