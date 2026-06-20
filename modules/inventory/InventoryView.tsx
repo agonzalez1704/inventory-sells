@@ -19,6 +19,7 @@ import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Modal } from "@/components/ui/modal";
 import { ImportPanel } from "./import/ImportPanel";
+import { ProductEditModal } from "./ProductEditModal";
 
 export type InventoryRow = Pick<
   Product,
@@ -98,6 +99,7 @@ export function InventoryView({
 }) {
   const [query, setQuery] = useState("");
   const [importOpen, setImportOpen] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
 
   const stats = useMemo(() => {
     const units = products.reduce((s, p) => s + p.quantity, 0);
@@ -125,6 +127,7 @@ export function InventoryView({
           <h1 className="text-2xl font-semibold tracking-tight">Inventario</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {products.length} productos · {stats.units} unidades
+            {isAdmin && " · toca un producto para editar"}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -204,7 +207,11 @@ export function InventoryView({
                 {filtered.map((p) => (
                   <tr
                     key={p.id}
-                    className="border-b border-border/60 transition-colors last:border-0 hover:bg-muted/40"
+                    onClick={isAdmin ? () => setEditId(p.id) : undefined}
+                    className={cn(
+                      "border-b border-border/60 transition-colors last:border-0 hover:bg-muted/40",
+                      isAdmin && "cursor-pointer",
+                    )}
                   >
                     <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">
                       {p.sku}
@@ -245,6 +252,10 @@ export function InventoryView({
       >
         <ImportPanel onClose={() => setImportOpen(false)} />
       </Modal>
+
+      {editId && (
+        <ProductEditModal productId={editId} onClose={() => setEditId(null)} />
+      )}
     </section>
   );
 }
