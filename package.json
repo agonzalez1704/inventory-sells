@@ -14,6 +14,7 @@
     "@clerk/nextjs": "^7.5.7",
     "@insforge/sdk": "latest",
     "@openrouter/ai-sdk-provider": "^2.9.1",
+    "@react-pdf/renderer": "^4.5.1",
     "ai": "^6.0.208",
     "clsx": "^2.1.1",
     "lucide-react": "^1.21.0",

@@ -1,7 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Boxes, PackageSearch, Upload, Search } from "lucide-react";
+import {
+  Boxes,
+  PackageSearch,
+  Upload,
+  Search,
+  FileDown,
+  ChevronDown,
+} from "lucide-react";
 import type { Product } from "@/lib/types";
 import { formatMXN } from "@/lib/money";
 import { cn } from "@/lib/utils";
@@ -19,9 +26,12 @@ export type InventoryRow = Pick<
 >;
 
 function StockCell({ qty }: { qty: number }) {
-  if (qty === 0) return <Badge tone="danger">Agotado</Badge>;
-  if (qty <= 5) return <Badge tone="warning">{qty} bajo</Badge>;
-  return <span className="tabular-nums text-foreground">{qty}</span>;
+  // Color carries the meaning: red = sold out, amber = low, default = healthy.
+  const color =
+    qty === 0 ? "text-red-600" : qty <= 5 ? "text-amber-600" : "text-foreground";
+  return (
+    <span className={cn("font-medium tabular-nums", color)}>{qty}</span>
+  );
 }
 
 function Kpi({ label, value }: { label: string; value: string }) {
@@ -32,6 +42,50 @@ function Kpi({ label, value }: { label: string; value: string }) {
         {value}
       </p>
     </Card>
+  );
+}
+
+function ExportMenu({ isAdmin }: { isAdmin: boolean }) {
+  const [open, setOpen] = useState(false);
+  const item =
+    "block rounded-md px-3 py-2 transition-colors hover:bg-muted cursor-pointer";
+  return (
+    <div className="relative">
+      <Button variant="secondary" onClick={() => setOpen((o) => !o)}>
+        <FileDown className="h-4 w-4" />
+        Exportar PDF
+        <ChevronDown className="h-4 w-4 opacity-60" />
+      </Button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 z-20 mt-1.5 w-60 overflow-hidden rounded-lg border border-border bg-background p-1 shadow-pop">
+            <a
+              href="/api/inventario/export?variant=public"
+              onClick={() => setOpen(false)}
+              className={item}
+            >
+              <p className="text-sm font-medium">Lista para cliente</p>
+              <p className="text-xs text-muted-foreground">
+                Solo precios de venta
+              </p>
+            </a>
+            {isAdmin && (
+              <a
+                href="/api/inventario/export?variant=internal"
+                onClick={() => setOpen(false)}
+                className={item}
+              >
+                <p className="text-sm font-medium">Inventario interno</p>
+                <p className="text-xs text-muted-foreground">
+                  Costo, margen y stock
+                </p>
+              </a>
+            )}
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 
@@ -73,12 +127,15 @@ export function InventoryView({
             {products.length} productos · {stats.units} unidades
           </p>
         </div>
-        {isAdmin && (
-          <Button onClick={() => setImportOpen(true)}>
-            <Upload className="h-4 w-4" />
-            Importar
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {products.length > 0 && <ExportMenu isAdmin={isAdmin} />}
+          {isAdmin && (
+            <Button onClick={() => setImportOpen(true)}>
+              <Upload className="h-4 w-4" />
+              Importar
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

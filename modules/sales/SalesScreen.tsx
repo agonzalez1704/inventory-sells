@@ -137,17 +137,21 @@ export function SalesScreen({ products }: { products: SalesProduct[] }) {
                     <p className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
                       <span className="font-mono">{p.sku}</span>
                       {p.size && <span>· {p.size}</span>}
-                      <span className="font-mono">{formatMXN(p.price_cents)}</span>
                     </p>
                   </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    {soldOut ? (
-                      <Badge tone="danger">Agotado</Badge>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">
-                        {p.quantity} disp.
-                      </span>
-                    )}
+                  <div className="flex shrink-0 items-center gap-3">
+                    <div className="text-right leading-tight">
+                      <p className="font-mono text-base font-semibold tabular-nums text-foreground">
+                        {formatMXN(p.price_cents)}
+                      </p>
+                      {soldOut ? (
+                        <Badge tone="danger">Agotado</Badge>
+                      ) : (
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {p.quantity} disp.
+                        </p>
+                      )}
+                    </div>
                     <Button
                       size="sm"
                       variant="secondary"
