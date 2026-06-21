@@ -192,56 +192,65 @@ export function InventoryView({
             />
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
-                  <th className="px-4 py-2.5 font-medium">SKU</th>
-                  <th className="px-4 py-2.5 font-medium">Producto</th>
-                  <th className="px-4 py-2.5 font-medium">Categoría</th>
-                  <th className="px-4 py-2.5 text-right font-medium">Precio</th>
-                  <th className="px-4 py-2.5 text-right font-medium">Stock</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((p) => (
-                  <tr
-                    key={p.id}
-                    onClick={isAdmin ? () => setEditId(p.id) : undefined}
-                    className={cn(
-                      "border-b border-border/60 transition-colors last:border-0 hover:bg-muted/40",
-                      isAdmin && "cursor-pointer",
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
+                <th className="hidden px-4 py-2.5 font-medium sm:table-cell">SKU</th>
+                <th className="px-4 py-2.5 font-medium">Producto</th>
+                <th className="hidden px-4 py-2.5 font-medium sm:table-cell">Categoría</th>
+                <th className="hidden px-4 py-2.5 text-right font-medium sm:table-cell">Precio</th>
+                <th className="px-4 py-2.5 text-right font-medium">Stock</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((p) => (
+                <tr
+                  key={p.id}
+                  onClick={isAdmin ? () => setEditId(p.id) : undefined}
+                  className={cn(
+                    "border-b border-border/60 transition-colors last:border-0 hover:bg-muted/40",
+                    isAdmin && "cursor-pointer",
+                  )}
+                >
+                  <td className="hidden px-4 py-2.5 font-mono text-xs text-muted-foreground sm:table-cell">
+                    {p.sku}
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <span className="font-medium">{p.name}</span>
+                    {(p.brand || p.size) && (
+                      <span className="ml-2 hidden text-xs text-muted-foreground sm:inline">
+                        {[p.brand, p.size].filter(Boolean).join(" · ")}
+                      </span>
                     )}
-                  >
-                    <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">
-                      {p.sku}
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <span className="font-medium">{p.name}</span>
-                      {(p.brand || p.size) && (
-                        <span className="ml-2 text-xs text-muted-foreground">
-                          {[p.brand, p.size].filter(Boolean).join(" · ")}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2.5">
-                      {p.category ? (
-                        <Badge tone="neutral">{p.category}</Badge>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2.5 text-right font-mono tabular-nums">
-                      {formatMXN(p.price_cents)}
-                    </td>
-                    <td className="px-4 py-2.5 text-right">
-                      <StockCell qty={p.quantity} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                    {/* On mobile the SKU/Categoría/Precio columns are hidden, so
+                        surface that info compactly under the name. */}
+                    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 sm:hidden">
+                      <span className="font-mono text-xs text-muted-foreground">
+                        {p.sku}
+                      </span>
+                      {p.category && <Badge tone="neutral">{p.category}</Badge>}
+                      <span className="font-mono text-xs font-medium tabular-nums">
+                        {formatMXN(p.price_cents)}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="hidden px-4 py-2.5 sm:table-cell">
+                    {p.category ? (
+                      <Badge tone="neutral">{p.category}</Badge>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </td>
+                  <td className="hidden px-4 py-2.5 text-right font-mono tabular-nums sm:table-cell">
+                    {formatMXN(p.price_cents)}
+                  </td>
+                  <td className="px-4 py-2.5 text-right">
+                    <StockCell qty={p.quantity} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </Card>
 
