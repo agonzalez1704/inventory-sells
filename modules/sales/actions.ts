@@ -62,6 +62,24 @@ export async function settleLoan(
   if (error) throw new Error(error.message ?? "Error al cobrar");
 }
 
+// Correct a completed sale's payment method / customer (admin only).
+export async function editarVenta(
+  saleId: string,
+  paymentMethod: PaymentMethod,
+  customerName: string | null,
+): Promise<void> {
+  const { userId } = await auth();
+  if (!userId) throw new Error("No autenticado");
+
+  const insforge = await createInsForgeServerClient();
+  const { error } = await insforge.database.rpc("editar_venta", {
+    p_sale_id: saleId,
+    p_payment_method: paymentMethod,
+    p_customer_name: customerName?.trim() || null,
+  });
+  if (error) throw new Error(error.message ?? "Error al editar la venta");
+}
+
 // Cancel a pending loan: item returned without payment → stock restored.
 export async function cancelLoan(saleId: string): Promise<void> {
   const { userId } = await auth();
