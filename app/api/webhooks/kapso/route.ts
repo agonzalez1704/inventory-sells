@@ -26,6 +26,15 @@ type KapsoEvent = {
   conversation?: { phone_number?: string };
 };
 
+// Verification handshake (Kapso/Meta GET) so the webhook can be marked verified.
+export async function GET(req: Request) {
+  const challenge =
+    new URL(req.url).searchParams.get("hub.challenge") ??
+    new URL(req.url).searchParams.get("challenge");
+  if (challenge) return new Response(challenge, { status: 200 });
+  return new Response("ok", { status: 200 });
+}
+
 export async function POST(req: Request) {
   const raw = await req.text();
   const evento = req.headers.get("x-webhook-event") ?? "";
