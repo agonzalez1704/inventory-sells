@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { responderMensaje } from "@/modules/agent/inventory-agent";
+import { cargarHistorial, guardarMensaje } from "@/modules/agent/memoria";
 import { enviarTexto } from "@/lib/kapso";
 
 export const runtime = "nodejs";
@@ -84,7 +85,13 @@ export async function POST(req: Request) {
   }
 
   try {
-    const respuesta = await responderMensaje(texto);
+    const historial = await cargarHistorial(numero, 10);
+    const respuesta = await responderMensaje([
+      ...historial,
+      { role: "user", content: texto },
+    ]);
+    await guardarMensaje(numero, "user", texto);
+    await guardarMensaje(numero, "assistant", respuesta);
     await enviarTexto(phoneNumberId, numero, respuesta);
   } catch (err) {
     console.error("Kapso webhook error:", err);

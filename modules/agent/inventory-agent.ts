@@ -3,6 +3,8 @@ import { generateText, tool, stepCountIs } from "ai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { z } from "zod";
 import { buscarProducto } from "@/modules/analytics/queries";
+import { getNegocioInfo } from "@/modules/config/lib";
+import type { Turno } from "./memoria";
 
 const openrouter = createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY! });
 const MODEL =
@@ -11,24 +13,32 @@ const MODEL =
   "anthropic/claude-sonnet-4.6";
 
 const SYSTEM = `Eres el asistente de WhatsApp de una tienda de celulares y accesorios (Fiable).
-Atiendes a clientes que preguntan por PRECIO y DISPONIBILIDAD de productos.
+Atiendes a clientes que preguntan por PRECIO y DISPONIBILIDAD de productos, y por datos del negocio (envíos, pagos, ubicación, etc.).
 
-Reglas:
-- Usa la herramienta buscar_producto (por nombre o SKU) para responder.
-- Al buscar, usa términos concisos tal como los dijo el cliente (modelo y tipo). NO agregues marcas que el cliente no mencionó.
-- Si buscar_producto no devuelve resultados, INTENTA DE NUEVO con menos palabras (solo el modelo, o solo el tipo) antes de decir que no hay.
-- NUNCA digas cantidades ni números de stock. Solo indica si está DISPONIBLE o AGOTADO (usa el campo "disponible").
-- Da el precio en pesos mexicanos. Si el precio es 0, di que el precio aún no está cargado y que un asesor lo confirmará (no digas que cuesta $0).
-- Responde SIEMPRE en español, breve y claro, estilo WhatsApp (sin tablas ni markdown pesado).
-- Si tras varios intentos no existe, dilo y pide una descripción más específica (modelo, marca).
-- No inventes datos ni precios: usa solo lo que devuelven las herramientas.`;
+Reglas de productos:
+- Usa la herramienta buscar_producto (por nombre o SKU) para precio y disponibilidad.
+- Usa términos concisos como los dijo el cliente. NO agregues marcas que no mencionó.
+- Si no hay resultados, intenta de nuevo con menos palabras antes de decir que no hay.
+- NUNCA digas cantidades ni números de stock. Solo "Disponible" o "Agotado" (campo "disponible").
+- Da el precio en pesos. Si el precio es 0, di que aún no está cargado y un asesor lo confirma (no digas $0).
 
-// Generate a WhatsApp reply for an incoming customer message.
-export async function responderMensaje(texto: string): Promise<string> {
+Reglas de conversación:
+- MANTÉN EL CONTEXTO: el historial de la conversación viene en los mensajes. Si el cliente dice "la OLED" o "el segundo", se refiere a lo que ya hablaron; NO vuelvas a pedir datos que ya tienes.
+- Responde SIEMPRE en español, breve y claro, estilo WhatsApp.
+
+Datos del negocio (envíos, pagos, transferencia, Uber, ubicación, horario):
+- Responde SOLO con la "Información del negocio" de abajo. Si la pregunta no está cubierta ahí, di que un asesor lo confirma; no inventes.`;
+
+export async function responderMensaje(messages: Turno[]): Promise<string> {
+  const info = await getNegocioInfo();
+  const system = info
+    ? `${SYSTEM}\n\n=== Información del negocio ===\n${info}`
+    : `${SYSTEM}\n\n(No hay información del negocio configurada; para envíos/pagos/ubicación di que un asesor lo confirma.)`;
+
   const { text } = await generateText({
     model: openrouter(MODEL),
-    system: SYSTEM,
-    prompt: texto,
+    system,
+    messages,
     maxOutputTokens: 600,
     stopWhen: stepCountIs(5),
     tools: {
@@ -38,7 +48,7 @@ export async function responderMensaje(texto: string): Promise<string> {
         inputSchema: z.object({
           consulta: z.string().describe("nombre o SKU del producto"),
         }),
-        // Customer-facing: expose availability only — never the quantity or cost.
+        // Customer-facing: availability only — never the quantity or cost.
         execute: async ({ consulta }) => {
           const rows = await buscarProducto(consulta);
           return rows.map((r) => ({
