@@ -1,8 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { useMemo, useState } from "react";
 import {
   Boxes,
   PackageSearch,
@@ -23,7 +21,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Modal } from "@/components/ui/modal";
 import { ImportPanel } from "./import/ImportPanel";
 import { ProductEditModal } from "./ProductEditModal";
-import { createInventory } from "./inventories";
+import { ManualProductModal } from "./ManualProductModal";
 
 export type InventoryRow = Pick<
   Product,
@@ -135,14 +133,12 @@ export function InventoryView({
   inventories: Inventory[];
   isAdmin: boolean;
 }) {
-  const router = useRouter();
   const [query, setQuery] = useState("");
   const [selectedInv, setSelectedInv] = useState<string>("all");
   const [importOpen, setImportOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [newInvOpen, setNewInvOpen] = useState(false);
-  const [newInvName, setNewInvName] = useState("");
-  const [creating, startCreate] = useTransition();
+  const [manualOpen, setManualOpen] = useState(false);
 
   const invName = useMemo(
     () => Object.fromEntries(inventories.map((i) => [i.id, i.name])),
@@ -176,23 +172,6 @@ export function InventoryView({
     );
   }, [query, scoped]);
 
-  function createInv() {
-    const name = newInvName.trim();
-    if (!name) return;
-    startCreate(async () => {
-      try {
-        const inv = await createInventory(name);
-        toast.success(`Inventario "${inv.name}" creado`);
-        setNewInvName("");
-        setNewInvOpen(false);
-        setSelectedInv(inv.id);
-        router.refresh();
-      } catch (e) {
-        toast.error(e instanceof Error ? e.message : "Error al crear");
-      }
-    });
-  }
-
   return (
     <section className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -205,6 +184,12 @@ export function InventoryView({
         </div>
         <div className="flex items-center gap-2">
           {scoped.length > 0 && <ExportMenu isAdmin={isAdmin} />}
+          {isAdmin && selectedInv !== "all" && (
+            <Button variant="secondary" onClick={() => setManualOpen(true)}>
+              <Plus className="h-4 w-4" />
+              Producto
+            </Button>
+          )}
           {isAdmin && (
             <Button onClick={() => setImportOpen(true)}>
               <Upload className="h-4 w-4" />
@@ -379,36 +364,17 @@ export function InventoryView({
         open={newInvOpen}
         onClose={() => setNewInvOpen(false)}
         title="Nuevo inventario"
-        className="max-w-md"
       >
-        <div className="space-y-3">
-          <Input
-            value={newInvName}
-            onChange={(e) => setNewInvName(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") createInv();
-            }}
-            placeholder="Ej: Moca's displays"
-            autoFocus
-          />
-          <div className="flex justify-end gap-2">
-            <Button
-              variant="ghost"
-              onClick={() => setNewInvOpen(false)}
-              disabled={creating}
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={createInv}
-              loading={creating}
-              disabled={!newInvName.trim()}
-            >
-              Crear
-            </Button>
-          </div>
-        </div>
+        <ImportPanel newMode onClose={() => setNewInvOpen(false)} />
       </Modal>
+
+      {manualOpen && selectedInv !== "all" && (
+        <ManualProductModal
+          inventoryId={selectedInv}
+          inventoryName={invName[selectedInv]}
+          onClose={() => setManualOpen(false)}
+        />
+      )}
 
       {editId && (
         <ProductEditModal productId={editId} onClose={() => setEditId(null)} />

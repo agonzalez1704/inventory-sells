@@ -63,18 +63,24 @@ function attrsToObject(
 
 export type CommitResult = { inserted: number; updated: number };
 
-export async function commitImport(
-  rows: ExtractedRow[],
-  source: ImportSource,
-  filename: string | null,
-  inventoryId: string,
-): Promise<CommitResult> {
-  await requireAdmin();
-  if (!inventoryId) throw new Error("Selecciona un inventario destino");
+function slugify(s: string): string {
+  return s
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+}
 
-  // Sanitize the (possibly edited) rows: require sku, round qty, clamp negatives.
-  const payload = rows
-    .map((r) => ({ ...r, sku: r.sku?.trim() ?? "" }))
+// Sanitize rows into the DB payload: require sku (derive from name if blank),
+// convert pesos → centavos, round qty, clamp negatives.
+function buildPayload(rows: ExtractedRow[]) {
+  return rows
+    .map((r) => ({
+      ...r,
+      sku: r.sku?.trim() || (r.name ? slugify(r.name) : ""),
+    }))
     .filter((r) => r.sku !== "")
     .map((r) => {
       const attributes = attrsToObject(r.attributes);
@@ -92,7 +98,18 @@ export async function commitImport(
         ...(attributes ? { attributes } : {}),
       };
     });
+}
 
+export async function commitImport(
+  rows: ExtractedRow[],
+  source: ImportSource,
+  filename: string | null,
+  inventoryId: string,
+): Promise<CommitResult> {
+  await requireAdmin();
+  if (!inventoryId) throw new Error("Selecciona un inventario destino");
+
+  const payload = buildPayload(rows);
   if (payload.length === 0) throw new Error("Sin filas para importar");
 
   const insforge = await createInsForgeServerClient();
@@ -108,4 +125,63 @@ export async function commitImport(
     inserted: Number((data as { inserted?: number })?.inserted ?? 0),
     updated: Number((data as { updated?: number })?.updated ?? 0),
   };
+}
+
+export type CreatedInventory = {
+  inventory_id: string;
+  name: string;
+  inserted: number;
+  updated: number;
+};
+
+// Create an inventory and import in one transaction. If the import has no valid
+// rows or the RPC fails, no inventory is created.
+export async function createInventoryWithImport(
+  name: string,
+  rows: ExtractedRow[],
+  source: ImportSource,
+  filename: string | null,
+): Promise<CreatedInventory> {
+  await requireAdmin();
+  const clean = name.trim();
+  if (!clean) throw new Error("El nombre es obligatorio");
+
+  const payload = buildPayload(rows);
+  if (payload.length === 0) throw new Error("Sin filas para importar");
+
+  const insforge = await createInsForgeServerClient();
+  const { data, error } = await insforge.database.rpc(
+    "create_inventory_and_import",
+    { p_name: clean, p_rows: payload, p_source: source, p_filename: filename },
+  );
+  if (error) throw new Error(error.message ?? "Error al crear el inventario");
+
+  const d = data as Partial<CreatedInventory>;
+  return {
+    inventory_id: String(d?.inventory_id ?? ""),
+    name: String(d?.name ?? clean),
+    inserted: Number(d?.inserted ?? 0),
+    updated: Number(d?.updated ?? 0),
+  };
+}
+
+// Add a single product manually to an existing inventory.
+export async function addProduct(
+  inventoryId: string,
+  row: ExtractedRow,
+): Promise<void> {
+  await requireAdmin();
+  if (!inventoryId) throw new Error("Inventario requerido");
+
+  const payload = buildPayload([row]);
+  if (payload.length === 0) throw new Error("Falta el nombre o SKU");
+
+  const insforge = await createInsForgeServerClient();
+  const { error } = await insforge.database.rpc("commit_import", {
+    p_rows: payload,
+    p_source: "manual",
+    p_filename: null,
+    p_inventory_id: inventoryId,
+  });
+  if (error) throw new Error(error.message ?? "Error al agregar el producto");
 }

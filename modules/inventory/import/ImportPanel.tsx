@@ -17,7 +17,8 @@ import { Input, Select } from "@/components/ui/input";
 import type { Inventory } from "@/lib/types";
 import type { ExtractedRow, ImportSource } from "./schema";
 import { parseSpreadsheet } from "./parse-spreadsheet";
-import { extractFromUpload, commitImport } from "./actions";
+import { extractFromUpload, commitImport, createInventoryWithImport } from "./actions";
+import { createInventory } from "../inventories";
 
 type Format = "image" | "spreadsheet" | "pdf";
 type Status = "idle" | "reading" | "review" | "done";
@@ -35,12 +36,14 @@ const FORMATS: {
 ];
 
 export function ImportPanel({
-  inventories,
+  inventories = [],
   defaultInventoryId,
+  newMode = false,
   onClose,
 }: {
-  inventories: Inventory[];
+  inventories?: Inventory[];
   defaultInventoryId?: string;
+  newMode?: boolean;
   onClose?: () => void;
 }) {
   const router = useRouter();
@@ -48,6 +51,7 @@ export function ImportPanel({
   const [inventoryId, setInventoryId] = useState(
     defaultInventoryId || inventories[0]?.id || "",
   );
+  const [name, setName] = useState("");
   const [format, setFormat] = useState<Format>("image");
   const [status, setStatus] = useState<Status>("idle");
   const [rows, setRows] = useState<ExtractedRow[]>([]);
@@ -132,20 +136,47 @@ export function ImportPanel({
   }
 
   function confirm() {
-    if (!inventoryId) {
+    if (newMode && !name.trim()) {
+      toast.error("Escribe un nombre para el inventario");
+      return;
+    }
+    if (!newMode && !inventoryId) {
       toast.error("Selecciona un inventario destino");
       return;
     }
     startTransition(async () => {
       try {
-        const res = await commitImport(rows, source, filename, inventoryId);
-        toast.success(
-          `Importado: ${res.inserted} nuevos, ${res.updated} actualizados`,
-        );
+        if (newMode) {
+          const r = await createInventoryWithImport(name, rows, source, filename);
+          toast.success(`"${r.name}" creado · ${r.inserted} productos`);
+        } else {
+          const res = await commitImport(rows, source, filename, inventoryId);
+          toast.success(
+            `Importado: ${res.inserted} nuevos, ${res.updated} actualizados`,
+          );
+        }
         setStatus("done");
         router.refresh();
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Error al importar");
+      }
+    });
+  }
+
+  // New-inventory mode: create the inventory empty and add products manually later.
+  function createEmpty() {
+    if (!name.trim()) {
+      toast.error("Escribe un nombre para el inventario");
+      return;
+    }
+    startTransition(async () => {
+      try {
+        const inv = await createInventory(name);
+        toast.success(`Inventario "${inv.name}" creado`);
+        router.refresh();
+        onClose?.();
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Error al crear");
       }
     });
   }
@@ -156,11 +187,15 @@ export function ImportPanel({
         <span className="flex h-11 w-11 items-center justify-center rounded-full bg-accent-soft text-accent">
           <CheckCircle2 className="h-6 w-6" />
         </span>
-        <p className="mt-3 text-sm font-medium">Inventario importado</p>
+        <p className="mt-3 text-sm font-medium">
+          {newMode ? "Inventario creado" : "Inventario importado"}
+        </p>
         <div className="mt-5 flex gap-2">
-          <Button variant="secondary" onClick={reset}>
-            Importar otro
-          </Button>
+          {!newMode && (
+            <Button variant="secondary" onClick={reset}>
+              Importar otro
+            </Button>
+          )}
           {onClose && <Button onClick={onClose}>Listo</Button>}
         </div>
       </div>
@@ -169,22 +204,36 @@ export function ImportPanel({
 
   return (
     <div>
-      {inventories.length > 0 && (
+      {newMode ? (
         <label className="mb-3 block">
           <span className="mb-1 block text-xs font-medium text-muted-foreground">
-            Inventario destino
+            Nombre del inventario
           </span>
-          <Select
-            value={inventoryId}
-            onChange={(e) => setInventoryId(e.target.value)}
-          >
-            {inventories.map((inv) => (
-              <option key={inv.id} value={inv.id}>
-                {inv.name}
-              </option>
-            ))}
-          </Select>
+          <Input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Ej: Moca's displays"
+            autoFocus
+          />
         </label>
+      ) : (
+        inventories.length > 0 && (
+          <label className="mb-3 block">
+            <span className="mb-1 block text-xs font-medium text-muted-foreground">
+              Inventario destino
+            </span>
+            <Select
+              value={inventoryId}
+              onChange={(e) => setInventoryId(e.target.value)}
+            >
+              {inventories.map((inv) => (
+                <option key={inv.id} value={inv.id}>
+                  {inv.name}
+                </option>
+              ))}
+            </Select>
+          </label>
+        )
       )}
 
       {/* Format segmented control */}
@@ -239,7 +288,21 @@ export function ImportPanel({
           </span>
           <span className="mt-1 text-xs text-muted-foreground">{fmt.hint}</span>
         </label>
-      ) : (
+      ) : null}
+
+      {newMode && status === "idle" && (
+        <div className="mt-3 text-center">
+          <button
+            onClick={createEmpty}
+            disabled={pending}
+            className="cursor-pointer text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline disabled:opacity-50"
+          >
+            o crea el inventario vacío y agrega productos manualmente
+          </button>
+        </div>
+      )}
+
+      {status === "review" && (
         <ReviewStep
           rows={rows}
           costMode={costMode}
