@@ -60,6 +60,7 @@ export function ImportPanel({
   const [costMode, setCostModeState] = useState(false);
   const [margin, setMargin] = useState("");
   const [pending, startTransition] = useTransition();
+  const [dragging, setDragging] = useState(false);
 
   const fmt = FORMATS.find((f) => f.key === format)!;
 
@@ -72,9 +73,7 @@ export function ImportPanel({
     if (fileRef.current) fileRef.current.value = "";
   }
 
-  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  async function handleFile(file: File) {
     setStatus("reading");
     try {
       if (format === "spreadsheet") {
@@ -99,6 +98,19 @@ export function ImportPanel({
       toast.error(err instanceof Error ? err.message : "Error al leer el archivo");
       reset();
     }
+  }
+
+  function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) handleFile(file);
+  }
+
+  function onDrop(e: React.DragEvent<HTMLLabelElement>) {
+    e.preventDefault();
+    setDragging(false);
+    if (status === "reading") return;
+    const file = e.dataTransfer.files?.[0];
+    if (file) handleFile(file);
   }
 
   function update(i: number, patch: Partial<ExtractedRow>) {
@@ -263,8 +275,15 @@ export function ImportPanel({
 
       {status !== "review" ? (
         <label
+          onDragOver={(e) => {
+            e.preventDefault();
+            if (status !== "reading") setDragging(true);
+          }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={onDrop}
           className={cn(
             "mt-4 flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-border bg-muted/30 px-6 py-10 text-center transition-colors hover:border-ring/40 hover:bg-muted/50",
+            dragging && "border-ring/70 bg-muted/60",
             status === "reading" && "pointer-events-none opacity-70",
           )}
         >
@@ -284,7 +303,9 @@ export function ImportPanel({
               ? format === "spreadsheet"
                 ? "Leyendo archivo…"
                 : "Extrayendo con IA…"
-              : "Haz clic para elegir un archivo"}
+              : dragging
+                ? "Suelta el archivo aquí"
+                : "Haz clic o arrastra un archivo aquí"}
           </span>
           <span className="mt-1 text-xs text-muted-foreground">{fmt.hint}</span>
         </label>
