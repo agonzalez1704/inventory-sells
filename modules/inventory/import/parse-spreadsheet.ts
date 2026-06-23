@@ -1,42 +1,50 @@
 import * as XLSX from "xlsx";
 import type { ExtractedRow } from "./schema";
 
-// Normalize a header: lowercase, trim, strip accents.
+// Parses real-world inventory spreadsheets in the browser:
+//  - every tab/sheet (skipping Numbers "Export Summary"), tab name → category
+//  - the header row is detected (it isn't always row 0)
+//  - wide "pivoted" layouts are un-pivoted: a brand row above repeated
+//    MODELO/COLOR/PZ column groups becomes one product per cell
+//  - simple MODELO/PZ (or sku/nombre/precio…) sheets still work
+
+type Field =
+  | "name"
+  | "sku"
+  | "brand"
+  | "color"
+  | "size"
+  | "cost"
+  | "price"
+  | "quantity";
+
+const ALIASES: Record<Field, string[]> = {
+  name: ["modelo", "model", "nombre", "producto", "descripcion", "articulo"],
+  sku: ["sku", "codigo", "code", "clave"],
+  brand: ["marca", "brand"],
+  color: ["color"],
+  size: ["talla", "size", "medida"],
+  cost: ["costo", "cost"],
+  price: ["precio", "price", "pvp", "venta"],
+  quantity: [
+    "pz", "pza", "pzas", "pieza", "piezas", "cantidad",
+    "existencia", "existencias", "stock", "qty", "cant",
+  ],
+};
+
 function norm(s: unknown): string {
-  return String(s)
+  return String(s ?? "")
     .trim()
     .toLowerCase()
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, ""); // strip combining diacritics
 }
 
-type ScalarField =
-  | "sku"
-  | "name"
-  | "brand"
-  | "size"
-  | "color"
-  | "category"
-  | "cost"
-  | "price"
-  | "quantity";
+function str(v: unknown): string | undefined {
+  return v != null && String(v).trim() !== "" ? String(v).trim() : undefined;
+}
 
-const ALIASES: Record<ScalarField, string[]> = {
-  sku: ["sku", "codigo", "code", "clave", "id"],
-  name: ["name", "nombre", "descripcion", "producto", "modelo", "articulo"],
-  brand: ["brand", "marca"],
-  size: ["size", "talla", "medida"],
-  color: ["color"],
-  category: ["category", "categoria", "tipo", "linea"],
-  cost: ["cost", "costo"],
-  price: ["price", "precio", "pvp", "venta"],
-  quantity: ["quantity", "cantidad", "existencia", "existencias", "stock", "qty", "piezas", "cant"],
-};
-
-// Headers consumed by known fields; everything else becomes an attribute.
-const KNOWN = new Set<string>(Object.values(ALIASES).flat());
-
-function parseNumber(v: unknown): number | undefined {
+function num(v: unknown): number | undefined {
   if (v == null || v === "") return undefined;
   const n =
     typeof v === "number" ? v : parseFloat(String(v).replace(/[^0-9.-]/g, ""));
@@ -49,69 +57,124 @@ function slug(s: string): string {
     .replace(/(^-|-$)/g, "");
 }
 
-// Parse an Excel/CSV file in the browser into pre-commit rows. Unknown columns
-// are preserved as type-specific attributes (category-agnostic catalog).
+function fieldOf(cell: unknown): Field | null {
+  const n = norm(cell);
+  if (!n) return null;
+  for (const key of Object.keys(ALIASES) as Field[]) {
+    if (ALIASES[key].includes(n)) return key;
+  }
+  return null;
+}
+
+function rowsFromGrid(grid: unknown[][], sheetName: string): ExtractedRow[] {
+  // Find the header row: the one with the most recognizable field labels.
+  let headerIdx = -1;
+  let best = 0;
+  let headerMap: Record<number, Field> = {};
+  for (let r = 0; r < Math.min(grid.length, 15); r++) {
+    const map: Record<number, Field> = {};
+    let score = 0;
+    (grid[r] ?? []).forEach((cell, c) => {
+      const f = fieldOf(cell);
+      if (f) {
+        map[c] = f;
+        score++;
+      }
+    });
+    if (score > best) {
+      best = score;
+      headerIdx = r;
+      headerMap = map;
+    }
+  }
+  if (headerIdx < 0 || best === 0) return [];
+
+  const category = norm(sheetName) || undefined;
+  const cols = Object.keys(headerMap).map(Number);
+  const nameCols = cols.filter((c) => headerMap[c] === "name").sort((a, b) => a - b);
+  const skuCols = cols.filter((c) => headerMap[c] === "sku").sort((a, b) => a - b);
+  const anchors = nameCols.length ? nameCols : skuCols;
+  if (anchors.length === 0) return [];
+
+  const multiGroup = anchors.length > 1;
+  const brandRow = headerIdx > 0 ? (grid[headerIdx - 1] ?? []) : [];
+  const width = (grid[headerIdx] ?? []).length;
+
+  const out: ExtractedRow[] = [];
+  for (let gi = 0; gi < anchors.length; gi++) {
+    const start = anchors[gi];
+    const end = gi + 1 < anchors.length ? anchors[gi + 1] : width;
+
+    // Map fields within this column group.
+    const g: Partial<Record<Field, number>> = {};
+    for (let c = start; c < end; c++) {
+      const f = headerMap[c];
+      if (f && g[f] === undefined) g[f] = c;
+    }
+    // A brand label above the group only makes sense in a multi-group (pivoted)
+    // sheet; in single-group sheets the row above is a title, not a brand.
+    const brand = multiGroup ? str(brandRow[start]) : undefined;
+    const nameCol = g.name ?? g.sku;
+    if (nameCol === undefined) continue;
+
+    for (let r = headerIdx + 1; r < grid.length; r++) {
+      const row = grid[r] ?? [];
+      const nameVal = str(row[nameCol]);
+      if (!nameVal) continue;
+
+      const color = g.color !== undefined ? str(row[g.color]) : undefined;
+      const size = g.size !== undefined ? str(row[g.size]) : undefined;
+      const qty = g.quantity !== undefined ? num(row[g.quantity]) : undefined;
+      const price = g.price !== undefined ? num(row[g.price]) : undefined;
+      const cost = g.cost !== undefined ? num(row[g.cost]) : undefined;
+      const skuRaw = g.sku !== undefined ? str(row[g.sku]) : undefined;
+
+      const row2: ExtractedRow = {
+        sku: skuRaw ?? slug([brand, nameVal, color].filter(Boolean).join("-")),
+        name: nameVal,
+      };
+      if (brand) row2.brand = brand;
+      if (category) row2.category = category;
+      if (color) row2.color = color;
+      if (size) row2.size = size;
+      if (qty != null) row2.quantity = Math.round(qty);
+      if (price != null) row2.price = price;
+      if (cost != null) row2.cost = cost;
+      if (row2.sku) out.push(row2);
+    }
+  }
+  return out;
+}
+
+// Merge rows that resolve to the same SKU (same brand+model+color): sum
+// quantities so a duplicate doesn't overwrite an earlier one.
+function mergeBySku(rows: ExtractedRow[]): ExtractedRow[] {
+  const map = new Map<string, ExtractedRow>();
+  for (const r of rows) {
+    const existing = map.get(r.sku);
+    if (existing) {
+      existing.quantity = (existing.quantity ?? 0) + (r.quantity ?? 0);
+    } else {
+      map.set(r.sku, { ...r });
+    }
+  }
+  return [...map.values()];
+}
+
 export async function parseSpreadsheet(file: File): Promise<ExtractedRow[]> {
   const buf = await file.arrayBuffer();
   const wb = XLSX.read(buf, { type: "array" });
-  const sheet = wb.Sheets[wb.SheetNames[0]];
-  if (!sheet) return [];
-  const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
-    defval: "",
-  });
 
-  return json
-    .map((raw): ExtractedRow => {
-      const byKey: Record<string, unknown> = {};
-      const origByNorm: Record<string, string> = {};
-      for (const k of Object.keys(raw)) {
-        const n = norm(k);
-        byKey[n] = raw[k];
-        origByNorm[n] = String(k).trim();
-      }
-
-      const pick = (field: ScalarField): unknown => {
-        for (const alias of ALIASES[field]) {
-          if (alias in byKey && byKey[alias] !== "") return byKey[alias];
-        }
-        return undefined;
-      };
-      const str = (v: unknown) =>
-        v != null && String(v).trim() !== "" ? String(v).trim() : undefined;
-
-      const nameRaw = str(pick("name"));
-      const skuRaw = str(pick("sku"));
-      const sku = skuRaw ?? (nameRaw ? slug(nameRaw) : "");
-
-      const row: ExtractedRow = { sku };
-      if (nameRaw) row.name = nameRaw;
-      const brand = str(pick("brand"));
-      const size = str(pick("size"));
-      const color = str(pick("color"));
-      const category = str(pick("category"));
-      if (brand) row.brand = brand;
-      if (size) row.size = size;
-      if (color) row.color = color;
-      if (category) row.category = category;
-
-      const cost = parseNumber(pick("cost"));
-      const price = parseNumber(pick("price"));
-      const quantity = parseNumber(pick("quantity"));
-      if (cost != null) row.cost = cost;
-      if (price != null) row.price = price;
-      if (quantity != null) row.quantity = Math.round(quantity);
-
-      // Any column we didn't recognize → an attribute (original header as key).
-      const attrs: { key: string; value: string }[] = [];
-      for (const n of Object.keys(byKey)) {
-        if (KNOWN.has(n)) continue;
-        const v = byKey[n];
-        if (v == null || String(v).trim() === "") continue;
-        attrs.push({ key: origByNorm[n] ?? n, value: String(v).trim() });
-      }
-      if (attrs.length > 0) row.attributes = attrs;
-
-      return row;
-    })
-    .filter((r) => r.sku !== "");
+  const all: ExtractedRow[] = [];
+  for (const sheetName of wb.SheetNames) {
+    if (/summary|resumen/.test(norm(sheetName))) continue; // Numbers export tab
+    const sheet = wb.Sheets[sheetName];
+    if (!sheet) continue;
+    const grid = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
+      header: 1,
+      defval: "",
+    });
+    all.push(...rowsFromGrid(grid, sheetName));
+  }
+  return mergeBySku(all).filter((r) => r.sku !== "");
 }
