@@ -2,6 +2,8 @@ import { auth, currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { ensureProfile } from "@/lib/auth/profile";
 import { isAllowedEmail } from "@/lib/auth/allowlist";
+import { getNegocioInfo } from "@/modules/config/lib";
+import { ConfigPrompt } from "@/modules/config/ConfigPrompt";
 
 export default async function AppLayout({
   children,
@@ -22,9 +24,16 @@ export default async function AppLayout({
       : null;
 
   // First user becomes admin; row is created if missing.
-  await ensureProfile(userId, fullName);
+  const profile = await ensureProfile(userId, fullName);
+  const isAdmin = profile.role === "admin";
+
+  // Nudge admins to configure the business info (needed by the WhatsApp agent).
+  const necesitaConfig = isAdmin && (await getNegocioInfo()) === "";
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">{children}</div>
+    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
+      {necesitaConfig && <ConfigPrompt />}
+      {children}
+    </div>
   );
 }
