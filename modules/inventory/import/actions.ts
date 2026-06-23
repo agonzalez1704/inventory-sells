@@ -67,8 +67,10 @@ export async function commitImport(
   rows: ExtractedRow[],
   source: ImportSource,
   filename: string | null,
+  inventoryId: string,
 ): Promise<CommitResult> {
   await requireAdmin();
+  if (!inventoryId) throw new Error("Selecciona un inventario destino");
 
   // Sanitize the (possibly edited) rows: require sku, round qty, clamp negatives.
   const payload = rows
@@ -98,6 +100,7 @@ export async function commitImport(
     p_rows: payload,
     p_source: source,
     p_filename: filename,
+    p_inventory_id: inventoryId,
   });
 
   if (error) throw new Error(error.message ?? "Error al importar");

@@ -17,21 +17,28 @@ const PAYMENT_LABELS: Record<string, string> = {
 export default async function VentasPage() {
   const insforge = await createInsForgeServerClient();
 
-  const [{ data: productData }, { data: salesData }] = await Promise.all([
-    insforge.database
-      .from("products")
-      .select("id, sku, name, size, price_cents, quantity")
-      .eq("is_active", true)
-      .order("name", { ascending: true }),
-    insforge.database
-      .from("sales")
-      .select("id, total_cents, payment_method, customer_name, created_at")
-      .eq("status", "completed")
-      .order("created_at", { ascending: false })
-      .limit(8),
-  ]);
+  const [{ data: productData }, { data: salesData }, { data: invData }] =
+    await Promise.all([
+      insforge.database
+        .from("products")
+        .select("id, inventory_id, sku, name, size, price_cents, quantity")
+        .eq("is_active", true)
+        .order("name", { ascending: true }),
+      insforge.database
+        .from("sales")
+        .select("id, total_cents, payment_method, customer_name, created_at")
+        .eq("status", "completed")
+        .order("created_at", { ascending: false })
+        .limit(8),
+      insforge.database.from("inventories").select("id, name"),
+    ]);
 
-  const products = (productData ?? []) as SalesProduct[];
+  const invName = new Map(
+    ((invData ?? []) as { id: string; name: string }[]).map((i) => [i.id, i.name]),
+  );
+  const products = (
+    (productData ?? []) as (SalesProduct & { inventory_id: string })[]
+  ).map((p) => ({ ...p, inventory_name: invName.get(p.inventory_id) ?? null }));
   const sales = (salesData ?? []) as Sale[];
 
   return (

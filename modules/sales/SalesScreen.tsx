@@ -17,7 +17,7 @@ import { registerSale, registerLoan } from "./actions";
 export type SalesProduct = Pick<
   Product,
   "id" | "sku" | "name" | "size" | "price_cents" | "quantity"
->;
+> & { inventory_name?: string | null };
 
 const PAYMENT_METHODS: [PaymentMethod, string][] = [
   ["efectivo", "Efectivo"],
@@ -188,10 +188,15 @@ export function SalesScreen({ products }: { products: SalesProduct[] }) {
                     <Thumb />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium">{p.name}</p>
-                      <p className="truncate text-xs text-muted-foreground">
+                      <div className="mt-0.5 flex items-center gap-1.5 truncate text-xs text-muted-foreground">
                         <span className="font-mono">{p.sku}</span>
-                        {p.size ? ` · ${p.size}` : ""}
-                      </p>
+                        {p.size && <span>· {p.size}</span>}
+                        {p.inventory_name && (
+                          <span className="shrink-0 rounded bg-accent-soft px-1.5 py-0.5 font-medium text-accent">
+                            {p.inventory_name}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div className="shrink-0 text-right">
                       <p className="font-mono text-sm font-semibold tabular-nums">

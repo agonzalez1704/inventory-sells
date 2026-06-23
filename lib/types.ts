@@ -7,8 +7,14 @@ export interface Profile {
   role: Role;
 }
 
+export interface Inventory {
+  id: string;
+  name: string;
+}
+
 export interface Product {
   id: string;
+  inventory_id: string;
   sku: string;
   name: string;
   brand: string | null;

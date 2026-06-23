@@ -13,7 +13,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Input, Select } from "@/components/ui/input";
+import type { Inventory } from "@/lib/types";
 import type { ExtractedRow, ImportSource } from "./schema";
 import { parseSpreadsheet } from "./parse-spreadsheet";
 import { extractFromUpload, commitImport } from "./actions";
@@ -33,9 +34,20 @@ const FORMATS: {
   { key: "pdf", label: "PDF", icon: FileText, accept: "application/pdf", hint: "Documento PDF de inventario" },
 ];
 
-export function ImportPanel({ onClose }: { onClose?: () => void }) {
+export function ImportPanel({
+  inventories,
+  defaultInventoryId,
+  onClose,
+}: {
+  inventories: Inventory[];
+  defaultInventoryId?: string;
+  onClose?: () => void;
+}) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
+  const [inventoryId, setInventoryId] = useState(
+    defaultInventoryId || inventories[0]?.id || "",
+  );
   const [format, setFormat] = useState<Format>("image");
   const [status, setStatus] = useState<Status>("idle");
   const [rows, setRows] = useState<ExtractedRow[]>([]);
@@ -120,9 +132,13 @@ export function ImportPanel({ onClose }: { onClose?: () => void }) {
   }
 
   function confirm() {
+    if (!inventoryId) {
+      toast.error("Selecciona un inventario destino");
+      return;
+    }
     startTransition(async () => {
       try {
-        const res = await commitImport(rows, source, filename);
+        const res = await commitImport(rows, source, filename, inventoryId);
         toast.success(
           `Importado: ${res.inserted} nuevos, ${res.updated} actualizados`,
         );
@@ -153,6 +169,24 @@ export function ImportPanel({ onClose }: { onClose?: () => void }) {
 
   return (
     <div>
+      {inventories.length > 0 && (
+        <label className="mb-3 block">
+          <span className="mb-1 block text-xs font-medium text-muted-foreground">
+            Inventario destino
+          </span>
+          <Select
+            value={inventoryId}
+            onChange={(e) => setInventoryId(e.target.value)}
+          >
+            {inventories.map((inv) => (
+              <option key={inv.id} value={inv.id}>
+                {inv.name}
+              </option>
+            ))}
+          </Select>
+        </label>
+      )}
+
       {/* Format segmented control */}
       <div className="inline-flex rounded-lg bg-muted p-0.5">
         {FORMATS.map((f) => {

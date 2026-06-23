@@ -1,6 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import {
   Boxes,
   PackageSearch,
@@ -8,8 +10,9 @@ import {
   Search,
   FileDown,
   ChevronDown,
+  Plus,
 } from "lucide-react";
-import type { Product } from "@/lib/types";
+import type { Inventory, Product } from "@/lib/types";
 import { formatMXN } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -20,10 +23,19 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Modal } from "@/components/ui/modal";
 import { ImportPanel } from "./import/ImportPanel";
 import { ProductEditModal } from "./ProductEditModal";
+import { createInventory } from "./inventories";
 
 export type InventoryRow = Pick<
   Product,
-  "id" | "sku" | "name" | "category" | "brand" | "size" | "price_cents" | "quantity"
+  | "id"
+  | "inventory_id"
+  | "sku"
+  | "name"
+  | "category"
+  | "brand"
+  | "size"
+  | "price_cents"
+  | "quantity"
 >;
 
 function StockCell({ qty }: { qty: number }) {
@@ -90,35 +102,96 @@ function ExportMenu({ isAdmin }: { isAdmin: boolean }) {
   );
 }
 
+function InvTab({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "cursor-pointer rounded-full px-3 py-1 text-xs font-medium transition-colors",
+        active
+          ? "bg-primary text-primary-foreground"
+          : "bg-muted text-muted-foreground hover:text-foreground",
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
 export function InventoryView({
   products,
+  inventories,
   isAdmin,
 }: {
   products: InventoryRow[];
+  inventories: Inventory[];
   isAdmin: boolean;
 }) {
+  const router = useRouter();
   const [query, setQuery] = useState("");
+  const [selectedInv, setSelectedInv] = useState<string>("all");
   const [importOpen, setImportOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
+  const [newInvOpen, setNewInvOpen] = useState(false);
+  const [newInvName, setNewInvName] = useState("");
+  const [creating, startCreate] = useTransition();
+
+  const invName = useMemo(
+    () => Object.fromEntries(inventories.map((i) => [i.id, i.name])),
+    [inventories],
+  );
+
+  const scoped = useMemo(
+    () =>
+      selectedInv === "all"
+        ? products
+        : products.filter((p) => p.inventory_id === selectedInv),
+    [products, selectedInv],
+  );
 
   const stats = useMemo(() => {
-    const units = products.reduce((s, p) => s + p.quantity, 0);
-    const value = products.reduce((s, p) => s + p.price_cents * p.quantity, 0);
-    const low = products.filter((p) => p.quantity > 0 && p.quantity <= 5).length;
-    const out = products.filter((p) => p.quantity === 0).length;
+    const units = scoped.reduce((s, p) => s + p.quantity, 0);
+    const value = scoped.reduce((s, p) => s + p.price_cents * p.quantity, 0);
+    const low = scoped.filter((p) => p.quantity > 0 && p.quantity <= 5).length;
+    const out = scoped.filter((p) => p.quantity === 0).length;
     return { units, value, low, out };
-  }, [products]);
+  }, [scoped]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return products;
-    return products.filter(
+    if (!q) return scoped;
+    return scoped.filter(
       (p) =>
         p.sku.toLowerCase().includes(q) ||
         p.name.toLowerCase().includes(q) ||
         (p.category ?? "").toLowerCase().includes(q),
     );
-  }, [query, products]);
+  }, [query, scoped]);
+
+  function createInv() {
+    const name = newInvName.trim();
+    if (!name) return;
+    startCreate(async () => {
+      try {
+        const inv = await createInventory(name);
+        toast.success(`Inventario "${inv.name}" creado`);
+        setNewInvName("");
+        setNewInvOpen(false);
+        setSelectedInv(inv.id);
+        router.refresh();
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Error al crear");
+      }
+    });
+  }
 
   return (
     <section className="space-y-6">
@@ -126,12 +199,12 @@ export function InventoryView({
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Inventario</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {products.length} productos · {stats.units} unidades
+            {scoped.length} productos · {stats.units} unidades
             {isAdmin && " · toca un producto para editar"}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {products.length > 0 && <ExportMenu isAdmin={isAdmin} />}
+          {scoped.length > 0 && <ExportMenu isAdmin={isAdmin} />}
           {isAdmin && (
             <Button onClick={() => setImportOpen(true)}>
               <Upload className="h-4 w-4" />
@@ -141,8 +214,33 @@ export function InventoryView({
         </div>
       </div>
 
+      {/* Inventory selector */}
+      <div className="flex flex-wrap items-center gap-2">
+        <InvTab active={selectedInv === "all"} onClick={() => setSelectedInv("all")}>
+          Todos
+        </InvTab>
+        {inventories.map((inv) => (
+          <InvTab
+            key={inv.id}
+            active={selectedInv === inv.id}
+            onClick={() => setSelectedInv(inv.id)}
+          >
+            {inv.name}
+          </InvTab>
+        ))}
+        {isAdmin && (
+          <button
+            onClick={() => setNewInvOpen(true)}
+            className="flex cursor-pointer items-center gap-1 rounded-full border border-dashed border-border px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-ring/40 hover:text-foreground"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Nuevo
+          </button>
+        )}
+      </div>
+
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Kpi label="Productos" value={String(products.length)} />
+        <Kpi label="Productos" value={String(scoped.length)} />
         <Kpi label="Unidades" value={String(stats.units)} />
         <Kpi label="Valor (venta)" value={formatMXN(stats.value)} />
         <Kpi label="Bajo / agotado" value={`${stats.low} / ${stats.out}`} />
@@ -161,7 +259,7 @@ export function InventoryView({
           </div>
         </div>
 
-        {products.length === 0 ? (
+        {scoped.length === 0 ? (
           <div className="p-6">
             <EmptyState
               icon={Boxes}
@@ -217,6 +315,14 @@ export function InventoryView({
                   </td>
                   <td className="px-4 py-2.5">
                     <span className="font-medium">{p.name}</span>
+                    {selectedInv === "all" && (
+                      <Badge
+                        tone="accent"
+                        className="ml-2 hidden align-middle sm:inline-flex"
+                      >
+                        {invName[p.inventory_id] ?? "—"}
+                      </Badge>
+                    )}
                     {(p.brand || p.size) && (
                       <span className="ml-2 hidden text-xs text-muted-foreground sm:inline">
                         {[p.brand, p.size].filter(Boolean).join(" · ")}
@@ -228,6 +334,9 @@ export function InventoryView({
                       <span className="font-mono text-xs text-muted-foreground">
                         {p.sku}
                       </span>
+                      {selectedInv === "all" && (
+                        <Badge tone="accent">{invName[p.inventory_id] ?? "—"}</Badge>
+                      )}
                       {p.category && <Badge tone="neutral">{p.category}</Badge>}
                       <span className="font-mono text-xs font-medium tabular-nums">
                         {formatMXN(p.price_cents)}
@@ -259,7 +368,46 @@ export function InventoryView({
         onClose={() => setImportOpen(false)}
         title="Importar inventario"
       >
-        <ImportPanel onClose={() => setImportOpen(false)} />
+        <ImportPanel
+          inventories={inventories}
+          defaultInventoryId={selectedInv !== "all" ? selectedInv : undefined}
+          onClose={() => setImportOpen(false)}
+        />
+      </Modal>
+
+      <Modal
+        open={newInvOpen}
+        onClose={() => setNewInvOpen(false)}
+        title="Nuevo inventario"
+        className="max-w-md"
+      >
+        <div className="space-y-3">
+          <Input
+            value={newInvName}
+            onChange={(e) => setNewInvName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") createInv();
+            }}
+            placeholder="Ej: Moca's displays"
+            autoFocus
+          />
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="ghost"
+              onClick={() => setNewInvOpen(false)}
+              disabled={creating}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={createInv}
+              loading={creating}
+              disabled={!newInvName.trim()}
+            >
+              Crear
+            </Button>
+          </div>
+        </div>
       </Modal>
 
       {editId && (

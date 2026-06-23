@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
 import { getProfile } from "@/lib/auth/profile";
+import type { Inventory } from "@/lib/types";
 import {
   InventoryView,
   type InventoryRow,
@@ -12,12 +13,21 @@ export default async function InventarioPage() {
   const isAdmin = profile?.role === "admin";
 
   const insforge = await createInsForgeServerClient();
-  const { data, error } = await insforge.database
-    .from("products")
-    .select("id, sku, name, category, brand, size, price_cents, quantity")
-    .order("created_at", { ascending: false });
+  const [{ data: productData, error }, { data: invData }] = await Promise.all([
+    insforge.database
+      .from("products")
+      .select(
+        "id, inventory_id, sku, name, category, brand, size, price_cents, quantity",
+      )
+      .order("created_at", { ascending: false }),
+    insforge.database
+      .from("inventories")
+      .select("id, name")
+      .order("name", { ascending: true }),
+  ]);
 
-  const products = (data ?? []) as InventoryRow[];
+  const products = (productData ?? []) as InventoryRow[];
+  const inventories = (invData ?? []) as Inventory[];
 
   return (
     <>
@@ -26,7 +36,11 @@ export default async function InventarioPage() {
           {error.message}
         </p>
       )}
-      <InventoryView products={products} isAdmin={isAdmin} />
+      <InventoryView
+        products={products}
+        inventories={inventories}
+        isAdmin={isAdmin}
+      />
     </>
   );
 }
