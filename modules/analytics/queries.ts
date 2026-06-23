@@ -113,6 +113,7 @@ export async function fiadosPendientes() {
 }
 
 type ProductRow = {
+  inventory_id: string;
   sku: string;
   name: string;
   category: string | null;
@@ -124,31 +125,108 @@ type ProductRow = {
   is_active: boolean;
 };
 
+async function inventoryNames(): Promise<Map<string, string>> {
+  const { data } = await DB.from("inventories").select("id, name");
+  return new Map(
+    ((data ?? []) as { id: string; name: string }[]).map((i) => [i.id, i.name]),
+  );
+}
+
+export async function listarInventarios() {
+  const [names, { data: pData }] = await Promise.all([
+    inventoryNames(),
+    DB.from("products")
+      .select("inventory_id, price_cents, quantity")
+      .eq("is_active", true),
+  ]);
+  const ps = (pData ?? []) as Pick<
+    ProductRow,
+    "inventory_id" | "price_cents" | "quantity"
+  >[];
+
+  return [...names.entries()].map(([id, inventario]) => {
+    const items = ps.filter((p) => p.inventory_id === id);
+    return {
+      inventario,
+      productos: items.length,
+      unidades: items.reduce((s, p) => s + p.quantity, 0),
+      valor_venta_mxn: pesos(
+        items.reduce((s, p) => s + p.price_cents * p.quantity, 0),
+      ),
+    };
+  });
+}
+
 export async function estadoInventario() {
-  const { data } = await DB.from("products")
-    .select("sku, name, price_cents, quantity")
-    .eq("is_active", true);
-  const ps = (data ?? []) as Pick<ProductRow, "sku" | "name" | "price_cents" | "quantity">[];
+  const [names, { data }] = await Promise.all([
+    inventoryNames(),
+    DB.from("products")
+      .select("inventory_id, sku, name, price_cents, quantity")
+      .eq("is_active", true),
+  ]);
+  const ps = (data ?? []) as Pick<
+    ProductRow,
+    "inventory_id" | "sku" | "name" | "price_cents" | "quantity"
+  >[];
+  const inv = (id: string) => names.get(id) ?? "—";
+
+  const porInv = new Map<
+    string,
+    {
+      inventario: string;
+      productos: number;
+      unidades: number;
+      valor_venta_mxn: number;
+      agotados: number;
+      bajo_stock: number;
+    }
+  >();
+  for (const p of ps) {
+    const name = inv(p.inventory_id);
+    const cur = porInv.get(name) ?? {
+      inventario: name,
+      productos: 0,
+      unidades: 0,
+      valor_venta_mxn: 0,
+      agotados: 0,
+      bajo_stock: 0,
+    };
+    cur.productos += 1;
+    cur.unidades += p.quantity;
+    cur.valor_venta_mxn += pesos(p.price_cents * p.quantity);
+    if (p.quantity === 0) cur.agotados += 1;
+    else if (p.quantity <= 5) cur.bajo_stock += 1;
+    porInv.set(name, cur);
+  }
 
   return {
     productos: ps.length,
     unidades: ps.reduce((s, p) => s + p.quantity, 0),
     valor_venta_mxn: pesos(ps.reduce((s, p) => s + p.price_cents * p.quantity, 0)),
+    por_inventario: [...porInv.values()].sort((a, b) => b.unidades - a.unidades),
     agotados: ps
       .filter((p) => p.quantity === 0)
-      .map((p) => ({ sku: p.sku, nombre: p.name })),
+      .map((p) => ({ inventario: inv(p.inventory_id), sku: p.sku, nombre: p.name })),
     bajo_stock: ps
       .filter((p) => p.quantity > 0 && p.quantity <= 5)
-      .map((p) => ({ sku: p.sku, nombre: p.name, stock: p.quantity })),
+      .map((p) => ({
+        inventario: inv(p.inventory_id),
+        sku: p.sku,
+        nombre: p.name,
+        stock: p.quantity,
+      })),
   };
 }
 
 export async function buscarProducto(q: string) {
   const needle = q.trim().toLowerCase();
   if (!needle) return [];
-  const { data } = await DB.from("products").select(
-    "sku, name, category, brand, size, cost_cents, price_cents, quantity, is_active",
-  );
+  const [names, { data }] = await Promise.all([
+    inventoryNames(),
+    DB.from("products").select(
+      "inventory_id, sku, name, category, brand, size, cost_cents, price_cents, quantity, is_active",
+    ),
+  ]);
   const ps = (data ?? []) as ProductRow[];
 
   return ps
@@ -157,8 +235,9 @@ export async function buscarProducto(q: string) {
         p.sku.toLowerCase().includes(needle) ||
         p.name.toLowerCase().includes(needle),
     )
-    .slice(0, 10)
+    .slice(0, 15)
     .map((p) => ({
+      inventario: names.get(p.inventory_id) ?? "—",
       sku: p.sku,
       nombre: p.name,
       categoria: p.category,

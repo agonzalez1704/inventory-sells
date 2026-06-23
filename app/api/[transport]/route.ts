@@ -6,6 +6,7 @@ import {
   fiadosPendientes,
   estadoInventario,
   buscarProducto,
+  listarInventarios,
 } from "@/modules/analytics/queries";
 
 export const runtime = "nodejs";
@@ -43,15 +44,22 @@ const handler = createMcpHandler(
     );
 
     server.tool(
+      "listar_inventarios",
+      "Lista los inventarios (bodegas) con su número de productos, unidades y valor de venta.",
+      {},
+      async () => json(await listarInventarios()),
+    );
+
+    server.tool(
       "estado_inventario",
-      "Estado del inventario: total de productos, unidades, valor de venta, y listas de bajo stock y agotados.",
+      "Estado del inventario: totales y desglose por inventario (productos, unidades, valor), más listas de bajo stock y agotados (cada uno etiquetado con su inventario).",
       {},
       async () => json(await estadoInventario()),
     );
 
     server.tool(
       "buscar_producto",
-      "Busca productos por SKU o nombre. Devuelve precio, costo, stock, categoría y estado.",
+      "Busca productos por SKU o nombre en todos los inventarios. Devuelve inventario, precio, costo, stock, categoría y estado.",
       { q: z.string().describe("SKU o nombre a buscar") },
       async ({ q }) => json(await buscarProducto(q)),
     );
