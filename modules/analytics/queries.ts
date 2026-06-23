@@ -119,6 +119,7 @@ type ProductRow = {
   category: string | null;
   brand: string | null;
   size: string | null;
+  color: string | null;
   cost_cents: number;
   price_cents: number;
   quantity: number;
@@ -219,22 +220,32 @@ export async function estadoInventario() {
 }
 
 export async function buscarProducto(q: string) {
-  const needle = q.trim().toLowerCase();
-  if (!needle) return [];
+  // Token-AND match across all text fields: every word in the query must appear
+  // somewhere (name, sku, brand, category, color, size). Robust to phrasing
+  // like "pantalla iphone 15 pro max".
+  const tokens = q
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((t) => t.length >= 2);
+  if (tokens.length === 0) return [];
+
   const [names, { data }] = await Promise.all([
     inventoryNames(),
     DB.from("products").select(
-      "inventory_id, sku, name, category, brand, size, cost_cents, price_cents, quantity, is_active",
+      "inventory_id, sku, name, category, brand, size, color, cost_cents, price_cents, quantity, is_active",
     ),
   ]);
   const ps = (data ?? []) as ProductRow[];
 
   return ps
-    .filter(
-      (p) =>
-        p.sku.toLowerCase().includes(needle) ||
-        p.name.toLowerCase().includes(needle),
-    )
+    .filter((p) => {
+      const hay = [p.name, p.sku, p.brand, p.category, p.color, p.size]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return tokens.every((t) => hay.includes(t));
+    })
     .slice(0, 15)
     .map((p) => ({
       inventario: names.get(p.inventory_id) ?? "—",
@@ -242,6 +253,7 @@ export async function buscarProducto(q: string) {
       nombre: p.name,
       categoria: p.category,
       marca: p.brand,
+      color: p.color,
       talla: p.size,
       costo_mxn: pesos(p.cost_cents),
       precio_mxn: pesos(p.price_cents),
