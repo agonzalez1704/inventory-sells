@@ -1,17 +1,36 @@
 import { createInsForgeServerClient } from "@/lib/insforge/server";
-import { LoansView, type Loan } from "@/modules/loans/LoansView";
+import { LoansView, type Loan, type SwapProduct } from "@/modules/loans/LoansView";
 
 export default async function FiadosPage() {
   const insforge = await createInsForgeServerClient();
-  const { data, error } = await insforge.database
-    .from("sales")
-    .select("id, total_cents, note, created_at, sale_items(qty, products(name, sku))")
-    .eq("status", "pending")
-    .order("created_at", { ascending: true });
+
+  const [{ data, error }, { data: productData }, { data: invData }] =
+    await Promise.all([
+      insforge.database
+        .from("sales")
+        .select(
+          "id, total_cents, note, created_at, sale_items(product_id, qty, products(name, sku))",
+        )
+        .eq("status", "pending")
+        .order("created_at", { ascending: true }),
+      insforge.database
+        .from("products")
+        .select("id, inventory_id, sku, name, size, price_cents, quantity")
+        .eq("is_active", true)
+        .order("name", { ascending: true }),
+      insforge.database.from("inventories").select("id, name"),
+    ]);
 
   // PostgREST returns the to-one `products` embed as an object; the SDK's
   // generic types it as an array, so cast through unknown.
   const loans = (data ?? []) as unknown as Loan[];
+
+  const invName = new Map(
+    ((invData ?? []) as { id: string; name: string }[]).map((i) => [i.id, i.name]),
+  );
+  const products = (
+    (productData ?? []) as (SwapProduct & { inventory_id: string })[]
+  ).map((p) => ({ ...p, inventory_name: invName.get(p.inventory_id) ?? null }));
 
   return (
     <>
@@ -20,7 +39,7 @@ export default async function FiadosPage() {
           {error.message}
         </p>
       )}
-      <LoansView loans={loans} />
+      <LoansView loans={loans} products={products} />
     </>
   );
 }

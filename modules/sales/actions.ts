@@ -80,6 +80,24 @@ export async function editarVenta(
   if (error) throw new Error(error.message ?? "Error al editar la venta");
 }
 
+// Swap the product(s) on a pending loan: the old items go back to stock, the
+// new ones leave it, and the loan total is recomputed — all atomically.
+export async function cambiarFiado(
+  saleId: string,
+  items: CartLine[],
+): Promise<void> {
+  const { userId } = await auth();
+  if (!userId) throw new Error("No autenticado");
+  if (items.length === 0) throw new Error("Sin productos");
+
+  const insforge = await createInsForgeServerClient();
+  const { error } = await insforge.database.rpc("editar_fiado", {
+    p_sale_id: saleId,
+    p_items: items.map((i) => ({ product_id: i.product_id, qty: i.qty })),
+  });
+  if (error) throw new Error(error.message ?? "Error al cambiar el fiado");
+}
+
 // Cancel a pending loan: item returned without payment → stock restored.
 export async function cancelLoan(saleId: string): Promise<void> {
   const { userId } = await auth();
