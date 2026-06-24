@@ -1,9 +1,8 @@
 import { auth } from "@clerk/nextjs/server";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
 import { getProfile } from "@/lib/auth/profile";
-import type { Sale } from "@/lib/types";
 import { SalesScreen, type SalesProduct } from "@/modules/sales/SalesScreen";
-import { RecentSales } from "@/modules/sales/RecentSales";
+import { RecentSales, type SaleWithItems } from "@/modules/sales/RecentSales";
 
 export default async function VentasPage() {
   const { userId } = await auth();
@@ -21,7 +20,9 @@ export default async function VentasPage() {
         .order("name", { ascending: true }),
       insforge.database
         .from("sales")
-        .select("id, total_cents, payment_method, customer_name, created_at")
+        .select(
+          "id, total_cents, payment_method, customer_name, created_at, sale_items(qty, unit_price_cents, products(name, sku))",
+        )
         .eq("status", "completed")
         .order("created_at", { ascending: false })
         .limit(8),
@@ -34,7 +35,9 @@ export default async function VentasPage() {
   const products = (
     (productData ?? []) as (SalesProduct & { inventory_id: string })[]
   ).map((p) => ({ ...p, inventory_name: invName.get(p.inventory_id) ?? null }));
-  const sales = (salesData ?? []) as Sale[];
+  // PostgREST returns the to-one `products` embed as an object; the SDK types
+  // it as an array, so cast through unknown.
+  const sales = (salesData ?? []) as unknown as SaleWithItems[];
 
   return (
     <section className="space-y-8">

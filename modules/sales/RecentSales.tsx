@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { Fragment, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Receipt, Pencil } from "lucide-react";
+import { Receipt, Pencil, ChevronRight } from "lucide-react";
 import { formatMXN } from "@/lib/money";
 import type { PaymentMethod, Sale } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -14,6 +14,14 @@ import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { editarVenta } from "./actions";
+
+// A sale row with its line items embedded (for the expandable detail).
+export type SaleLine = {
+  qty: number;
+  unit_price_cents: number;
+  products: { name: string; sku: string } | null;
+};
+export type SaleWithItems = Sale & { sale_items: SaleLine[] };
 
 const PAYMENT: [PaymentMethod, string][] = [
   ["efectivo", "Efectivo"],
@@ -94,16 +102,30 @@ export function RecentSales({
   sales,
   isAdmin,
 }: {
-  sales: Sale[];
+  sales: SaleWithItems[];
   isAdmin: boolean;
 }) {
   const [edit, setEdit] = useState<Sale | null>(null);
+  const [open, setOpen] = useState<Set<string>>(new Set());
+
+  function toggle(id: string) {
+    setOpen((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  const cols = isAdmin ? 6 : 5;
 
   return (
     <div>
       <h2 className="text-sm font-semibold text-muted-foreground">
         Ventas recientes
       </h2>
+      <p className="mt-0.5 text-xs text-muted-foreground">
+        Toca una venta para ver sus productos.
+      </p>
       {sales.length === 0 ? (
         <EmptyState
           icon={Receipt}
@@ -116,47 +138,110 @@ export function RecentSales({
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
-                <th className="px-4 py-2.5 font-medium">Fecha</th>
-                <th className="px-4 py-2.5 font-medium">Cliente</th>
-                <th className="px-4 py-2.5 font-medium">Pago</th>
+                <th className="w-8 px-2 py-2.5" />
+                <th className="px-2 py-2.5 font-medium">Fecha</th>
+                <th className="px-2 py-2.5 font-medium">Cliente</th>
+                <th className="px-2 py-2.5 font-medium">Pago</th>
                 <th className="px-4 py-2.5 text-right font-medium">Total</th>
                 {isAdmin && <th className="px-2 py-2.5" />}
               </tr>
             </thead>
             <tbody>
-              {sales.map((s) => (
-                <tr
-                  key={s.id}
-                  onClick={isAdmin ? () => setEdit(s) : undefined}
-                  className={cn(
-                    "border-b border-border/60 transition-colors last:border-0",
-                    isAdmin && "cursor-pointer hover:bg-muted/40",
-                  )}
-                >
-                  <td className="px-4 py-2.5 text-muted-foreground">
-                    {new Date(s.created_at).toLocaleString("es-MX", {
-                      dateStyle: "short",
-                      timeStyle: "short",
-                    })}
-                  </td>
-                  <td className="px-4 py-2.5">{s.customer_name ?? "—"}</td>
-                  <td className="px-4 py-2.5">
-                    <Badge tone="neutral">
-                      {s.payment_method
-                        ? (LABEL[s.payment_method] ?? s.payment_method)
-                        : "—"}
-                    </Badge>
-                  </td>
-                  <td className="px-4 py-2.5 text-right font-mono tabular-nums">
-                    {formatMXN(s.total_cents)}
-                  </td>
-                  {isAdmin && (
-                    <td className="px-2 py-2.5 text-muted-foreground">
-                      <Pencil className="h-3.5 w-3.5" />
-                    </td>
-                  )}
-                </tr>
-              ))}
+              {sales.map((s) => {
+                const expanded = open.has(s.id);
+                const items = s.sale_items ?? [];
+                return (
+                  <Fragment key={s.id}>
+                    <tr
+                      onClick={() => toggle(s.id)}
+                      className="cursor-pointer border-b border-border/60 transition-colors last:border-0 hover:bg-muted/40"
+                    >
+                      <td className="px-2 py-2.5 text-muted-foreground">
+                        <ChevronRight
+                          className={cn(
+                            "h-4 w-4 transition-transform",
+                            expanded && "rotate-90",
+                          )}
+                        />
+                      </td>
+                      <td className="px-2 py-2.5 text-muted-foreground">
+                        {new Date(s.created_at).toLocaleString("es-MX", {
+                          dateStyle: "short",
+                          timeStyle: "short",
+                        })}
+                      </td>
+                      <td className="px-2 py-2.5">{s.customer_name ?? "—"}</td>
+                      <td className="px-2 py-2.5">
+                        <Badge tone="neutral">
+                          {s.payment_method
+                            ? (LABEL[s.payment_method] ?? s.payment_method)
+                            : "—"}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-2.5 text-right font-mono tabular-nums">
+                        {formatMXN(s.total_cents)}
+                      </td>
+                      {isAdmin && (
+                        <td className="px-2 py-2.5">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEdit(s);
+                            }}
+                            aria-label="Corregir venta"
+                            className="cursor-pointer rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                    {expanded && (
+                      <tr className="border-b border-border/60 bg-muted/30 last:border-0">
+                        <td />
+                        <td colSpan={cols - 1} className="px-2 pb-3 pt-0.5">
+                          {items.length === 0 ? (
+                            <p className="text-xs text-muted-foreground">
+                              Sin productos registrados.
+                            </p>
+                          ) : (
+                            <ul className="divide-y divide-border/60">
+                              {items.map((it, i) => (
+                                <li
+                                  key={i}
+                                  className="flex items-center justify-between gap-3 py-1.5"
+                                >
+                                  <span className="min-w-0 flex-1 truncate">
+                                    <span className="font-medium tabular-nums">
+                                      {it.qty}×
+                                    </span>{" "}
+                                    {it.products?.name ?? "Producto eliminado"}
+                                    {it.products?.sku && (
+                                      <span className="ml-1.5 font-mono text-xs text-muted-foreground">
+                                        {it.products.sku}
+                                      </span>
+                                    )}
+                                  </span>
+                                  <span className="shrink-0 text-right">
+                                    <span className="font-mono tabular-nums">
+                                      {formatMXN(it.unit_price_cents * it.qty)}
+                                    </span>
+                                    {it.qty > 1 && (
+                                      <span className="ml-1.5 text-xs text-muted-foreground">
+                                        ({formatMXN(it.unit_price_cents)} c/u)
+                                      </span>
+                                    )}
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })}
             </tbody>
           </table>
         </Card>
