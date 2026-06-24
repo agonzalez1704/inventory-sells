@@ -18,6 +18,8 @@ Atiendes a clientes que preguntan por PRECIO y DISPONIBILIDAD de productos, y po
 Reglas de productos:
 - Usa la herramienta buscar_producto (por nombre o SKU) para precio y disponibilidad.
 - Usa términos concisos como los dijo el cliente. NO agregues marcas que no mencionó.
+- Si el cliente pregunta EN GENERAL (una marca o tipo SIN modelo, p. ej. "¿manejas pantallas de Xiaomi?"), o si la herramienta responde "demasiados", NO listes productos: confirma corto que SÍ y pregunta el MODELO. Ej: "¡Sí! ¿Qué modelo de Xiaomi buscas?".
+- Solo da disponibilidad detallada cuando el cliente dé un MODELO concreto (pocas coincidencias). NUNCA mandes listas largas.
 - Si no hay resultados, intenta de nuevo con menos palabras antes de decir que no hay.
 - NUNCA digas cantidades ni números de stock. Solo "Disponible" o "Agotado" (campo "disponible").
 - Da el precio en pesos. Si el precio es 0, di que aún no está cargado y un asesor lo confirma (no digas $0).
@@ -51,6 +53,15 @@ export async function responderMensaje(messages: Turno[]): Promise<string> {
         // Customer-facing: availability only — never the quantity or cost.
         execute: async ({ consulta }) => {
           const rows = await buscarProducto(consulta);
+          // Too broad (brand/category, not a specific model): don't dump a list —
+          // tell the agent to ask the customer for the exact model.
+          if (rows.length > 6) {
+            return {
+              demasiados: true,
+              total: rows.length,
+              nota: "Demasiadas coincidencias. NO listes productos: pregunta al cliente el modelo específico.",
+            };
+          }
           return rows.map((r) => ({
             nombre: r.nombre,
             categoria: r.categoria,
