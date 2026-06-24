@@ -12,6 +12,29 @@ const MODEL =
   process.env.OPENROUTER_CHAT_MODEL ??
   "anthropic/claude-sonnet-4.6";
 
+// Web-search (OpenRouter ":online") lookup of which other phone models share
+// the same display as `modelo`, so we can match the customer's model to a
+// compatible product we actually stock.
+async function modelosCompatibles(modelo: string): Promise<string[]> {
+  const webModel = `${process.env.OPENROUTER_WEB_MODEL ?? MODEL}:online`;
+  try {
+    const { text } = await generateText({
+      model: openrouter(webModel),
+      system:
+        "Eres experto en refacciones de celulares. Dado un modelo, lista TODOS los modelos cuyo display/pantalla es físicamente intercambiable (el mismo display sirve en todos), incluyendo equivalencias entre marcas (Oppo, Realme, OnePlus, etc.). Responde SOLO los nombres de los modelos separados por coma, sin explicación ni códigos.",
+      prompt: `Modelos con pantalla compatible/intercambiable con ${modelo}:`,
+      maxOutputTokens: 250,
+    });
+    return text
+      .split(/[,\n]/)
+      .map((s) => s.replace(/^[-*\d.\s]+/, "").trim())
+      .filter((s) => s.length >= 2 && s.length < 40)
+      .slice(0, 12);
+  } catch {
+    return [];
+  }
+}
+
 const SYSTEM = `Eres el asistente de WhatsApp de una tienda de celulares y accesorios (Fiable).
 Atiendes a clientes que preguntan por PRECIO y DISPONIBILIDAD de productos, y por datos del negocio (envíos, pagos, ubicación, etc.).
 
@@ -21,6 +44,7 @@ Reglas de productos:
 - Si el cliente pregunta EN GENERAL (una marca o tipo SIN modelo, p. ej. "¿manejas pantallas de Xiaomi?"), o si la herramienta responde "demasiados", NO listes productos: confirma corto que SÍ y pregunta el MODELO. Ej: "¡Sí! ¿Qué modelo de Xiaomi buscas?".
 - Solo da disponibilidad detallada cuando el cliente dé un MODELO concreto (pocas coincidencias). NUNCA mandes listas largas.
 - Si no hay resultados, intenta de nuevo con menos palabras antes de decir que no hay.
+- Si aún no lo encuentras, usa buscar_compatibilidad: muchas pantallas sirven para VARIOS modelos. Si hay una pantalla compatible disponible, ofrécela y explica la compatibilidad (ej: "La pantalla del Oppo A79 es la misma que la del Realme 11 5G, y esa sí la tenemos disponible").
 - NUNCA digas cantidades ni números de stock. Solo "Disponible" o "Agotado" (campo "disponible").
 - Da el precio en pesos. Si el precio es 0, di que aún no está cargado y un asesor lo confirma (no digas $0).
 
@@ -71,6 +95,39 @@ export async function responderMensaje(messages: Turno[]): Promise<string> {
             precio_mxn: r.precio_mxn,
             disponible: r.stock > 0,
           }));
+        },
+      }),
+      buscar_compatibilidad: tool({
+        description:
+          "Úsala SOLO cuando buscar_producto no encontró el modelo exacto. Busca en internet con qué otros modelos comparte pantalla y revisa cuáles de esos tenemos en inventario.",
+        inputSchema: z.object({
+          modelo: z.string().describe("modelo del celular, ej: Oppo A79 5G"),
+        }),
+        execute: async ({ modelo }) => {
+          const compatibles = await modelosCompatibles(modelo);
+          const vistos = new Set<string>();
+          const encontrados: {
+            nombre: string;
+            marca: string | null;
+            precio_mxn: number;
+            disponible: boolean;
+          }[] = [];
+          for (const m of [modelo, ...compatibles]) {
+            const rows = await buscarProducto(m);
+            for (const r of rows) {
+              if (vistos.has(r.nombre)) continue;
+              vistos.add(r.nombre);
+              encontrados.push({
+                nombre: r.nombre,
+                marca: r.marca,
+                precio_mxn: r.precio_mxn,
+                disponible: r.stock > 0,
+              });
+              if (encontrados.length >= 8) break;
+            }
+            if (encontrados.length >= 8) break;
+          }
+          return { modelo, modelos_compatibles: compatibles, encontrados };
         },
       }),
     },
