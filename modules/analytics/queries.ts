@@ -219,16 +219,30 @@ export async function estadoInventario() {
   };
 }
 
+// Spanish/English filler words that should never constrain a product search.
+// (Product nouns like "bateria"/"pantalla" are NOT here — they're meaningful.)
+const STOPWORDS = new Set([
+  "de", "del", "la", "el", "los", "las", "un", "una", "unos", "unas", "para",
+  "con", "por", "que", "the", "for", "and", "tienes", "tiene", "hay", "manejas",
+  "maneja", "vendes", "vende",
+]);
+const DIACRITICS = /[̀-ͯ]/g; // combining accents
+// Lowercase + strip accents, and fold the iphone/iph spelling split that exists
+// across the catalog so "iphone 13" matches rows written "BAT IPH 13".
+const strip = (s: string) =>
+  s.toLowerCase().normalize("NFD").replace(DIACRITICS, "").replace(/iphone/g, "iph");
+
 export async function buscarProducto(q: string) {
-  // Token-AND match across all text fields: every word in the query must appear
-  // somewhere (name, sku, brand, category, color, size). Robust to phrasing
-  // like "pantalla iphone 15 pro max".
-  const tokens = q
-    .trim()
-    .toLowerCase()
+  // Token match across all text fields (name, sku, brand, category, color,
+  // size). We require every *meaningful* token to appear, but a token that
+  // matches zero products is treated as noise (slang/typo/stopword like
+  // "diagnóstico" or "de") and dropped — otherwise one unknown word would
+  // wipe out an otherwise-valid match. Robust to phrasing like "batería
+  // diagnóstico de 13" or "pantalla iphone 15 pro max".
+  const raw = strip(q.trim())
     .split(/\s+/)
-    .filter((t) => t.length >= 2);
-  if (tokens.length === 0) return [];
+    .filter((t) => t.length >= 2 && !STOPWORDS.has(t));
+  if (raw.length === 0) return [];
 
   const [names, { data }] = await Promise.all([
     inventoryNames(),
@@ -238,14 +252,22 @@ export async function buscarProducto(q: string) {
   ]);
   const ps = (data ?? []) as ProductRow[];
 
-  return ps
-    .filter((p) => {
-      const hay = [p.name, p.sku, p.brand, p.category, p.color, p.size]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      return tokens.every((t) => hay.includes(t));
-    })
+  // Pre-compute an accent-stripped haystack per product, once.
+  const indexed = ps.map((p) => ({
+    p,
+    hay: strip([p.name, p.sku, p.brand, p.category, p.color, p.size].filter(Boolean).join(" ")),
+  }));
+
+  // Keep only tokens that exist in at least one product; an unsatisfiable token
+  // can only ever return zero rows, so dropping it gives the best-effort answer.
+  const tokens = raw.filter((t) => indexed.some((h) => h.hay.includes(t)));
+  if (tokens.length === 0) return [];
+
+  return indexed
+    .filter((h) => tokens.every((t) => h.hay.includes(t)))
+    .map((h) => h.p)
+    // In-stock first, then alphabetical — so the agent leads with what's sellable.
+    .sort((a, b) => Number(b.quantity > 0) - Number(a.quantity > 0) || a.name.localeCompare(b.name))
     .slice(0, 15)
     .map((p) => ({
       inventario: names.get(p.inventory_id) ?? "—",
