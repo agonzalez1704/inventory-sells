@@ -10,7 +10,7 @@ import {
   Plus,
   Minus,
   Package,
-  Repeat,
+  Pencil,
 } from "lucide-react";
 import { formatMXN } from "@/lib/money";
 import type { PaymentMethod, Product } from "@/lib/types";
@@ -163,8 +163,8 @@ function LoanRow({
           onClick={() => setSwapOpen(true)}
           disabled={pending}
         >
-          <Repeat className="h-4 w-4" />
-          Cambiar producto
+          <Pencil className="h-4 w-4" />
+          Editar productos
         </Button>
         <Button variant="ghost" onClick={cancel} disabled={pending}>
           Cancelar
@@ -321,10 +321,10 @@ function SwapModal({
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Cambiar producto del fiado" className="max-w-xl">
+    <Modal open={open} onClose={onClose} title="Editar productos del fiado" className="max-w-xl">
       <div className="space-y-4">
         <p className="text-sm text-muted-foreground">
-          Quita el producto equivocado y agrega el correcto. El stock se ajusta
+          Agrega, quita o cambia productos de este fiado. El stock se ajusta
           solo: lo que quites regresa al inventario, lo nuevo se descuenta.
         </p>
 
