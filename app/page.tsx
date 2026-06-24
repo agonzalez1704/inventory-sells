@@ -28,10 +28,10 @@ export default async function Home() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 sm:px-6">
-      <section className="flex flex-col items-center py-20 text-center sm:py-28">
+      <section className="relative flex flex-col items-center overflow-hidden rounded-3xl border border-border bg-dots py-20 text-center sm:py-28">
         <Logo className="mb-6 h-10 w-auto text-foreground" />
         <span className="mb-5 inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1 text-xs font-medium text-muted-foreground shadow-xs">
-          <span className="h-1.5 w-1.5 rounded-full bg-accent" />
+          <span className="h-1.5 w-1.5 rounded-full bg-brand" />
           Inventario + punto de venta
         </span>
         <h1 className="max-w-2xl text-balance text-4xl font-semibold tracking-tight sm:text-5xl">
@@ -62,7 +62,7 @@ export default async function Home() {
             key={title}
             className="rounded-xl border border-border bg-background p-5 shadow-card"
           >
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent-soft text-accent">
+            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-soft text-brand-foreground">
               <Icon className="h-5 w-5" />
             </span>
             <h3 className="mt-3 text-sm font-semibold">{title}</h3>
