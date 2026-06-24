@@ -46,6 +46,27 @@ export async function enviarTexto(
   });
 }
 
+// Download an inbound media file (audio note, image) from a Kapso media_url.
+// Kapso media URLs require the API key; returns the raw bytes + content type.
+export async function descargarMedia(
+  url: string,
+): Promise<{ bytes: Uint8Array; tipo: string } | null> {
+  const key = process.env.KAPSO_API_KEY;
+  if (!key) return null;
+  try {
+    const r = await fetch(url, {
+      headers: { "X-API-Key": key },
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!r.ok) return null;
+    const tipo = r.headers.get("content-type") ?? "audio/ogg";
+    return { bytes: new Uint8Array(await r.arrayBuffer()), tipo };
+  } catch (err) {
+    console.error("Descarga de media Kapso falló:", err);
+    return null;
+  }
+}
+
 // One-time setup: register the inbound-message webhook for a connected number.
 // Returns the signing secret to store as KAPSO_WEBHOOK_SECRET.
 export async function crearWebhookMensajes(

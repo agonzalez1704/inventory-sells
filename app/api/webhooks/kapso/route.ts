@@ -1,7 +1,8 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { responderMensaje } from "@/modules/agent/inventory-agent";
 import { cargarHistorial, guardarMensaje } from "@/modules/agent/memoria";
-import { enviarTexto } from "@/lib/kapso";
+import { transcribirAudio } from "@/modules/agent/transcribir";
+import { enviarTexto, descargarMedia } from "@/lib/kapso";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,10 +23,32 @@ type KapsoEvent = {
   message?: {
     type?: string;
     text?: { body?: string };
-    kapso?: { content?: string; transcript?: { text?: string } };
+    kapso?: {
+      content?: string;
+      transcript?: { text?: string };
+      media_url?: string;
+      media_data?: { content_type?: string };
+    };
   };
   conversation?: { phone_number?: string };
 };
+
+// Pull the text out of one inbound event. Voice notes: Kapso may already attach
+// a transcript; if not, download the audio and transcribe it ourselves.
+async function textoDeEvento(ev: KapsoEvent): Promise<string> {
+  const m = ev.message;
+  let t = (m?.text?.body ?? m?.kapso?.transcript?.text ?? "").trim();
+
+  if (!t && m?.type === "audio" && m?.kapso?.media_url) {
+    const audio = await descargarMedia(m.kapso.media_url);
+    if (audio) {
+      const mime = m.kapso.media_data?.content_type ?? audio.tipo;
+      t = (await transcribirAudio(audio.bytes, mime))?.trim() ?? "";
+    }
+  }
+  if (!t) t = (m?.kapso?.content ?? "").trim();
+  return t;
+}
 
 // Verification handshake (Kapso/Meta GET) so the webhook can be marked verified.
 export async function GET(req: Request) {
@@ -67,18 +90,14 @@ export async function POST(req: Request) {
       "",
   );
 
-  let numero = "";
-  const partes: string[] = [];
-  for (const ev of eventos) {
-    if (ev.conversation?.phone_number) numero = ev.conversation.phone_number;
-    const t =
-      ev.message?.text?.body ??
-      ev.message?.kapso?.transcript?.text ??
-      ev.message?.kapso?.content ??
-      "";
-    if (t) partes.push(t);
-  }
-  const texto = partes.join("\n").trim();
+  const numero =
+    eventos.find((ev) => ev.conversation?.phone_number)?.conversation
+      ?.phone_number ?? "";
+
+  // Extract every event's text in parallel (audio downloads/transcription can
+  // be slow), then merge into one turn.
+  const partes = await Promise.all(eventos.map((ev) => textoDeEvento(ev)));
+  const texto = partes.filter(Boolean).join("\n").trim();
 
   if (!phoneNumberId || !numero || !texto) {
     return new Response(null, { status: 200 });
