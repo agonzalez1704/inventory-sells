@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/logo";
+import { AsesorNavBadge } from "@/components/asesor-nav-badge";
 
 const links = [
   { href: "/inventario", label: "Inventario", icon: Boxes },
@@ -51,6 +52,7 @@ export function SiteHeader() {
                 >
                   <Icon className="h-4 w-4" />
                   <span className="hidden sm:inline">{label}</span>
+                  {href === "/asesor" && <AsesorNavBadge />}
                 </Link>
               );
             })}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Headset, User, MessageSquare } from "lucide-react";
@@ -30,6 +30,24 @@ function ago(iso: string | null): string {
 const waLink = (numero: string) => `https://wa.me/${numero.replace(/\D/g, "")}`;
 
 export function AsesorView({ conversaciones }: { conversaciones: Conversacion[] }) {
+  const router = useRouter();
+
+  // Live updates: re-fetch the server component on a short interval and whenever
+  // the tab regains focus, so new handoffs show without a manual refresh.
+  useEffect(() => {
+    const tick = () => {
+      if (!document.hidden) router.refresh();
+    };
+    const id = setInterval(tick, 8000);
+    document.addEventListener("visibilitychange", tick);
+    window.addEventListener("focus", tick);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", tick);
+      window.removeEventListener("focus", tick);
+    };
+  }, [router]);
+
   return (
     <section className="space-y-6">
       <div>
