@@ -3,7 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Show, UserButton, SignInButton, SignUpButton } from "@clerk/nextjs";
-import { Boxes, ShoppingCart, HandCoins, BarChart3, Settings } from "lucide-react";
+import {
+  Boxes,
+  ShoppingCart,
+  HandCoins,
+  BarChart3,
+  Settings,
+  Headset,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/logo";
 
@@ -11,6 +18,7 @@ const links = [
   { href: "/inventario", label: "Inventario", icon: Boxes },
   { href: "/ventas", label: "Ventas", icon: ShoppingCart },
   { href: "/fiados", label: "Fiados", icon: HandCoins },
+  { href: "/asesor", label: "Asesor", icon: Headset },
   { href: "/reportes", label: "Reportes", icon: BarChart3 },
   { href: "/configuracion", label: "Configuración", icon: Settings },
 ];

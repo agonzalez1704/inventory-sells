@@ -65,13 +65,29 @@ Reglas de conversación:
 - Responde SIEMPRE en español, breve y claro, estilo WhatsApp.
 
 Datos del negocio (envíos, pagos, transferencia, Uber, ubicación, horario):
-- Responde SOLO con la "Información del negocio" de abajo. Si la pregunta no está cubierta ahí, di que un asesor lo confirma; no inventes.`;
+- Responde SOLO con la "Información del negocio" de abajo. Si la pregunta no está cubierta ahí, di que un asesor lo confirma; no inventes.
 
-export async function responderMensaje(messages: Turno[]): Promise<string> {
+Cuándo pasar a un asesor (IMPORTANTE):
+- Siempre que vayas a decir "un asesor te confirma/checa/atiende", PRIMERO llama la herramienta pasar_a_asesor con un motivo breve. Sin eso, NADIE se entera.
+- Hazlo cuando: el precio salga en $0 (no cargado), no encontraste el producto ni una pantalla compatible, falte un dato del negocio que no está configurado, el cliente quiera apartar/comprar/pagar, o pida hablar con una persona.
+- Tras llamarla, dile al cliente en tono cálido que un asesor lo atiende en breve (NO digas "marqué la conversación" ni nada técnico).
+- NO la llames si pudiste responder tú solo con precio y disponibilidad.`;
+
+export type RespuestaAgente = {
+  texto: string;
+  escalar: { motivo: string } | null;
+};
+
+export async function responderMensaje(
+  messages: Turno[],
+): Promise<RespuestaAgente> {
   const info = await getNegocioInfo();
   const system = info
     ? `${SYSTEM}\n\n=== Información del negocio ===\n${info}`
     : `${SYSTEM}\n\n(No hay información del negocio configurada; para envíos/pagos/ubicación di que un asesor lo confirma.)`;
+
+  // Set by the pasar_a_asesor tool if the agent decides it needs a human.
+  let escalar: { motivo: string } | null = null;
 
   const { text } = await generateText({
     model: openrouter(MODEL),
@@ -80,6 +96,24 @@ export async function responderMensaje(messages: Turno[]): Promise<string> {
     maxOutputTokens: 600,
     stopWhen: stepCountIs(5),
     tools: {
+      pasar_a_asesor: tool({
+        description:
+          "Marca la conversación para que una PERSONA (asesor) la tome. Úsala siempre que vayas a decir que 'un asesor confirma/atiende': precio en $0, no encontraste el producto ni compatibilidad, falta un dato del negocio, o el cliente quiere apartar/comprar/pagar o hablar con una persona.",
+        inputSchema: z.object({
+          motivo: z
+            .string()
+            .describe(
+              "razón breve, ej: 'precio no cargado: pantalla iPhone 13' o 'cliente quiere apartar'",
+            ),
+        }),
+        execute: async ({ motivo }) => {
+          escalar = { motivo };
+          return {
+            ok: true,
+            nota: "Listo, un asesor tomará la conversación. Dile al cliente, cálido y breve, que un asesor lo atenderá en seguida.",
+          };
+        },
+      }),
       buscar_producto: tool({
         description:
           "Busca productos por nombre o SKU. Devuelve precio (MXN) y si está disponible (no la cantidad).",
@@ -145,8 +179,10 @@ export async function responderMensaje(messages: Turno[]): Promise<string> {
     },
   });
 
-  return (
-    text.trim() ||
-    "Perdón, no pude encontrar esa información. ¿Me das el modelo o SKU exacto?"
-  );
+  return {
+    texto:
+      text.trim() ||
+      "Perdón, no pude encontrar esa información. ¿Me das el modelo o SKU exacto?",
+    escalar,
+  };
 }

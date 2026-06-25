@@ -2,6 +2,8 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { responderMensaje } from "@/modules/agent/inventory-agent";
 import { cargarHistorial, guardarMensaje } from "@/modules/agent/memoria";
 import { transcribirAudio } from "@/modules/agent/transcribir";
+import { estadoConversacion, marcarAsesor } from "@/modules/agent/handoff";
+import { getAsesores } from "@/modules/config/lib";
 import { enviarTexto, descargarMedia } from "@/lib/kapso";
 
 export const runtime = "nodejs";
@@ -103,15 +105,46 @@ export async function POST(req: Request) {
     return new Response(null, { status: 200 });
   }
 
+  // A human already took over this conversation: pause the bot. Record the
+  // customer's message (so history is intact when it returns to the bot), but
+  // don't auto-reply over the asesor.
+  if ((await estadoConversacion(numero)) === "asesor") {
+    await guardarMensaje(numero, "user", texto);
+    return new Response(null, { status: 200 });
+  }
+
   try {
     const historial = await cargarHistorial(numero, 10);
-    const respuesta = await responderMensaje([
+    const { texto: respuesta, escalar } = await responderMensaje([
       ...historial,
       { role: "user", content: texto },
     ]);
     await guardarMensaje(numero, "user", texto);
     await guardarMensaje(numero, "assistant", respuesta);
     await enviarTexto(phoneNumberId, numero, respuesta);
+
+    // Agent asked for a human: pause the bot + ping the asesores (best-effort,
+    // WhatsApp only delivers inside the 24h window).
+    if (escalar) {
+      await marcarAsesor(numero, escalar.motivo, texto);
+      const asesores = await getAsesores();
+      if (asesores.length) {
+        const aviso =
+          `🔔 *Un cliente necesita asesor*\n` +
+          `Cliente: ${numero}\n` +
+          `Motivo: ${escalar.motivo}\n` +
+          `Último mensaje: "${texto}"\n\n` +
+          `Respóndele directo. El bot quedó en pausa con ese cliente; ` +
+          `reactívalo en la app (Asesor → Devolver al bot) cuando termines.`;
+        await Promise.all(
+          asesores.map((a) =>
+            enviarTexto(phoneNumberId, a, aviso).catch((e) =>
+              console.error("Aviso a asesor falló:", a, e),
+            ),
+          ),
+        );
+      }
+    }
   } catch (err) {
     console.error("Kapso webhook error:", err);
   }
