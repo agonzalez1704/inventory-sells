@@ -13,6 +13,7 @@ import { Modal } from "@/components/ui/modal";
 import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { PrintTicketButtons } from "@/components/ticket/PrintTicketButtons";
 import { editarVenta } from "./actions";
 
 // A sale row with its line items embedded (for the expandable detail).
@@ -205,6 +206,7 @@ export function RecentSales({
                               Sin productos registrados.
                             </p>
                           ) : (
+                            <>
                             <ul className="divide-y divide-border/60">
                               {items.map((it, i) => (
                                 <li
@@ -235,6 +237,25 @@ export function RecentSales({
                                 </li>
                               ))}
                             </ul>
+                            <div className="mt-2.5 flex justify-end">
+                              <PrintTicketButtons
+                                data={() => ({
+                                  folio: s.id,
+                                  fecha: s.created_at,
+                                  items: items.map((it) => ({
+                                    nombre: it.products?.name ?? "Producto eliminado",
+                                    qty: it.qty,
+                                    precioUnit: it.unit_price_cents,
+                                    total: it.unit_price_cents * it.qty,
+                                  })),
+                                  total: s.total_cents,
+                                  metodoPago: s.payment_method,
+                                  cliente: s.customer_name,
+                                  tipo: "venta",
+                                })}
+                              />
+                            </div>
+                            </>
                           )}
                         </td>
                       </tr>

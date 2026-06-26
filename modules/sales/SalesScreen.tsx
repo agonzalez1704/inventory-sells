@@ -12,6 +12,7 @@ import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
+import { imprimirTicketNavegador, type TicketData } from "@/lib/ticket";
 import { registerSale, registerLoan } from "./actions";
 
 export type SalesProduct = Pick<
@@ -126,15 +127,42 @@ export function SalesScreen({ products }: { products: SalesProduct[] }) {
   function submit() {
     if (!canSubmit) return;
     const items = lines.map((l) => ({ product_id: l.product.id, qty: l.qty }));
+    // Snapshot the ticket data now — the cart is cleared before the user taps
+    // "Imprimir" in the toast, so the closure must capture, not read state.
+    const esFiado = mode === "prestamo";
+    const ticketItems = lines.map((l) => ({
+      nombre: l.product.name,
+      qty: l.qty,
+      precioUnit: l.product.price_cents,
+      total: l.product.price_cents * l.qty,
+    }));
+    const ticketTotal = total;
+    const ticketCliente = esFiado ? note.trim() || null : customer.trim() || null;
+    const ticketPago = esFiado ? null : payment;
+
     startTransition(async () => {
       try {
-        if (mode === "prestamo") {
-          await registerLoan(items, note);
-          toast.success(`Fiado registrado · ${formatMXN(total)}`);
-        } else {
-          await registerSale(items, payment, customer);
-          toast.success(`Venta registrada · ${formatMXN(total)}`);
-        }
+        const { saleId } = esFiado
+          ? await registerLoan(items, note)
+          : await registerSale(items, payment, customer);
+        const ticket: TicketData = {
+          folio: saleId,
+          fecha: new Date().toISOString(),
+          items: ticketItems,
+          total: ticketTotal,
+          metodoPago: ticketPago,
+          cliente: ticketCliente,
+          tipo: esFiado ? "fiado" : "venta",
+        };
+        toast.success(
+          `${esFiado ? "Fiado registrado" : "Venta registrada"} · ${formatMXN(ticketTotal)}`,
+          {
+            action: {
+              label: "Imprimir",
+              onClick: () => imprimirTicketNavegador(ticket),
+            },
+          },
+        );
         setCart({});
         setCustomer("");
         setNote("");
