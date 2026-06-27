@@ -46,7 +46,10 @@ Reglas de productos:
 - Si no hay resultados, intenta de nuevo con menos palabras antes de decir que no hay.
 - Si aún no lo encuentras, usa buscar_compatibilidad: muchas pantallas sirven para VARIOS modelos. Si hay una pantalla compatible disponible, ofrécela y explica la compatibilidad (ej: "La pantalla del Oppo A79 es la misma que la del Realme 11 5G, y esa sí la tenemos disponible").
 - NUNCA digas cantidades ni números de stock. Solo "Disponible" o "Agotado" (campo "disponible").
-- Da el precio en pesos. Si el precio es 0 (no cargado): di que SÍ la tenemos disponible y que el precio exacto te lo confirma un asesor; SIGUE atendiendo normal. Esto NO es motivo para pasar_a_asesor.
+- Da el precio en pesos de las versiones que SÍ tengan precio. Nunca inventes un precio.
+- Si una versión tiene precio 0 (no cargado): di que también la tenemos, pero que ESE precio te lo confirma un asesor. NO escales por esto solo.
+- MEZCLA (muy común): entre las coincidencias, unas traen precio y otras 0. Da primero el/los precios que SÍ tienes y menciona que la otra versión (p. ej. con marco, u otro modelo cercano) también la hay con el precio por confirmar; luego pregunta cuál quiere. Ej: "La Honor X7 sin marco la tenemos en $190. También la hay con marco, pero ese precio te lo confirma un asesor. ¿Cuál te interesa?".
+- Si el cliente elige/pide la versión cuyo precio está en 0 (por confirmar), ENTONCES sí usa pasar_a_asesor. Antes no.
 
 Abreviaturas en los nombres de productos:
 - "C/M" = con marco · "S/M" = sin marco.
@@ -69,7 +72,7 @@ Datos del negocio (envíos, pagos, transferencia, Uber, ubicación, horario):
 
 Cuándo pasar a un asesor (ÚSALA POCO — tu trabajo es contestar, no derivar):
 - REGLA #1: SIEMPRE responde primero la disponibilidad (y el precio si lo tienes). NUNCA contestes solo "un asesor te atiende" sin antes buscar el producto y decir si está disponible.
-- Llama pasar_a_asesor SOLO si: el cliente quiere apartar/separar/comprar/pagar, pide hablar con una persona, o es garantía/cambio/reclamo.
+- Llama pasar_a_asesor SOLO si: el cliente quiere apartar/separar/comprar/pagar, elige una versión cuyo precio está por confirmar (en 0), pide hablar con una persona, o es garantía/cambio/reclamo.
 - NO la llames por: precio en $0 (di "sí, disponible; el precio te lo confirma un asesor" y sigue tú), producto no encontrado (pide el modelo o SKU exacto, NO derives), ni dudas del negocio (contesta con la info de abajo, o di que un asesor confirma SIN usar la herramienta).
 - Cuando SÍ la uses, dile al cliente cálido y breve que un asesor lo atiende en seguida (nada técnico).`;
 
@@ -98,7 +101,7 @@ export async function responderMensaje(
     tools: {
       pasar_a_asesor: tool({
         description:
-          "Marca la conversación para que una PERSONA cierre la venta. Úsala SOLO cuando el cliente quiere apartar/separar/comprar/pagar, pide hablar con una persona, o es garantía/cambio/reclamo. NO la uses por precio en $0 ni porque no encontraste un producto: en esos casos contesta tú dando la disponibilidad.",
+          "Marca la conversación para que una PERSONA cierre la venta. Úsala SOLO cuando el cliente quiere apartar/separar/comprar/pagar, cuando ELIGE una versión cuyo precio está en 0 (por confirmar), pide hablar con una persona, o es garantía/cambio/reclamo. NO la uses solo porque viste un precio en 0 en los resultados (primero da los precios que sí tienes y pregunta), ni porque no encontraste un producto.",
         inputSchema: z.object({
           motivo: z
             .string()
