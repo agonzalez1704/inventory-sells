@@ -8,6 +8,8 @@ import {
   Search,
   FileDown,
   ChevronDown,
+  ChevronUp,
+  ChevronsUpDown,
   Plus,
 } from "lucide-react";
 import type { Inventory, Product } from "@/lib/types";
@@ -100,6 +102,64 @@ function ExportMenu({ isAdmin }: { isAdmin: boolean }) {
   );
 }
 
+type SortKey = "sku" | "name" | "category" | "price" | "quantity";
+type Sort = { key: SortKey; dir: "asc" | "desc" };
+
+// Alphabetical for text (locale + natural number order so "X7" < "X10"),
+// numeric for price/stock.
+function compareRows(a: InventoryRow, b: InventoryRow, key: SortKey): number {
+  switch (key) {
+    case "price":
+      return a.price_cents - b.price_cents;
+    case "quantity":
+      return a.quantity - b.quantity;
+    case "sku":
+      return a.sku.localeCompare(b.sku, "es", { numeric: true, sensitivity: "base" });
+    case "name":
+      return a.name.localeCompare(b.name, "es", { numeric: true, sensitivity: "base" });
+    case "category":
+      return (a.category ?? "").localeCompare(b.category ?? "", "es", {
+        numeric: true,
+        sensitivity: "base",
+      });
+  }
+}
+
+// Clickable column header: 1st click sorts asc, 2nd desc, 3rd clears.
+function SortableTh({
+  label,
+  k,
+  sort,
+  onSort,
+  align = "left",
+  className,
+}: {
+  label: string;
+  k: SortKey;
+  sort: Sort | null;
+  onSort: (k: SortKey) => void;
+  align?: "left" | "right";
+  className?: string;
+}) {
+  const active = sort?.key === k;
+  const Icon = !active ? ChevronsUpDown : sort.dir === "asc" ? ChevronUp : ChevronDown;
+  return (
+    <th className={cn("px-4 py-2.5 font-medium", className)}>
+      <button
+        onClick={() => onSort(k)}
+        className={cn(
+          "inline-flex cursor-pointer items-center gap-1 transition-colors hover:text-foreground",
+          align === "right" && "flex-row-reverse",
+          active && "text-foreground",
+        )}
+      >
+        {label}
+        <Icon className={cn("h-3.5 w-3.5", !active && "opacity-40")} />
+      </button>
+    </th>
+  );
+}
+
 function InvTab({
   active,
   onClick,
@@ -134,7 +194,17 @@ export function InventoryView({
   isAdmin: boolean;
 }) {
   const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<Sort | null>(null);
   const [selectedInv, setSelectedInv] = useState<string>("all");
+
+  // Cycle: none → asc → desc → none for the clicked column.
+  function toggleSort(key: SortKey) {
+    setSort((cur) => {
+      if (cur?.key !== key) return { key, dir: "asc" };
+      if (cur.dir === "asc") return { key, dir: "desc" };
+      return null;
+    });
+  }
   const [importOpen, setImportOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [newInvOpen, setNewInvOpen] = useState(false);
@@ -171,6 +241,16 @@ export function InventoryView({
         (p.category ?? "").toLowerCase().includes(q),
     );
   }, [query, scoped]);
+
+  const sorted = useMemo(() => {
+    if (!sort) return filtered;
+    const arr = [...filtered];
+    arr.sort((a, b) => {
+      const c = compareRows(a, b, sort.key);
+      return sort.dir === "asc" ? c : -c;
+    });
+    return arr;
+  }, [filtered, sort]);
 
   return (
     <section className="space-y-6">
@@ -278,15 +358,15 @@ export function InventoryView({
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
-                <th className="hidden px-4 py-2.5 font-medium sm:table-cell">SKU</th>
-                <th className="px-4 py-2.5 font-medium">Producto</th>
-                <th className="hidden px-4 py-2.5 font-medium sm:table-cell">Categoría</th>
-                <th className="hidden px-4 py-2.5 text-right font-medium sm:table-cell">Precio</th>
-                <th className="px-4 py-2.5 text-right font-medium">Stock</th>
+                <SortableTh label="SKU" k="sku" sort={sort} onSort={toggleSort} className="hidden sm:table-cell" />
+                <SortableTh label="Producto" k="name" sort={sort} onSort={toggleSort} />
+                <SortableTh label="Categoría" k="category" sort={sort} onSort={toggleSort} className="hidden sm:table-cell" />
+                <SortableTh label="Precio" k="price" sort={sort} onSort={toggleSort} align="right" className="hidden text-right sm:table-cell" />
+                <SortableTh label="Stock" k="quantity" sort={sort} onSort={toggleSort} align="right" className="text-right" />
               </tr>
             </thead>
             <tbody>
-              {filtered.map((p) => (
+              {sorted.map((p) => (
                 <tr
                   key={p.id}
                   onClick={isAdmin ? () => setEditId(p.id) : undefined}
