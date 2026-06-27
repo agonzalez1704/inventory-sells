@@ -1,19 +1,18 @@
 import "server-only";
 
-// Only these emails may use Fiable. Override/extend via the ALLOWED_EMAILS env
-// (comma-separated). This is enforced in-app; the authoritative block is the
-// Clerk Dashboard allowlist (Configure → Restrictions), which prevents anyone
-// else from creating a session at all.
-const DEFAULT_ALLOWED = [
-  "agonzalez.nrn02@gmail.com",
-  "freseromayor@icloud.com",
-  "tiendasmovilhouse@gmail.com",
-];
-
+// Only the emails in ALLOWED_EMAILS (comma-separated) may use Fiable. There is
+// no hardcoded list — set the env in every environment (.env.local + Vercel).
+// Fails closed: if the env is missing or empty, nobody passes. The Clerk
+// Dashboard allowlist (Configure → Restrictions) remains the authoritative
+// sign-in block.
 function allowedSet(): Set<string> {
-  const env = process.env.ALLOWED_EMAILS;
-  const list = env ? env.split(",") : DEFAULT_ALLOWED;
-  return new Set(list.map((e) => e.trim().toLowerCase()).filter(Boolean));
+  const env = process.env.ALLOWED_EMAILS ?? "";
+  return new Set(
+    env
+      .split(",")
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean),
+  );
 }
 
 export function isAllowedEmail(email: string | null | undefined): boolean {
