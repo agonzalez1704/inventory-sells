@@ -1,5 +1,6 @@
 import { formatMXN } from "@/lib/money";
 import type { TicketData } from "@/lib/ticket";
+import type { CorteData } from "@/lib/corte";
 
 // Direct ESC/POS printing over WebUSB — one tap, auto-cut, no OS dialog.
 // Chrome/Edge on desktop only, and the USB interface must not be claimed by an
@@ -121,7 +122,8 @@ export function buildEscPos(d: TicketData): Uint8Array {
   return p.bytes();
 }
 
-export async function imprimirTicketUSB(d: TicketData): Promise<void> {
+// Send a raw ESC/POS byte stream to a user-picked USB printer.
+export async function enviarBytesUSB(bytes: Uint8Array): Promise<void> {
   const usb = getUsb();
   if (!usb) {
     throw new Error(
@@ -146,6 +148,42 @@ export async function imprimirTicketUSB(d: TicketData): Promise<void> {
   if (!ep) throw new Error("La impresora no expone un endpoint de impresión.");
 
   await device.claimInterface(iface.interfaceNumber);
-  await device.transferOut(ep.endpointNumber, buildEscPos(d));
+  await device.transferOut(ep.endpointNumber, bytes);
   await device.close();
+}
+
+export async function imprimirTicketUSB(d: TicketData): Promise<void> {
+  await enviarBytesUSB(buildEscPos(d));
+}
+
+export function buildEscPosCorte(d: CorteData): Uint8Array {
+  const gen = new Date(d.generadoEn).toLocaleString("es-MX", {
+    dateStyle: "short",
+    timeStyle: "short",
+  });
+  const p = new EscPos();
+  p.raw(0x1b, 0x40); // init
+  p.align("center").bold(true).line("FIABLE").bold(false);
+  p.line("CORTE DE CAJA").line(d.rango);
+  p.align("left").sep();
+  if (d.lineas.length === 0) p.line("Sin movimientos");
+  for (const l of d.lineas) {
+    p.lr(l.label, `${formatMXN(l.ingresos)}${l.gastos ? ` /-${formatMXN(l.gastos)}` : ""}`);
+  }
+  p.sep();
+  p.lr("Ventas", String(d.ventasCount));
+  p.lr("Ingresos", formatMXN(d.ingresosTotal));
+  p.lr(`Gastos (${d.gastosCount})`, `-${formatMXN(d.gastosTotal)}`);
+  p.sep();
+  p.bold(true).lr("BALANCE", formatMXN(d.balance)).bold(false);
+  p.lr("Efectivo en caja", formatMXN(d.efectivoCaja));
+  p.sep();
+  p.align("center").line(`Generado ${gen}`).line("fiable.vercel.app");
+  p.raw(0x0a, 0x0a, 0x0a); // feed
+  p.raw(0x1d, 0x56, 0x00); // full cut
+  return p.bytes();
+}
+
+export async function imprimirCorteUSB(d: CorteData): Promise<void> {
+  await enviarBytesUSB(buildEscPosCorte(d));
 }

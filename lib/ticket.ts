@@ -93,9 +93,10 @@ export function buildTicketHTML(d: TicketData): string {
 </body></html>`;
 }
 
-// Print via the OS dialog (works with any printer the device knows: USB,
-// Bluetooth or network, through the installed Hostech driver).
-export function imprimirTicketNavegador(d: TicketData): void {
+// Print any self-contained HTML document via a hidden iframe and the OS dialog
+// (works with any printer the device knows: USB, Bluetooth or network, through
+// the installed Hostech driver). Shared by the product ticket and the corte.
+export function printViaIframe(html: string): void {
   const iframe = document.createElement("iframe");
   iframe.setAttribute("aria-hidden", "true");
   Object.assign(iframe.style, {
@@ -114,7 +115,7 @@ export function imprimirTicketNavegador(d: TicketData): void {
     return;
   }
   win.document.open();
-  win.document.write(buildTicketHTML(d));
+  win.document.write(html);
   win.document.close();
 
   const run = () => {
@@ -128,6 +129,10 @@ export function imprimirTicketNavegador(d: TicketData): void {
   // Give the thermal layout a tick to settle before invoking the dialog.
   if (win.document.readyState === "complete") setTimeout(run, 80);
   else iframe.onload = () => setTimeout(run, 80);
+}
+
+export function imprimirTicketNavegador(d: TicketData): void {
+  printViaIframe(buildTicketHTML(d));
 }
 
 // Build a TicketData from the sale's parts (used by the cart and recent sales).

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -10,9 +10,13 @@ import {
   TrendingDown,
   Scale,
   Wallet,
+  Printer,
+  Usb,
 } from "lucide-react";
 import { formatMXN } from "@/lib/money";
 import type { PaymentMethod } from "@/lib/types";
+import { imprimirCorteNavegador, type CorteData } from "@/lib/corte";
+import { imprimirCorteUSB, webUsbDisponible } from "@/lib/escpos-usb";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/ui/input";
@@ -93,6 +97,12 @@ export function CajaView({ data }: { data: CajaData }) {
   const [from, setFrom] = useState(data.from);
   const [to, setTo] = useState(data.to);
   const [gastoOpen, setGastoOpen] = useState(false);
+  const [usbOk, setUsbOk] = useState(false);
+  const [usbBusy, setUsbBusy] = useState(false);
+
+  useEffect(() => {
+    setUsbOk(webUsbDisponible());
+  }, []);
 
   function go(f: string, t: string) {
     router.push(`/caja?from=${f}&to=${t}`);
@@ -129,6 +139,35 @@ export function CajaView({ data }: { data: CajaData }) {
     (data.ingresosPorMetodo.efectivo ?? 0) - (data.gastosPorMetodo.efectivo ?? 0);
   const rangoLabel = data.from === data.to ? data.from : `${data.from} → ${data.to}`;
 
+  function buildCorte(): CorteData {
+    const lineas = METODOS.map(([m, label]) => ({
+      label,
+      ingresos: data.ingresosPorMetodo[m] ?? 0,
+      gastos: data.gastosPorMetodo[m] ?? 0,
+    })).filter((l) => l.ingresos || l.gastos);
+    return {
+      rango: rangoLabel,
+      generadoEn: new Date().toISOString(),
+      lineas,
+      ingresosTotal: data.ingresosTotal,
+      gastosTotal: data.gastosTotal,
+      balance,
+      efectivoCaja,
+      ventasCount: data.ventasCount,
+      gastosCount: data.gastos.length,
+    };
+  }
+
+  function imprimirUSB() {
+    setUsbBusy(true);
+    imprimirCorteUSB(buildCorte())
+      .then(() => toast.success("Corte enviado a la impresora"))
+      .catch((e) =>
+        toast.error(e instanceof Error ? e.message : "No se pudo imprimir por USB"),
+      )
+      .finally(() => setUsbBusy(false));
+  }
+
   return (
     <section className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -138,10 +177,27 @@ export function CajaView({ data }: { data: CajaData }) {
             {rangoLabel} · {data.ventasCount} ventas · {data.gastos.length} gastos
           </p>
         </div>
-        <Button onClick={() => setGastoOpen(true)}>
-          <Plus className="h-4 w-4" />
-          Registrar gasto
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="secondary" onClick={() => imprimirCorteNavegador(buildCorte())}>
+            <Printer className="h-4 w-4" />
+            Imprimir corte
+          </Button>
+          {usbOk && (
+            <Button
+              variant="secondary"
+              onClick={imprimirUSB}
+              loading={usbBusy}
+              title="Impresión directa por USB (ESC/POS)"
+            >
+              <Usb className="h-4 w-4" />
+              USB
+            </Button>
+          )}
+          <Button onClick={() => setGastoOpen(true)}>
+            <Plus className="h-4 w-4" />
+            Registrar gasto
+          </Button>
+        </div>
       </div>
 
       {/* Date controls */}
