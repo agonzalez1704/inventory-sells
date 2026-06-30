@@ -3,7 +3,7 @@
 import { Fragment, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Receipt, Pencil, ChevronRight } from "lucide-react";
+import { Receipt, Pencil, ChevronRight, HandCoins } from "lucide-react";
 import { formatMXN } from "@/lib/money";
 import type { PaymentMethod, Sale } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -14,7 +14,7 @@ import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PrintTicketButtons } from "@/components/ticket/PrintTicketButtons";
-import { editarVenta } from "./actions";
+import { editarVenta, convertirAFiado } from "./actions";
 
 // A sale row with its line items embedded (for the expandable detail).
 export type SaleLine = {
@@ -59,6 +59,25 @@ function EditModal({
     });
   }
 
+  function aFiado() {
+    if (
+      !confirm(
+        "¿Convertir esta venta en fiado? Pasará a pendientes de pago (el stock no cambia).",
+      )
+    )
+      return;
+    start(async () => {
+      try {
+        await convertirAFiado(sale.id, customer);
+        toast.success("Convertida a fiado");
+        onClose();
+        router.refresh();
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Error al convertir");
+      }
+    });
+  }
+
   return (
     <Modal open onClose={onClose} title="Corregir venta" className="max-w-md">
       <div className="space-y-3">
@@ -86,6 +105,25 @@ function EditModal({
           </span>
           <Input value={customer} onChange={(e) => setCustomer(e.target.value)} />
         </label>
+
+        <div className="rounded-lg border border-border bg-muted/30 p-3">
+          <p className="text-xs font-medium">¿Era un fiado?</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Pásala a pendientes de pago. El campo “Cliente” se usa como la nota
+            de a quién. El stock no cambia.
+          </p>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="mt-2"
+            onClick={aFiado}
+            disabled={pending}
+          >
+            <HandCoins className="h-4 w-4" />
+            Convertir a fiado
+          </Button>
+        </div>
+
         <div className="flex justify-end gap-2 border-t border-border pt-3">
           <Button variant="ghost" onClick={onClose} disabled={pending}>
             Cancelar
