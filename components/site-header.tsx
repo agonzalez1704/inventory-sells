@@ -10,6 +10,7 @@ import {
   BarChart3,
   Settings,
   Headset,
+  Calculator,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/logo";
@@ -20,6 +21,7 @@ const links = [
   { href: "/ventas", label: "Ventas", icon: ShoppingCart },
   { href: "/fiados", label: "Fiados", icon: HandCoins },
   { href: "/asesor", label: "Asesor", icon: Headset },
+  { href: "/caja", label: "Caja", icon: Calculator },
   { href: "/reportes", label: "Reportes", icon: BarChart3 },
   { href: "/configuracion", label: "Configuración", icon: Settings },
 ];
