@@ -80,6 +80,24 @@ export async function editarVenta(
   if (error) throw new Error(error.message ?? "Error al editar la venta");
 }
 
+// Change the product(s) on a registered sale (customer swapped models). Old
+// items return to stock, new ones leave it, total recomputed — all atomically.
+export async function cambiarVentaItems(
+  saleId: string,
+  items: CartLine[],
+): Promise<void> {
+  const { userId } = await auth();
+  if (!userId) throw new Error("No autenticado");
+  if (items.length === 0) throw new Error("Sin productos");
+
+  const insforge = await createInsForgeServerClient();
+  const { error } = await insforge.database.rpc("editar_items", {
+    p_sale_id: saleId,
+    p_items: items.map((i) => ({ product_id: i.product_id, qty: i.qty })),
+  });
+  if (error) throw new Error(error.message ?? "Error al cambiar la venta");
+}
+
 // Swap the product(s) on a pending loan: the old items go back to stock, the
 // new ones leave it, and the loan total is recomputed — all atomically.
 export async function cambiarFiado(

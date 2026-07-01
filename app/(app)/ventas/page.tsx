@@ -21,7 +21,7 @@ export default async function VentasPage() {
       insforge.database
         .from("sales")
         .select(
-          "id, total_cents, payment_method, customer_name, created_at, sale_items(qty, unit_price_cents, products(name, sku))",
+          "id, total_cents, payment_method, customer_name, created_at, sale_items(product_id, qty, unit_price_cents, products(name, sku))",
         )
         .eq("status", "completed")
         .order("created_at", { ascending: false })
@@ -51,7 +51,7 @@ export default async function VentasPage() {
 
       <SalesScreen products={products} />
 
-      <RecentSales sales={sales} isAdmin={isAdmin} />
+      <RecentSales sales={sales} isAdmin={isAdmin} products={products} />
     </section>
   );
 }

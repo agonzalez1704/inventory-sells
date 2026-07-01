@@ -3,7 +3,7 @@
 import { Fragment, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Receipt, Pencil, ChevronRight, HandCoins } from "lucide-react";
+import { Receipt, Pencil, ChevronRight, HandCoins, Repeat } from "lucide-react";
 import { formatMXN } from "@/lib/money";
 import type { PaymentMethod, Sale } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -14,10 +14,12 @@ import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PrintTicketButtons } from "@/components/ticket/PrintTicketButtons";
-import { editarVenta, convertirAFiado } from "./actions";
+import { ItemSwapModal, type SwapProduct } from "@/modules/sales/ItemSwapModal";
+import { editarVenta, convertirAFiado, cambiarVentaItems } from "./actions";
 
 // A sale row with its line items embedded (for the expandable detail).
 export type SaleLine = {
+  product_id: string | null;
   qty: number;
   unit_price_cents: number;
   products: { name: string; sku: string } | null;
@@ -34,9 +36,11 @@ const LABEL = Object.fromEntries(PAYMENT) as Record<string, string>;
 
 function EditModal({
   sale,
+  products,
   onClose,
 }: {
-  sale: Sale;
+  sale: SaleWithItems;
+  products: SwapProduct[];
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -44,6 +48,7 @@ function EditModal({
     sale.payment_method ?? "efectivo",
   );
   const [customer, setCustomer] = useState(sale.customer_name ?? "");
+  const [swapOpen, setSwapOpen] = useState(false);
   const [pending, start] = useTransition();
 
   function save() {
@@ -107,6 +112,24 @@ function EditModal({
         </label>
 
         <div className="rounded-lg border border-border bg-muted/30 p-3">
+          <p className="text-xs font-medium">¿Se equivocó de producto?</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Cambia, agrega o quita productos de esta venta. El stock y el total
+            se ajustan solos.
+          </p>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="mt-2"
+            onClick={() => setSwapOpen(true)}
+            disabled={pending}
+          >
+            <Repeat className="h-4 w-4" />
+            Cambiar productos
+          </Button>
+        </div>
+
+        <div className="rounded-lg border border-border bg-muted/30 p-3">
           <p className="text-xs font-medium">¿Era un fiado?</p>
           <p className="mt-0.5 text-xs text-muted-foreground">
             Pásala a pendientes de pago. El campo “Cliente” se usa como la nota
@@ -133,6 +156,17 @@ function EditModal({
           </Button>
         </div>
       </div>
+
+      <ItemSwapModal
+        open={swapOpen}
+        onClose={() => setSwapOpen(false)}
+        title="Cambiar productos de la venta"
+        description="Cambia el modelo, agrega o quita productos. El stock se ajusta solo (lo que quites regresa, lo nuevo se descuenta) y el total se recalcula."
+        currentItems={sale.sale_items}
+        products={products}
+        onSubmit={(items) => cambiarVentaItems(sale.id, items)}
+        successMsg={(t) => `Venta actualizada · ${formatMXN(t)}`}
+      />
     </Modal>
   );
 }
@@ -140,11 +174,13 @@ function EditModal({
 export function RecentSales({
   sales,
   isAdmin,
+  products,
 }: {
   sales: SaleWithItems[];
   isAdmin: boolean;
+  products: SwapProduct[];
 }) {
-  const [edit, setEdit] = useState<Sale | null>(null);
+  const [edit, setEdit] = useState<SaleWithItems | null>(null);
   const [open, setOpen] = useState<Set<string>>(new Set());
 
   function toggle(id: string) {
@@ -306,7 +342,9 @@ export function RecentSales({
         </Card>
       )}
 
-      {edit && <EditModal sale={edit} onClose={() => setEdit(null)} />}
+      {edit && (
+        <EditModal sale={edit} products={products} onClose={() => setEdit(null)} />
+      )}
     </div>
   );
 }
