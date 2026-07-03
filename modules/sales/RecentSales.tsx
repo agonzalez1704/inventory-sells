@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState, useTransition } from "react";
+import { Fragment, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -195,6 +195,37 @@ export function RecentSales({
   const [returnSale, setReturnSale] = useState<SaleWithItems | null>(null);
   const [open, setOpen] = useState<Set<string>>(new Set());
 
+  // Local copy so a return can update the list optimistically; re-syncs when
+  // the server data (props) arrives after router.refresh().
+  const [rows, setRows] = useState(sales);
+  useEffect(() => setRows(sales), [sales]);
+
+  // Subtract the returned quantities from the sale's displayed items right away;
+  // a fully-returned sale drops off the list.
+  function applyReturn(
+    saleId: string,
+    returned: { product_id: string; qty: number }[],
+  ) {
+    const rmap = new Map(returned.map((r) => [r.product_id, r.qty]));
+    setRows((prev) =>
+      prev.flatMap((s) => {
+        if (s.id !== saleId) return [s];
+        const sale_items = s.sale_items
+          .map((it) => ({
+            ...it,
+            qty: it.qty - (it.product_id ? (rmap.get(it.product_id) ?? 0) : 0),
+          }))
+          .filter((it) => it.qty > 0);
+        if (sale_items.length === 0) return [];
+        const total_cents = sale_items.reduce(
+          (a, it) => a + it.unit_price_cents * it.qty,
+          0,
+        );
+        return [{ ...s, sale_items, total_cents }];
+      }),
+    );
+  }
+
   function toggle(id: string) {
     setOpen((prev) => {
       const next = new Set(prev);
@@ -213,7 +244,7 @@ export function RecentSales({
       <p className="mt-0.5 text-xs text-muted-foreground">
         Toca una venta para ver sus productos.
       </p>
-      {sales.length === 0 ? (
+      {rows.length === 0 ? (
         <EmptyState
           icon={Receipt}
           title="Aún no hay ventas"
@@ -237,7 +268,7 @@ export function RecentSales({
               </tr>
             </thead>
             <tbody>
-              {sales.map((s) => {
+              {rows.map((s) => {
                 const expanded = open.has(s.id);
                 const items = s.sale_items ?? [];
                 return (
@@ -380,7 +411,11 @@ export function RecentSales({
         <EditModal sale={edit} products={products} onClose={() => setEdit(null)} />
       )}
       {returnSale && (
-        <ReturnModal sale={returnSale} onClose={() => setReturnSale(null)} />
+        <ReturnModal
+          sale={returnSale}
+          onDone={(items) => applyReturn(returnSale.id, items)}
+          onClose={() => setReturnSale(null)}
+        />
       )}
     </div>
   );

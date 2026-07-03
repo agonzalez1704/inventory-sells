@@ -57,9 +57,11 @@ function Stepper({
 
 export function ReturnModal({
   sale,
+  onDone,
   onClose,
 }: {
   sale: SaleWithItems;
+  onDone: (items: { product_id: string; qty: number }[]) => void;
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -103,6 +105,7 @@ export function ReturnModal({
       try {
         await devolverItems(sale.id, items, metodo, motivo || null);
         toast.success(`Devolución registrada · ${formatMXN(total)}`);
+        onDone(items); // optimistic: drop the returned qty from the list now
         onClose();
         router.refresh();
       } catch (e) {

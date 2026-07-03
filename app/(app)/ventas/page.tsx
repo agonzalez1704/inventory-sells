@@ -54,6 +54,46 @@ export default async function VentasPage() {
     vendedor: (s.sold_by ? sellerName.get(s.sold_by) : null) ?? null,
   }));
 
+  // Returned quantities per sale/product — Recent Sales shows items NET of
+  // returns (the sale itself stays intact; only the display is reduced).
+  const saleIds = sales.map((s) => s.id);
+  const returnedBySale = new Map<string, Map<string, number>>();
+  if (saleIds.length) {
+    const { data: devData } = await insforge.database
+      .from("devoluciones")
+      .select("sale_id, devolucion_items(product_id, qty)")
+      .in("sale_id", saleIds);
+    for (const d of (devData ?? []) as {
+      sale_id: string;
+      devolucion_items: { product_id: string; qty: number }[];
+    }[]) {
+      const m = returnedBySale.get(d.sale_id) ?? new Map<string, number>();
+      for (const it of d.devolucion_items ?? []) {
+        m.set(it.product_id, (m.get(it.product_id) ?? 0) + it.qty);
+      }
+      returnedBySale.set(d.sale_id, m);
+    }
+  }
+
+  const netSales = sales
+    .map((s) => {
+      const ret = returnedBySale.get(s.id);
+      if (!ret) return s;
+      const sale_items = s.sale_items
+        .map((it) => ({
+          ...it,
+          qty: it.qty - (it.product_id ? (ret.get(it.product_id) ?? 0) : 0),
+        }))
+        .filter((it) => it.qty > 0);
+      const total_cents = sale_items.reduce(
+        (a, it) => a + it.unit_price_cents * it.qty,
+        0,
+      );
+      return { ...s, sale_items, total_cents };
+    })
+    // Fully-returned sales disappear from the list.
+    .filter((s) => s.sale_items.length > 0);
+
   return (
     <section className="space-y-8">
       <div>
@@ -66,7 +106,7 @@ export default async function VentasPage() {
 
       <SalesScreen products={products} />
 
-      <RecentSales sales={sales} isAdmin={isAdmin} products={products} />
+      <RecentSales sales={netSales} isAdmin={isAdmin} products={products} />
     </section>
   );
 }
