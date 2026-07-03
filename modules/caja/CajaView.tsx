@@ -14,6 +14,7 @@ import {
   Usb,
 } from "lucide-react";
 import { formatMXN } from "@/lib/money";
+import { cn } from "@/lib/utils";
 import type { PaymentMethod } from "@/lib/types";
 import { imprimirCorteNavegador, type CorteData } from "@/lib/corte";
 import { imprimirCorteUSB, webUsbDisponible } from "@/lib/escpos-usb";
@@ -23,7 +24,12 @@ import { Input, Select } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
-import { registrarGasto, eliminarGasto } from "./actions";
+import {
+  registrarGasto,
+  eliminarGasto,
+  registrarIngreso,
+  eliminarIngreso,
+} from "./actions";
 
 const METODOS: [PaymentMethod, string][] = [
   ["efectivo", "Efectivo"],
@@ -41,6 +47,7 @@ export type Gasto = {
   categoria: string | null;
   created_at: string;
 };
+export type Ingreso = Gasto;
 
 export type CajaData = {
   from: string;
@@ -52,6 +59,7 @@ export type CajaData = {
   ingresosTotal: number;
   gastosTotal: number;
   gastos: Gasto[];
+  ingresos: Ingreso[];
 };
 
 function ymd(d: Date): string {
@@ -97,6 +105,7 @@ export function CajaView({ data }: { data: CajaData }) {
   const [from, setFrom] = useState(data.from);
   const [to, setTo] = useState(data.to);
   const [gastoOpen, setGastoOpen] = useState(false);
+  const [ingresoOpen, setIngresoOpen] = useState(false);
   const [usbOk, setUsbOk] = useState(false);
   const [usbBusy, setUsbBusy] = useState(false);
 
@@ -174,10 +183,11 @@ export function CajaView({ data }: { data: CajaData }) {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Corte de caja</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {rangoLabel} · {data.ventasCount} ventas · {data.gastos.length} gastos
+            {rangoLabel} · {data.ventasCount} ventas · {data.ingresos.length} ingresos
+            extra · {data.gastos.length} gastos
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button variant="secondary" onClick={() => imprimirCorteNavegador(buildCorte())}>
             <Printer className="h-4 w-4" />
             Imprimir corte
@@ -193,6 +203,10 @@ export function CajaView({ data }: { data: CajaData }) {
               USB
             </Button>
           )}
+          <Button variant="secondary" onClick={() => setIngresoOpen(true)}>
+            <Plus className="h-4 w-4" />
+            Ingreso extra
+          </Button>
           <Button onClick={() => setGastoOpen(true)}>
             <Plus className="h-4 w-4" />
             Registrar gasto
@@ -298,6 +312,20 @@ export function CajaView({ data }: { data: CajaData }) {
         </table>
       </Card>
 
+      {/* Ingresos extra list */}
+      {data.ingresos.length > 0 && (
+        <Card className="overflow-hidden">
+          <div className="border-b border-border px-4 py-3">
+            <h2 className="text-sm font-semibold">Ingresos extra del periodo</h2>
+          </div>
+          <ul className="divide-y divide-border">
+            {data.ingresos.map((i) => (
+              <MovRow key={i.id} m={i} isAdmin={data.isAdmin} tipo="ingreso" />
+            ))}
+          </ul>
+        </Card>
+      )}
+
       {/* Gastos list */}
       <Card className="overflow-hidden">
         <div className="border-b border-border px-4 py-3">
@@ -315,27 +343,37 @@ export function CajaView({ data }: { data: CajaData }) {
         ) : (
           <ul className="divide-y divide-border">
             {data.gastos.map((g) => (
-              <GastoRow key={g.id} g={g} isAdmin={data.isAdmin} />
+              <MovRow key={g.id} m={g} isAdmin={data.isAdmin} tipo="gasto" />
             ))}
           </ul>
         )}
       </Card>
 
-      <GastoModal open={gastoOpen} onClose={() => setGastoOpen(false)} />
+      <MovModal open={gastoOpen} onClose={() => setGastoOpen(false)} tipo="gasto" />
+      <MovModal open={ingresoOpen} onClose={() => setIngresoOpen(false)} tipo="ingreso" />
     </section>
   );
 }
 
-function GastoRow({ g, isAdmin }: { g: Gasto; isAdmin: boolean }) {
+function MovRow({
+  m,
+  isAdmin,
+  tipo,
+}: {
+  m: Gasto;
+  isAdmin: boolean;
+  tipo: "gasto" | "ingreso";
+}) {
   const router = useRouter();
   const [pending, start] = useTransition();
+  const esIngreso = tipo === "ingreso";
 
   function borrar() {
-    if (!confirm("¿Eliminar este gasto?")) return;
+    if (!confirm(`¿Eliminar este ${tipo}?`)) return;
     start(async () => {
       try {
-        await eliminarGasto(g.id);
-        toast.success("Gasto eliminado");
+        await (esIngreso ? eliminarIngreso(m.id) : eliminarGasto(m.id));
+        toast.success(`${esIngreso ? "Ingreso" : "Gasto"} eliminado`);
         router.refresh();
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Error al eliminar");
@@ -346,27 +384,33 @@ function GastoRow({ g, isAdmin }: { g: Gasto; isAdmin: boolean }) {
   return (
     <li className="flex items-center gap-3 px-4 py-2.5">
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium">{g.concepto}</p>
+        <p className="truncate text-sm font-medium">{m.concepto}</p>
         <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Badge tone="neutral">{LABEL[g.metodo] ?? g.metodo}</Badge>
-          {g.categoria && <span>· {g.categoria}</span>}
+          <Badge tone="neutral">{LABEL[m.metodo] ?? m.metodo}</Badge>
+          {m.categoria && <span>· {m.categoria}</span>}
           <span>
             ·{" "}
-            {new Date(g.created_at).toLocaleString("es-MX", {
+            {new Date(m.created_at).toLocaleString("es-MX", {
               dateStyle: "short",
               timeStyle: "short",
             })}
           </span>
         </div>
       </div>
-      <span className="shrink-0 font-mono text-sm font-semibold tabular-nums text-red-600">
-        −{formatMXN(g.monto_cents)}
+      <span
+        className={cn(
+          "shrink-0 font-mono text-sm font-semibold tabular-nums",
+          esIngreso ? "text-accent" : "text-red-600",
+        )}
+      >
+        {esIngreso ? "+" : "−"}
+        {formatMXN(m.monto_cents)}
       </span>
       {isAdmin && (
         <button
           onClick={borrar}
           disabled={pending}
-          aria-label="Eliminar gasto"
+          aria-label={`Eliminar ${tipo}`}
           className="shrink-0 cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-red-600"
         >
           <Trash2 className="h-4 w-4" />
@@ -376,8 +420,17 @@ function GastoRow({ g, isAdmin }: { g: Gasto; isAdmin: boolean }) {
   );
 }
 
-function GastoModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+function MovModal({
+  open,
+  onClose,
+  tipo,
+}: {
+  open: boolean;
+  onClose: () => void;
+  tipo: "gasto" | "ingreso";
+}) {
   const router = useRouter();
+  const esIngreso = tipo === "ingreso";
   const [concepto, setConcepto] = useState("");
   const [monto, setMonto] = useState("");
   const [metodo, setMetodo] = useState<PaymentMethod>("efectivo");
@@ -395,15 +448,16 @@ function GastoModal({ open, onClose }: { open: boolean; onClose: () => void }) {
     const pesos = Number(monto.replace(",", "."));
     if (!concepto.trim()) return toast.error("Falta el concepto");
     if (!Number.isFinite(pesos) || pesos <= 0) return toast.error("Monto inválido");
+    const payload = {
+      concepto,
+      monto_cents: Math.round(pesos * 100),
+      metodo,
+      categoria: categoria.trim() || null,
+    };
     start(async () => {
       try {
-        await registrarGasto({
-          concepto,
-          monto_cents: Math.round(pesos * 100),
-          metodo,
-          categoria: categoria.trim() || null,
-        });
-        toast.success("Gasto registrado");
+        await (esIngreso ? registrarIngreso(payload) : registrarGasto(payload));
+        toast.success(esIngreso ? "Ingreso registrado" : "Gasto registrado");
         reset();
         onClose();
         router.refresh();
@@ -414,14 +468,23 @@ function GastoModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Registrar gasto" className="max-w-md">
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={esIngreso ? "Registrar ingreso extra" : "Registrar gasto"}
+      className="max-w-md"
+    >
       <div className="space-y-3">
         <label className="block">
           <span className="mb-1 block text-xs font-medium text-muted-foreground">Concepto</span>
           <Input
             value={concepto}
             onChange={(e) => setConcepto(e.target.value)}
-            placeholder="Ej: Renta del local, pago a proveedor…"
+            placeholder={
+              esIngreso
+                ? "Ej: Instalación de pantalla, reparación…"
+                : "Ej: Renta del local, pago a proveedor…"
+            }
             autoFocus
           />
         </label>
@@ -453,7 +516,11 @@ function GastoModal({ open, onClose }: { open: boolean; onClose: () => void }) {
           <Input
             value={categoria}
             onChange={(e) => setCategoria(e.target.value)}
-            placeholder="Renta · Proveedor · Servicios · Sueldos…"
+            placeholder={
+              esIngreso
+                ? "Instalación · Reparación · Servicio…"
+                : "Renta · Proveedor · Servicios · Sueldos…"
+            }
           />
         </label>
         <div className="flex justify-end gap-2 border-t border-border pt-3">
@@ -461,7 +528,7 @@ function GastoModal({ open, onClose }: { open: boolean; onClose: () => void }) {
             Cancelar
           </Button>
           <Button onClick={save} loading={pending}>
-            Guardar gasto
+            {esIngreso ? "Guardar ingreso" : "Guardar gasto"}
           </Button>
         </div>
       </div>

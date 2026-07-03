@@ -41,3 +41,40 @@ export async function eliminarGasto(id: string): Promise<void> {
   const { error } = await insforge.database.from("gastos").delete().eq("id", id);
   if (error) throw new Error(error.message ?? "Error al eliminar el gasto");
 }
+
+// Extra income not tied to a product sale (e.g. screen installation).
+export async function registrarIngreso(input: {
+  concepto: string;
+  monto_cents: number;
+  metodo: PaymentMethod;
+  categoria: string | null;
+}): Promise<void> {
+  const { userId } = await auth();
+  if (!userId) throw new Error("No autenticado");
+  if (!input.concepto.trim()) throw new Error("Falta el concepto");
+  if (!Number.isFinite(input.monto_cents) || input.monto_cents <= 0) {
+    throw new Error("Monto inválido");
+  }
+
+  const insforge = await createInsForgeServerClient();
+  const { error } = await insforge.database.from("ingresos").insert([
+    {
+      concepto: input.concepto.trim(),
+      monto_cents: Math.round(input.monto_cents),
+      metodo: input.metodo,
+      categoria: input.categoria?.trim() || null,
+    },
+  ]);
+  if (error) throw new Error(error.message ?? "Error al registrar el ingreso");
+}
+
+export async function eliminarIngreso(id: string): Promise<void> {
+  const { userId } = await auth();
+  if (!userId) throw new Error("No autenticado");
+  const profile = await getProfile(userId);
+  if (profile?.role !== "admin") throw new Error("Solo administradores");
+
+  const insforge = await createInsForgeServerClient();
+  const { error } = await insforge.database.from("ingresos").delete().eq("id", id);
+  if (error) throw new Error(error.message ?? "Error al eliminar el ingreso");
+}
