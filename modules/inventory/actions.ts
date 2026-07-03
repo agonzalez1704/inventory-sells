@@ -5,6 +5,7 @@ import { getProfile } from "@/lib/auth/profile";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { toCents } from "@/lib/money";
+import { esEtiquetaValida } from "@/lib/etiquetas";
 
 export type EditableProduct = {
   id: string;
@@ -60,6 +61,10 @@ export async function updateProduct(
   patch: ProductPatch,
 ): Promise<void> {
   await requireAdmin();
+  const etiqueta = patch.etiqueta?.trim() || null;
+  if (etiqueta !== null && !esEtiquetaValida(etiqueta)) {
+    throw new Error("Etiqueta no válida");
+  }
   const insforge = await createInsForgeServerClient();
   const { error } = await insforge.database
     .from("products")
@@ -72,7 +77,7 @@ export async function updateProduct(
       cost_cents: Math.max(0, toCents(patch.cost || 0)),
       price_cents: Math.max(0, toCents(patch.price || 0)),
       is_active: patch.is_active,
-      etiqueta: patch.etiqueta?.trim() || null,
+      etiqueta,
     })
     .eq("id", id);
   if (error) throw new Error(error.message ?? "Error al guardar");

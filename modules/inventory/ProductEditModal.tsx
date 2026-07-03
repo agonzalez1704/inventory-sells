@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { fromCents } from "@/lib/money";
+import { ETIQUETAS } from "@/lib/etiquetas";
 import { Modal } from "@/components/ui/modal";
 import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -182,14 +183,20 @@ export function ProductEditModal({
           </div>
 
           <Field label="Etiqueta (opcional)">
-            <Input
+            <Select
               value={form.etiqueta}
               onChange={(e) => set("etiqueta", e.target.value)}
-              placeholder="Ej: Almacén disputa"
-            />
+            >
+              <option value="">Ninguna (producto normal)</option>
+              {ETIQUETAS.map((et) => (
+                <option key={et} value={et}>
+                  {et}
+                </option>
+              ))}
+            </Select>
             <span className="mt-1 block text-xs text-muted-foreground">
               Se vende normal, pero su efectivo se reporta aparte en el corte de
-              caja bajo esta etiqueta. Deja vacío para producto normal.
+              caja bajo esta etiqueta.
             </span>
           </Field>
 
