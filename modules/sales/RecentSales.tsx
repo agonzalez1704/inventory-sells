@@ -24,7 +24,10 @@ export type SaleLine = {
   unit_price_cents: number;
   products: { name: string; sku: string } | null;
 };
-export type SaleWithItems = Sale & { sale_items: SaleLine[] };
+export type SaleWithItems = Sale & {
+  sale_items: SaleLine[];
+  vendedor?: string | null;
+};
 
 const PAYMENT: [PaymentMethod, string][] = [
   ["efectivo", "Efectivo"],
@@ -191,7 +194,7 @@ export function RecentSales({
     });
   }
 
-  const cols = isAdmin ? 6 : 5;
+  const cols = isAdmin ? 7 : 6;
 
   return (
     <div>
@@ -216,6 +219,9 @@ export function RecentSales({
                 <th className="w-8 px-2 py-2.5" />
                 <th className="px-2 py-2.5 font-medium">Fecha</th>
                 <th className="px-2 py-2.5 font-medium">Cliente</th>
+                <th className="hidden px-2 py-2.5 font-medium sm:table-cell">
+                  Vendedor
+                </th>
                 <th className="px-2 py-2.5 font-medium">Pago</th>
                 <th className="px-4 py-2.5 text-right font-medium">Total</th>
                 {isAdmin && <th className="px-2 py-2.5" />}
@@ -246,6 +252,9 @@ export function RecentSales({
                         })}
                       </td>
                       <td className="px-2 py-2.5">{s.customer_name ?? "—"}</td>
+                      <td className="hidden px-2 py-2.5 text-muted-foreground sm:table-cell">
+                        {s.vendedor ?? "—"}
+                      </td>
                       <td className="px-2 py-2.5">
                         <Badge tone="neutral">
                           {s.payment_method
@@ -275,6 +284,9 @@ export function RecentSales({
                       <tr className="border-b border-border/60 bg-muted/30 last:border-0">
                         <td />
                         <td colSpan={cols - 1} className="px-2 pb-3 pt-0.5">
+                          <p className="mb-1.5 text-xs text-muted-foreground sm:hidden">
+                            Vendedor: {s.vendedor ?? "—"}
+                          </p>
                           {items.length === 0 ? (
                             <p className="text-xs text-muted-foreground">
                               Sin productos registrados.

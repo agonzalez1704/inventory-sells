@@ -11,23 +11,28 @@ export default async function VentasPage() {
 
   const insforge = await createInsForgeServerClient();
 
-  const [{ data: productData }, { data: salesData }, { data: invData }] =
-    await Promise.all([
-      insforge.database
-        .from("products")
-        .select("id, inventory_id, sku, name, size, price_cents, quantity")
-        .eq("is_active", true)
-        .order("name", { ascending: true }),
-      insforge.database
-        .from("sales")
-        .select(
-          "id, total_cents, payment_method, customer_name, created_at, sale_items(product_id, qty, unit_price_cents, products(name, sku))",
-        )
-        .eq("status", "completed")
-        .order("created_at", { ascending: false })
-        .limit(8),
-      insforge.database.from("inventories").select("id, name"),
-    ]);
+  const [
+    { data: productData },
+    { data: salesData },
+    { data: invData },
+    { data: profileData },
+  ] = await Promise.all([
+    insforge.database
+      .from("products")
+      .select("id, inventory_id, sku, name, size, price_cents, quantity")
+      .eq("is_active", true)
+      .order("name", { ascending: true }),
+    insforge.database
+      .from("sales")
+      .select(
+        "id, total_cents, payment_method, customer_name, created_at, sold_by, sale_items(product_id, qty, unit_price_cents, products(name, sku))",
+      )
+      .eq("status", "completed")
+      .order("created_at", { ascending: false })
+      .limit(8),
+    insforge.database.from("inventories").select("id, name"),
+    insforge.database.from("profiles").select("id, full_name"),
+  ]);
 
   const invName = new Map(
     ((invData ?? []) as { id: string; name: string }[]).map((i) => [i.id, i.name]),
@@ -35,9 +40,19 @@ export default async function VentasPage() {
   const products = (
     (productData ?? []) as (SalesProduct & { inventory_id: string })[]
   ).map((p) => ({ ...p, inventory_name: invName.get(p.inventory_id) ?? null }));
+
+  // sold_by is a Clerk user id (no FK to profiles), so resolve the name here.
+  const sellerName = new Map(
+    ((profileData ?? []) as { id: string; full_name: string | null }[]).map(
+      (p) => [p.id, p.full_name],
+    ),
+  );
   // PostgREST returns the to-one `products` embed as an object; the SDK types
   // it as an array, so cast through unknown.
-  const sales = (salesData ?? []) as unknown as SaleWithItems[];
+  const sales = ((salesData ?? []) as unknown as SaleWithItems[]).map((s) => ({
+    ...s,
+    vendedor: (s.sold_by ? sellerName.get(s.sold_by) : null) ?? null,
+  }));
 
   return (
     <section className="space-y-8">
