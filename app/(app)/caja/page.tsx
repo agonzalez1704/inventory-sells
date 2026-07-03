@@ -2,7 +2,12 @@ import { auth } from "@clerk/nextjs/server";
 import { getProfile } from "@/lib/auth/profile";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
 import { mxHoy, rangoUTC } from "@/lib/caja-range";
-import { CajaView, type Gasto, type Ingreso } from "@/modules/caja/CajaView";
+import {
+  CajaView,
+  type Gasto,
+  type Ingreso,
+  type Devolucion,
+} from "@/modules/caja/CajaView";
 import type { PaymentMethod } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -46,6 +51,7 @@ export default async function CajaPage({
     { data: cobrados },
     { data: gastosData },
     { data: ingresosData },
+    { data: devolucionesData },
   ] = await Promise.all([
     insforge.database
       .from("sales")
@@ -76,6 +82,12 @@ export default async function CajaPage({
       .gte("created_at", startISO)
       .lt("created_at", endISO)
       .order("created_at", { ascending: false }),
+    insforge.database
+      .from("devoluciones")
+      .select("id, monto_cents, metodo, motivo, created_at")
+      .gte("created_at", startISO)
+      .lt("created_at", endISO)
+      .order("created_at", { ascending: false }),
   ]);
 
   const ventas = [
@@ -84,6 +96,7 @@ export default async function CajaPage({
   ];
   const gastos = (gastosData ?? []) as Gasto[];
   const ingresos = (ingresosData ?? []) as Ingreso[];
+  const devoluciones = (devolucionesData ?? []) as Devolucion[];
 
   // Income = product sales + extra income (installations, labor…), by method.
   const ingresosPorMetodo = cero();
@@ -113,6 +126,14 @@ export default async function CajaPage({
     gastosTotal += g.monto_cents;
   }
 
+  // Refunds are cash that left the drawer today (per-day cash-correct).
+  const devolucionesPorMetodo = cero();
+  let devolucionesTotal = 0;
+  for (const d of devoluciones) {
+    devolucionesPorMetodo[d.metodo] += d.monto_cents;
+    devolucionesTotal += d.monto_cents;
+  }
+
   return (
     <CajaView
       data={{
@@ -122,10 +143,13 @@ export default async function CajaPage({
         ventasCount: ventas.length,
         ingresosPorMetodo,
         gastosPorMetodo,
+        devolucionesPorMetodo,
         ingresosTotal,
         gastosTotal,
+        devolucionesTotal,
         gastos,
         ingresos,
+        devoluciones,
         etiquetado,
       }}
     />

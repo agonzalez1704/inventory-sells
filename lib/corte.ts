@@ -13,10 +13,12 @@ export type CorteData = {
   lineas: CorteMetodoLinea[]; // methods with any movement
   ingresosTotal: number;
   gastosTotal: number;
+  devolucionesTotal: number;
   balance: number;
   efectivoCaja: number;
   ventasCount: number;
   gastosCount: number;
+  devolucionesCount: number;
   etiquetado: { tag: string; monto: number }[];
 };
 
@@ -61,6 +63,7 @@ export function buildCorteHTML(d: CorteData): string {
   <div class="row"><span>Ventas</span><span class="amt">${d.ventasCount}</span></div>
   <div class="row"><span>Ingresos</span><span class="amt">${formatMXN(d.ingresosTotal)}</span></div>
   <div class="row"><span>Gastos (${d.gastosCount})</span><span class="amt">−${formatMXN(d.gastosTotal)}</span></div>
+  ${d.devolucionesCount ? `<div class="row"><span>Devoluciones (${d.devolucionesCount})</span><span class="amt">−${formatMXN(d.devolucionesTotal)}</span></div>` : ""}
   <div class="sep"></div>
   <div class="row big"><span>BALANCE</span><span>${formatMXN(d.balance)}</span></div>
   <div class="row"><span>Efectivo en caja</span><span class="amt">${formatMXN(d.efectivoCaja)}</span></div>

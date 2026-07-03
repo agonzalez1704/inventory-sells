@@ -80,6 +80,28 @@ export async function editarVenta(
   if (error) throw new Error(error.message ?? "Error al editar la venta");
 }
 
+// Partial return: refund some items of a completed sale. Restores stock and
+// records the refund as a cash outflow today (the original sale is untouched).
+export async function devolverItems(
+  saleId: string,
+  items: CartLine[],
+  metodo: PaymentMethod,
+  motivo: string | null,
+): Promise<void> {
+  const { userId } = await auth();
+  if (!userId) throw new Error("No autenticado");
+  if (items.length === 0) throw new Error("Sin artículos a devolver");
+
+  const insforge = await createInsForgeServerClient();
+  const { error } = await insforge.database.rpc("devolver_items", {
+    p_sale_id: saleId,
+    p_items: items.map((i) => ({ product_id: i.product_id, qty: i.qty })),
+    p_metodo: metodo,
+    p_motivo: motivo?.trim() || null,
+  });
+  if (error) throw new Error(error.message ?? "Error al registrar la devolución");
+}
+
 // Change the product(s) on a registered sale (customer swapped models). Old
 // items return to stock, new ones leave it, total recomputed — all atomically.
 export async function cambiarVentaItems(

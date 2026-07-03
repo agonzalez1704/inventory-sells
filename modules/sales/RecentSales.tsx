@@ -3,7 +3,14 @@
 import { Fragment, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Receipt, Pencil, ChevronRight, HandCoins, Repeat } from "lucide-react";
+import {
+  Receipt,
+  Pencil,
+  ChevronRight,
+  HandCoins,
+  Repeat,
+  Undo2,
+} from "lucide-react";
 import { formatMXN } from "@/lib/money";
 import type { PaymentMethod, Sale } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -15,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PrintTicketButtons } from "@/components/ticket/PrintTicketButtons";
 import { ItemSwapModal, type SwapProduct } from "@/modules/sales/ItemSwapModal";
+import { ReturnModal } from "@/modules/sales/ReturnModal";
 import { editarVenta, convertirAFiado, cambiarVentaItems } from "./actions";
 
 // A sale row with its line items embedded (for the expandable detail).
@@ -184,6 +192,7 @@ export function RecentSales({
   products: SwapProduct[];
 }) {
   const [edit, setEdit] = useState<SaleWithItems | null>(null);
+  const [returnSale, setReturnSale] = useState<SaleWithItems | null>(null);
   const [open, setOpen] = useState<Set<string>>(new Set());
 
   function toggle(id: string) {
@@ -323,7 +332,18 @@ export function RecentSales({
                                 </li>
                               ))}
                             </ul>
-                            <div className="mt-2.5 flex justify-end">
+                            <div className="mt-2.5 flex flex-wrap items-center justify-end gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setReturnSale(s);
+                                }}
+                              >
+                                <Undo2 className="h-4 w-4" />
+                                Devolver
+                              </Button>
                               <PrintTicketButtons
                                 data={() => ({
                                   folio: s.id,
@@ -356,6 +376,9 @@ export function RecentSales({
 
       {edit && (
         <EditModal sale={edit} products={products} onClose={() => setEdit(null)} />
+      )}
+      {returnSale && (
+        <ReturnModal sale={returnSale} onClose={() => setReturnSale(null)} />
       )}
     </div>
   );

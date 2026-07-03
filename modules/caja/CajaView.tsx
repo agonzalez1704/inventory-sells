@@ -48,6 +48,13 @@ export type Gasto = {
   created_at: string;
 };
 export type Ingreso = Gasto;
+export type Devolucion = {
+  id: string;
+  monto_cents: number;
+  metodo: PaymentMethod;
+  motivo: string | null;
+  created_at: string;
+};
 
 export type CajaData = {
   from: string;
@@ -56,10 +63,13 @@ export type CajaData = {
   ventasCount: number;
   ingresosPorMetodo: Record<PaymentMethod, number>;
   gastosPorMetodo: Record<PaymentMethod, number>;
+  devolucionesPorMetodo: Record<PaymentMethod, number>;
   ingresosTotal: number;
   gastosTotal: number;
+  devolucionesTotal: number;
   gastos: Gasto[];
   ingresos: Ingreso[];
+  devoluciones: Devolucion[];
   etiquetado: { tag: string; monto: number }[];
 };
 
@@ -144,9 +154,12 @@ export function CajaView({ data }: { data: CajaData }) {
     }
   }
 
-  const balance = data.ingresosTotal - data.gastosTotal;
+  const balance =
+    data.ingresosTotal - data.gastosTotal - data.devolucionesTotal;
   const efectivoCaja =
-    (data.ingresosPorMetodo.efectivo ?? 0) - (data.gastosPorMetodo.efectivo ?? 0);
+    (data.ingresosPorMetodo.efectivo ?? 0) -
+    (data.gastosPorMetodo.efectivo ?? 0) -
+    (data.devolucionesPorMetodo.efectivo ?? 0);
   const rangoLabel = data.from === data.to ? data.from : `${data.from} → ${data.to}`;
 
   function buildCorte(): CorteData {
@@ -161,10 +174,12 @@ export function CajaView({ data }: { data: CajaData }) {
       lineas,
       ingresosTotal: data.ingresosTotal,
       gastosTotal: data.gastosTotal,
+      devolucionesTotal: data.devolucionesTotal,
       balance,
       efectivoCaja,
       ventasCount: data.ventasCount,
       gastosCount: data.gastos.length,
+      devolucionesCount: data.devoluciones.length,
       etiquetado: data.etiquetado,
     };
   }
@@ -186,7 +201,8 @@ export function CajaView({ data }: { data: CajaData }) {
           <h1 className="text-2xl font-semibold tracking-tight">Corte de caja</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {rangoLabel} · {data.ventasCount} ventas · {data.ingresos.length} ingresos
-            extra · {data.gastos.length} gastos
+            extra · {data.gastos.length} gastos · {data.devoluciones.length}{" "}
+            devoluciones
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -282,6 +298,7 @@ export function CajaView({ data }: { data: CajaData }) {
               <th className="px-4 py-2 font-medium">Método</th>
               <th className="px-4 py-2 text-right font-medium">Ingresos</th>
               <th className="px-4 py-2 text-right font-medium">Gastos</th>
+              <th className="px-4 py-2 text-right font-medium">Devol.</th>
               <th className="px-4 py-2 text-right font-medium">Neto</th>
             </tr>
           </thead>
@@ -289,7 +306,8 @@ export function CajaView({ data }: { data: CajaData }) {
             {METODOS.map(([m, label]) => {
               const ing = data.ingresosPorMetodo[m] ?? 0;
               const gas = data.gastosPorMetodo[m] ?? 0;
-              if (ing === 0 && gas === 0) return null;
+              const dev = data.devolucionesPorMetodo[m] ?? 0;
+              if (ing === 0 && gas === 0 && dev === 0) return null;
               return (
                 <tr key={m} className="border-b border-border/60 last:border-0">
                   <td className="px-4 py-2">{label}</td>
@@ -297,19 +315,24 @@ export function CajaView({ data }: { data: CajaData }) {
                   <td className="px-4 py-2 text-right font-mono tabular-nums text-muted-foreground">
                     {gas ? `−${formatMXN(gas)}` : "—"}
                   </td>
+                  <td className="px-4 py-2 text-right font-mono tabular-nums text-muted-foreground">
+                    {dev ? `−${formatMXN(dev)}` : "—"}
+                  </td>
                   <td className="px-4 py-2 text-right font-mono font-medium tabular-nums">
-                    {formatMXN(ing - gas)}
+                    {formatMXN(ing - gas - dev)}
                   </td>
                 </tr>
               );
             })}
-            {data.ingresosTotal === 0 && data.gastosTotal === 0 && (
-              <tr>
-                <td colSpan={4} className="px-4 py-6 text-center text-sm text-muted-foreground">
-                  Sin movimientos en este rango.
-                </td>
-              </tr>
-            )}
+            {data.ingresosTotal === 0 &&
+              data.gastosTotal === 0 &&
+              data.devolucionesTotal === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-4 py-6 text-center text-sm text-muted-foreground">
+                    Sin movimientos en este rango.
+                  </td>
+                </tr>
+              )}
           </tbody>
         </table>
       </Card>
@@ -333,6 +356,39 @@ export function CajaView({ data }: { data: CajaData }) {
                 <Badge tone="warning">{e.tag}</Badge>
                 <span className="font-mono text-sm font-semibold tabular-nums">
                   {formatMXN(e.monto)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+
+      {/* Devoluciones list */}
+      {data.devoluciones.length > 0 && (
+        <Card className="overflow-hidden">
+          <div className="border-b border-border px-4 py-3">
+            <h2 className="text-sm font-semibold">Devoluciones del periodo</h2>
+          </div>
+          <ul className="divide-y divide-border">
+            {data.devoluciones.map((d) => (
+              <li key={d.id} className="flex items-center gap-3 px-4 py-2.5">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">
+                    {d.motivo || "Devolución"}
+                  </p>
+                  <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Badge tone="neutral">{LABEL[d.metodo] ?? d.metodo}</Badge>
+                    <span>
+                      ·{" "}
+                      {new Date(d.created_at).toLocaleString("es-MX", {
+                        dateStyle: "short",
+                        timeStyle: "short",
+                      })}
+                    </span>
+                  </div>
+                </div>
+                <span className="shrink-0 font-mono text-sm font-semibold tabular-nums text-red-600">
+                  −{formatMXN(d.monto_cents)}
                 </span>
               </li>
             ))}

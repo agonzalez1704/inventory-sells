@@ -174,6 +174,9 @@ export function buildEscPosCorte(d: CorteData): Uint8Array {
   p.lr("Ventas", String(d.ventasCount));
   p.lr("Ingresos", formatMXN(d.ingresosTotal));
   p.lr(`Gastos (${d.gastosCount})`, `-${formatMXN(d.gastosTotal)}`);
+  if (d.devolucionesCount) {
+    p.lr(`Devoluciones (${d.devolucionesCount})`, `-${formatMXN(d.devolucionesTotal)}`);
+  }
   p.sep();
   p.bold(true).lr("BALANCE", formatMXN(d.balance)).bold(false);
   p.lr("Efectivo en caja", formatMXN(d.efectivoCaja));
