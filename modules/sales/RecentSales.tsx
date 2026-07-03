@@ -333,17 +333,19 @@ export function RecentSales({
                               ))}
                             </ul>
                             <div className="mt-2.5 flex flex-wrap items-center justify-end gap-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setReturnSale(s);
-                                }}
-                              >
-                                <Undo2 className="h-4 w-4" />
-                                Devolver
-                              </Button>
+                              {isAdmin && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setReturnSale(s);
+                                  }}
+                                >
+                                  <Undo2 className="h-4 w-4" />
+                                  Devolver
+                                </Button>
+                              )}
                               <PrintTicketButtons
                                 data={() => ({
                                   folio: s.id,

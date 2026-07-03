@@ -1,6 +1,7 @@
 "use server";
 
 import { auth } from "@clerk/nextjs/server";
+import { getProfile } from "@/lib/auth/profile";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
 import type { CartLine, PaymentMethod } from "@/lib/types";
 
@@ -90,6 +91,8 @@ export async function devolverItems(
 ): Promise<void> {
   const { userId } = await auth();
   if (!userId) throw new Error("No autenticado");
+  const profile = await getProfile(userId);
+  if (profile?.role !== "admin") throw new Error("Solo administradores");
   if (items.length === 0) throw new Error("Sin artículos a devolver");
 
   const insforge = await createInsForgeServerClient();
