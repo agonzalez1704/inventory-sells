@@ -17,6 +17,7 @@ export type CorteData = {
   efectivoCaja: number;
   ventasCount: number;
   gastosCount: number;
+  etiquetado: { tag: string; monto: number }[];
 };
 
 const esc = (s: string) =>
@@ -63,6 +64,17 @@ export function buildCorteHTML(d: CorteData): string {
   <div class="sep"></div>
   <div class="row big"><span>BALANCE</span><span>${formatMXN(d.balance)}</span></div>
   <div class="row"><span>Efectivo en caja</span><span class="amt">${formatMXN(d.efectivoCaja)}</span></div>
+  ${
+    d.etiquetado.length
+      ? `<div class="sep"></div><div class="hdr">Efectivo etiquetado (incluido arriba)</div>` +
+        d.etiquetado
+          .map(
+            (e) =>
+              `<div class="row"><span>${esc(e.tag)}</span><span class="amt">${formatMXN(e.monto)}</span></div>`,
+          )
+          .join("")
+      : ""
+  }
   <div class="sep"></div>
   <div class="center muted">Generado ${esc(gen)}</div>
   <div class="center muted">fiable.vercel.app</div>

@@ -18,6 +18,7 @@ export type EditableProduct = {
   price_cents: number;
   quantity: number;
   is_active: boolean;
+  etiqueta: string | null;
 };
 
 export type ProductPatch = {
@@ -29,6 +30,7 @@ export type ProductPatch = {
   cost: number; // pesos
   price: number; // pesos
   is_active: boolean;
+  etiqueta: string | null;
 };
 
 async function requireAdmin(): Promise<void> {
@@ -45,7 +47,7 @@ export async function getProductForEdit(id: string): Promise<EditableProduct> {
   const { data, error } = await insforgeAdmin.database
     .from("products")
     .select(
-      "id, sku, name, brand, size, color, category, cost_cents, price_cents, quantity, is_active",
+      "id, sku, name, brand, size, color, category, cost_cents, price_cents, quantity, is_active, etiqueta",
     )
     .eq("id", id)
     .maybeSingle();
@@ -70,6 +72,7 @@ export async function updateProduct(
       cost_cents: Math.max(0, toCents(patch.cost || 0)),
       price_cents: Math.max(0, toCents(patch.price || 0)),
       is_active: patch.is_active,
+      etiqueta: patch.etiqueta?.trim() || null,
     })
     .eq("id", id);
   if (error) throw new Error(error.message ?? "Error al guardar");

@@ -24,6 +24,7 @@ type Form = {
   cost: string;
   price: string;
   is_active: boolean;
+  etiqueta: string;
 };
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -71,6 +72,7 @@ export function ProductEditModal({
           cost: String(fromCents(p.cost_cents)),
           price: String(fromCents(p.price_cents)),
           is_active: p.is_active,
+          etiqueta: p.etiqueta ?? "",
         });
       })
       .catch((e) => !cancelled && setLoadError(e.message));
@@ -96,6 +98,7 @@ export function ProductEditModal({
           cost: parseFloat(form.cost) || 0,
           price: parseFloat(form.price) || 0,
           is_active: form.is_active,
+          etiqueta: form.etiqueta || null,
         });
         toast.success("Producto actualizado");
         router.refresh();
@@ -177,6 +180,18 @@ export function ProductEditModal({
               />
             </Field>
           </div>
+
+          <Field label="Etiqueta (opcional)">
+            <Input
+              value={form.etiqueta}
+              onChange={(e) => set("etiqueta", e.target.value)}
+              placeholder="Ej: Almacén disputa"
+            />
+            <span className="mt-1 block text-xs text-muted-foreground">
+              Se vende normal, pero su efectivo se reporta aparte en el corte de
+              caja bajo esta etiqueta. Deja vacío para producto normal.
+            </span>
+          </Field>
 
           <label className="flex cursor-pointer items-center gap-2 text-sm">
             <input

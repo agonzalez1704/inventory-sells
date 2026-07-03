@@ -11,7 +11,15 @@ const METODOS: PaymentMethod[] = ["efectivo", "tarjeta", "transferencia", "otro"
 const cero = () =>
   Object.fromEntries(METODOS.map((m) => [m, 0])) as Record<PaymentMethod, number>;
 
-type VentaRow = { total_cents: number; payment_method: PaymentMethod | null };
+type VentaRow = {
+  total_cents: number;
+  payment_method: PaymentMethod | null;
+  sale_items: {
+    qty: number;
+    unit_price_cents: number;
+    products: { etiqueta: string | null } | null;
+  }[];
+};
 
 export default async function CajaPage({
   searchParams,
@@ -41,14 +49,18 @@ export default async function CajaPage({
   ] = await Promise.all([
     insforge.database
       .from("sales")
-      .select("total_cents, payment_method")
+      .select(
+        "total_cents, payment_method, sale_items(qty, unit_price_cents, products(etiqueta))",
+      )
       .eq("status", "completed")
       .is("settled_at", null)
       .gte("created_at", startISO)
       .lt("created_at", endISO),
     insforge.database
       .from("sales")
-      .select("total_cents, payment_method")
+      .select(
+        "total_cents, payment_method, sale_items(qty, unit_price_cents, products(etiqueta))",
+      )
       .eq("status", "completed")
       .gte("settled_at", startISO)
       .lt("settled_at", endISO),
@@ -67,8 +79,8 @@ export default async function CajaPage({
   ]);
 
   const ventas = [
-    ...((directas ?? []) as VentaRow[]),
-    ...((cobrados ?? []) as VentaRow[]),
+    ...((directas ?? []) as unknown as VentaRow[]),
+    ...((cobrados ?? []) as unknown as VentaRow[]),
   ];
   const gastos = (gastosData ?? []) as Gasto[];
   const ingresos = (ingresosData ?? []) as Ingreso[];
@@ -76,14 +88,23 @@ export default async function CajaPage({
   // Income = product sales + extra income (installations, labor…), by method.
   const ingresosPorMetodo = cero();
   let ingresosTotal = 0;
+  // Of which: revenue from tagged products, split out per tag for the corte.
+  const etiquetadoMap: Record<string, number> = {};
   for (const v of ventas) {
     ingresosPorMetodo[v.payment_method ?? "otro"] += v.total_cents;
     ingresosTotal += v.total_cents;
+    for (const it of v.sale_items ?? []) {
+      const tag = it.products?.etiqueta;
+      if (tag) etiquetadoMap[tag] = (etiquetadoMap[tag] ?? 0) + it.unit_price_cents * it.qty;
+    }
   }
   for (const i of ingresos) {
     ingresosPorMetodo[i.metodo] += i.monto_cents;
     ingresosTotal += i.monto_cents;
   }
+  const etiquetado = Object.entries(etiquetadoMap)
+    .map(([tag, monto]) => ({ tag, monto }))
+    .sort((a, b) => b.monto - a.monto);
 
   const gastosPorMetodo = cero();
   let gastosTotal = 0;
@@ -105,6 +126,7 @@ export default async function CajaPage({
         gastosTotal,
         gastos,
         ingresos,
+        etiquetado,
       }}
     />
   );

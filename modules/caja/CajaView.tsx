@@ -60,6 +60,7 @@ export type CajaData = {
   gastosTotal: number;
   gastos: Gasto[];
   ingresos: Ingreso[];
+  etiquetado: { tag: string; monto: number }[];
 };
 
 function ymd(d: Date): string {
@@ -164,6 +165,7 @@ export function CajaView({ data }: { data: CajaData }) {
       efectivoCaja,
       ventasCount: data.ventasCount,
       gastosCount: data.gastos.length,
+      etiquetado: data.etiquetado,
     };
   }
 
@@ -311,6 +313,32 @@ export function CajaView({ data }: { data: CajaData }) {
           </tbody>
         </table>
       </Card>
+
+      {/* Efectivo etiquetado (subset of income, split per tag) */}
+      {data.etiquetado.length > 0 && (
+        <Card className="overflow-hidden border-brand/40">
+          <div className="border-b border-border px-4 py-3">
+            <h2 className="text-sm font-semibold">Efectivo etiquetado</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Ya incluido en los ingresos de arriba. Aquí separado para
+              reportarlo aparte.
+            </p>
+          </div>
+          <ul className="divide-y divide-border">
+            {data.etiquetado.map((e) => (
+              <li
+                key={e.tag}
+                className="flex items-center justify-between gap-3 px-4 py-2.5"
+              >
+                <Badge tone="warning">{e.tag}</Badge>
+                <span className="font-mono text-sm font-semibold tabular-nums">
+                  {formatMXN(e.monto)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
 
       {/* Ingresos extra list */}
       {data.ingresos.length > 0 && (

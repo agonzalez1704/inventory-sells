@@ -26,6 +26,7 @@ export interface Product {
   price_cents: number;
   quantity: number;
   is_active: boolean;
+  etiqueta: string | null;
   created_at: string;
   updated_at: string;
 }

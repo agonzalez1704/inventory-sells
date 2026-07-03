@@ -36,6 +36,7 @@ export type InventoryRow = Pick<
   | "size"
   | "price_cents"
   | "quantity"
+  | "etiqueta"
 >;
 
 function StockCell({ qty }: { qty: number }) {
@@ -380,6 +381,11 @@ export function InventoryView({
                   </td>
                   <td className="px-4 py-2.5">
                     <span className="font-medium">{p.name}</span>
+                    {p.etiqueta && (
+                      <Badge tone="warning" className="ml-2 align-middle">
+                        {p.etiqueta}
+                      </Badge>
+                    )}
                     {selectedInv === "all" && (
                       <Badge
                         tone="accent"

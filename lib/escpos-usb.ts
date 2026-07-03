@@ -177,6 +177,11 @@ export function buildEscPosCorte(d: CorteData): Uint8Array {
   p.sep();
   p.bold(true).lr("BALANCE", formatMXN(d.balance)).bold(false);
   p.lr("Efectivo en caja", formatMXN(d.efectivoCaja));
+  if (d.etiquetado.length) {
+    p.sep();
+    p.line("Efectivo etiquetado (incluido):");
+    for (const e of d.etiquetado) p.lr(e.tag, formatMXN(e.monto));
+  }
   p.sep();
   p.align("center").line(`Generado ${gen}`).line("fiable.vercel.app");
   p.raw(0x0a, 0x0a, 0x0a); // feed
