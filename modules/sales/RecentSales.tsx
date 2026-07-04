@@ -10,6 +10,8 @@ import {
   HandCoins,
   Repeat,
   Undo2,
+  Search,
+  Loader2,
 } from "lucide-react";
 import { formatMXN } from "@/lib/money";
 import type { PaymentMethod, Sale } from "@/lib/types";
@@ -23,7 +25,12 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { PrintTicketButtons } from "@/components/ticket/PrintTicketButtons";
 import { ItemSwapModal, type SwapProduct } from "@/modules/sales/ItemSwapModal";
 import { ReturnModal } from "@/modules/sales/ReturnModal";
-import { editarVenta, convertirAFiado, cambiarVentaItems } from "./actions";
+import {
+  editarVenta,
+  convertirAFiado,
+  cambiarVentaItems,
+  buscarVentas,
+} from "./actions";
 
 // A sale row with its line items embedded (for the expandable detail).
 export type SaleLine = {
@@ -200,6 +207,34 @@ export function RecentSales({
   const [rows, setRows] = useState(sales);
   useEffect(() => setRows(sales), [sales]);
 
+  // Search sales by creator / customer / product / total.
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<SaleWithItems[]>([]);
+  const [searching, setSearching] = useState(false);
+  const buscando = query.trim().length > 0;
+
+  useEffect(() => {
+    const q = query.trim();
+    if (!q) {
+      setResults([]);
+      setSearching(false);
+      return;
+    }
+    setSearching(true);
+    const id = setTimeout(async () => {
+      try {
+        setResults(await buscarVentas(q));
+      } catch {
+        setResults([]);
+      } finally {
+        setSearching(false);
+      }
+    }, 300);
+    return () => clearTimeout(id);
+  }, [query]);
+
+  const displayed = buscando ? results : rows;
+
   // Subtract the returned quantities from the sale's displayed items right away;
   // a fully-returned sale drops off the list.
   function applyReturn(
@@ -238,17 +273,37 @@ export function RecentSales({
 
   return (
     <div>
-      <h2 className="text-sm font-semibold text-muted-foreground">
-        Ventas recientes
-      </h2>
-      <p className="mt-0.5 text-xs text-muted-foreground">
-        Toca una venta para ver sus productos.
-      </p>
-      {rows.length === 0 ? (
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 className="text-sm font-semibold text-muted-foreground">
+            {buscando ? "Resultados de búsqueda" : "Ventas recientes"}
+          </h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Toca una venta para ver sus productos.
+          </p>
+        </div>
+        <div className="relative w-full sm:w-72">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          {searching && (
+            <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+          )}
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Buscar por vendedor, cliente, producto o total…"
+            className="h-9 pl-9"
+          />
+        </div>
+      </div>
+      {displayed.length === 0 ? (
         <EmptyState
           icon={Receipt}
-          title="Aún no hay ventas"
-          description="Las ventas que registres aparecerán aquí."
+          title={buscando ? "Sin resultados" : "Aún no hay ventas"}
+          description={
+            buscando
+              ? `Nada coincide con “${query.trim()}”.`
+              : "Las ventas que registres aparecerán aquí."
+          }
           className="mt-3"
         />
       ) : (
@@ -268,7 +323,7 @@ export function RecentSales({
               </tr>
             </thead>
             <tbody>
-              {rows.map((s) => {
+              {displayed.map((s) => {
                 const expanded = open.has(s.id);
                 const items = s.sale_items ?? [];
                 return (

@@ -4,6 +4,61 @@ import { auth } from "@clerk/nextjs/server";
 import { getProfile } from "@/lib/auth/profile";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
 import type { CartLine, PaymentMethod } from "@/lib/types";
+import type { SaleWithItems } from "./RecentSales";
+
+// Search completed sales by creator (seller), customer, sold products, or total.
+// Token-AND across all those fields; a numeric token also matches the total.
+export async function buscarVentas(q: string): Promise<SaleWithItems[]> {
+  const { userId } = await auth();
+  if (!userId) throw new Error("No autenticado");
+  const query = q.trim().toLowerCase();
+  if (!query) return [];
+
+  const insforge = await createInsForgeServerClient();
+  const [{ data: salesData }, { data: profileData }] = await Promise.all([
+    insforge.database
+      .from("sales")
+      .select(
+        "id, total_cents, payment_method, customer_name, created_at, sold_by, sale_items(product_id, qty, unit_price_cents, products(name, sku))",
+      )
+      .eq("status", "completed")
+      .order("created_at", { ascending: false })
+      .limit(500),
+    insforge.database.from("profiles").select("id, full_name"),
+  ]);
+
+  const sellerName = new Map(
+    ((profileData ?? []) as { id: string; full_name: string | null }[]).map(
+      (p) => [p.id, p.full_name],
+    ),
+  );
+  const tokens = query.split(/\s+/).filter(Boolean);
+  const sales = (salesData ?? []) as unknown as SaleWithItems[];
+
+  return sales
+    .filter((s) => {
+      const vendedor = s.sold_by ? sellerName.get(s.sold_by) : null;
+      const pesos = s.total_cents / 100;
+      const hay = [
+        s.customer_name ?? "",
+        vendedor ?? "",
+        String(pesos),
+        pesos.toFixed(2),
+        ...(s.sale_items ?? []).flatMap((it) => [
+          it.products?.name ?? "",
+          it.products?.sku ?? "",
+        ]),
+      ]
+        .join(" ")
+        .toLowerCase();
+      return tokens.every((t) => hay.includes(t));
+    })
+    .slice(0, 50)
+    .map((s) => ({
+      ...s,
+      vendedor: (s.sold_by ? sellerName.get(s.sold_by) : null) ?? null,
+    }));
+}
 
 // Register a sale atomically via the register_sale() RPC: it locks each product
 // row, rejects oversell, and writes sale + items + stock movements in one tx.
