@@ -180,6 +180,7 @@ export function buildEscPosCorte(d: CorteData): Uint8Array {
   p.sep();
   p.bold(true).lr("BALANCE", formatMXN(d.balance)).bold(false);
   p.lr("Efectivo en caja", formatMXN(d.efectivoCaja));
+  if (d.ganancia !== null) p.lr("Ganancia neta (venta)", formatMXN(d.ganancia));
   if (d.etiquetado.length) {
     p.sep();
     p.line("Efectivo etiquetado (incluido):");

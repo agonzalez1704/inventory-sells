@@ -20,6 +20,7 @@ export type CorteData = {
   gastosCount: number;
   devolucionesCount: number;
   etiquetado: { tag: string; monto: number }[];
+  ganancia: number | null;
 };
 
 const esc = (s: string) =>
@@ -67,6 +68,7 @@ export function buildCorteHTML(d: CorteData): string {
   <div class="sep"></div>
   <div class="row big"><span>BALANCE</span><span>${formatMXN(d.balance)}</span></div>
   <div class="row"><span>Efectivo en caja</span><span class="amt">${formatMXN(d.efectivoCaja)}</span></div>
+  ${d.ganancia !== null ? `<div class="row"><span>Ganancia neta (venta)</span><span class="amt">${formatMXN(d.ganancia)}</span></div>` : ""}
   ${
     d.etiquetado.length
       ? `<div class="sep"></div><div class="hdr">Efectivo etiquetado (incluido arriba)</div>` +

@@ -22,7 +22,15 @@ type VentaRow = {
   sale_items: {
     qty: number;
     unit_price_cents: number;
-    products: { etiqueta: string | null } | null;
+    products: { etiqueta: string | null; cost_cents: number } | null;
+  }[];
+};
+
+type DevolRow = {
+  devolucion_items: {
+    qty: number;
+    unit_price_cents: number;
+    products: { cost_cents: number } | null;
   }[];
 };
 
@@ -56,7 +64,7 @@ export default async function CajaPage({
     insforge.database
       .from("sales")
       .select(
-        "total_cents, payment_method, sale_items(qty, unit_price_cents, products(etiqueta))",
+        "total_cents, payment_method, sale_items(qty, unit_price_cents, products(etiqueta, cost_cents))",
       )
       .eq("status", "completed")
       .is("settled_at", null)
@@ -65,7 +73,7 @@ export default async function CajaPage({
     insforge.database
       .from("sales")
       .select(
-        "total_cents, payment_method, sale_items(qty, unit_price_cents, products(etiqueta))",
+        "total_cents, payment_method, sale_items(qty, unit_price_cents, products(etiqueta, cost_cents))",
       )
       .eq("status", "completed")
       .gte("settled_at", startISO)
@@ -84,7 +92,9 @@ export default async function CajaPage({
       .order("created_at", { ascending: false }),
     insforge.database
       .from("devoluciones")
-      .select("id, monto_cents, metodo, motivo, created_at")
+      .select(
+        "id, monto_cents, metodo, motivo, created_at, devolucion_items(qty, unit_price_cents, products(cost_cents))",
+      )
       .gte("created_at", startISO)
       .lt("created_at", endISO)
       .order("created_at", { ascending: false }),
@@ -103,14 +113,25 @@ export default async function CajaPage({
   let ingresosTotal = 0;
   // Of which: revenue from tagged products, split out per tag for the corte.
   const etiquetadoMap: Record<string, number> = {};
+  // Net sales profit = Σ (price paid − cost) per unit, less the margin of what
+  // was returned. Admin-only (cost/margin is sensitive).
+  let gananciaVentas = 0;
   for (const v of ventas) {
     ingresosPorMetodo[v.payment_method ?? "otro"] += v.total_cents;
     ingresosTotal += v.total_cents;
     for (const it of v.sale_items ?? []) {
       const tag = it.products?.etiqueta;
       if (tag) etiquetadoMap[tag] = (etiquetadoMap[tag] ?? 0) + it.unit_price_cents * it.qty;
+      gananciaVentas += (it.unit_price_cents - (it.products?.cost_cents ?? 0)) * it.qty;
     }
   }
+  let gananciaDevuelta = 0;
+  for (const d of (devolucionesData ?? []) as unknown as DevolRow[]) {
+    for (const it of d.devolucion_items ?? []) {
+      gananciaDevuelta += (it.unit_price_cents - (it.products?.cost_cents ?? 0)) * it.qty;
+    }
+  }
+  const ganancia = isAdmin ? gananciaVentas - gananciaDevuelta : null;
   for (const i of ingresos) {
     ingresosPorMetodo[i.metodo] += i.monto_cents;
     ingresosTotal += i.monto_cents;
@@ -151,6 +172,7 @@ export default async function CajaPage({
         ingresos,
         devoluciones,
         etiquetado,
+        ganancia,
       }}
     />
   );

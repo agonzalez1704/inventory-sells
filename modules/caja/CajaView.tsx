@@ -12,6 +12,7 @@ import {
   Wallet,
   Printer,
   Usb,
+  Coins,
 } from "lucide-react";
 import { formatMXN } from "@/lib/money";
 import { cn } from "@/lib/utils";
@@ -71,6 +72,7 @@ export type CajaData = {
   ingresos: Ingreso[];
   devoluciones: Devolucion[];
   etiquetado: { tag: string; monto: number }[];
+  ganancia: number | null; // net sales profit; null for non-admins
 };
 
 function ymd(d: Date): string {
@@ -181,6 +183,7 @@ export function CajaView({ data }: { data: CajaData }) {
       gastosCount: data.gastos.length,
       devolucionesCount: data.devoluciones.length,
       etiquetado: data.etiquetado,
+      ganancia: data.ganancia,
     };
   }
 
@@ -285,6 +288,13 @@ export function CajaView({ data }: { data: CajaData }) {
         <Kpi icon={TrendingDown} label="Gastos" value={formatMXN(data.gastosTotal)} tone="out" />
         <Kpi icon={Scale} label="Balance" value={formatMXN(balance)} />
         <Kpi icon={Wallet} label="Efectivo en caja" value={formatMXN(efectivoCaja)} />
+        {data.ganancia !== null && (
+          <Kpi
+            icon={Coins}
+            label="Ganancia neta (venta)"
+            value={formatMXN(data.ganancia)}
+          />
+        )}
       </div>
 
       {/* Breakdown by method */}
