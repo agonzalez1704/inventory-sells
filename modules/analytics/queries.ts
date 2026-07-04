@@ -1,5 +1,6 @@
 import "server-only";
 import { insforgeAdmin } from "@/lib/insforge/admin";
+import { rangoUTC } from "@/lib/caja-range";
 
 // Analytics over InsForge for the MCP server. The bearer token already gates
 // access (owner = full access), so these run with the admin client and include
@@ -282,4 +283,162 @@ export async function buscarProducto(q: string) {
       stock: p.quantity,
       activo: p.is_active,
     }));
+}
+
+// ============================================================
+// Admin-only financial reports for the MCP (date-range, MX days)
+// ============================================================
+type Metodo = "efectivo" | "tarjeta" | "transferencia" | "otro";
+const METODOS: Metodo[] = ["efectivo", "tarjeta", "transferencia", "otro"];
+const ceroMetodos = () =>
+  Object.fromEntries(METODOS.map((m) => [m, 0])) as Record<Metodo, number>;
+const pesosMap = (m: Record<Metodo, number>) =>
+  Object.fromEntries(METODOS.map((k) => [k, pesos(m[k])])) as Record<Metodo, number>;
+
+type VentaAgg = {
+  total_cents: number;
+  payment_method: Metodo | null;
+  sale_items: {
+    qty: number;
+    unit_price_cents: number;
+    products: { etiqueta: string | null; cost_cents: number } | null;
+  }[];
+};
+type DevolAgg = {
+  monto_cents: number;
+  metodo: Metodo;
+  devolucion_items: {
+    qty: number;
+    unit_price_cents: number;
+    products: { cost_cents: number } | null;
+  }[];
+};
+
+async function ventasEnRango(startISO: string, endISO: string): Promise<VentaAgg[]> {
+  const sel =
+    "total_cents, payment_method, sale_items(qty, unit_price_cents, products(etiqueta, cost_cents))";
+  const [{ data: directas }, { data: cobrados }] = await Promise.all([
+    DB.from("sales").select(sel).eq("status", "completed").is("settled_at", null)
+      .gte("created_at", startISO).lt("created_at", endISO),
+    DB.from("sales").select(sel).eq("status", "completed")
+      .gte("settled_at", startISO).lt("settled_at", endISO),
+  ]);
+  return [
+    ...((directas ?? []) as unknown as VentaAgg[]),
+    ...((cobrados ?? []) as unknown as VentaAgg[]),
+  ];
+}
+
+// Full cash cut for a date range [desde, hasta] (YYYY-MM-DD, MX local days).
+export async function corteCaja(desde: string, hasta: string) {
+  const { startISO, endISO } = rangoUTC(desde, hasta);
+  const [ventas, { data: gastosData }, { data: ingresosData }, { data: devolData }] =
+    await Promise.all([
+      ventasEnRango(startISO, endISO),
+      DB.from("gastos").select("monto_cents, metodo").gte("created_at", startISO).lt("created_at", endISO),
+      DB.from("ingresos").select("monto_cents, metodo").gte("created_at", startISO).lt("created_at", endISO),
+      DB.from("devoluciones")
+        .select("monto_cents, metodo, devolucion_items(qty, unit_price_cents, products(cost_cents))")
+        .gte("created_at", startISO).lt("created_at", endISO),
+    ]);
+  const gastos = (gastosData ?? []) as { monto_cents: number; metodo: Metodo }[];
+  const ingresos = (ingresosData ?? []) as { monto_cents: number; metodo: Metodo }[];
+  const devols = (devolData ?? []) as unknown as DevolAgg[];
+
+  const ingresosMet = ceroMetodos();
+  let ingresosTotal = 0;
+  let gananciaVentas = 0;
+  const etqMap: Record<string, number> = {};
+  for (const v of ventas) {
+    ingresosMet[v.payment_method ?? "otro"] += v.total_cents;
+    ingresosTotal += v.total_cents;
+    for (const it of v.sale_items ?? []) {
+      gananciaVentas += (it.unit_price_cents - (it.products?.cost_cents ?? 0)) * it.qty;
+      const tag = it.products?.etiqueta;
+      if (tag) etqMap[tag] = (etqMap[tag] ?? 0) + it.unit_price_cents * it.qty;
+    }
+  }
+  for (const i of ingresos) {
+    ingresosMet[i.metodo] += i.monto_cents;
+    ingresosTotal += i.monto_cents;
+  }
+  const gastosMet = ceroMetodos();
+  let gastosTotal = 0;
+  for (const g of gastos) { gastosMet[g.metodo] += g.monto_cents; gastosTotal += g.monto_cents; }
+
+  const devolMet = ceroMetodos();
+  let devolTotal = 0;
+  let gananciaDevuelta = 0;
+  for (const d of devols) {
+    devolMet[d.metodo] += d.monto_cents;
+    devolTotal += d.monto_cents;
+    for (const it of d.devolucion_items ?? [])
+      gananciaDevuelta += (it.unit_price_cents - (it.products?.cost_cents ?? 0)) * it.qty;
+  }
+
+  return {
+    rango: desde === hasta ? desde : `${desde} a ${hasta}`,
+    ventas: ventas.length,
+    ingresos_mxn: pesos(ingresosTotal),
+    ingresos_por_metodo: pesosMap(ingresosMet),
+    gastos_mxn: pesos(gastosTotal),
+    gastos_por_metodo: pesosMap(gastosMet),
+    devoluciones_mxn: pesos(devolTotal),
+    devoluciones_por_metodo: pesosMap(devolMet),
+    balance_mxn: pesos(ingresosTotal - gastosTotal - devolTotal),
+    efectivo_en_caja_mxn: pesos(ingresosMet.efectivo - gastosMet.efectivo - devolMet.efectivo),
+    ganancia_neta_mxn: pesos(gananciaVentas - gananciaDevuelta),
+    etiquetado: Object.entries(etqMap)
+      .map(([etiqueta, monto]) => ({ etiqueta, monto_mxn: pesos(monto) }))
+      .sort((a, b) => b.monto_mxn - a.monto_mxn),
+  };
+}
+
+// Sales performance for a date range: totals, profit, by method, top products.
+export async function reporteVentas(desde: string, hasta: string, limite = 5) {
+  const { startISO, endISO } = rangoUTC(desde, hasta);
+  const ventas = await ventasEnRango(startISO, endISO);
+
+  const porMetodo = ceroMetodos();
+  let ingresos = 0;
+  let ganancia = 0;
+  const top = new Map<string, { producto: string; vendidos: number; ingreso: number }>();
+  for (const v of ventas) {
+    porMetodo[v.payment_method ?? "otro"] += v.total_cents;
+    ingresos += v.total_cents;
+    for (const it of v.sale_items ?? []) {
+      ganancia += (it.unit_price_cents - (it.products?.cost_cents ?? 0)) * it.qty;
+    }
+  }
+  // Top products need names — one more targeted fetch.
+  const sel = "sale_items(qty, unit_price_cents, products(name, sku))";
+  const [{ data: d1 }, { data: d2 }] = await Promise.all([
+    DB.from("sales").select(sel).eq("status", "completed").is("settled_at", null)
+      .gte("created_at", startISO).lt("created_at", endISO),
+    DB.from("sales").select(sel).eq("status", "completed")
+      .gte("settled_at", startISO).lt("settled_at", endISO),
+  ]);
+  const lineas = [...((d1 ?? []) as unknown as { sale_items: { qty: number; unit_price_cents: number; products: { name: string; sku: string } | null }[] }[]),
+                  ...((d2 ?? []) as unknown as { sale_items: { qty: number; unit_price_cents: number; products: { name: string; sku: string } | null }[] }[])];
+  for (const s of lineas)
+    for (const it of s.sale_items ?? []) {
+      const key = it.products?.sku ?? "—";
+      const cur = top.get(key) ?? { producto: it.products?.name ?? "—", vendidos: 0, ingreso: 0 };
+      cur.vendidos += it.qty;
+      cur.ingreso += it.unit_price_cents * it.qty;
+      top.set(key, cur);
+    }
+
+  return {
+    rango: desde === hasta ? desde : `${desde} a ${hasta}`,
+    ventas: ventas.length,
+    ingresos_mxn: pesos(ingresos),
+    ganancia_neta_mxn: pesos(ganancia),
+    ticket_promedio_mxn: ventas.length ? pesos(ingresos / ventas.length) : 0,
+    por_metodo: pesosMap(porMetodo),
+    mas_vendidos: [...top.values()]
+      .sort((a, b) => b.ingreso - a.ingreso)
+      .slice(0, limite)
+      .map((x) => ({ producto: x.producto, vendidos: x.vendidos, ingreso_mxn: pesos(x.ingreso) })),
+  };
 }

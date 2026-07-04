@@ -7,12 +7,19 @@ import {
   estadoInventario,
   buscarProducto,
   listarInventarios,
+  corteCaja,
+  reporteVentas,
 } from "@/modules/analytics/queries";
+import { mxHoy } from "@/lib/caja-range";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 const PERIODO = z.enum(["hoy", "7d", "30d"]);
+const FECHA = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "fecha en formato YYYY-MM-DD")
+  .optional();
 
 function json(data: unknown) {
   return {
@@ -41,6 +48,27 @@ const handler = createMcpHandler(
       "Fiados (préstamos) pendientes de cobro: cliente, monto, días y productos.",
       {},
       async () => json(await fiadosPendientes()),
+    );
+
+    // --- Reportes financieros (solo admin — este MCP es privado del dueño) ---
+    server.tool(
+      "corte_caja",
+      "Corte de caja de un rango de fechas (solo admin). Ingresos por método, gastos, devoluciones, balance, efectivo en caja, ganancia neta y efectivo etiquetado. Fechas YYYY-MM-DD (México). Si se omiten, usa hoy.",
+      { desde: FECHA, hasta: FECHA },
+      async ({ desde, hasta }) => {
+        const d = desde ?? mxHoy();
+        return json(await corteCaja(d, hasta ?? d));
+      },
+    );
+
+    server.tool(
+      "reporte_ventas",
+      "Reporte de ventas de un rango de fechas (solo admin): número de ventas, ingresos, ganancia neta, ticket promedio, desglose por método de pago y productos más vendidos. Fechas YYYY-MM-DD (México). Si se omiten, usa hoy.",
+      { desde: FECHA, hasta: FECHA, limite: z.number().optional() },
+      async ({ desde, hasta, limite }) => {
+        const d = desde ?? mxHoy();
+        return json(await reporteVentas(d, hasta ?? d, limite ?? 5));
+      },
     );
 
     server.tool(
