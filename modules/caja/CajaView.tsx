@@ -288,14 +288,26 @@ export function CajaView({ data }: { data: CajaData }) {
         <Kpi icon={TrendingDown} label="Gastos" value={formatMXN(data.gastosTotal)} tone="out" />
         <Kpi icon={Scale} label="Balance" value={formatMXN(balance)} />
         <Kpi icon={Wallet} label="Efectivo en caja" value={formatMXN(efectivoCaja)} />
-        {data.ganancia !== null && (
-          <Kpi
-            icon={Coins}
-            label="Ganancia neta (venta)"
-            value={formatMXN(data.ganancia)}
-          />
-        )}
       </div>
+
+      {data.ganancia !== null && (
+        <Card className="flex flex-wrap items-center justify-between gap-3 border-brand/40 bg-brand-soft/30 p-4">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-soft text-brand-foreground">
+              <Coins className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="text-sm font-medium">Ganancia neta de venta</p>
+              <p className="text-xs text-muted-foreground">
+                Precio − costo, menos lo devuelto · {rangoLabel}
+              </p>
+            </div>
+          </div>
+          <p className="font-mono text-2xl font-semibold tabular-nums text-brand-foreground">
+            {formatMXN(data.ganancia)}
+          </p>
+        </Card>
+      )}
 
       {/* Breakdown by method */}
       <Card className="overflow-hidden">
