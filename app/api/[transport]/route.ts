@@ -119,9 +119,16 @@ function authorized(req: Request): boolean {
   const expected = process.env.MCP_BEARER_TOKEN;
   if (!expected) return false;
   const header = req.headers.get("authorization") ?? "";
-  const token = header.toLowerCase().startsWith("bearer ")
+  let token = header.toLowerCase().startsWith("bearer ")
     ? header.slice(7).trim()
     : "";
+  // Fallback to a URL token (?token= or ?key=): the claude.ai custom-connector
+  // form has no field for a custom Authorization header, so the owner can pass
+  // the token in the connector URL instead. Same admin credential either way.
+  if (!token) {
+    const sp = new URL(req.url).searchParams;
+    token = (sp.get("token") ?? sp.get("key") ?? "").trim();
+  }
   return token.length > 0 && token === expected;
 }
 
