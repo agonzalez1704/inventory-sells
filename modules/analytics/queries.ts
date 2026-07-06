@@ -442,3 +442,46 @@ export async function reporteVentas(desde: string, hasta: string, limite = 5) {
       .map((x) => ({ producto: x.producto, vendidos: x.vendidos, ingreso_mxn: pesos(x.ingreso) })),
   };
 }
+
+// Date-range variants of the summary tools (so every sales tool accepts a range).
+export async function ventasResumenRango(desde: string, hasta: string) {
+  const { startISO, endISO } = rangoUTC(desde, hasta);
+  const ventas = await ventasEnRango(startISO, endISO);
+  let ingresos = 0;
+  let cogs = 0;
+  for (const v of ventas) {
+    ingresos += v.total_cents;
+    for (const it of v.sale_items ?? []) cogs += (it.products?.cost_cents ?? 0) * it.qty;
+  }
+  return {
+    rango: desde === hasta ? desde : `${desde} a ${hasta}`,
+    ventas: ventas.length,
+    ingresos_mxn: pesos(ingresos),
+    ganancia_estimada_mxn: pesos(ingresos - cogs),
+    ticket_promedio_mxn: ventas.length ? pesos(ingresos / ventas.length) : 0,
+  };
+}
+
+export async function masVendidosRango(desde: string, hasta: string, limite = 5) {
+  const { startISO, endISO } = rangoUTC(desde, hasta);
+  const sel = "sale_items(qty, unit_price_cents, products(name, sku))";
+  const [{ data: d1 }, { data: d2 }] = await Promise.all([
+    DB.from("sales").select(sel).eq("status", "completed").is("settled_at", null)
+      .gte("created_at", startISO).lt("created_at", endISO),
+    DB.from("sales").select(sel).eq("status", "completed")
+      .gte("settled_at", startISO).lt("settled_at", endISO),
+  ]);
+  const rows = [...((d1 ?? []) as unknown as SaleAgg[]), ...((d2 ?? []) as unknown as SaleAgg[])];
+  const map = new Map<string, { producto: string; sku: string; vendidos: number; ingreso_mxn: number }>();
+  for (const s of rows)
+    for (const it of s.sale_items ?? []) {
+      const sku = it.products?.sku ?? "—";
+      const cur = map.get(sku) ?? { producto: it.products?.name ?? "—", sku, vendidos: 0, ingreso_mxn: 0 };
+      cur.vendidos += it.qty;
+      cur.ingreso_mxn += pesos(it.unit_price_cents * it.qty);
+      map.set(sku, cur);
+    }
+  return [...map.values()]
+    .sort((a, b) => b.ingreso_mxn - a.ingreso_mxn)
+    .slice(0, Math.max(1, Math.min(20, Math.floor(limite))));
+}

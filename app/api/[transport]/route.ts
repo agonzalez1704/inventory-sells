@@ -2,7 +2,9 @@ import { createMcpHandler } from "mcp-handler";
 import { z } from "zod";
 import {
   ventasResumen,
+  ventasResumenRango,
   masVendidos,
+  masVendidosRango,
   fiadosPendientes,
   estadoInventario,
   buscarProducto,
@@ -30,17 +32,34 @@ function json(data: unknown) {
 const handler = createMcpHandler(
   (server) => {
     server.tool(
+      "salud",
+      "Verifica que el conector de Fiable responde (ping rápido, sin datos). Úsalo para confirmar la conexión antes de un reporte.",
+      {},
+      async () => json({ ok: true, servicio: "fiable-mcp", fecha: mxHoy() }),
+    );
+
+    server.tool(
       "ventas_resumen",
-      "Resumen de ventas en un periodo: ingresos, ganancia estimada, número de ventas y ticket promedio.",
-      { periodo: PERIODO },
-      async ({ periodo }) => json(await ventasResumen(periodo)),
+      "Resumen de ventas: ingresos, ganancia estimada, número de ventas y ticket promedio. Usa un periodo (hoy/7d/30d) O un rango de fechas desde/hasta (YYYY-MM-DD, México). Para 'semana pasada' o cualquier rango, pasa desde/hasta.",
+      { periodo: PERIODO.optional(), desde: FECHA, hasta: FECHA },
+      async ({ periodo, desde, hasta }) =>
+        json(
+          desde
+            ? await ventasResumenRango(desde, hasta ?? desde)
+            : await ventasResumen(periodo ?? "7d"),
+        ),
     );
 
     server.tool(
       "mas_vendidos",
-      "Productos más vendidos por ingreso en un periodo (top N).",
-      { periodo: PERIODO, limite: z.number().optional() },
-      async ({ periodo, limite }) => json(await masVendidos(periodo, limite ?? 5)),
+      "Productos más vendidos por ingreso (top N). Usa un periodo (hoy/7d/30d) O un rango de fechas desde/hasta (YYYY-MM-DD, México).",
+      { periodo: PERIODO.optional(), desde: FECHA, hasta: FECHA, limite: z.number().optional() },
+      async ({ periodo, desde, hasta, limite }) =>
+        json(
+          desde
+            ? await masVendidosRango(desde, hasta ?? desde, limite ?? 5)
+            : await masVendidos(periodo ?? "7d", limite ?? 5),
+        ),
     );
 
     server.tool(
