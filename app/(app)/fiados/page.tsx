@@ -9,7 +9,7 @@ export default async function FiadosPage() {
       insforge.database
         .from("sales")
         .select(
-          "id, total_cents, note, created_at, sale_items(product_id, qty, products(name, sku))",
+          "id, total_cents, note, created_at, sale_items(product_id, qty, products(name, sku)), sale_pagos(monto_cents)",
         )
         .eq("status", "pending")
         .order("created_at", { ascending: true }),
@@ -22,8 +22,15 @@ export default async function FiadosPage() {
     ]);
 
   // PostgREST returns the to-one `products` embed as an object; the SDK's
-  // generic types it as an array, so cast through unknown.
-  const loans = (data ?? []) as unknown as Loan[];
+  // generic types it as an array, so cast through unknown. Sum abonos → pagado.
+  const loans = (
+    (data ?? []) as unknown as (Loan & {
+      sale_pagos?: { monto_cents: number }[];
+    })[]
+  ).map((l) => ({
+    ...l,
+    pagado_cents: (l.sale_pagos ?? []).reduce((s, p) => s + p.monto_cents, 0),
+  })) as Loan[];
 
   const invName = new Map(
     ((invData ?? []) as { id: string; name: string }[]).map((i) => [i.id, i.name]),

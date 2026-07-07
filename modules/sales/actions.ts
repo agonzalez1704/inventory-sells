@@ -3,6 +3,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { getProfile } from "@/lib/auth/profile";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
+import { toCents } from "@/lib/money";
 import type { CartLine, PaymentMethod } from "@/lib/types";
 import type { SaleWithItems } from "./RecentSales";
 
@@ -100,6 +101,25 @@ export async function registerLoan(
 
   if (error) throw new Error(error.message ?? "Error al registrar el fiado");
   return { saleId: String(data) };
+}
+
+// Partial payment (abono) toward a fiado. When it reaches the total, the fiado
+// completes.
+export async function abonarFiado(
+  saleId: string,
+  monto: number, // pesos
+  metodo: PaymentMethod,
+): Promise<void> {
+  const { userId } = await auth();
+  if (!userId) throw new Error("No autenticado");
+
+  const insforge = await createInsForgeServerClient();
+  const { error } = await insforge.database.rpc("abonar_fiado", {
+    p_sale_id: saleId,
+    p_monto_cents: Math.max(0, toCents(monto || 0)),
+    p_metodo: metodo,
+  });
+  if (error) throw new Error(error.message ?? "Error al abonar");
 }
 
 // Collect a pending loan → becomes a completed sale (revenue counts now).
