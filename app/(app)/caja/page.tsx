@@ -50,16 +50,20 @@ export default async function CajaPage({
 
   const insforge = await createInsForgeServerClient();
 
-  // Cash hits the drawer when a sale completes: for direct sales that's
-  // created_at; for a fiado it's settled_at (settled in this range, even if
-  // lent earlier). Filtering on settled_at also naturally excludes direct
-  // sales (their settled_at is null).
+  // Cash is attributed to the DAY it enters, by method:
+  // - direct sales: their full total at created_at (paid at register);
+  // - fiados: their abonos (sale_pagos) — partial or full — by abono date;
+  // - adelantos: their abonos (adelanto_pagos, abono) by abono date.
+  // Profit is recognized at completion/delivery, not per abono.
   const [
     { data: directas },
-    { data: cobrados },
+    { data: fiadosComp },
     { data: gastosData },
     { data: ingresosData },
     { data: devolucionesData },
+    { data: salePagosData },
+    { data: adelantoPagosData },
+    { data: adelantosEntData },
   ] = await Promise.all([
     insforge.database
       .from("sales")
@@ -70,11 +74,11 @@ export default async function CajaPage({
       .is("settled_at", null)
       .gte("created_at", startISO)
       .lt("created_at", endISO),
+    // Fiados completed in range — for profit/tagged revenue only (cash comes
+    // from sale_pagos, not from re-counting the total here).
     insforge.database
       .from("sales")
-      .select(
-        "total_cents, payment_method, sale_items(qty, unit_price_cents, products(etiqueta, cost_cents))",
-      )
+      .select("sale_items(qty, unit_price_cents, products(etiqueta, cost_cents))")
       .eq("status", "completed")
       .gte("settled_at", startISO)
       .lt("settled_at", endISO),
@@ -98,32 +102,79 @@ export default async function CajaPage({
       .gte("created_at", startISO)
       .lt("created_at", endISO)
       .order("created_at", { ascending: false }),
+    insforge.database
+      .from("sale_pagos")
+      .select("monto_cents, metodo")
+      .gte("created_at", startISO)
+      .lt("created_at", endISO),
+    insforge.database
+      .from("adelanto_pagos")
+      .select("monto_cents, metodo, tipo")
+      .gte("created_at", startISO)
+      .lt("created_at", endISO),
+    insforge.database
+      .from("adelantos")
+      .select("precio_cents, qty, products(cost_cents)")
+      .eq("estado", "entregado")
+      .gte("entregado_at", startISO)
+      .lt("entregado_at", endISO),
   ]);
 
-  const ventas = [
-    ...((directas ?? []) as unknown as VentaRow[]),
-    ...((cobrados ?? []) as unknown as VentaRow[]),
-  ];
+  const directasV = (directas ?? []) as unknown as VentaRow[];
+  const fiadosV = (fiadosComp ?? []) as unknown as VentaRow[];
   const gastos = (gastosData ?? []) as Gasto[];
   const ingresos = (ingresosData ?? []) as Ingreso[];
   const devoluciones = (devolucionesData ?? []) as Devolucion[];
+  const salePagos = (salePagosData ?? []) as { monto_cents: number; metodo: PaymentMethod }[];
+  const adelantoPagos = (adelantoPagosData ?? []) as {
+    monto_cents: number;
+    metodo: PaymentMethod;
+    tipo: "abono" | "devolucion";
+  }[];
+  const adelantosEnt = (adelantosEntData ?? []) as unknown as {
+    precio_cents: number;
+    qty: number;
+    products: { cost_cents: number } | null;
+  }[];
 
-  // Income = product sales + extra income (installations, labor…), by method.
+  // --- Income (cash in by day/method) ---
   const ingresosPorMetodo = cero();
   let ingresosTotal = 0;
-  // Of which: revenue from tagged products, split out per tag for the corte.
+  const addIngreso = (m: PaymentMethod, c: number) => {
+    ingresosPorMetodo[m] += c;
+    ingresosTotal += c;
+  };
+  for (const v of directasV) addIngreso(v.payment_method ?? "otro", v.total_cents);
+  for (const p of salePagos) addIngreso(p.metodo, p.monto_cents);
+  for (const p of adelantoPagos) if (p.tipo === "abono") addIngreso(p.metodo, p.monto_cents);
+  for (const i of ingresos) addIngreso(i.metodo, i.monto_cents);
+
+  // --- Tagged revenue (recognized at completion) ---
   const etiquetadoMap: Record<string, number> = {};
-  // Net sales profit = Σ (price paid − cost) per unit, less the margin of what
-  // was returned. Admin-only (cost/margin is sensitive).
+  const tagRev = (rows: VentaRow[]) => {
+    for (const v of rows)
+      for (const it of v.sale_items ?? []) {
+        const t = it.products?.etiqueta;
+        if (t) etiquetadoMap[t] = (etiquetadoMap[t] ?? 0) + it.unit_price_cents * it.qty;
+      }
+  };
+  tagRev(directasV);
+  tagRev(fiadosV);
+  const etiquetado = Object.entries(etiquetadoMap)
+    .map(([tag, monto]) => ({ tag, monto }))
+    .sort((a, b) => b.monto - a.monto);
+
+  // --- Net profit (admin): margin at completion/delivery, less returns ---
   let gananciaVentas = 0;
-  for (const v of ventas) {
-    ingresosPorMetodo[v.payment_method ?? "otro"] += v.total_cents;
-    ingresosTotal += v.total_cents;
-    for (const it of v.sale_items ?? []) {
-      const tag = it.products?.etiqueta;
-      if (tag) etiquetadoMap[tag] = (etiquetadoMap[tag] ?? 0) + it.unit_price_cents * it.qty;
-      gananciaVentas += (it.unit_price_cents - (it.products?.cost_cents ?? 0)) * it.qty;
-    }
+  const margen = (rows: VentaRow[]) => {
+    for (const v of rows)
+      for (const it of v.sale_items ?? [])
+        gananciaVentas += (it.unit_price_cents - (it.products?.cost_cents ?? 0)) * it.qty;
+  };
+  margen(directasV);
+  margen(fiadosV);
+  for (const a of adelantosEnt) {
+    gananciaVentas += a.precio_cents - (a.products?.cost_cents ?? 0) * a.qty;
   }
   let gananciaDevuelta = 0;
   for (const d of (devolucionesData ?? []) as unknown as DevolRow[]) {
@@ -132,13 +183,6 @@ export default async function CajaPage({
     }
   }
   const ganancia = isAdmin ? gananciaVentas - gananciaDevuelta : null;
-  for (const i of ingresos) {
-    ingresosPorMetodo[i.metodo] += i.monto_cents;
-    ingresosTotal += i.monto_cents;
-  }
-  const etiquetado = Object.entries(etiquetadoMap)
-    .map(([tag, monto]) => ({ tag, monto }))
-    .sort((a, b) => b.monto - a.monto);
 
   const gastosPorMetodo = cero();
   let gastosTotal = 0;
@@ -147,13 +191,20 @@ export default async function CajaPage({
     gastosTotal += g.monto_cents;
   }
 
-  // Refunds are cash that left the drawer today (per-day cash-correct).
+  // --- Cash out (by day/method): sale returns + adelanto refunds ---
   const devolucionesPorMetodo = cero();
   let devolucionesTotal = 0;
   for (const d of devoluciones) {
     devolucionesPorMetodo[d.metodo] += d.monto_cents;
     devolucionesTotal += d.monto_cents;
   }
+  for (const p of adelantoPagos)
+    if (p.tipo === "devolucion") {
+      devolucionesPorMetodo[p.metodo] += p.monto_cents;
+      devolucionesTotal += p.monto_cents;
+    }
+
+  const ventasCount = directasV.length + fiadosV.length;
 
   return (
     <CajaView
@@ -161,7 +212,7 @@ export default async function CajaPage({
         from,
         to,
         isAdmin,
-        ventasCount: ventas.length,
+        ventasCount,
         ingresosPorMetodo,
         gastosPorMetodo,
         devolucionesPorMetodo,
