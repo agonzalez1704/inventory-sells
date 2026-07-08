@@ -1,6 +1,25 @@
 import { clerkMiddleware } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
 
-export default clerkMiddleware();
+// On the "store." subdomain we serve ONLY the public catalog (rewritten from
+// /tienda). Any other path there falls back to the catalog — the staff app
+// lives on the main domain. Assets, API and Clerk paths pass through.
+export default clerkMiddleware(async (_auth, req) => {
+  const host = (req.headers.get("host") ?? "").split(":")[0];
+  if (host.startsWith("store.")) {
+    const p = req.nextUrl.pathname;
+    const passthrough =
+      p.startsWith("/_next") ||
+      p.startsWith("/api") ||
+      p.startsWith("/__clerk") ||
+      p.includes(".");
+    if (!passthrough) {
+      const url = req.nextUrl.clone();
+      url.pathname = "/tienda";
+      return NextResponse.rewrite(url);
+    }
+  }
+});
 
 export const config = {
   matcher: [
