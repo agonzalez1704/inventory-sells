@@ -174,9 +174,16 @@ export default async function CajaPage({
     ingresosPorMetodo[m] += c;
     ingresosTotal += c;
   };
+  // Adelanto abonos are a subset of income, tracked per method too so the corte
+  // can show them separately (they're already folded into ingresosPorMetodo).
+  const adelantosPorMetodo = cero();
   for (const v of directasV) addIngreso(v.payment_method ?? "otro", v.total_cents);
   for (const p of salePagos) addIngreso(p.metodo, p.monto_cents);
-  for (const p of adelantoPagos) if (p.tipo === "abono") addIngreso(p.metodo, p.monto_cents);
+  for (const p of adelantoPagos)
+    if (p.tipo === "abono") {
+      addIngreso(p.metodo, p.monto_cents);
+      adelantosPorMetodo[p.metodo] += p.monto_cents;
+    }
   for (const i of ingresos) addIngreso(i.metodo, i.monto_cents);
 
   // --- Tagged revenue (recognized at completion), broken down per product ---
@@ -318,6 +325,7 @@ export default async function CajaPage({
         isAdmin,
         ventasCount,
         ingresosPorMetodo,
+        adelantosPorMetodo,
         gastosPorMetodo,
         devolucionesPorMetodo,
         ingresosTotal,

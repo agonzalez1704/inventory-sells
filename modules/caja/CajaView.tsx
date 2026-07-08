@@ -74,6 +74,7 @@ export type CajaData = {
   isAdmin: boolean;
   ventasCount: number;
   ingresosPorMetodo: Record<PaymentMethod, number>;
+  adelantosPorMetodo: Record<PaymentMethod, number>; // subset of ingresos
   gastosPorMetodo: Record<PaymentMethod, number>;
   devolucionesPorMetodo: Record<PaymentMethod, number>;
   ingresosTotal: number;
@@ -358,12 +359,17 @@ export function CajaView({ data }: { data: CajaData }) {
       <Card className="overflow-hidden">
         <div className="border-b border-border px-4 py-3">
           <h2 className="text-sm font-semibold">Por método de pago</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            La columna Adelantos es un subconjunto de Ingresos (abonos a
+            adelantos), separada para reportarla aparte.
+          </p>
         </div>
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
               <th className="px-4 py-2 font-medium">Método</th>
               <th className="px-4 py-2 text-right font-medium">Ingresos</th>
+              <th className="px-4 py-2 text-right font-medium">Adelantos</th>
               <th className="px-4 py-2 text-right font-medium">Gastos</th>
               <th className="px-4 py-2 text-right font-medium">Devol.</th>
               <th className="px-4 py-2 text-right font-medium">Neto</th>
@@ -372,6 +378,7 @@ export function CajaView({ data }: { data: CajaData }) {
           <tbody>
             {METODOS.map(([m, label]) => {
               const ing = data.ingresosPorMetodo[m] ?? 0;
+              const adel = data.adelantosPorMetodo[m] ?? 0;
               const gas = data.gastosPorMetodo[m] ?? 0;
               const dev = data.devolucionesPorMetodo[m] ?? 0;
               if (ing === 0 && gas === 0 && dev === 0) return null;
@@ -379,6 +386,9 @@ export function CajaView({ data }: { data: CajaData }) {
                 <tr key={m} className="border-b border-border/60 last:border-0">
                   <td className="px-4 py-2">{label}</td>
                   <td className="px-4 py-2 text-right font-mono tabular-nums">{formatMXN(ing)}</td>
+                  <td className="px-4 py-2 text-right font-mono tabular-nums text-muted-foreground">
+                    {adel ? formatMXN(adel) : "—"}
+                  </td>
                   <td className="px-4 py-2 text-right font-mono tabular-nums text-muted-foreground">
                     {gas ? `−${formatMXN(gas)}` : "—"}
                   </td>
@@ -395,7 +405,7 @@ export function CajaView({ data }: { data: CajaData }) {
               data.gastosTotal === 0 &&
               data.devolucionesTotal === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-6 text-center text-sm text-muted-foreground">
+                  <td colSpan={6} className="px-4 py-6 text-center text-sm text-muted-foreground">
                     Sin movimientos en este rango.
                   </td>
                 </tr>
