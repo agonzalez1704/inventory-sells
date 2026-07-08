@@ -74,6 +74,12 @@ export function SiteHeader() {
 
         <Show when="signed-out">
           <div className="ml-auto flex items-center gap-2">
+            <Link
+              href="/tienda"
+              className="cursor-pointer rounded-lg px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+            >
+              Catálogo
+            </Link>
             <SignInButton mode="modal">
               <button className="cursor-pointer rounded-lg px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
                 Entrar

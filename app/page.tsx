@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { SignInButton, SignUpButton } from "@clerk/nextjs";
+import Link from "next/link";
+import { SignInButton } from "@clerk/nextjs";
 import { Camera, Boxes, ShoppingCart, ArrowRight } from "lucide-react";
 import { Logo } from "@/components/logo";
 
@@ -41,13 +42,14 @@ export default async function Home() {
           Carga productos desde una foto o Excel, registra ventas en segundos y
           mantén el stock siempre al día.
         </p>
-        <div className="mt-8 flex items-center gap-3">
-          <SignUpButton mode="modal">
-            <button className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-xl bg-primary px-5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90">
-              Crear cuenta
-              <ArrowRight className="h-4 w-4" />
-            </button>
-          </SignUpButton>
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+          <Link
+            href="/tienda"
+            className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-xl bg-primary px-5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+          >
+            Ver catálogo
+            <ArrowRight className="h-4 w-4" />
+          </Link>
           <SignInButton mode="modal">
             <button className="inline-flex h-11 cursor-pointer items-center rounded-xl border border-border bg-background px-5 text-sm font-medium transition-colors hover:bg-muted">
               Entrar
