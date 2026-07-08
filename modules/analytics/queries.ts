@@ -88,28 +88,78 @@ type LoanAgg = {
   note: string | null;
   created_at: string;
   sale_items: { qty: number; products: { name: string } | null }[];
+  sale_pagos: { monto_cents: number }[];
 };
 
 export async function fiadosPendientes() {
   const { data } = await DB.from("sales")
-    .select("total_cents, note, created_at, sale_items(qty, products(name))")
+    .select("total_cents, note, created_at, sale_items(qty, products(name)), sale_pagos(monto_cents)")
     .eq("status", "pending")
     .order("created_at", { ascending: true });
   const loans = (data ?? []) as unknown as LoanAgg[];
 
-  const fiados = loans.map((l) => ({
-    cliente: l.note ?? "sin nota",
-    total_mxn: pesos(l.total_cents),
-    dias: Math.floor((Date.now() - new Date(l.created_at).getTime()) / 86_400_000),
-    productos: (l.sale_items ?? [])
-      .map((it) => `${it.products?.name ?? "?"}${it.qty > 1 ? ` x${it.qty}` : ""}`)
-      .join(", "),
-  }));
+  const fiados = loans.map((l) => {
+    const pagado = (l.sale_pagos ?? []).reduce((s, p) => s + p.monto_cents, 0);
+    return {
+      cliente: l.note ?? "sin nota",
+      total_mxn: pesos(l.total_cents),
+      pagado_mxn: pesos(pagado),
+      resta_mxn: pesos(Math.max(0, l.total_cents - pagado)),
+      dias: Math.floor((Date.now() - new Date(l.created_at).getTime()) / 86_400_000),
+      productos: (l.sale_items ?? [])
+        .map((it) => `${it.products?.name ?? "?"}${it.qty > 1 ? ` x${it.qty}` : ""}`)
+        .join(", "),
+    };
+  });
 
   return {
-    total_mxn: fiados.reduce((s, f) => s + f.total_mxn, 0),
+    por_cobrar_mxn: fiados.reduce((s, f) => s + f.resta_mxn, 0),
     pendientes: fiados.length,
     fiados,
+  };
+}
+
+type AdelantoAgg = {
+  tipo: "apartado" | "pedido";
+  descripcion: string | null;
+  qty: number;
+  precio_cents: number;
+  cliente: string | null;
+  created_at: string;
+  products: { name: string } | null;
+  adelanto_pagos: { monto_cents: number; tipo: "abono" | "devolucion" }[];
+};
+
+export async function adelantosPendientes() {
+  const { data } = await DB.from("adelantos")
+    .select(
+      "tipo, descripcion, qty, precio_cents, cliente, created_at, products(name), adelanto_pagos(monto_cents, tipo)",
+    )
+    .eq("estado", "activo")
+    .order("created_at", { ascending: true });
+  const rows = (data ?? []) as unknown as AdelantoAgg[];
+
+  const adelantos = rows.map((a) => {
+    const pagado = (a.adelanto_pagos ?? []).reduce(
+      (s, p) => s + (p.tipo === "abono" ? p.monto_cents : -p.monto_cents),
+      0,
+    );
+    return {
+      tipo: a.tipo,
+      producto: a.products?.name ?? a.descripcion ?? "—",
+      cliente: a.cliente ?? "sin nombre",
+      precio_mxn: pesos(a.precio_cents * 1),
+      pagado_mxn: pesos(pagado),
+      resta_mxn: pesos(Math.max(0, a.precio_cents - pagado)),
+      dias: Math.floor((Date.now() - new Date(a.created_at).getTime()) / 86_400_000),
+    };
+  });
+
+  return {
+    por_cobrar_mxn: adelantos.reduce((s, a) => s + a.resta_mxn, 0),
+    abonado_mxn: adelantos.reduce((s, a) => s + a.pagado_mxn, 0),
+    activos: adelantos.length,
+    adelantos,
   };
 }
 

@@ -6,6 +6,7 @@ import {
   masVendidos,
   masVendidosRango,
   fiadosPendientes,
+  adelantosPendientes,
   estadoInventario,
   buscarProducto,
   listarInventarios,
@@ -64,9 +65,16 @@ const handler = createMcpHandler(
 
     server.tool(
       "fiados_pendientes",
-      "Fiados (préstamos) pendientes de cobro: cliente, monto, días y productos.",
+      "Fiados pendientes de cobro: cliente, total, pagado (abonos), resta, días y productos.",
       {},
       async () => json(await fiadosPendientes()),
+    );
+
+    server.tool(
+      "adelantos_pendientes",
+      "Adelantos activos (apartados con stock y pedidos especiales): cliente, producto, precio, pagado (abonos), resta, tipo y días. Total por cobrar y total abonado.",
+      {},
+      async () => json(await adelantosPendientes()),
     );
 
     // --- Reportes financieros (solo admin — este MCP es privado del dueño) ---
