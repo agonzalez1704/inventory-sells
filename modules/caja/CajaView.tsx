@@ -57,13 +57,15 @@ export type Devolucion = {
   motivo: string | null;
   created_at: string;
 };
-export type VentaDetalle = {
+// One cash-in event feeding the Ingresos KPI. The four `tipo`s are the KPI's
+// four sources, so summing every line's monto_cents === ingresosTotal.
+export type IngresoLinea = {
   id: string;
-  total_cents: number;
+  tipo: "venta" | "abono" | "adelanto" | "extra";
+  concepto: string;
+  monto_cents: number;
   metodo: PaymentMethod | null;
   fecha: string;
-  tipo: "venta" | "fiado";
-  productos: { qty: number; nombre: string }[];
 };
 
 export type CajaData = {
@@ -86,7 +88,7 @@ export type CajaData = {
     productos: { nombre: string; sku: string; qty: number; monto: number }[];
   }[];
   ganancia: number | null; // net sales profit; null for non-admins
-  ventasDetalle: VentaDetalle[];
+  ingresosDetalle: IngresoLinea[]; // every cash-in event; sums to ingresosTotal
 };
 
 function ymd(d: Date): string {
@@ -326,7 +328,7 @@ export function CajaView({ data }: { data: CajaData }) {
           label="Ingresos"
           value={formatMXN(data.ingresosTotal)}
           tone="in"
-          onClick={data.ventasDetalle.length > 0 ? () => setVentasOpen(true) : undefined}
+          onClick={data.ingresosDetalle.length > 0 ? () => setVentasOpen(true) : undefined}
         />
         <Kpi icon={TrendingDown} label="Gastos" value={formatMXN(data.gastosTotal)} tone="out" />
         <Kpi icon={Scale} label="Balance" value={formatMXN(balance)} />
@@ -515,58 +517,90 @@ export function CajaView({ data }: { data: CajaData }) {
 
       <MovModal open={gastoOpen} onClose={() => setGastoOpen(false)} tipo="gasto" />
       <MovModal open={ingresoOpen} onClose={() => setIngresoOpen(false)} tipo="ingreso" />
-      <VentasModal
+      <IngresosModal
         open={ventasOpen}
         onClose={() => setVentasOpen(false)}
-        ventas={data.ventasDetalle}
-        total={data.ventasDetalle.reduce((s, v) => s + v.total_cents, 0)}
+        lineas={data.ingresosDetalle}
+        total={data.ingresosTotal}
       />
     </section>
   );
 }
 
-function VentasModal({
+const TIPO_META: Record<
+  IngresoLinea["tipo"],
+  { label: string; tone: "neutral" | "warning" | "accent" | "success" }
+> = {
+  venta: { label: "Venta", tone: "neutral" },
+  abono: { label: "Abono fiado", tone: "warning" },
+  adelanto: { label: "Adelanto", tone: "accent" },
+  extra: { label: "Ingreso extra", tone: "success" },
+};
+
+function IngresosModal({
   open,
   onClose,
-  ventas,
+  lineas,
   total,
 }: {
   open: boolean;
   onClose: () => void;
-  ventas: VentaDetalle[];
+  lineas: IngresoLinea[];
   total: number;
 }) {
+  // Subtotals per source so the modal reconciles the KPI: the chips sum to total.
+  const orden: IngresoLinea["tipo"][] = ["venta", "abono", "adelanto", "extra"];
+  const subtotales = orden
+    .map((tipo) => ({
+      tipo,
+      monto: lineas
+        .filter((l) => l.tipo === tipo)
+        .reduce((s, l) => s + l.monto_cents, 0),
+    }))
+    .filter((s) => s.monto > 0);
+
   return (
-    <Modal open={open} onClose={onClose} title="Ventas del periodo" className="max-w-xl">
+    <Modal open={open} onClose={onClose} title="Ingresos del periodo" className="max-w-xl">
       <div className="space-y-3">
         <div className="flex items-baseline justify-between">
           <span className="text-sm text-muted-foreground">
-            {ventas.length} {ventas.length === 1 ? "venta" : "ventas"}
+            {lineas.length} {lineas.length === 1 ? "movimiento" : "movimientos"}
           </span>
           <span className="font-mono text-lg font-semibold tabular-nums">
             {formatMXN(total)}
           </span>
         </div>
+
+        {subtotales.length > 1 && (
+          <div className="flex flex-wrap gap-1.5">
+            {subtotales.map((s) => (
+              <span
+                key={s.tipo}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-muted px-2.5 py-1 text-xs"
+              >
+                <span className="text-muted-foreground">{TIPO_META[s.tipo].label}</span>
+                <span className="font-mono font-semibold tabular-nums">
+                  {formatMXN(s.monto)}
+                </span>
+              </span>
+            ))}
+          </div>
+        )}
+
         <ul className="max-h-[60vh] divide-y divide-border overflow-auto rounded-xl border border-border">
-          {ventas.map((v) => (
-            <li key={v.id} className="flex items-start justify-between gap-3 px-3 py-2.5">
+          {lineas.map((l) => (
+            <li key={l.id} className="flex items-start justify-between gap-3 px-3 py-2.5">
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm">
-                  {v.productos.length > 0
-                    ? v.productos
-                        .map((p) => `${p.qty > 1 ? `${p.qty}× ` : ""}${p.nombre}`)
-                        .join(" · ")
-                    : "Sin productos"}
-                </p>
-                <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-                  {v.tipo === "fiado" && <Badge tone="warning">Fiado</Badge>}
+                <p className="truncate text-sm">{l.concepto}</p>
+                <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                  <Badge tone={TIPO_META[l.tipo].tone}>{TIPO_META[l.tipo].label}</Badge>
                   <Badge tone="neutral">
-                    {v.metodo ? (LABEL[v.metodo] ?? v.metodo) : "—"}
+                    {l.metodo ? (LABEL[l.metodo] ?? l.metodo) : "—"}
                   </Badge>
-                  {v.fecha && (
+                  {l.fecha && (
                     <span>
                       ·{" "}
-                      {new Date(v.fecha).toLocaleString("es-MX", {
+                      {new Date(l.fecha).toLocaleString("es-MX", {
                         dateStyle: "short",
                         timeStyle: "short",
                       })}
@@ -574,8 +608,8 @@ function VentasModal({
                   )}
                 </div>
               </div>
-              <span className="shrink-0 font-mono text-sm font-semibold tabular-nums">
-                {formatMXN(v.total_cents)}
+              <span className="shrink-0 font-mono text-sm font-semibold tabular-nums text-accent">
+                +{formatMXN(l.monto_cents)}
               </span>
             </li>
           ))}

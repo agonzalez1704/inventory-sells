@@ -7,6 +7,7 @@ import {
   type Gasto,
   type Ingreso,
   type Devolucion,
+  type IngresoLinea,
 } from "@/modules/caja/CajaView";
 import type { PaymentMethod } from "@/lib/types";
 
@@ -114,12 +115,16 @@ export default async function CajaPage({
       .order("created_at", { ascending: false }),
     insforge.database
       .from("sale_pagos")
-      .select("monto_cents, metodo")
+      .select(
+        "monto_cents, metodo, created_at, sales(customer_name, sale_items(qty, products(name)))",
+      )
       .gte("created_at", startISO)
       .lt("created_at", endISO),
     insforge.database
       .from("adelanto_pagos")
-      .select("monto_cents, metodo, tipo")
+      .select(
+        "monto_cents, metodo, tipo, created_at, adelantos(cliente, descripcion, qty, products(name))",
+      )
       .gte("created_at", startISO)
       .lt("created_at", endISO),
     insforge.database
@@ -135,11 +140,26 @@ export default async function CajaPage({
   const gastos = (gastosData ?? []) as Gasto[];
   const ingresos = (ingresosData ?? []) as Ingreso[];
   const devoluciones = (devolucionesData ?? []) as Devolucion[];
-  const salePagos = (salePagosData ?? []) as { monto_cents: number; metodo: PaymentMethod }[];
-  const adelantoPagos = (adelantoPagosData ?? []) as {
+  const salePagos = (salePagosData ?? []) as unknown as {
+    monto_cents: number;
+    metodo: PaymentMethod;
+    created_at: string;
+    sales: {
+      customer_name: string | null;
+      sale_items: { qty: number; products: { name: string } | null }[];
+    } | null;
+  }[];
+  const adelantoPagos = (adelantoPagosData ?? []) as unknown as {
     monto_cents: number;
     metodo: PaymentMethod;
     tipo: "abono" | "devolucion";
+    created_at: string;
+    adelantos: {
+      cliente: string | null;
+      descripcion: string | null;
+      qty: number;
+      products: { name: string } | null;
+    } | null;
   }[];
   const adelantosEnt = (adelantosEntData ?? []) as unknown as {
     precio_cents: number;
@@ -237,21 +257,57 @@ export default async function CajaPage({
 
   const ventasCount = directasV.length + fiadosV.length;
 
-  // Breakdown of the completed sales (products + total) for the Ingresos widget.
-  const mapVenta = (v: VentaRow, tipo: "venta" | "fiado") => ({
-    id: v.id ?? "",
-    total_cents: v.total_cents,
-    metodo: v.payment_method,
-    fecha: (tipo === "fiado" ? v.settled_at : v.created_at) ?? "",
-    tipo,
-    productos: (v.sale_items ?? []).map((it) => ({
-      qty: it.qty,
-      nombre: it.products?.name ?? "—",
+  // Breakdown of the Ingresos KPI: every cash-in event, so the lines sum to
+  // ingresosTotal exactly. Same four sources as the KPI — direct sales, abonos a
+  // fiados, abonos a adelantos, ingresos extra. Fiado *totals* are NOT listed:
+  // their cash is the abonos (counting both would double them).
+  const prodList = (
+    items: { qty: number; products: { name: string } | null }[] | undefined,
+  ) =>
+    (items ?? [])
+      .map((it) => `${it.qty > 1 ? `${it.qty}× ` : ""}${it.products?.name ?? "—"}`)
+      .join(" · ");
+  const ingresosDetalle: IngresoLinea[] = [
+    ...directasV.map((v, i) => ({
+      id: v.id ?? `venta-${i}`,
+      tipo: "venta" as const,
+      concepto: prodList(v.sale_items) || "Venta",
+      monto_cents: v.total_cents,
+      metodo: v.payment_method,
+      fecha: v.created_at ?? "",
     })),
-  });
-  const ventasDetalle = [
-    ...directasV.map((v) => mapVenta(v, "venta")),
-    ...fiadosV.map((v) => mapVenta(v, "fiado")),
+    ...salePagos.map((p, i) => ({
+      id: `abono-${i}`,
+      tipo: "abono" as const,
+      concepto: p.sales?.customer_name?.trim()
+        ? p.sales.customer_name.trim()
+        : prodList(p.sales?.sale_items) || "Fiado",
+      monto_cents: p.monto_cents,
+      metodo: p.metodo,
+      fecha: p.created_at,
+    })),
+    ...adelantoPagos
+      .filter((p) => p.tipo === "abono")
+      .map((p, i) => ({
+        id: `adel-${i}`,
+        tipo: "adelanto" as const,
+        concepto:
+          p.adelantos?.products?.name ??
+          p.adelantos?.descripcion ??
+          p.adelantos?.cliente ??
+          "Adelanto",
+        monto_cents: p.monto_cents,
+        metodo: p.metodo,
+        fecha: p.created_at,
+      })),
+    ...ingresos.map((i) => ({
+      id: i.id,
+      tipo: "extra" as const,
+      concepto: i.concepto,
+      monto_cents: i.monto_cents,
+      metodo: i.metodo,
+      fecha: i.created_at,
+    })),
   ].sort((a, b) => (a.fecha < b.fecha ? 1 : -1));
 
   return (
@@ -272,7 +328,7 @@ export default async function CajaPage({
         devoluciones,
         etiquetado,
         ganancia,
-        ventasDetalle,
+        ingresosDetalle,
       }}
     />
   );
