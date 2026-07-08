@@ -18,6 +18,7 @@ export type DetalleProducto = {
   color: string | null;
   precio_cents: number;
   disponible: boolean;
+  imagen: string | null;
 };
 export type RelacionadoProducto = {
   id: string;
@@ -25,6 +26,7 @@ export type RelacionadoProducto = {
   marca: string | null;
   precio_cents: number;
   disponible: boolean;
+  imagen: string | null;
 };
 
 // Derived, customer-facing specs read from the product name.
@@ -80,8 +82,19 @@ export function ProductoDetalle({
 
       <div className="mt-5 grid gap-8 md:grid-cols-2">
         {/* Image */}
-        <div className="flex aspect-square items-center justify-center rounded-3xl border border-blue-100 bg-gradient-to-br from-blue-50 to-slate-50 text-blue-300">
-          <Smartphone className="h-24 w-24" />
+        <div className="flex aspect-square items-center justify-center overflow-hidden rounded-3xl border border-blue-100 bg-white">
+          {p.imagen ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={p.imagen}
+              alt={p.nombre}
+              className="h-full w-full object-contain p-4"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-blue-50 to-slate-50 text-blue-300">
+              <Smartphone className="h-24 w-24" />
+            </div>
+          )}
         </div>
 
         {/* Info */}
@@ -163,8 +176,20 @@ export function ProductoDetalle({
                   !r.disponible && "opacity-75",
                 )}
               >
-                <div className="mb-3 flex aspect-square items-center justify-center rounded-xl bg-gradient-to-br from-blue-50 to-slate-50 text-blue-400 transition-colors group-hover:text-blue-500">
-                  <Smartphone className="h-8 w-8" />
+                <div className="mb-3 flex aspect-square items-center justify-center overflow-hidden rounded-xl bg-white">
+                  {r.imagen ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={r.imagen}
+                      alt={r.nombre}
+                      loading="lazy"
+                      className="h-full w-full object-contain"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-blue-50 to-slate-50 text-blue-400 transition-colors group-hover:text-blue-500">
+                      <Smartphone className="h-8 w-8" />
+                    </div>
+                  )}
                 </div>
                 <p className="line-clamp-2 min-h-[2.5rem] text-sm font-medium leading-tight text-slate-900">
                   {r.nombre}

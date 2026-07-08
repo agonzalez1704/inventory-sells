@@ -10,6 +10,7 @@ type Row = {
   category: string | null;
   price_cents: number;
   quantity: number;
+  image_url: string | null;
 };
 
 // Public storefront: read with the admin client (RLS is staff-only) but expose
@@ -17,7 +18,7 @@ type Row = {
 export default async function TiendaPage() {
   const { data } = await insforgeAdmin.database
     .from("products")
-    .select("id, name, brand, category, price_cents, quantity")
+    .select("id, name, brand, category, price_cents, quantity, image_url")
     .eq("is_active", true);
 
   const productos: PublicProduct[] = ((data ?? []) as Row[])
@@ -28,6 +29,7 @@ export default async function TiendaPage() {
       categoria: p.category,
       precio_cents: p.price_cents,
       disponible: p.quantity > 0,
+      imagen: p.image_url,
     }))
     // Available + priced first, then the rest, alphabetical.
     .sort(

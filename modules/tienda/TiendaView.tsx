@@ -13,6 +13,7 @@ export type PublicProduct = {
   categoria: string | null;
   precio_cents: number;
   disponible: boolean;
+  imagen: string | null;
 };
 
 const LIMITE = 150;
@@ -159,8 +160,20 @@ function ProductCard({ p }: { p: PublicProduct }) {
         !p.disponible && "opacity-75",
       )}
     >
-      <div className="mb-3 flex aspect-square items-center justify-center rounded-xl bg-gradient-to-br from-blue-50 to-slate-50 text-blue-400 transition-colors group-hover:text-blue-500">
-        <Smartphone className="h-9 w-9" />
+      <div className="mb-3 flex aspect-square items-center justify-center overflow-hidden rounded-xl bg-white">
+        {p.imagen ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={p.imagen}
+            alt={p.nombre}
+            loading="lazy"
+            className="h-full w-full object-contain"
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-blue-50 to-slate-50 text-blue-400 transition-colors group-hover:text-blue-500">
+            <Smartphone className="h-9 w-9" />
+          </div>
+        )}
       </div>
       <p className="line-clamp-2 min-h-[2.5rem] text-sm font-medium leading-tight text-slate-900">
         {p.nombre}

@@ -18,6 +18,7 @@ type Row = {
   price_cents: number;
   quantity: number;
   is_active: boolean;
+  image_url: string | null;
 };
 
 export default async function ProductoPage({
@@ -29,7 +30,7 @@ export default async function ProductoPage({
 
   const { data } = await insforgeAdmin.database
     .from("products")
-    .select("id, name, brand, category, size, color, price_cents, quantity, is_active")
+    .select("id, name, brand, category, size, color, price_cents, quantity, is_active, image_url")
     .eq("id", id)
     .maybeSingle();
 
@@ -45,12 +46,13 @@ export default async function ProductoPage({
     color: row.color,
     precio_cents: row.price_cents,
     disponible: row.quantity > 0,
+    imagen: row.image_url,
   };
 
   // Related: same category (or brand), a few active products.
   const rel = insforgeAdmin.database
     .from("products")
-    .select("id, name, brand, category, price_cents, quantity")
+    .select("id, name, brand, category, price_cents, quantity, image_url")
     .eq("is_active", true)
     .neq("id", row.id)
     .limit(8);
@@ -67,6 +69,7 @@ export default async function ProductoPage({
       marca: p.brand,
       precio_cents: p.price_cents,
       disponible: p.quantity > 0,
+      imagen: p.image_url,
     }))
     .sort((a, b) => Number(b.disponible) - Number(a.disponible))
     .slice(0, 4);
