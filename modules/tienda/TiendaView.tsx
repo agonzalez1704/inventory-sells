@@ -1,13 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Search, Smartphone, PackageSearch } from "lucide-react";
+import { Search, Smartphone, PackageSearch, ShieldCheck } from "lucide-react";
 import { formatMXN } from "@/lib/money";
 import { cn } from "@/lib/utils";
-import { Logo } from "@/components/logo";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { EmptyState } from "@/components/ui/empty-state";
 
 export type PublicProduct = {
   id: string;
@@ -44,73 +40,87 @@ export function TiendaView({ productos }: { productos: PublicProduct[] }) {
   const mostrados = filtrados.slice(0, LIMITE);
 
   return (
-    <div className="mx-auto max-w-6xl px-4 pb-16 sm:px-6">
-      {/* Hero */}
-      <section className="relative mt-6 overflow-hidden rounded-3xl border border-border bg-dots px-6 py-12 text-center sm:py-16">
-        <Logo className="mx-auto mb-5 h-9 w-auto text-foreground" />
-        <span className="mb-4 inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1 text-xs font-medium text-muted-foreground shadow-xs">
-          <span className="h-1.5 w-1.5 rounded-full bg-brand" />
-          Catálogo
-        </span>
-        <h1 className="text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
-          Pantallas, baterías y refacciones
-        </h1>
-        <p className="mx-auto mt-3 max-w-lg text-pretty text-sm text-muted-foreground sm:text-base">
-          Explora nuestro inventario. Para comprar o cotizar, escríbenos por
-          WhatsApp con el modelo que buscas.
-        </p>
+    <div>
+      {/* Hero — deep blue = trust / technology */}
+      <section className="relative overflow-hidden bg-gradient-to-br from-blue-700 via-blue-800 to-indigo-900 text-white">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-blue-400/20 blur-3xl"
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -bottom-32 -left-24 h-80 w-80 rounded-full bg-indigo-500/20 blur-3xl"
+        />
+        <div className="relative mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-20">
+          <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-medium text-blue-50">
+            <ShieldCheck className="h-3.5 w-3.5" />
+            Refacciones con garantía
+          </span>
+          <h1 className="mt-5 max-w-2xl text-balance text-3xl font-semibold leading-tight tracking-tight [font-family:var(--font-display)] sm:text-5xl">
+            Pantallas y refacciones para tu celular
+          </h1>
+          <p className="mt-4 max-w-xl text-pretty text-sm text-blue-100 sm:text-base">
+            Explora nuestro catálogo por modelo. Precios claros y disponibilidad
+            al día. Para comprar, escríbenos con el modelo que buscas.
+          </p>
+
+          {/* Search on the hero */}
+          <div className="mt-7 max-w-xl">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Busca tu modelo (ej: iPhone 13, Redmi Note 12…)"
+                className="h-[3.25rem] w-full rounded-xl border border-white/10 bg-white py-3.5 pl-11 pr-4 text-base text-slate-900 shadow-lg shadow-blue-950/20 outline-none placeholder:text-slate-400 focus:ring-2 focus:ring-blue-400"
+              />
+            </div>
+          </div>
+        </div>
       </section>
 
-      {/* Search */}
-      <div className="sticky top-16 z-10 -mx-4 mt-6 bg-background/80 px-4 py-3 backdrop-blur sm:mx-0 sm:rounded-xl sm:px-0">
-        <div className="relative mx-auto max-w-xl">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Busca tu modelo (ej: iPhone 13, Redmi Note 12…)"
-            className="h-12 pl-9 text-base"
-          />
-        </div>
-      </div>
-
-      {/* Category chips */}
-      {categorias.length > 1 && (
-        <div className="mt-3 flex flex-wrap justify-center gap-1.5">
-          <Chip active={cat === null} onClick={() => setCat(null)}>
-            Todos
-          </Chip>
-          {categorias.map((c) => (
-            <Chip key={c} active={cat === c} onClick={() => setCat(c)}>
-              {c}
+      <div className="mx-auto max-w-6xl px-4 pb-16 sm:px-6">
+        {/* Category chips */}
+        {categorias.length > 1 && (
+          <div className="mt-6 flex flex-wrap gap-1.5">
+            <Chip active={cat === null} onClick={() => setCat(null)}>
+              Todos
             </Chip>
-          ))}
-        </div>
-      )}
-
-      {/* Grid */}
-      {mostrados.length === 0 ? (
-        <EmptyState
-          icon={PackageSearch}
-          title="Sin resultados"
-          description="Prueba con otro modelo o marca."
-          className="mt-8"
-        />
-      ) : (
-        <>
-          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            {mostrados.map((p) => (
-              <ProductCard key={p.id} p={p} />
+            {categorias.map((c) => (
+              <Chip key={c} active={cat === c} onClick={() => setCat(c)}>
+                {c}
+              </Chip>
             ))}
           </div>
-          {filtrados.length > LIMITE && (
-            <p className="mt-6 text-center text-sm text-muted-foreground">
-              Mostrando {LIMITE} de {filtrados.length}. Usa el buscador para
-              encontrar tu modelo.
+        )}
+
+        {/* Grid */}
+        {mostrados.length === 0 ? (
+          <div className="mt-16 flex flex-col items-center text-center text-slate-500">
+            <PackageSearch className="h-10 w-10 text-slate-300" />
+            <p className="mt-3 text-sm font-medium text-slate-700">Sin resultados</p>
+            <p className="text-sm">Prueba con otro modelo o marca.</p>
+          </div>
+        ) : (
+          <>
+            <p className="mt-5 text-xs text-slate-500">
+              {filtrados.length} {filtrados.length === 1 ? "producto" : "productos"}
+              {cat ? ` en ${cat}` : ""}
             </p>
-          )}
-        </>
-      )}
+            <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              {mostrados.map((p) => (
+                <ProductCard key={p.id} p={p} />
+              ))}
+            </div>
+            {filtrados.length > LIMITE && (
+              <p className="mt-6 text-center text-sm text-slate-500">
+                Mostrando {LIMITE} de {filtrados.length}. Usa el buscador para
+                encontrar tu modelo.
+              </p>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }
@@ -128,10 +138,10 @@ function Chip({
     <button
       onClick={onClick}
       className={cn(
-        "cursor-pointer rounded-full px-3 py-1 text-xs font-medium transition-colors",
+        "cursor-pointer rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
         active
-          ? "bg-primary text-primary-foreground"
-          : "bg-muted text-muted-foreground hover:text-foreground",
+          ? "bg-blue-600 text-white shadow-sm shadow-blue-600/30"
+          : "border border-blue-100 bg-white text-slate-600 hover:border-blue-200 hover:text-blue-700",
       )}
     >
       {children}
@@ -143,28 +153,35 @@ function ProductCard({ p }: { p: PublicProduct }) {
   return (
     <div
       className={cn(
-        "flex flex-col rounded-xl border border-border bg-background p-3 shadow-card transition-colors",
-        !p.disponible && "opacity-70",
+        "group flex flex-col rounded-2xl border border-slate-200 bg-white p-3 transition-all hover:border-blue-300 hover:shadow-lg hover:shadow-blue-900/5",
+        !p.disponible && "opacity-75",
       )}
     >
-      <div className="mb-3 flex aspect-square items-center justify-center rounded-lg bg-muted text-muted-foreground">
-        <Smartphone className="h-8 w-8" />
+      <div className="mb-3 flex aspect-square items-center justify-center rounded-xl bg-gradient-to-br from-blue-50 to-slate-50 text-blue-400 transition-colors group-hover:text-blue-500">
+        <Smartphone className="h-9 w-9" />
       </div>
-      <p className="line-clamp-2 min-h-[2.5rem] text-sm font-medium leading-tight">
+      <p className="line-clamp-2 min-h-[2.5rem] text-sm font-medium leading-tight text-slate-900">
         {p.nombre}
       </p>
       {(p.marca || p.categoria) && (
-        <p className="mt-0.5 truncate text-xs text-muted-foreground">
+        <p className="mt-0.5 truncate text-xs text-slate-500">
           {[p.marca, p.categoria].filter(Boolean).join(" · ")}
         </p>
       )}
       <div className="mt-2 flex items-center justify-between gap-2">
-        <span className="font-mono text-sm font-semibold tabular-nums">
+        <span className="font-semibold tabular-nums text-blue-800 [font-family:var(--font-display)]">
           {p.precio_cents > 0 ? formatMXN(p.precio_cents) : "A cotizar"}
         </span>
-        <Badge tone={p.disponible ? "accent" : "neutral"}>
+        <span
+          className={cn(
+            "shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium",
+            p.disponible
+              ? "bg-green-100 text-green-700"
+              : "bg-slate-100 text-slate-500",
+          )}
+        >
           {p.disponible ? "Disponible" : "Agotado"}
-        </Badge>
+        </span>
       </div>
     </div>
   );

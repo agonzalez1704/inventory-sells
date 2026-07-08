@@ -1,11 +1,5 @@
-import type { Metadata } from "next";
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { TiendaView, type PublicProduct } from "@/modules/tienda/TiendaView";
-
-export const metadata: Metadata = {
-  title: "Catálogo — Fiable",
-  description: "Pantallas, baterías y refacciones para celular.",
-};
 
 export const dynamic = "force-dynamic";
 

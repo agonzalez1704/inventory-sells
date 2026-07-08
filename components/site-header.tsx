@@ -31,6 +31,9 @@ const links = [
 export function SiteHeader() {
   const pathname = usePathname();
 
+  // The public storefront (Lead Displays) has its own brand + header.
+  if (pathname.startsWith("/tienda")) return null;
+
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-background/80 backdrop-blur">
       <div className="brand-gradient h-[2px] w-full" />
