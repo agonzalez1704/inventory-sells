@@ -17,8 +17,11 @@ const cero = () =>
   Object.fromEntries(METODOS.map((m) => [m, 0])) as Record<PaymentMethod, number>;
 
 type VentaRow = {
+  id?: string;
   total_cents: number;
   payment_method: PaymentMethod | null;
+  created_at?: string;
+  settled_at?: string;
   sale_items: {
     qty: number;
     unit_price_cents: number;
@@ -73,7 +76,7 @@ export default async function CajaPage({
     insforge.database
       .from("sales")
       .select(
-        "total_cents, payment_method, sale_items(qty, unit_price_cents, products(etiqueta, cost_cents, name, sku))",
+        "id, total_cents, payment_method, created_at, sale_items(qty, unit_price_cents, products(etiqueta, cost_cents, name, sku))",
       )
       .eq("status", "completed")
       .is("settled_at", null)
@@ -84,7 +87,7 @@ export default async function CajaPage({
     insforge.database
       .from("sales")
       .select(
-        "sale_items(qty, unit_price_cents, products(etiqueta, cost_cents, name, sku))",
+        "id, total_cents, payment_method, settled_at, sale_items(qty, unit_price_cents, products(etiqueta, cost_cents, name, sku))",
       )
       .eq("status", "completed")
       .gte("settled_at", startISO)
@@ -234,6 +237,23 @@ export default async function CajaPage({
 
   const ventasCount = directasV.length + fiadosV.length;
 
+  // Breakdown of the completed sales (products + total) for the Ingresos widget.
+  const mapVenta = (v: VentaRow, tipo: "venta" | "fiado") => ({
+    id: v.id ?? "",
+    total_cents: v.total_cents,
+    metodo: v.payment_method,
+    fecha: (tipo === "fiado" ? v.settled_at : v.created_at) ?? "",
+    tipo,
+    productos: (v.sale_items ?? []).map((it) => ({
+      qty: it.qty,
+      nombre: it.products?.name ?? "—",
+    })),
+  });
+  const ventasDetalle = [
+    ...directasV.map((v) => mapVenta(v, "venta")),
+    ...fiadosV.map((v) => mapVenta(v, "fiado")),
+  ].sort((a, b) => (a.fecha < b.fecha ? 1 : -1));
+
   return (
     <CajaView
       data={{
@@ -252,6 +272,7 @@ export default async function CajaPage({
         devoluciones,
         etiquetado,
         ganancia,
+        ventasDetalle,
       }}
     />
   );

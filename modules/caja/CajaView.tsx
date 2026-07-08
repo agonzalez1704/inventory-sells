@@ -13,6 +13,7 @@ import {
   Printer,
   Usb,
   Coins,
+  ChevronRight,
 } from "lucide-react";
 import { formatMXN } from "@/lib/money";
 import { cn } from "@/lib/utils";
@@ -56,6 +57,14 @@ export type Devolucion = {
   motivo: string | null;
   created_at: string;
 };
+export type VentaDetalle = {
+  id: string;
+  total_cents: number;
+  metodo: PaymentMethod | null;
+  fecha: string;
+  tipo: "venta" | "fiado";
+  productos: { qty: number; nombre: string }[];
+};
 
 export type CajaData = {
   from: string;
@@ -77,6 +86,7 @@ export type CajaData = {
     productos: { nombre: string; sku: string; qty: number; monto: number }[];
   }[];
   ganancia: number | null; // net sales profit; null for non-admins
+  ventasDetalle: VentaDetalle[];
 };
 
 function ymd(d: Date): string {
@@ -88,14 +98,22 @@ function Kpi({
   label,
   value,
   tone = "default",
+  onClick,
 }: {
   icon: typeof Wallet;
   label: string;
   value: string;
   tone?: "default" | "in" | "out";
+  onClick?: () => void;
 }) {
   return (
-    <Card className="p-4">
+    <Card
+      className={cn(
+        "p-4",
+        onClick && "cursor-pointer transition-colors hover:border-ring/40 hover:bg-muted/30",
+      )}
+      onClick={onClick}
+    >
       <div className="flex items-center gap-2">
         <span
           className={
@@ -109,6 +127,7 @@ function Kpi({
           <Icon className="h-4 w-4" />
         </span>
         <span className="text-xs font-medium text-muted-foreground">{label}</span>
+        {onClick && <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground" />}
       </div>
       <p className="mt-2.5 font-mono text-2xl font-semibold tabular-nums tracking-tight">
         {value}
@@ -123,6 +142,7 @@ export function CajaView({ data }: { data: CajaData }) {
   const [to, setTo] = useState(data.to);
   const [gastoOpen, setGastoOpen] = useState(false);
   const [ingresoOpen, setIngresoOpen] = useState(false);
+  const [ventasOpen, setVentasOpen] = useState(false);
   const [usbOk, setUsbOk] = useState(false);
   const [usbBusy, setUsbBusy] = useState(false);
 
@@ -301,7 +321,13 @@ export function CajaView({ data }: { data: CajaData }) {
 
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Kpi icon={TrendingUp} label="Ingresos" value={formatMXN(data.ingresosTotal)} tone="in" />
+        <Kpi
+          icon={TrendingUp}
+          label="Ingresos"
+          value={formatMXN(data.ingresosTotal)}
+          tone="in"
+          onClick={data.ventasDetalle.length > 0 ? () => setVentasOpen(true) : undefined}
+        />
         <Kpi icon={TrendingDown} label="Gastos" value={formatMXN(data.gastosTotal)} tone="out" />
         <Kpi icon={Scale} label="Balance" value={formatMXN(balance)} />
         <Kpi icon={Wallet} label="Efectivo en caja" value={formatMXN(efectivoCaja)} />
@@ -489,7 +515,73 @@ export function CajaView({ data }: { data: CajaData }) {
 
       <MovModal open={gastoOpen} onClose={() => setGastoOpen(false)} tipo="gasto" />
       <MovModal open={ingresoOpen} onClose={() => setIngresoOpen(false)} tipo="ingreso" />
+      <VentasModal
+        open={ventasOpen}
+        onClose={() => setVentasOpen(false)}
+        ventas={data.ventasDetalle}
+        total={data.ventasDetalle.reduce((s, v) => s + v.total_cents, 0)}
+      />
     </section>
+  );
+}
+
+function VentasModal({
+  open,
+  onClose,
+  ventas,
+  total,
+}: {
+  open: boolean;
+  onClose: () => void;
+  ventas: VentaDetalle[];
+  total: number;
+}) {
+  return (
+    <Modal open={open} onClose={onClose} title="Ventas del periodo" className="max-w-xl">
+      <div className="space-y-3">
+        <div className="flex items-baseline justify-between">
+          <span className="text-sm text-muted-foreground">
+            {ventas.length} {ventas.length === 1 ? "venta" : "ventas"}
+          </span>
+          <span className="font-mono text-lg font-semibold tabular-nums">
+            {formatMXN(total)}
+          </span>
+        </div>
+        <ul className="max-h-[60vh] divide-y divide-border overflow-auto rounded-xl border border-border">
+          {ventas.map((v) => (
+            <li key={v.id} className="flex items-start justify-between gap-3 px-3 py-2.5">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm">
+                  {v.productos.length > 0
+                    ? v.productos
+                        .map((p) => `${p.qty > 1 ? `${p.qty}× ` : ""}${p.nombre}`)
+                        .join(" · ")
+                    : "Sin productos"}
+                </p>
+                <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+                  {v.tipo === "fiado" && <Badge tone="warning">Fiado</Badge>}
+                  <Badge tone="neutral">
+                    {v.metodo ? (LABEL[v.metodo] ?? v.metodo) : "—"}
+                  </Badge>
+                  {v.fecha && (
+                    <span>
+                      ·{" "}
+                      {new Date(v.fecha).toLocaleString("es-MX", {
+                        dateStyle: "short",
+                        timeStyle: "short",
+                      })}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <span className="shrink-0 font-mono text-sm font-semibold tabular-nums">
+                {formatMXN(v.total_cents)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </Modal>
   );
 }
 
