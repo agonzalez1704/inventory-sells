@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { Search, Smartphone, PackageSearch, ShieldCheck } from "lucide-react";
 import { formatMXN } from "@/lib/money";
 import { cn } from "@/lib/utils";
@@ -151,7 +152,8 @@ function Chip({
 
 function ProductCard({ p }: { p: PublicProduct }) {
   return (
-    <div
+    <Link
+      href={`/tienda/${p.id}`}
       className={cn(
         "group flex flex-col rounded-2xl border border-slate-200 bg-white p-3 transition-all hover:border-blue-300 hover:shadow-lg hover:shadow-blue-900/5",
         !p.disponible && "opacity-75",
@@ -183,6 +185,6 @@ function ProductCard({ p }: { p: PublicProduct }) {
           {p.disponible ? "Disponible" : "Agotado"}
         </span>
       </div>
-    </div>
+    </Link>
   );
 }
