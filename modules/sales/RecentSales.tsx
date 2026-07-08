@@ -12,6 +12,7 @@ import {
   Undo2,
   Search,
   Loader2,
+  Trash2,
 } from "lucide-react";
 import { formatMXN } from "@/lib/money";
 import type { PaymentMethod, Sale } from "@/lib/types";
@@ -30,6 +31,7 @@ import {
   convertirAFiado,
   cambiarVentaItems,
   buscarVentas,
+  anularVenta,
 } from "./actions";
 
 // A sale row with its line items embedded (for the expandable detail).
@@ -101,6 +103,25 @@ function EditModal({
     });
   }
 
+  function anular() {
+    if (
+      !confirm(
+        "¿Anular esta venta? Regresa el stock y quita su dinero del corte. Úsalo para ventas duplicadas o registradas por error.",
+      )
+    )
+      return;
+    start(async () => {
+      try {
+        await anularVenta(sale.id);
+        toast.success("Venta anulada");
+        onClose();
+        router.refresh();
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Error al anular");
+      }
+    });
+  }
+
   return (
     <Modal open onClose={onClose} title="Corregir venta" className="max-w-md">
       <div className="space-y-3">
@@ -162,6 +183,24 @@ function EditModal({
           >
             <HandCoins className="h-4 w-4" />
             Convertir a fiado
+          </Button>
+        </div>
+
+        <div className="rounded-lg border border-red-200 bg-red-50/50 p-3">
+          <p className="text-xs font-medium text-red-700">¿Venta duplicada o por error?</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Anúlala: regresa el stock y quita su dinero del corte. No se puede
+            deshacer.
+          </p>
+          <Button
+            variant="danger"
+            size="sm"
+            className="mt-2"
+            onClick={anular}
+            disabled={pending}
+          >
+            <Trash2 className="h-4 w-4" />
+            Anular venta
           </Button>
         </div>
 

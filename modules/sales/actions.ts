@@ -216,6 +216,21 @@ export async function cambiarFiado(
   if (error) throw new Error(error.message ?? "Error al cambiar el fiado");
 }
 
+// Void a completed sale (e.g. a duplicate). Admin only: restores stock, removes
+// its abonos and marks it void so it drops out of income.
+export async function anularVenta(saleId: string): Promise<void> {
+  const { userId } = await auth();
+  if (!userId) throw new Error("No autenticado");
+  const profile = await getProfile(userId);
+  if (profile?.role !== "admin") throw new Error("Solo administradores");
+
+  const insforge = await createInsForgeServerClient();
+  const { error } = await insforge.database.rpc("anular_venta", {
+    p_sale_id: saleId,
+  });
+  if (error) throw new Error(error.message ?? "Error al anular la venta");
+}
+
 // Fix a sale registered by mistake that should have been a fiado: flip the
 // completed sale back to a pending loan. Stock is untouched (it already left on
 // the sale); `note` records who owes.
