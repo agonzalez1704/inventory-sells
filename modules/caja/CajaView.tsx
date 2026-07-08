@@ -71,7 +71,11 @@ export type CajaData = {
   gastos: Gasto[];
   ingresos: Ingreso[];
   devoluciones: Devolucion[];
-  etiquetado: { tag: string; monto: number }[];
+  etiquetado: {
+    tag: string;
+    monto: number;
+    productos: { nombre: string; sku: string; qty: number; monto: number }[];
+  }[];
   ganancia: number | null; // net sales profit; null for non-admins
 };
 
@@ -371,14 +375,29 @@ export function CajaView({ data }: { data: CajaData }) {
           </div>
           <ul className="divide-y divide-border">
             {data.etiquetado.map((e) => (
-              <li
-                key={e.tag}
-                className="flex items-center justify-between gap-3 px-4 py-2.5"
-              >
-                <Badge tone="warning">{e.tag}</Badge>
-                <span className="font-mono text-sm font-semibold tabular-nums">
-                  {formatMXN(e.monto)}
-                </span>
+              <li key={e.tag} className="px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <Badge tone="warning">{e.tag}</Badge>
+                  <span className="font-mono text-sm font-semibold tabular-nums">
+                    {formatMXN(e.monto)}
+                  </span>
+                </div>
+                <ul className="mt-2 space-y-1">
+                  {e.productos.map((p) => (
+                    <li
+                      key={p.sku}
+                      className="flex items-center justify-between gap-3 text-xs text-muted-foreground"
+                    >
+                      <span className="min-w-0 flex-1 truncate">
+                        <span className="font-medium tabular-nums">{p.qty}×</span>{" "}
+                        {p.nombre}
+                      </span>
+                      <span className="shrink-0 font-mono tabular-nums">
+                        {formatMXN(p.monto)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
               </li>
             ))}
           </ul>

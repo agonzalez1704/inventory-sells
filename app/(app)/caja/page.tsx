@@ -22,7 +22,12 @@ type VentaRow = {
   sale_items: {
     qty: number;
     unit_price_cents: number;
-    products: { etiqueta: string | null; cost_cents: number } | null;
+    products: {
+      etiqueta: string | null;
+      cost_cents: number;
+      name: string;
+      sku: string;
+    } | null;
   }[];
 };
 
@@ -68,7 +73,7 @@ export default async function CajaPage({
     insforge.database
       .from("sales")
       .select(
-        "total_cents, payment_method, sale_items(qty, unit_price_cents, products(etiqueta, cost_cents))",
+        "total_cents, payment_method, sale_items(qty, unit_price_cents, products(etiqueta, cost_cents, name, sku))",
       )
       .eq("status", "completed")
       .is("settled_at", null)
@@ -78,7 +83,9 @@ export default async function CajaPage({
     // from sale_pagos, not from re-counting the total here).
     insforge.database
       .from("sales")
-      .select("sale_items(qty, unit_price_cents, products(etiqueta, cost_cents))")
+      .select(
+        "sale_items(qty, unit_price_cents, products(etiqueta, cost_cents, name, sku))",
+      )
       .eq("status", "completed")
       .gte("settled_at", startISO)
       .lt("settled_at", endISO),
@@ -149,19 +156,40 @@ export default async function CajaPage({
   for (const p of adelantoPagos) if (p.tipo === "abono") addIngreso(p.metodo, p.monto_cents);
   for (const i of ingresos) addIngreso(i.metodo, i.monto_cents);
 
-  // --- Tagged revenue (recognized at completion) ---
-  const etiquetadoMap: Record<string, number> = {};
+  // --- Tagged revenue (recognized at completion), broken down per product ---
+  type TagAgg = {
+    monto: number;
+    productos: Map<string, { nombre: string; sku: string; qty: number; monto: number }>;
+  };
+  const etiquetadoMap: Record<string, TagAgg> = {};
   const tagRev = (rows: VentaRow[]) => {
     for (const v of rows)
       for (const it of v.sale_items ?? []) {
         const t = it.products?.etiqueta;
-        if (t) etiquetadoMap[t] = (etiquetadoMap[t] ?? 0) + it.unit_price_cents * it.qty;
+        if (!t) continue;
+        const monto = it.unit_price_cents * it.qty;
+        const agg = (etiquetadoMap[t] ??= { monto: 0, productos: new Map() });
+        agg.monto += monto;
+        const sku = it.products?.sku ?? "—";
+        const p = agg.productos.get(sku) ?? {
+          nombre: it.products?.name ?? "—",
+          sku,
+          qty: 0,
+          monto: 0,
+        };
+        p.qty += it.qty;
+        p.monto += monto;
+        agg.productos.set(sku, p);
       }
   };
   tagRev(directasV);
   tagRev(fiadosV);
   const etiquetado = Object.entries(etiquetadoMap)
-    .map(([tag, monto]) => ({ tag, monto }))
+    .map(([tag, a]) => ({
+      tag,
+      monto: a.monto,
+      productos: [...a.productos.values()].sort((x, y) => y.monto - x.monto),
+    }))
     .sort((a, b) => b.monto - a.monto);
 
   // --- Net profit (admin): margin at completion/delivery, less returns ---
