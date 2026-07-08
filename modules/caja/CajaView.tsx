@@ -212,14 +212,19 @@ export function CajaView({ data }: { data: CajaData }) {
             devoluciones
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="secondary" onClick={() => imprimirCorteNavegador(buildCorte())}>
+        <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
+          <Button
+            variant="secondary"
+            className="w-full sm:w-auto"
+            onClick={() => imprimirCorteNavegador(buildCorte())}
+          >
             <Printer className="h-4 w-4" />
             Imprimir corte
           </Button>
           {usbOk && (
             <Button
               variant="secondary"
+              className="w-full sm:w-auto"
               onClick={imprimirUSB}
               loading={usbBusy}
               title="Impresión directa por USB (ESC/POS)"
@@ -228,11 +233,15 @@ export function CajaView({ data }: { data: CajaData }) {
               USB
             </Button>
           )}
-          <Button variant="secondary" onClick={() => setIngresoOpen(true)}>
+          <Button
+            variant="secondary"
+            className="w-full sm:w-auto"
+            onClick={() => setIngresoOpen(true)}
+          >
             <Plus className="h-4 w-4" />
             Ingreso extra
           </Button>
-          <Button onClick={() => setGastoOpen(true)}>
+          <Button className="w-full sm:w-auto" onClick={() => setGastoOpen(true)}>
             <Plus className="h-4 w-4" />
             Registrar gasto
           </Button>
@@ -240,7 +249,7 @@ export function CajaView({ data }: { data: CajaData }) {
       </div>
 
       {/* Date controls */}
-      <Card className="flex flex-wrap items-end gap-3 p-3">
+      <Card className="space-y-3 p-3">
         <div className="flex flex-wrap gap-1.5">
           {(
             [
@@ -259,28 +268,32 @@ export function CajaView({ data }: { data: CajaData }) {
             </button>
           ))}
         </div>
-        <div className="flex items-end gap-2">
-          <label className="block">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+          <label className="block sm:flex-1">
             <span className="mb-1 block text-xs text-muted-foreground">Desde</span>
             <Input
               type="date"
               value={from}
               max={to}
               onChange={(e) => setFrom(e.target.value)}
-              className="h-9 w-auto"
+              className="h-9 w-full"
             />
           </label>
-          <label className="block">
+          <label className="block sm:flex-1">
             <span className="mb-1 block text-xs text-muted-foreground">Hasta</span>
             <Input
               type="date"
               value={to}
               min={from}
               onChange={(e) => setTo(e.target.value)}
-              className="h-9 w-auto"
+              className="h-9 w-full"
             />
           </label>
-          <Button variant="secondary" onClick={() => go(from, to)}>
+          <Button
+            variant="secondary"
+            className="h-9 w-full sm:w-auto"
+            onClick={() => go(from, to)}
+          >
             Aplicar
           </Button>
         </div>
