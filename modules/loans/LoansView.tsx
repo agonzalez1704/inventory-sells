@@ -34,6 +34,7 @@ export type Loan = {
   created_at: string;
   sale_items: LoanItem[];
   pagado_cents: number;
+  vendedor: string | null; // who created the fiado
 };
 
 const PAYMENT_METHODS: [PaymentMethod, string][] = [
@@ -153,7 +154,10 @@ function LoanRow({
             {loan.note || "Sin nota"}
           </p>
           <p className="mt-1 text-sm text-muted-foreground">{items}</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">{ago(loan.created_at)}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {ago(loan.created_at)}
+            {loan.vendedor && <> · Creó {loan.vendedor}</>}
+          </p>
         </div>
         <div className="text-right">
           <p className="font-mono text-lg font-semibold tabular-nums">
