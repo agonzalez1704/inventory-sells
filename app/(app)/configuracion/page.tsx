@@ -4,15 +4,18 @@ import { getNegocioInfo, getAsesoresRaw } from "@/modules/config/lib";
 import { ConfigView } from "@/modules/config/ConfigView";
 import { Card } from "@/components/ui/card";
 import { PushToggle } from "@/components/push-toggle";
+import { NotifPrefs } from "@/modules/notifications/NotifPrefs";
+import { getNotifPrefs } from "@/modules/notifications/actions";
 import { Bell } from "lucide-react";
 
 export default async function ConfiguracionPage() {
   const { userId } = await auth();
   const profile = userId ? await getProfile(userId) : null;
   const isAdmin = profile?.role === "admin";
-  const [info, asesores] = await Promise.all([
+  const [info, asesores, notifPrefs] = await Promise.all([
     getNegocioInfo(),
     getAsesoresRaw(),
+    isAdmin ? getNotifPrefs() : null,
   ]);
 
   return (
@@ -33,8 +36,9 @@ export default async function ConfiguracionPage() {
               </p>
             </div>
           </div>
-          <div className="mt-3">
+          <div className="mt-3 space-y-4">
             <PushToggle />
+            {notifPrefs && <NotifPrefs initial={notifPrefs} />}
           </div>
         </Card>
       )}

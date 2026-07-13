@@ -5,7 +5,7 @@ import { auth } from "@clerk/nextjs/server";
 import { getProfile } from "@/lib/auth/profile";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
 import { toCents } from "@/lib/money";
-import { notifyNuevaVenta } from "@/lib/push";
+import { notifyNuevaVenta, notifyAbono, notifyCancelacion } from "@/lib/push";
 import type { CartLine, PaymentMethod } from "@/lib/types";
 import type { SaleWithItems } from "./RecentSales";
 
@@ -129,6 +129,7 @@ export async function abonarFiado(
     p_metodo: metodo,
   });
   if (error) throw new Error(error.message ?? "Error al abonar");
+  after(() => notifyAbono(saleId));
 }
 
 // Collect a pending loan → becomes a completed sale (revenue counts now).
@@ -145,6 +146,7 @@ export async function settleLoan(
     p_payment_method: paymentMethod,
   });
   if (error) throw new Error(error.message ?? "Error al cobrar");
+  after(() => notifyAbono(saleId));
 }
 
 // Correct a completed sale's payment method / customer (admin only).
@@ -238,6 +240,7 @@ export async function anularVenta(saleId: string): Promise<void> {
     p_sale_id: saleId,
   });
   if (error) throw new Error(error.message ?? "Error al anular la venta");
+  after(() => notifyCancelacion(saleId, "venta"));
 }
 
 // Fix a sale registered by mistake that should have been a fiado: flip the
@@ -268,4 +271,5 @@ export async function cancelLoan(saleId: string): Promise<void> {
     p_sale_id: saleId,
   });
   if (error) throw new Error(error.message ?? "Error al cancelar");
+  after(() => notifyCancelacion(saleId, "fiado"));
 }
