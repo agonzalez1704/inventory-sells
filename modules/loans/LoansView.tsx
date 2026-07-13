@@ -156,7 +156,7 @@ function LoanRow({
           <p className="mt-1 text-sm text-muted-foreground">{items}</p>
           <p className="mt-0.5 text-xs text-muted-foreground">
             {ago(loan.created_at)}
-            {loan.vendedor && <> · Creó {loan.vendedor}</>}
+            {loan.vendedor && <> · Creado por: {loan.vendedor}</>}
           </p>
         </div>
         <div className="text-right">
