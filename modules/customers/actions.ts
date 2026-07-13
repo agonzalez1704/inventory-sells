@@ -30,12 +30,15 @@ export type CustomerInput = {
 function clean(input: CustomerInput) {
   const nombre = input.nombre.trim();
   if (!nombre) throw new Error("Falta el nombre");
+  const telefono = input.telefono?.trim() || "";
+  if (telefono.replace(/\D/g, "").length < 10)
+    throw new Error("Teléfono obligatorio (al menos 10 dígitos)");
   const pct = Number(input.descuento_pct);
   if (!Number.isFinite(pct) || pct < 0 || pct > 100)
     throw new Error("Descuento inválido (0–100)");
   return {
     nombre,
-    telefono: input.telefono?.trim() || null,
+    telefono,
     email: input.email?.trim() || null,
     descuento_pct: Math.round(pct * 100) / 100,
     tipo: input.tipo,

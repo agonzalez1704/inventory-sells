@@ -218,6 +218,8 @@ function ClienteModal({
       notas: notas || null,
     };
     if (!payload.nombre.trim()) return toast.error("Falta el nombre");
+    if ((payload.telefono ?? "").replace(/\D/g, "").length < 10)
+      return toast.error("Teléfono obligatorio (al menos 10 dígitos)");
     const d = payload.descuento_pct;
     if (!Number.isFinite(d) || d < 0 || d > 100)
       return toast.error("Descuento inválido (0–100)");
@@ -255,7 +257,7 @@ function ClienteModal({
         <div className="grid grid-cols-2 gap-2">
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-muted-foreground">
-              Teléfono / WhatsApp
+              Teléfono / WhatsApp <span className="text-red-500">*</span>
             </span>
             <Input
               value={telefono}
