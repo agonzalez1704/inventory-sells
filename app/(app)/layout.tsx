@@ -4,6 +4,7 @@ import { ensureProfile } from "@/lib/auth/profile";
 import { isAllowedEmail } from "@/lib/auth/allowlist";
 import { getNegocioInfo } from "@/modules/config/lib";
 import { ConfigPrompt } from "@/modules/config/ConfigPrompt";
+import { PushBanner } from "@/components/push-banner";
 
 export default async function AppLayout({
   children,
@@ -33,6 +34,7 @@ export default async function AppLayout({
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
       {necesitaConfig && <ConfigPrompt />}
+      {isAdmin && <PushBanner />}
       {children}
     </div>
   );
