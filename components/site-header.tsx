@@ -12,6 +12,7 @@ import {
   Headset,
   Calculator,
   Wallet,
+  Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/logo";
@@ -21,6 +22,7 @@ const links = [
   { href: "/inventario", label: "Inventario", icon: Boxes },
   { href: "/ventas", label: "Ventas", icon: ShoppingCart },
   { href: "/fiados", label: "Fiados", icon: HandCoins },
+  { href: "/clientes", label: "Clientes", icon: Users },
   { href: "/adelantos", label: "Adelantos", icon: Wallet },
   { href: "/asesor", label: "Asesor", icon: Headset },
   { href: "/caja", label: "Caja", icon: Calculator },
