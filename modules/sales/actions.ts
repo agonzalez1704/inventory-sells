@@ -112,6 +112,23 @@ export async function registerLoan(
   return { saleId };
 }
 
+// Attach (or change) the customer on a fiado/sale — used from Fiados when
+// closing or registering a payment.
+export async function asignarClienteFiado(
+  saleId: string,
+  customerId: string,
+): Promise<void> {
+  const { userId } = await auth();
+  if (!userId) throw new Error("No autenticado");
+
+  const insforge = await createInsForgeServerClient();
+  const { error } = await insforge.database.rpc("asignar_cliente_venta", {
+    p_sale_id: saleId,
+    p_customer_id: customerId,
+  });
+  if (error) throw new Error(error.message ?? "Error al asignar el cliente");
+}
+
 // Partial payment (abono) toward a fiado. When it reaches the total, the fiado
 // completes.
 export async function abonarFiado(

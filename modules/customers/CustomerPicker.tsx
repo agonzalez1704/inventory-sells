@@ -30,10 +30,16 @@ export function CustomerPicker({
   customers,
   value,
   onChange,
+  placeholder = "Elegir cliente",
+  excludeSystem = false,
+  openUp = true,
 }: {
   customers: PickerCustomer[];
-  value: PickerCustomer;
+  value: PickerCustomer | null;
   onChange: (c: PickerCustomer) => void;
+  placeholder?: string;
+  excludeSystem?: boolean;
+  openUp?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<"list" | "new">("list");
@@ -61,14 +67,15 @@ export function CustomerPicker({
   }, [open]);
 
   const filtered = useMemo(() => {
+    const base = excludeSystem ? list.filter((c) => !c.is_system) : list;
     const s = q.trim().toLowerCase();
-    if (!s) return list;
+    if (!s) return base;
     const tokens = s.split(/\s+/).filter(Boolean);
-    return list.filter((c) => {
+    return base.filter((c) => {
       const hay = `${c.nombre} ${c.telefono}`.toLowerCase();
       return tokens.every((t) => hay.includes(t));
     });
-  }, [q, list]);
+  }, [q, list, excludeSystem]);
 
   function pick(c: PickerCustomer) {
     onChange(c);
@@ -94,15 +101,22 @@ export function CustomerPicker({
         <span
           className={cn(
             "flex h-6 w-6 shrink-0 items-center justify-center rounded-md",
-            value.is_system
-              ? "bg-muted text-muted-foreground"
-              : "bg-accent-soft text-accent",
+            value && !value.is_system
+              ? "bg-accent-soft text-accent"
+              : "bg-muted text-muted-foreground",
           )}
         >
           <Store className="h-3.5 w-3.5" />
         </span>
-        <span className="min-w-0 flex-1 truncate font-medium">{value.nombre}</span>
-        {!value.is_system && value.telefono && (
+        <span
+          className={cn(
+            "min-w-0 flex-1 truncate",
+            value ? "font-medium" : "text-muted-foreground",
+          )}
+        >
+          {value ? value.nombre : placeholder}
+        </span>
+        {value && !value.is_system && value.telefono && (
           <span className="shrink-0 text-xs text-muted-foreground">
             {value.telefono}
           </span>
@@ -111,7 +125,12 @@ export function CustomerPicker({
       </button>
 
       {open && (
-        <div className="absolute bottom-full left-0 z-40 mb-2 w-full rounded-xl border border-border bg-background shadow-xl">
+        <div
+          className={cn(
+            "absolute left-0 z-40 w-full rounded-xl border border-border bg-background shadow-xl",
+            openUp ? "bottom-full mb-2" : "top-full mt-2",
+          )}
+        >
           {view === "list" ? (
             <>
               <div className="border-b border-border p-2">
@@ -152,7 +171,7 @@ export function CustomerPicker({
                           </span>
                         )}
                       </span>
-                      {value.id === c.id && (
+                      {value?.id === c.id && (
                         <Check className="h-4 w-4 shrink-0 text-accent" />
                       )}
                     </button>

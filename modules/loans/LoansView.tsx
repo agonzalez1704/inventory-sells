@@ -14,10 +14,15 @@ import { Modal } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ItemSwapModal, type SwapProduct } from "@/modules/sales/ItemSwapModal";
 import {
+  CustomerPicker,
+  type PickerCustomer,
+} from "@/modules/customers/CustomerPicker";
+import {
   settleLoan,
   cancelLoan,
   cambiarFiado,
   abonarFiado,
+  asignarClienteFiado,
 } from "@/modules/sales/actions";
 
 export type { SwapProduct };
@@ -35,6 +40,7 @@ export type Loan = {
   sale_items: LoanItem[];
   pagado_cents: number;
   vendedor: string | null; // who created the fiado
+  cliente: PickerCustomer | null; // linked customer, if assigned
 };
 
 const PAYMENT_METHODS: [PaymentMethod, string][] = [
@@ -54,9 +60,11 @@ function ago(iso: string): string {
 export function LoansView({
   loans,
   products,
+  customers,
 }: {
   loans: Loan[];
   products: SwapProduct[];
+  customers: PickerCustomer[];
 }) {
   const total = loans.reduce(
     (s, l) => s + Math.max(0, l.total_cents - l.pagado_cents),
@@ -91,7 +99,7 @@ export function LoansView({
       ) : (
         <div className="space-y-2.5">
           {loans.map((l) => (
-            <LoanRow key={l.id} loan={l} products={products} />
+            <LoanRow key={l.id} loan={l} products={products} customers={customers} />
           ))}
         </div>
       )}
@@ -102,15 +110,33 @@ export function LoansView({
 function LoanRow({
   loan,
   products,
+  customers,
 }: {
   loan: Loan;
   products: SwapProduct[];
+  customers: PickerCustomer[];
 }) {
   const router = useRouter();
   const [payment, setPayment] = useState<PaymentMethod>("efectivo");
   const [swapOpen, setSwapOpen] = useState(false);
   const [abonar, setAbonar] = useState(false);
+  const [cliente, setCliente] = useState<PickerCustomer | null>(loan.cliente);
   const [pending, startTransition] = useTransition();
+
+  function asignar(c: PickerCustomer) {
+    const prev = cliente;
+    setCliente(c);
+    startTransition(async () => {
+      try {
+        await asignarClienteFiado(loan.id, c.id);
+        toast.success(`Cliente asignado · ${c.nombre}`);
+        router.refresh();
+      } catch (e) {
+        setCliente(prev);
+        toast.error(e instanceof Error ? e.message : "Error al asignar");
+      }
+    });
+  }
 
   const resta = Math.max(0, loan.total_cents - loan.pagado_cents);
   const pct = Math.min(100, Math.round((loan.pagado_cents / loan.total_cents) * 100));
@@ -172,6 +198,17 @@ function LoanRow({
         </div>
       </div>
 
+      <div className="mt-3 sm:max-w-xs">
+        <CustomerPicker
+          customers={customers}
+          value={cliente}
+          onChange={asignar}
+          placeholder="Asignar cliente"
+          excludeSystem
+          openUp={false}
+        />
+      </div>
+
       {conAbonos && (
         <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-muted">
           <div
@@ -226,7 +263,14 @@ function LoanRow({
       />
 
       {abonar && (
-        <AbonarFiadoModal loan={loan} resta={resta} onClose={() => setAbonar(false)} />
+        <AbonarFiadoModal
+          loan={loan}
+          resta={resta}
+          cliente={cliente}
+          customers={customers}
+          onAsignarCliente={asignar}
+          onClose={() => setAbonar(false)}
+        />
       )}
     </Card>
   );
@@ -235,10 +279,16 @@ function LoanRow({
 function AbonarFiadoModal({
   loan,
   resta,
+  cliente,
+  customers,
+  onAsignarCliente,
   onClose,
 }: {
   loan: Loan;
   resta: number;
+  cliente: PickerCustomer | null;
+  customers: PickerCustomer[];
+  onAsignarCliente: (c: PickerCustomer) => void;
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -269,6 +319,19 @@ function AbonarFiadoModal({
           {loan.note || "Fiado"} · falta{" "}
           <span className="font-medium text-foreground">{formatMXN(resta)}</span>
         </p>
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-muted-foreground">
+            Cliente
+          </span>
+          <CustomerPicker
+            customers={customers}
+            value={cliente}
+            onChange={onAsignarCliente}
+            placeholder="Asignar cliente"
+            excludeSystem
+            openUp={false}
+          />
+        </label>
         <div className="grid grid-cols-2 gap-2">
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-muted-foreground">Monto (MXN)</span>
