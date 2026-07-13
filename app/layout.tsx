@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Toaster } from "sonner";
@@ -15,6 +15,13 @@ const mono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "Fiable",
   description: "Inventario, ventas y fiados",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: { capable: true, title: "Fiable", statusBarStyle: "default" },
+  icons: { icon: "/icon.svg", apple: "/icon.svg" },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0f172a",
 };
 
 export default function RootLayout({

@@ -1,9 +1,11 @@
 "use server";
 
+import { after } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { getProfile } from "@/lib/auth/profile";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
 import { toCents } from "@/lib/money";
+import { notifyNuevaVenta } from "@/lib/push";
 import type { CartLine, PaymentMethod } from "@/lib/types";
 import type { SaleWithItems } from "./RecentSales";
 
@@ -82,7 +84,10 @@ export async function registerSale(
   });
 
   if (error) throw new Error(error.message ?? "Error al registrar la venta");
-  return { saleId: String(data) };
+  const saleId = String(data);
+  // Notify admins after the response is sent (non-blocking, never breaks the sale).
+  after(() => notifyNuevaVenta(saleId, "venta"));
+  return { saleId };
 }
 
 // Lend items on credit (fiado): stock leaves now, payment pending. `note` is a
@@ -102,7 +107,9 @@ export async function registerLoan(
   });
 
   if (error) throw new Error(error.message ?? "Error al registrar el fiado");
-  return { saleId: String(data) };
+  const saleId = String(data);
+  after(() => notifyNuevaVenta(saleId, "fiado"));
+  return { saleId };
 }
 
 // Partial payment (abono) toward a fiado. When it reaches the total, the fiado
