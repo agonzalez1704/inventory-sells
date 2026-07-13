@@ -66,17 +66,19 @@ export async function buscarVentas(q: string): Promise<SaleWithItems[]> {
 export async function registerSale(
   items: CartLine[],
   paymentMethod: PaymentMethod,
-  customerName: string | null,
+  customerId: string | null,
 ): Promise<{ saleId: string }> {
   const { userId } = await auth();
   if (!userId) throw new Error("No autenticado");
   if (items.length === 0) throw new Error("Carrito vacío");
 
   const insforge = await createInsForgeServerClient();
+  // register_sale copies the customer's name into customer_name from the id,
+  // so the ticket/history keep one source of truth.
   const { data, error } = await insforge.database.rpc("register_sale", {
     p_items: items.map((i) => ({ product_id: i.product_id, qty: i.qty })),
     p_payment_method: paymentMethod,
-    p_customer_name: customerName?.trim() || null,
+    p_customer_id: customerId,
   });
 
   if (error) throw new Error(error.message ?? "Error al registrar la venta");

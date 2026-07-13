@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { imprimirTicketNavegador, type TicketData } from "@/lib/ticket";
+import { CustomerPicker, type PickerCustomer } from "@/modules/customers/CustomerPicker";
 import { registerSale, registerLoan } from "./actions";
 
 export type SalesProduct = Pick<
@@ -70,13 +71,23 @@ function Stepper({
   );
 }
 
-export function SalesScreen({ products }: { products: SalesProduct[] }) {
+export function SalesScreen({
+  products,
+  customers,
+}: {
+  products: SalesProduct[];
+  customers: PickerCustomer[];
+}) {
   const router = useRouter();
+  const mostrador = useMemo(
+    () => customers.find((c) => c.is_system) ?? customers[0],
+    [customers],
+  );
   const [query, setQuery] = useState("");
   const [cart, setCart] = useState<Record<string, number>>({});
   const [mode, setMode] = useState<"venta" | "prestamo">("venta");
   const [payment, setPayment] = useState<PaymentMethod>("efectivo");
-  const [customer, setCustomer] = useState("");
+  const [customer, setCustomer] = useState<PickerCustomer>(mostrador);
   const [note, setNote] = useState("");
   const [pending, startTransition] = useTransition();
 
@@ -137,14 +148,18 @@ export function SalesScreen({ products }: { products: SalesProduct[] }) {
       total: l.product.price_cents * l.qty,
     }));
     const ticketTotal = total;
-    const ticketCliente = esFiado ? note.trim() || null : customer.trim() || null;
+    const ticketCliente = esFiado
+      ? note.trim() || null
+      : customer.is_system
+        ? null
+        : customer.nombre;
     const ticketPago = esFiado ? null : payment;
 
     startTransition(async () => {
       try {
         const { saleId } = esFiado
           ? await registerLoan(items, note)
-          : await registerSale(items, payment, customer);
+          : await registerSale(items, payment, customer.id);
         const ticket: TicketData = {
           folio: saleId,
           fecha: new Date().toISOString(),
@@ -164,7 +179,7 @@ export function SalesScreen({ products }: { products: SalesProduct[] }) {
           },
         );
         setCart({});
-        setCustomer("");
+        setCustomer(mostrador);
         setNote("");
         setQuery("");
         router.refresh();
@@ -332,7 +347,7 @@ export function SalesScreen({ products }: { products: SalesProduct[] }) {
 
                 <div className="space-y-3 border-t border-border p-4">
                   {mode === "venta" ? (
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-2">
                       <Select
                         value={payment}
                         onChange={(e) =>
@@ -345,10 +360,10 @@ export function SalesScreen({ products }: { products: SalesProduct[] }) {
                           </option>
                         ))}
                       </Select>
-                      <Input
+                      <CustomerPicker
+                        customers={customers}
                         value={customer}
-                        onChange={(e) => setCustomer(e.target.value)}
-                        placeholder="Cliente (opcional)"
+                        onChange={setCustomer}
                       />
                     </div>
                   ) : (

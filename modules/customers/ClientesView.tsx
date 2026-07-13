@@ -139,7 +139,11 @@ function ClienteRow({ c, onEdit }: { c: Customer; onEdit: () => void }) {
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <p className="font-medium">{c.nombre}</p>
-            <Badge tone={TIPO_TONE[c.tipo]}>{TIPO_LABEL[c.tipo]}</Badge>
+            {c.is_system ? (
+              <Badge tone="neutral">Sistema</Badge>
+            ) : (
+              <Badge tone={TIPO_TONE[c.tipo]}>{TIPO_LABEL[c.tipo]}</Badge>
+            )}
             {descuento > 0 && (
               <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
                 <Percent className="h-3 w-3" />
@@ -170,20 +174,22 @@ function ClienteRow({ c, onEdit }: { c: Customer; onEdit: () => void }) {
             <p className="mt-1.5 text-xs text-muted-foreground">{c.notas}</p>
           )}
         </div>
-        <div className="flex items-center gap-1">
-          <Button variant="ghost" size="sm" onClick={onEdit} disabled={pending}>
-            <Pencil className="h-4 w-4" />
-            Editar
-          </Button>
-          <button
-            onClick={archivar}
-            disabled={pending}
-            aria-label="Archivar cliente"
-            className="shrink-0 cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-red-600"
-          >
-            <Archive className="h-4 w-4" />
-          </button>
-        </div>
+        {!c.is_system && (
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="sm" onClick={onEdit} disabled={pending}>
+              <Pencil className="h-4 w-4" />
+              Editar
+            </Button>
+            <button
+              onClick={archivar}
+              disabled={pending}
+              aria-label="Archivar cliente"
+              className="shrink-0 cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-red-600"
+            >
+              <Archive className="h-4 w-4" />
+            </button>
+          </div>
+        )}
       </div>
     </Card>
   );

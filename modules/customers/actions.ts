@@ -14,8 +14,23 @@ export type Customer = {
   tipo: CustomerTipo;
   notas: string | null;
   is_active: boolean;
+  is_system: boolean;
   created_at: string;
 };
+
+// The seeded "Mostrador" walk-in is a system row — not editable/archivable.
+async function assertNotSystem(
+  insforge: Awaited<ReturnType<typeof createInsForgeServerClient>>,
+  id: string,
+) {
+  const { data } = await insforge.database
+    .from("customers")
+    .select("is_system")
+    .eq("id", id)
+    .maybeSingle();
+  if ((data as { is_system?: boolean } | null)?.is_system)
+    throw new Error("El cliente Mostrador no se puede modificar");
+}
 
 export type CustomerInput = {
   nombre: string;
@@ -73,6 +88,7 @@ export async function editarCliente(
   if (!userId) throw new Error("No autenticado");
 
   const insforge = await createInsForgeServerClient();
+  await assertNotSystem(insforge, id);
   const { error } = await insforge.database
     .from("customers")
     .update(clean(input))
@@ -90,6 +106,7 @@ export async function archivarCliente(id: string, activo: boolean): Promise<void
   if (!userId) throw new Error("No autenticado");
 
   const insforge = await createInsForgeServerClient();
+  await assertNotSystem(insforge, id);
   const { error } = await insforge.database
     .from("customers")
     .update({ is_active: activo })
@@ -106,7 +123,9 @@ export async function buscarClientes(q: string): Promise<Customer[]> {
   const insforge = await createInsForgeServerClient();
   const { data } = await insforge.database
     .from("customers")
-    .select("id, nombre, telefono, email, descuento_pct, tipo, notas, is_active, created_at")
+    .select(
+      "id, nombre, telefono, email, descuento_pct, tipo, notas, is_active, is_system, created_at",
+    )
     .eq("is_active", true)
     .order("nombre", { ascending: true })
     .limit(500);

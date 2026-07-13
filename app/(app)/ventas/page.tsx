@@ -16,6 +16,7 @@ export default async function VentasPage() {
     { data: salesData },
     { data: invData },
     { data: profileData },
+    { data: customerData },
   ] = await Promise.all([
     insforge.database
       .from("products")
@@ -32,7 +33,20 @@ export default async function VentasPage() {
       .limit(8),
     insforge.database.from("inventories").select("id, name"),
     insforge.database.from("profiles").select("id, full_name"),
+    insforge.database
+      .from("customers")
+      .select("id, nombre, telefono, is_system")
+      .eq("is_active", true)
+      .order("is_system", { ascending: false })
+      .order("nombre", { ascending: true }),
   ]);
+
+  const customers = (customerData ?? []) as {
+    id: string;
+    nombre: string;
+    telefono: string;
+    is_system: boolean;
+  }[];
 
   const invName = new Map(
     ((invData ?? []) as { id: string; name: string }[]).map((i) => [i.id, i.name]),
@@ -104,7 +118,7 @@ export default async function VentasPage() {
         </p>
       </div>
 
-      <SalesScreen products={products} />
+      <SalesScreen products={products} customers={customers} />
 
       <RecentSales sales={netSales} isAdmin={isAdmin} products={products} />
     </section>
