@@ -1,14 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Sparkles, Loader2, Info } from "lucide-react";
 import { searchProducts, type Searchable } from "@/lib/search";
+import { Button } from "@/components/ui/button";
 import { compatiblesStaff } from "./actions";
-import type { Compat } from "@/lib/compat";
+import { useCompat } from "./useCompat";
 
-// Shown in Inventario / Ventas when a search returns nothing: asks the AI which
-// models share the same part, then matches those against the products already
-// loaded in the client. The caller renders each hit in its own style.
+// Shown in Inventario / Ventas when a search returns nothing. The AI lookup is
+// MANUAL: firing it per keystroke would cost a model call for every partial
+// query. The user asks for it; answers are cached (session + DB).
 export function CompatPanel<T extends Searchable & { id: string }>({
   query,
   products,
@@ -18,21 +19,7 @@ export function CompatPanel<T extends Searchable & { id: string }>({
   products: T[];
   renderItem: (p: T) => React.ReactNode;
 }) {
-  const [data, setData] = useState<Compat | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let alive = true;
-    setLoading(true);
-    setData(null);
-    compatiblesStaff(query)
-      .then((r) => alive && setData(r))
-      .catch(() => alive && setData(null))
-      .finally(() => alive && setLoading(false));
-    return () => {
-      alive = false;
-    };
-  }, [query]);
+  const { query: q, data, loading, run } = useCompat(query, compatiblesStaff);
 
   const hits = useMemo(() => {
     if (!data?.modelos.length) return [];
@@ -48,6 +35,23 @@ export function CompatPanel<T extends Searchable & { id: string }>({
     return out;
   }, [data, products]);
 
+  if (!q.trim()) return null;
+
+  // Idle — offer the lookup, don't spend on it.
+  if (!data && !loading) {
+    return (
+      <div className="mt-4 flex flex-col items-center gap-2 rounded-xl border border-dashed border-border px-4 py-4 text-center">
+        <p className="text-xs text-muted-foreground">
+          ¿Buscas un modelo que no manejamos? Puede haber pantallas compatibles.
+        </p>
+        <Button variant="secondary" size="sm" onClick={run}>
+          <Sparkles className="h-4 w-4" />
+          Buscar modelos compatibles
+        </Button>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="mt-4 flex items-center gap-2.5 rounded-xl border border-brand/30 bg-brand-soft/30 px-4 py-3 text-sm text-muted-foreground">
@@ -57,10 +61,16 @@ export function CompatPanel<T extends Searchable & { id: string }>({
     );
   }
 
-  if (!data || data.modelos.length === 0) return null;
+  if (!data || data.modelos.length === 0) {
+    return (
+      <div className="mt-4 rounded-xl border border-border px-4 py-3 text-sm text-muted-foreground">
+        {data?.nota ?? "No encontramos modelos compatibles para esa búsqueda."}
+      </div>
+    );
+  }
 
   return (
-    <section className="mt-4 overflow-hidden rounded-xl border border-brand/40 bg-brand-soft/20">
+    <section className="mt-4 overflow-hidden rounded-xl border border-brand/40 bg-brand-soft/20 text-left">
       <div className="border-b border-border px-4 py-3">
         <div className="flex items-center gap-2">
           <span className="flex h-6 w-6 items-center justify-center rounded-md bg-brand-soft text-brand-foreground">

@@ -54,7 +54,9 @@ function parse(text: string): Compat {
 // must not each cost a model call.
 export async function modelosCompatibles(query: string): Promise<Compat> {
   const key = normalize(query);
-  if (!key || key.length < 2) return EMPTY;
+  // Guardrails: a model name is short. Anything else is noise (or abuse) and
+  // must never reach the model.
+  if (!key || key.length < 3 || key.length > 60) return EMPTY;
   if (!process.env.OPENROUTER_API_KEY) return EMPTY;
 
   const { data: cached } = await insforgeAdmin.database
@@ -74,6 +76,7 @@ export async function modelosCompatibles(query: string): Promise<Compat> {
       system: SYSTEM,
       prompt: `Modelo buscado: "${query}"`,
       temperature: 0.2,
+      maxOutputTokens: 300, // the answer is a short JSON list — cap the cost
       abortSignal: AbortSignal.timeout(15_000),
     });
     result = parse(text);

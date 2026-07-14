@@ -1,29 +1,39 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { Sparkles, Loader2, Info } from "lucide-react";
+import { useCompat } from "@/modules/compat/useCompat";
 import { buscarCompatibles, type CompatResult } from "./actions";
 import { ProductCard } from "./TiendaView";
 
-// Zero results → ask the AI which models share the same panel, then show what
-// we actually have in stock for those. Runs on the client so the page itself
-// stays fast (the AI call only happens on a miss).
+// Zero results → offer an AI lookup of models that share the same panel. The
+// call is MANUAL and debounced: the storefront is public, so it must never fire
+// on its own (or on every keystroke). Answers are cached per session and in the
+// DB, so a repeat click costs nothing.
 export function CompatibleBox({ query }: { query: string }) {
-  const [data, setData] = useState<CompatResult | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { query: q, data, loading, run } = useCompat<CompatResult>(
+    query,
+    buscarCompatibles,
+  );
 
-  useEffect(() => {
-    let alive = true;
-    setLoading(true);
-    setData(null);
-    buscarCompatibles(query)
-      .then((r) => alive && setData(r))
-      .catch(() => alive && setData(null))
-      .finally(() => alive && setLoading(false));
-    return () => {
-      alive = false;
-    };
-  }, [query]);
+  if (!q.trim()) return null;
+
+  if (!data && !loading) {
+    return (
+      <div className="mx-auto mt-8 max-w-lg rounded-2xl border border-dashed border-blue-200 bg-blue-50/40 p-5 text-center">
+        <p className="text-sm text-slate-700">
+          Muchas pantallas son <span className="font-medium">iguales entre modelos</span>.
+          Podemos revisar si alguna que sí tenemos le queda a tu equipo.
+        </p>
+        <button
+          onClick={run}
+          className="mt-3 inline-flex h-10 cursor-pointer items-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm shadow-blue-600/30 transition-colors hover:bg-blue-700"
+        >
+          <Sparkles className="h-4 w-4" />
+          Buscar modelos compatibles
+        </button>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -44,10 +54,17 @@ export function CompatibleBox({ query }: { query: string }) {
     );
   }
 
-  if (!data || data.modelos.length === 0) return null;
+  if (!data || data.modelos.length === 0) {
+    return (
+      <div className="mx-auto mt-8 max-w-lg rounded-2xl border border-slate-200 bg-white p-5 text-center text-sm text-slate-600">
+        {data?.nota ??
+          "No encontramos modelos compatibles. Escríbenos y lo conseguimos."}
+      </div>
+    );
+  }
 
   return (
-    <section className="mx-auto mt-8 max-w-5xl overflow-hidden rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50/60">
+    <section className="mx-auto mt-8 max-w-5xl overflow-hidden rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50/60 text-left">
       <div className="border-b border-blue-100 px-5 py-4">
         <div className="flex items-center gap-2">
           <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600 text-white">
