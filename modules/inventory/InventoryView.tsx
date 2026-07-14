@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 import type { Inventory, Product } from "@/lib/types";
 import { formatMXN } from "@/lib/money";
+import { searchProducts } from "@/lib/search";
+import { CompatPanel } from "@/modules/compat/CompatPanel";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -232,16 +234,12 @@ export function InventoryView({
     return { units, value, low, out };
   }, [scoped]);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return scoped;
-    return scoped.filter(
-      (p) =>
-        p.sku.toLowerCase().includes(q) ||
-        p.name.toLowerCase().includes(q) ||
-        (p.category ?? "").toLowerCase().includes(q),
-    );
-  }, [query, scoped]);
+  // Brand-alias aware search: "moto g42" / "redmi note 7" find the shorthand
+  // catalog names. See lib/search.ts.
+  const filtered = useMemo(
+    () => searchProducts(scoped, query),
+    [query, scoped],
+  );
 
   const sorted = useMemo(() => {
     if (!sort) return filtered;
@@ -354,6 +352,38 @@ export function InventoryView({
               description={`Nada coincide con “${query}”.`}
               className="border-0"
             />
+            {query.trim() && (
+              <CompatPanel
+                query={query}
+                products={scoped}
+                renderItem={(p) => (
+                  <div
+                    key={p.id}
+                    className="flex items-center gap-3 rounded-xl border border-border bg-background p-2.5"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{p.name}</p>
+                      <p className="truncate font-mono text-xs text-muted-foreground">
+                        {p.sku}
+                      </p>
+                    </div>
+                    <span className="shrink-0 font-mono text-sm font-semibold tabular-nums">
+                      {formatMXN(p.price_cents)}
+                    </span>
+                    <span
+                      className={cn(
+                        "shrink-0 rounded-full px-2 py-0.5 text-xs font-medium",
+                        p.quantity > 0
+                          ? "bg-accent-soft text-accent"
+                          : "bg-muted text-muted-foreground",
+                      )}
+                    >
+                      {p.quantity} disp.
+                    </span>
+                  </div>
+                )}
+              />
+            )}
           </div>
         ) : (
           <table className="w-full text-sm">

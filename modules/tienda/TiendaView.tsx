@@ -1,10 +1,20 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
-import { Search, Smartphone, PackageSearch, ShieldCheck } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import {
+  Search,
+  Smartphone,
+  PackageSearch,
+  ShieldCheck,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+} from "lucide-react";
 import { formatMXN } from "@/lib/money";
 import { cn } from "@/lib/utils";
+import { CompatibleBox } from "./CompatibleBox";
 
 export type PublicProduct = {
   id: string;
@@ -16,30 +26,57 @@ export type PublicProduct = {
   imagen: string | null;
 };
 
-const LIMITE = 150;
+export type Facet = { value: string; n: number };
 
-export function TiendaView({ productos }: { productos: PublicProduct[] }) {
-  const [query, setQuery] = useState("");
-  const [cat, setCat] = useState<string | null>(null);
+export function TiendaView({
+  productos,
+  marcas,
+  categorias,
+  q,
+  marca,
+  cat,
+  page,
+  totalPages,
+  total,
+}: {
+  productos: PublicProduct[];
+  marcas: Facet[];
+  categorias: Facet[];
+  q: string;
+  marca: string | null;
+  cat: string | null;
+  page: number;
+  totalPages: number;
+  total: number;
+}) {
+  const router = useRouter();
+  const params = useSearchParams();
+  const [pending, start] = useTransition();
+  const [texto, setTexto] = useState(q);
 
-  const categorias = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const p of productos)
-      if (p.categoria) m.set(p.categoria, (m.get(p.categoria) ?? 0) + 1);
-    return [...m.entries()].sort((a, b) => b[1] - a[1]).map(([c]) => c);
-  }, [productos]);
+  // Keep the box in sync when navigating back/forward.
+  useEffect(() => setTexto(q), [q]);
 
-  const filtrados = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return productos.filter((p) => {
-      if (cat && p.categoria !== cat) return false;
-      if (!q) return true;
-      const hay = `${p.nombre} ${p.marca ?? ""} ${p.categoria ?? ""}`.toLowerCase();
-      return q.split(/\s+/).every((t) => hay.includes(t));
-    });
-  }, [productos, query, cat]);
+  function go(next: Record<string, string | null>) {
+    const sp = new URLSearchParams(params.toString());
+    for (const [k, v] of Object.entries(next)) {
+      if (v === null || v === "") sp.delete(k);
+      else sp.set(k, v);
+    }
+    // Any filter/search change restarts pagination.
+    if (!("page" in next)) sp.delete("page");
+    start(() => router.push(`/tienda?${sp.toString()}`, { scroll: false }));
+  }
 
-  const mostrados = filtrados.slice(0, LIMITE);
+  // Debounced search — typing navigates without a submit.
+  useEffect(() => {
+    if (texto === q) return;
+    const t = setTimeout(() => go({ q: texto || null }), 400);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [texto]);
+
+  const sinResultados = productos.length === 0;
 
   return (
     <div>
@@ -62,68 +99,204 @@ export function TiendaView({ productos }: { productos: PublicProduct[] }) {
             Pantallas y refacciones para tu celular
           </h1>
           <p className="mt-4 max-w-xl text-pretty text-sm text-blue-100 sm:text-base">
-            Explora nuestro catálogo por modelo. Precios claros y disponibilidad
-            al día. Para comprar, escríbenos con el modelo que buscas.
+            Busca por marca y modelo — “moto g42”, “redmi note 7”, “iPhone 13”.
+            Precios claros y disponibilidad al día.
           </p>
 
-          {/* Search on the hero */}
           <div className="mt-7 max-w-xl">
             <div className="relative">
               <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
               <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Busca tu modelo (ej: iPhone 13, Redmi Note 12…)"
-                className="h-[3.25rem] w-full rounded-xl border border-white/10 bg-white py-3.5 pl-11 pr-4 text-base text-slate-900 shadow-lg shadow-blue-950/20 outline-none placeholder:text-slate-400 focus:ring-2 focus:ring-blue-400"
+                value={texto}
+                onChange={(e) => setTexto(e.target.value)}
+                placeholder="Busca tu modelo (ej: moto g42, redmi note 7…)"
+                aria-label="Buscar producto"
+                className="h-[3.25rem] w-full rounded-xl border border-white/10 bg-white py-3.5 pl-11 pr-11 text-base text-slate-900 shadow-lg shadow-blue-950/20 outline-none placeholder:text-slate-400 focus:ring-2 focus:ring-blue-400"
               />
+              {pending && (
+                <Loader2 className="absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 animate-spin text-blue-500" />
+              )}
             </div>
           </div>
         </div>
       </section>
 
       <div className="mx-auto max-w-6xl px-4 pb-16 sm:px-6">
-        {/* Category chips */}
-        {categorias.length > 1 && (
-          <div className="mt-6 flex flex-wrap gap-1.5">
-            <Chip active={cat === null} onClick={() => setCat(null)}>
-              Todos
-            </Chip>
-            {categorias.map((c) => (
-              <Chip key={c} active={cat === c} onClick={() => setCat(c)}>
-                {c}
-              </Chip>
-            ))}
-          </div>
-        )}
+        {/* Facets */}
+        <div className="mt-6 space-y-2.5">
+          <FacetRow
+            label="Marca"
+            options={marcas}
+            active={marca}
+            onPick={(v) => go({ marca: v })}
+          />
+          {categorias.length > 1 && (
+            <FacetRow
+              label="Tipo"
+              options={categorias}
+              active={cat}
+              onPick={(v) => go({ cat: v })}
+            />
+          )}
+        </div>
 
-        {/* Grid */}
-        {mostrados.length === 0 ? (
-          <div className="mt-16 flex flex-col items-center text-center text-slate-500">
-            <PackageSearch className="h-10 w-10 text-slate-300" />
-            <p className="mt-3 text-sm font-medium text-slate-700">Sin resultados</p>
-            <p className="text-sm">Prueba con otro modelo o marca.</p>
+        {sinResultados ? (
+          <div className="mt-10">
+            <div className="flex flex-col items-center text-center text-slate-500">
+              <PackageSearch className="h-10 w-10 text-slate-300" />
+              <p className="mt-3 text-sm font-medium text-slate-700">
+                Sin resultados{q ? ` para “${q}”` : ""}
+              </p>
+              <p className="text-sm">Prueba con otra marca o modelo.</p>
+            </div>
+            {q && <CompatibleBox query={q} />}
           </div>
         ) : (
           <>
             <p className="mt-5 text-xs text-slate-500">
-              {filtrados.length} {filtrados.length === 1 ? "producto" : "productos"}
-              {cat ? ` en ${cat}` : ""}
+              {total} {total === 1 ? "producto" : "productos"}
+              {q ? ` para “${q}”` : ""}
+              {marca ? ` · ${marca}` : ""}
             </p>
-            <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-              {mostrados.map((p) => (
+            <div
+              className={cn(
+                "mt-3 grid grid-cols-2 gap-3 transition-opacity sm:grid-cols-3 lg:grid-cols-4",
+                pending && "opacity-60",
+              )}
+            >
+              {productos.map((p) => (
                 <ProductCard key={p.id} p={p} />
               ))}
             </div>
-            {filtrados.length > LIMITE && (
-              <p className="mt-6 text-center text-sm text-slate-500">
-                Mostrando {LIMITE} de {filtrados.length}. Usa el buscador para
-                encontrar tu modelo.
-              </p>
-            )}
+
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              onGo={(n) => go({ page: String(n) })}
+            />
           </>
         )}
       </div>
     </div>
+  );
+}
+
+function FacetRow({
+  label,
+  options,
+  active,
+  onPick,
+}: {
+  label: string;
+  options: Facet[];
+  active: string | null;
+  onPick: (v: string | null) => void;
+}) {
+  if (options.length === 0) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <span className="mr-1 text-xs font-medium text-slate-400">{label}</span>
+      <Chip active={active === null} onClick={() => onPick(null)}>
+        Todas
+      </Chip>
+      {options.map((o) => (
+        <Chip
+          key={o.value}
+          active={active === o.value}
+          onClick={() => onPick(active === o.value ? null : o.value)}
+        >
+          {o.value}
+          <span className="ml-1 text-[10px] opacity-60">{o.n}</span>
+        </Chip>
+      ))}
+    </div>
+  );
+}
+
+function Pagination({
+  page,
+  totalPages,
+  onGo,
+}: {
+  page: number;
+  totalPages: number;
+  onGo: (n: number) => void;
+}) {
+  if (totalPages <= 1) return null;
+
+  // Compact window around the current page.
+  const nums: number[] = [];
+  const from = Math.max(1, page - 2);
+  const to = Math.min(totalPages, from + 4);
+  for (let i = Math.max(1, to - 4); i <= to; i++) nums.push(i);
+
+  return (
+    <nav
+      aria-label="Paginación"
+      className="mt-8 flex flex-wrap items-center justify-center gap-1.5"
+    >
+      <PageBtn disabled={page <= 1} onClick={() => onGo(page - 1)} label="Anterior">
+        <ChevronLeft className="h-4 w-4" />
+      </PageBtn>
+      {nums[0] > 1 && (
+        <>
+          <PageBtn onClick={() => onGo(1)}>1</PageBtn>
+          {nums[0] > 2 && <span className="px-1 text-slate-400">…</span>}
+        </>
+      )}
+      {nums.map((n) => (
+        <PageBtn key={n} active={n === page} onClick={() => onGo(n)}>
+          {n}
+        </PageBtn>
+      ))}
+      {nums[nums.length - 1] < totalPages && (
+        <>
+          {nums[nums.length - 1] < totalPages - 1 && (
+            <span className="px-1 text-slate-400">…</span>
+          )}
+          <PageBtn onClick={() => onGo(totalPages)}>{totalPages}</PageBtn>
+        </>
+      )}
+      <PageBtn
+        disabled={page >= totalPages}
+        onClick={() => onGo(page + 1)}
+        label="Siguiente"
+      >
+        <ChevronRight className="h-4 w-4" />
+      </PageBtn>
+    </nav>
+  );
+}
+
+function PageBtn({
+  children,
+  onClick,
+  active,
+  disabled,
+  label,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  active?: boolean;
+  disabled?: boolean;
+  label?: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      aria-current={active ? "page" : undefined}
+      className={cn(
+        "flex h-9 min-w-9 cursor-pointer items-center justify-center rounded-lg px-3 text-sm font-medium transition-colors",
+        active
+          ? "bg-blue-600 text-white shadow-sm shadow-blue-600/30"
+          : "border border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:text-blue-700",
+        disabled && "cursor-not-allowed opacity-40 hover:border-slate-200 hover:text-slate-600",
+      )}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -151,7 +324,7 @@ function Chip({
   );
 }
 
-function ProductCard({ p }: { p: PublicProduct }) {
+export function ProductCard({ p }: { p: PublicProduct }) {
   return (
     <Link
       href={`/tienda/${p.id}`}

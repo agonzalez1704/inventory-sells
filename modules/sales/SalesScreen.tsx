@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Search, Plus, Minus, Package } from "lucide-react";
 import { formatMXN } from "@/lib/money";
+import { searchProducts } from "@/lib/search";
 import type { PaymentMethod, Product } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
@@ -14,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { imprimirTicketNavegador, type TicketData } from "@/lib/ticket";
 import { CustomerPicker, type PickerCustomer } from "@/modules/customers/CustomerPicker";
+import { CompatPanel } from "@/modules/compat/CompatPanel";
 import { registerSale, registerLoan } from "./actions";
 
 export type SalesProduct = Pick<
@@ -33,6 +35,67 @@ function Thumb() {
     <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
       <Package className="h-5 w-5" />
     </span>
+  );
+}
+
+function ProductButton({
+  p,
+  inCart,
+  onAdd,
+}: {
+  p: SalesProduct;
+  inCart: number;
+  onAdd: () => void;
+}) {
+  const soldOut = p.quantity === 0;
+  const maxed = inCart >= p.quantity;
+  return (
+    <button
+      onClick={onAdd}
+      disabled={soldOut || maxed}
+      className={cn(
+        "flex w-full items-center gap-3 rounded-xl border border-border bg-background p-2.5 text-left transition-colors",
+        soldOut || maxed
+          ? "opacity-60"
+          : "cursor-pointer hover:border-ring/30 hover:bg-muted/40 active:bg-muted",
+      )}
+    >
+      <Thumb />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium">{p.name}</p>
+        <div className="mt-0.5 flex items-center gap-1.5 truncate text-xs text-muted-foreground">
+          <span className="font-mono">{p.sku}</span>
+          {p.size && <span>· {p.size}</span>}
+          {p.inventory_name && (
+            <span className="shrink-0 rounded bg-accent-soft px-1.5 py-0.5 font-medium text-accent">
+              {p.inventory_name}
+            </span>
+          )}
+        </div>
+      </div>
+      <div className="shrink-0 text-right">
+        <p className="font-mono text-sm font-semibold tabular-nums">
+          {formatMXN(p.price_cents)}
+        </p>
+        {soldOut ? (
+          <Badge tone="danger">Agotado</Badge>
+        ) : inCart > 0 ? (
+          <span className="text-xs font-medium text-accent">{inCart} en venta</span>
+        ) : (
+          <span className="text-xs text-muted-foreground">{p.quantity} disp.</span>
+        )}
+      </div>
+      <span
+        className={cn(
+          "flex h-7 w-7 shrink-0 items-center justify-center rounded-full",
+          soldOut || maxed
+            ? "bg-muted text-muted-foreground"
+            : "bg-primary text-primary-foreground",
+        )}
+      >
+        <Plus className="h-4 w-4" />
+      </span>
+    </button>
   );
 }
 
@@ -96,16 +159,15 @@ export function SalesScreen({
     [products],
   );
 
-  const results = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const base = q
-      ? products.filter(
-          (p) =>
-            p.sku.toLowerCase().includes(q) || p.name.toLowerCase().includes(q),
-        )
-      : products;
-    return base.slice(0, 12);
-  }, [query, products]);
+  // Brand-alias aware search ("moto g42", "redmi note 7"); in-stock first.
+  const results = useMemo(
+    () =>
+      searchProducts(products, query, {
+        limit: 12,
+        tieBreak: (a, b) => Number(b.quantity > 0) - Number(a.quantity > 0),
+      }),
+    [query, products],
+  );
 
   const lines = Object.entries(cart)
     .map(([id, qty]) => ({ product: byId[id], qty }))
@@ -208,68 +270,34 @@ export function SalesScreen({
 
           <div className="mt-3 space-y-2">
             {results.length === 0 ? (
-              <p className="px-1 py-6 text-center text-sm text-muted-foreground">
-                Sin resultados.
-              </p>
-            ) : (
-              results.map((p) => {
-                const inCart = cart[p.id] ?? 0;
-                const soldOut = p.quantity === 0;
-                const maxed = inCart >= p.quantity;
-                return (
-                  <button
-                    key={p.id}
-                    onClick={() => add(p)}
-                    disabled={soldOut || maxed}
-                    className={cn(
-                      "flex w-full items-center gap-3 rounded-xl border border-border bg-background p-2.5 text-left transition-colors",
-                      soldOut || maxed
-                        ? "opacity-60"
-                        : "cursor-pointer hover:border-ring/30 hover:bg-muted/40 active:bg-muted",
+              <>
+                <p className="px-1 py-6 text-center text-sm text-muted-foreground">
+                  Sin resultados.
+                </p>
+                {query.trim() && (
+                  <CompatPanel
+                    query={query}
+                    products={products}
+                    renderItem={(p) => (
+                      <ProductButton
+                        key={p.id}
+                        p={p}
+                        inCart={cart[p.id] ?? 0}
+                        onAdd={() => add(p)}
+                      />
                     )}
-                  >
-                    <Thumb />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium">{p.name}</p>
-                      <div className="mt-0.5 flex items-center gap-1.5 truncate text-xs text-muted-foreground">
-                        <span className="font-mono">{p.sku}</span>
-                        {p.size && <span>· {p.size}</span>}
-                        {p.inventory_name && (
-                          <span className="shrink-0 rounded bg-accent-soft px-1.5 py-0.5 font-medium text-accent">
-                            {p.inventory_name}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="shrink-0 text-right">
-                      <p className="font-mono text-sm font-semibold tabular-nums">
-                        {formatMXN(p.price_cents)}
-                      </p>
-                      {soldOut ? (
-                        <Badge tone="danger">Agotado</Badge>
-                      ) : inCart > 0 ? (
-                        <span className="text-xs font-medium text-accent">
-                          {inCart} en venta
-                        </span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">
-                          {p.quantity} disp.
-                        </span>
-                      )}
-                    </div>
-                    <span
-                      className={cn(
-                        "flex h-7 w-7 shrink-0 items-center justify-center rounded-full",
-                        soldOut || maxed
-                          ? "bg-muted text-muted-foreground"
-                          : "bg-primary text-primary-foreground",
-                      )}
-                    >
-                      <Plus className="h-4 w-4" />
-                    </span>
-                  </button>
-                );
-              })
+                  />
+                )}
+              </>
+            ) : (
+              results.map((p) => (
+                <ProductButton
+                  key={p.id}
+                  p={p}
+                  inCart={cart[p.id] ?? 0}
+                  onAdd={() => add(p)}
+                />
+              ))
             )}
           </div>
         </div>
