@@ -39,8 +39,12 @@ export function ProductPhotoModal({
       const small = await resizeImage(file);
       const form = new FormData();
       form.append("file", small);
-      const { url } = await subirImagenProducto(productId, form);
-      setPreview(url);
+      const res = await subirImagenProducto(productId, form);
+      if (!res.ok) {
+        toast.error(res.error);
+        return;
+      }
+      setPreview(res.data.url);
       toast.success("Foto actualizada");
       router.refresh();
     } catch (err) {
@@ -53,14 +57,14 @@ export function ProductPhotoModal({
   function quitar() {
     if (!confirm("¿Quitar la foto de este producto?")) return;
     start(async () => {
-      try {
-        await quitarImagenProducto(productId);
-        setPreview(null);
-        toast.success("Foto eliminada");
-        router.refresh();
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Error al quitar");
+      const res = await quitarImagenProducto(productId);
+      if (!res.ok) {
+        toast.error(res.error);
+        return;
       }
+      setPreview(null);
+      toast.success("Foto eliminada");
+      router.refresh();
     });
   }
 
