@@ -76,9 +76,12 @@ async function main() {
         type: res.headers.get("content-type") || `image/${ext}`,
       });
 
-      const { data, error } = await admin.storage.from(BUCKET).upload(key, fileObj, {
-        upsert: true,
-      });
+      // upload() doesn't overwrite — drop any existing object at this key first.
+      await admin.storage
+        .from(BUCKET)
+        .remove(key)
+        .catch(() => {});
+      const { data, error } = await admin.storage.from(BUCKET).upload(key, fileObj);
       if (error) throw new Error(`upload: ${error.message ?? error}`);
 
       const { error: upErr } = await admin.database

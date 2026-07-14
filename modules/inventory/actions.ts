@@ -41,6 +41,88 @@ async function requireAdmin(): Promise<void> {
   if (profile?.role !== "admin") throw new Error("Solo administradores");
 }
 
+const BUCKET = "product-images";
+const MAX_BYTES = 5 * 1024 * 1024;
+const MIME_EXT: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/jpg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+};
+
+// Product photo for the storefront. Any signed-in staff member can add one —
+// it carries no cost/stock data, unlike the (admin-only) edit form.
+export async function subirImagenProducto(
+  productId: string,
+  form: FormData,
+): Promise<{ url: string }> {
+  const { userId } = await auth();
+  if (!userId) throw new Error("No autenticado");
+
+  const file = form.get("file");
+  if (!(file instanceof File)) throw new Error("Falta la imagen");
+  if (file.size === 0) throw new Error("Imagen vacía");
+  if (file.size > MAX_BYTES) throw new Error("La imagen pesa más de 5 MB");
+
+  const ext = MIME_EXT[file.type];
+  if (!ext) throw new Error("Formato no válido (usa JPG, PNG o WebP)");
+
+  const key = `products/${productId}.${ext}`;
+  // Replacing: drop the old object first (upload doesn't overwrite). Also clear
+  // any prior key with a different extension, or it would linger orphaned.
+  const { data: prev } = await insforgeAdmin.database
+    .from("products")
+    .select("image_key")
+    .eq("id", productId)
+    .maybeSingle();
+  const prevKey = (prev as { image_key?: string | null } | null)?.image_key;
+  for (const k of new Set([key, prevKey].filter(Boolean) as string[])) {
+    await insforgeAdmin.storage
+      .from(BUCKET)
+      .remove(k)
+      .catch(() => {});
+  }
+
+  const { data, error } = await insforgeAdmin.storage.from(BUCKET).upload(key, file);
+  if (error || !data) throw new Error(error?.message ?? "No se pudo subir");
+
+  const insforge = await createInsForgeServerClient();
+  const { error: upErr } = await insforge.database
+    .from("products")
+    .update({ image_url: data.url, image_key: data.key })
+    .eq("id", productId);
+  if (upErr) throw new Error(upErr.message ?? "No se pudo guardar la imagen");
+
+  return { url: data.url };
+}
+
+export async function quitarImagenProducto(productId: string): Promise<void> {
+  const { userId } = await auth();
+  if (!userId) throw new Error("No autenticado");
+
+  const { data } = await insforgeAdmin.database
+    .from("products")
+    .select("image_key")
+    .eq("id", productId)
+    .maybeSingle();
+  const key = (data as { image_key?: string | null } | null)?.image_key;
+
+  if (key) {
+    // Best-effort: a stale object is harmless, a stale row reference is not.
+    await insforgeAdmin.storage
+      .from(BUCKET)
+      .remove(key)
+      .catch(() => {});
+  }
+
+  const insforge = await createInsForgeServerClient();
+  const { error } = await insforge.database
+    .from("products")
+    .update({ image_url: null, image_key: null })
+    .eq("id", productId);
+  if (error) throw new Error(error.message ?? "No se pudo quitar la imagen");
+}
+
 // Full product (incl. cost) for the edit screen — admin only, so cost never
 // reaches a seller's client.
 export async function getProductForEdit(id: string): Promise<EditableProduct> {

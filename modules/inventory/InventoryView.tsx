@@ -11,6 +11,7 @@ import {
   ChevronUp,
   ChevronsUpDown,
   Plus,
+  Camera,
 } from "lucide-react";
 import type { Inventory, Product } from "@/lib/types";
 import { formatMXN } from "@/lib/money";
@@ -25,6 +26,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Modal } from "@/components/ui/modal";
 import { ImportPanel } from "./import/ImportPanel";
 import { ProductEditModal } from "./ProductEditModal";
+import { ProductPhotoModal } from "./ProductPhotoModal";
 import { ManualProductModal } from "./ManualProductModal";
 
 export type InventoryRow = Pick<
@@ -39,6 +41,7 @@ export type InventoryRow = Pick<
   | "price_cents"
   | "quantity"
   | "etiqueta"
+  | "image_url"
 >;
 
 function StockCell({ qty }: { qty: number }) {
@@ -210,6 +213,7 @@ export function InventoryView({
   }
   const [importOpen, setImportOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
+  const [foto, setFoto] = useState<InventoryRow | null>(null);
   const [newInvOpen, setNewInvOpen] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
 
@@ -389,6 +393,9 @@ export function InventoryView({
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
+                <th className="w-16 px-4 py-2 font-medium">
+                  <span className="sr-only">Foto</span>
+                </th>
                 <SortableTh label="SKU" k="sku" sort={sort} onSort={toggleSort} className="hidden sm:table-cell" />
                 <SortableTh label="Producto" k="name" sort={sort} onSort={toggleSort} />
                 <SortableTh label="Categoría" k="category" sort={sort} onSort={toggleSort} className="hidden sm:table-cell" />
@@ -406,6 +413,36 @@ export function InventoryView({
                     isAdmin && "cursor-pointer",
                   )}
                 >
+                  {/* Photo — open to every staff member (no cost/stock here),
+                      unlike the admin-only row click that opens the full edit. */}
+                  <td className="px-4 py-2.5">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setFoto(p);
+                      }}
+                      aria-label={`Foto de ${p.name}`}
+                      title={p.image_url ? "Cambiar foto" : "Agregar foto"}
+                      className={cn(
+                        "flex h-11 w-11 cursor-pointer items-center justify-center overflow-hidden rounded-lg border bg-white transition-colors",
+                        p.image_url
+                          ? "border-border hover:border-ring/40"
+                          : "border-dashed border-border text-muted-foreground hover:border-ring/40 hover:text-foreground",
+                      )}
+                    >
+                      {p.image_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={p.image_url}
+                          alt=""
+                          loading="lazy"
+                          className="h-full w-full object-contain"
+                        />
+                      ) : (
+                        <Camera className="h-4 w-4" />
+                      )}
+                    </button>
+                  </td>
                   <td className="hidden px-4 py-2.5 font-mono text-xs text-muted-foreground sm:table-cell">
                     {p.sku}
                   </td>
@@ -494,6 +531,15 @@ export function InventoryView({
 
       {editId && (
         <ProductEditModal productId={editId} onClose={() => setEditId(null)} />
+      )}
+
+      {foto && (
+        <ProductPhotoModal
+          productId={foto.id}
+          nombre={foto.name}
+          imagenActual={foto.image_url ?? null}
+          onClose={() => setFoto(null)}
+        />
       )}
     </section>
   );

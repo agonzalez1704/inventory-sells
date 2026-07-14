@@ -27,6 +27,8 @@ export interface Product {
   quantity: number;
   is_active: boolean;
   etiqueta: string | null;
+  image_url: string | null; // public storefront photo
+  image_key: string | null; // Storage object key (for replace/delete)
   created_at: string;
   updated_at: string;
 }

@@ -17,7 +17,7 @@ export default async function InventarioPage() {
     insforge.database
       .from("products")
       .select(
-        "id, inventory_id, sku, name, category, brand, size, price_cents, quantity, etiqueta",
+        "id, inventory_id, sku, name, category, brand, size, price_cents, quantity, etiqueta, image_url",
       )
       .order("created_at", { ascending: false }),
     insforge.database
