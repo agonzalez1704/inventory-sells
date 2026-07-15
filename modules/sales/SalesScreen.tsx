@@ -17,26 +17,20 @@ import { searchProducts } from "@/lib/search";
 import type { PaymentMethod, Product } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
-import { Input, Select } from "@/components/ui/input";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { imprimirTicketNavegador, type TicketData } from "@/lib/ticket";
 import { CustomerPicker, type PickerCustomer } from "@/modules/customers/CustomerPicker";
 import { CompatPanel } from "@/modules/compat/CompatPanel";
+import { PaymentSheet } from "./PaymentSheet";
 import { registerSale, registerLoan } from "./actions";
 
 export type SalesProduct = Pick<
   Product,
   "id" | "sku" | "name" | "size" | "category" | "price_cents" | "quantity"
 > & { inventory_name?: string | null; image_url?: string | null };
-
-const PAYMENT_METHODS: [PaymentMethod, string][] = [
-  ["efectivo", "Efectivo"],
-  ["tarjeta", "Tarjeta"],
-  ["transferencia", "Transferencia"],
-  ["otro", "Otro"],
-];
 
 const GRID_LIMIT = 30;
 
@@ -219,9 +213,9 @@ export function SalesScreen({
   const [categoria, setCategoria] = useState<string | null>(null);
   const [cart, setCart] = useState<Record<string, number>>({});
   const [mode, setMode] = useState<"venta" | "prestamo">("venta");
-  const [payment, setPayment] = useState<PaymentMethod>("efectivo");
   const [customer, setCustomer] = useState<PickerCustomer>(mostrador);
   const [note, setNote] = useState("");
+  const [paymentOpen, setPaymentOpen] = useState(false);
   const [pending, startTransition] = useTransition();
 
   const byId = useMemo(
@@ -280,12 +274,13 @@ export function SalesScreen({
   const canSubmit =
     lines.length > 0 && !(mode === "prestamo" && note.trim() === "");
 
-  function submit() {
+  function submit(metodo?: PaymentMethod) {
     if (!canSubmit) return;
     const items = lines.map((l) => ({ product_id: l.product.id, qty: l.qty }));
     // Snapshot ticket data now — the cart is cleared before the user taps
     // "Imprimir" in the toast, so the closure must capture, not read state.
     const esFiado = mode === "prestamo";
+    const pm: PaymentMethod = metodo ?? "efectivo";
     const ticketItems = lines.map((l) => ({
       nombre: l.product.name,
       qty: l.qty,
@@ -298,13 +293,13 @@ export function SalesScreen({
       : customer.is_system
         ? null
         : customer.nombre;
-    const ticketPago = esFiado ? null : payment;
+    const ticketPago = esFiado ? null : pm;
 
     startTransition(async () => {
       try {
         const { saleId } = esFiado
           ? await registerLoan(items, note)
-          : await registerSale(items, payment, customer.id);
+          : await registerSale(items, pm, customer.id);
         const ticket: TicketData = {
           folio: saleId,
           fecha: new Date().toISOString(),
@@ -322,11 +317,19 @@ export function SalesScreen({
         setCustomer(mostrador);
         setNote("");
         setQuery("");
+        setPaymentOpen(false);
         router.refresh();
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Error al registrar");
       }
     });
+  }
+
+  // Venta opens the payment sheet; fiado registers directly.
+  function onCta() {
+    if (!canSubmit) return;
+    if (mode === "prestamo") submit();
+    else setPaymentOpen(true);
   }
 
   const cta = mode === "prestamo" ? "Registrar fiado" : "Cobrar";
@@ -461,19 +464,7 @@ export function SalesScreen({
 
                 <div className="space-y-3 border-t border-border p-4">
                   {mode === "venta" ? (
-                    <div className="space-y-2">
-                      <Select
-                        value={payment}
-                        onChange={(e) => setPayment(e.target.value as PaymentMethod)}
-                      >
-                        {PAYMENT_METHODS.map(([v, label]) => (
-                          <option key={v} value={v}>
-                            {label}
-                          </option>
-                        ))}
-                      </Select>
-                      <CustomerPicker customers={customers} value={customer} onChange={setCustomer} />
-                    </div>
+                    <CustomerPicker customers={customers} value={customer} onChange={setCustomer} />
                   ) : (
                     <Input
                       value={note}
@@ -500,7 +491,7 @@ export function SalesScreen({
                     variant="accent"
                     size="lg"
                     className="hidden w-full lg:flex"
-                    onClick={submit}
+                    onClick={onCta}
                     loading={pending}
                     disabled={!canSubmit}
                   >
@@ -533,7 +524,7 @@ export function SalesScreen({
               variant="accent"
               size="lg"
               className="ml-auto h-12 flex-1 text-base"
-              onClick={submit}
+              onClick={onCta}
               loading={pending}
               disabled={!canSubmit}
             >
@@ -542,6 +533,14 @@ export function SalesScreen({
           </div>
         </div>
       )}
+
+      <PaymentSheet
+        open={paymentOpen}
+        onClose={() => setPaymentOpen(false)}
+        total={total}
+        pending={pending}
+        onConfirm={(metodo) => submit(metodo)}
+      />
     </>
   );
 }
