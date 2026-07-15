@@ -20,7 +20,9 @@ export default async function VentasPage() {
   ] = await Promise.all([
     insforge.database
       .from("products")
-      .select("id, inventory_id, sku, name, size, price_cents, quantity")
+      .select(
+        "id, inventory_id, sku, name, size, category, price_cents, quantity, image_url",
+      )
       .eq("is_active", true)
       .order("name", { ascending: true }),
     insforge.database
