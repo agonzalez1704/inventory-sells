@@ -93,6 +93,7 @@ export default async function TiendaPage({
       page={current}
       totalPages={totalPages}
       total={total}
+      whatsapp={process.env.STORE_WHATSAPP ?? null}
     />
   );
 }
