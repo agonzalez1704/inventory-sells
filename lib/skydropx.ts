@@ -1,4 +1,5 @@
 import "server-only";
+import { TIENDA } from "@/lib/tienda-info";
 
 // Skydropx Pro quoting. Verified empirically against the live API — their
 // developer docs (developers.skydropx.com) were down, and docs.skydropx.com
@@ -88,8 +89,6 @@ export async function cotizarEnvio(
   parcel: Parcel = paqueteParaPiezas(1),
 ): Promise<Tarifa[]> {
   if (!/^\d{5}$/.test(destino.cp)) throw new Error("Código postal inválido");
-  const zipFrom = process.env.SKYDROPX_ZIP_FROM;
-  if (!zipFrom) throw new Error("SKYDROPX_ZIP_FROM no configurado");
 
   const t = await token();
   const headers = { Authorization: `Bearer ${t}`, "Content-Type": "application/json" };
@@ -101,10 +100,10 @@ export async function cotizarEnvio(
       quotation: {
         address_from: {
           country_code: "mx",
-          postal_code: zipFrom,
-          area_level1: "Guanajuato",
-          area_level2: "Leon",
-          area_level3: "Centro",
+          postal_code: TIENDA.origen.cp,
+          area_level1: TIENDA.origen.estado,
+          area_level2: TIENDA.origen.municipio,
+          area_level3: TIENDA.origen.colonia,
         },
         address_to: {
           country_code: "mx",

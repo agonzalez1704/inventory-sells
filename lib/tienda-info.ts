@@ -12,4 +12,12 @@ export const TIENDA = {
   direccion: "5 de Mayo #216, Col. Centro, León, Guanajuato",
   ciudad: "León, Gto.",
   horario: "Lun–Sáb · 10:00–19:00",
+  // Shipping origin. A business fact, not a secret — keeping it in env only
+  // meant one more thing to forget in Vercel, and quoting died in production.
+  origen: {
+    cp: "37000",
+    estado: "Guanajuato",
+    municipio: "Leon",
+    colonia: "Centro",
+  },
 } as const;

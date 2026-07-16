@@ -24,6 +24,7 @@
     "mcp-handler": "^1.1.0",
     "next": "^16.2.9",
     "react": "^19.0.0",
+    "react-credit-cards-2": "^1.2.0",
     "react-dom": "^19.0.0",
     "react-phone-input-2": "^2.15.1",
     "sonner": "^2.0.7",

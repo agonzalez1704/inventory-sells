@@ -47,6 +47,9 @@ importers:
       react:
         specifier: ^19.0.0
         version: 19.2.7
+      react-credit-cards-2:
+        specifier: ^1.2.0
+        version: 1.2.0(react@19.2.7)
       react-dom:
         specifier: ^19.0.0
         version: 19.2.7(react@19.2.7)
@@ -1353,6 +1356,9 @@ packages:
     engines: {node: '>=0.8'}
     hasBin: true
 
+  credit-card-type@9.1.0:
+    resolution: {integrity: sha512-CpNFuLxiPFxuZqhSKml3M+t0K/484pMAnfYWH14JoD7OZMnmC0Lmo+P7JX9SobqFpRoo7ifA18kOHdxJywYPEA==}
+
   cross-spawn@7.0.6:
     resolution: {integrity: sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA==}
     engines: {node: '>= 8'}
@@ -2188,6 +2194,10 @@ packages:
     peerDependencies:
       react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
 
+  luhn@2.4.1:
+    resolution: {integrity: sha512-p1eEWSb2RJAfv+BzrPEUqbUXV1H3ylHEAOk9yDM1L12ojD6OQQGrE29DqKLa0XYluJTIwXIOFmyzVOme3QSyww==}
+    engines: {node: '>=10'}
+
   math-intrinsics@1.1.0:
     resolution: {integrity: sha512-/IXtbwEk5HTPyEwyKX6hGkYXxM9nbj64B+ilVJnC/R6B0pH5G4V3b0pVbL7DBj4tkhBAppbQUlf6F6Xl9LHu1g==}
     engines: {node: '>= 0.4'}
@@ -2391,6 +2401,9 @@ packages:
   path-to-regexp@8.4.2:
     resolution: {integrity: sha512-qRcuIdP69NPm4qbACK+aDogI5CBDMi1jKe0ry5rSQJz8JVLsC7jV8XpiJjGRLLol3N+R5ihGYcrPLTno6pAdBA==}
 
+  payment@2.4.7:
+    resolution: {integrity: sha512-5HyD3HJ0q3XtVm/Dss4t3KGtIughkCfnyQ1WfMashVD2vvBOmuXnkswhBcknMcHW8oo4zqVnNbQSkNaqafYaGA==}
+
   picocolors@1.1.1:
     resolution: {integrity: sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA==}
 
@@ -2487,6 +2500,9 @@ packages:
     resolution: {integrity: sha512-vYt7UD1U9Wg6138shLtLOvdAu+8DsC/ilFtEVHcH+wydcSpNE20AfSOduf6MkRFahL5FY7X1oU7nKVZFtfq8Fg==}
     engines: {node: '>=6'}
 
+  qj@2.0.0:
+    resolution: {integrity: sha512-8466vlnAF/piI42tzMBUfhaAWn2yBNPOLSSbA2YBlEh+S8CxBXbAO1AwuDReGKYX6LlsK19wBL9cpXZGlgsXxA==}
+
   qs@6.15.2:
     resolution: {integrity: sha512-Rzq0KEyX/w/tEybncDgdkZrJgVUsUMk3xjh3t5bv3S1HTAtg+uOYt72+ZfwiQwKdysThkTBdL/rTi6HDmX9Ddw==}
     engines: {node: '>=0.6'}
@@ -2504,6 +2520,11 @@ packages:
   raw-body@3.0.2:
     resolution: {integrity: sha512-K5zQjDllxWkf7Z5xJdV0/B0WTNqx6vxG70zJE4N0kBs4LovmEYWJzQGxC9bS9RAKu3bgM40lrd5zoLJ12MQ5BA==}
     engines: {node: '>= 0.10'}
+
+  react-credit-cards-2@1.2.0:
+    resolution: {integrity: sha512-rbW/Aqeb97LH4UOTv+xGQplY850/x7GLblrW4DIgsYkEdQtyTZnCkTyPQeakos3z1a5voPYqO3dPxz2RUwo4WQ==}
+    peerDependencies:
+      react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
 
   react-dom@19.2.7:
     resolution: {integrity: sha512-t0BRVXvbiE/o20Hfw669rLbMCDWtYZLvmJigy2f0MxsXF+71pxhR3xOkspmsO8h3ZlNzyibAmtCa3l4lYKk6gQ==}
@@ -4307,6 +4328,8 @@ snapshots:
 
   crc-32@1.2.2: {}
 
+  credit-card-type@9.1.0: {}
+
   cross-spawn@7.0.6:
     dependencies:
       path-key: 3.1.1
@@ -5303,6 +5326,8 @@ snapshots:
     dependencies:
       react: 19.2.7
 
+  luhn@2.4.1: {}
+
   math-intrinsics@1.1.0: {}
 
   mcp-handler@1.1.0(@modelcontextprotocol/sdk@1.26.0(zod@4.4.3))(next@16.2.9(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)):
@@ -5496,6 +5521,11 @@ snapshots:
 
   path-to-regexp@8.4.2: {}
 
+  payment@2.4.7:
+    dependencies:
+      globalthis: 1.0.4
+      qj: 2.0.0
+
   picocolors@1.1.1: {}
 
   picomatch@2.3.2: {}
@@ -5572,6 +5602,8 @@ snapshots:
 
   punycode@2.3.1: {}
 
+  qj@2.0.0: {}
+
   qs@6.15.2:
     dependencies:
       side-channel: 1.1.1
@@ -5590,6 +5622,13 @@ snapshots:
       http-errors: 2.0.1
       iconv-lite: 0.7.2
       unpipe: 1.0.0
+
+  react-credit-cards-2@1.2.0(react@19.2.7):
+    dependencies:
+      credit-card-type: 9.1.0
+      luhn: 2.4.1
+      payment: 2.4.7
+      react: 19.2.7
 
   react-dom@19.2.7(react@19.2.7):
     dependencies:

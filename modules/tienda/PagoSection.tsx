@@ -1,5 +1,8 @@
 "use client";
 
+import { useState } from "react";
+import Cards, { type Focused } from "react-credit-cards-2";
+import "react-credit-cards-2/dist/es/styles-compiled.css";
 import { CreditCard, Store, ArrowLeftRight, CalendarClock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { VOUCHER_HORAS_UI } from "./pago-const";
@@ -30,6 +33,8 @@ export function PagoSection({
   setTarjeta: (t: DatosTarjeta) => void;
 }) {
   const set = (k: keyof DatosTarjeta) => (v: string) => setTarjeta({ ...tarjeta, [k]: v });
+  // Drives the card preview's flip + highlighted field.
+  const [foco, setFoco] = useState<Focused | undefined>(undefined);
 
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-4">
@@ -58,30 +63,48 @@ export function PagoSection({
       </div>
 
       {metodo === "card" && (
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <Campo
-            label="Número de tarjeta"
-            value={tarjeta.numero}
-            onChange={(v) => set("numero")(v.replace(/[^\d\s]/g, "").slice(0, 19))}
-            inputMode="numeric"
-            placeholder="4242 4242 4242 4242"
-            className="sm:col-span-2"
-          />
-          <Campo
-            label="Nombre en la tarjeta"
-            value={tarjeta.nombre}
-            onChange={set("nombre")}
-            className="sm:col-span-2"
-          />
-          <div className="grid grid-cols-3 gap-2 sm:col-span-2">
-            <Campo label="Mes" value={tarjeta.mes} onChange={(v) => set("mes")(v.replace(/\D/g, "").slice(0, 2))} inputMode="numeric" placeholder="12" />
-            <Campo label="Año" value={tarjeta.anio} onChange={(v) => set("anio")(v.replace(/\D/g, "").slice(0, 4))} inputMode="numeric" placeholder="2030" />
-            <Campo label="CVC" value={tarjeta.cvc} onChange={(v) => set("cvc")(v.replace(/\D/g, "").slice(0, 4))} inputMode="numeric" placeholder="123" />
+        <div className="mt-4">
+          {/* Live preview: brand detection + flip on CVC. Cuts typos, and the
+              familiar card shape is a trust cue at the riskiest step. */}
+          <div className="mb-4">
+            <Cards
+              number={tarjeta.numero}
+              name={tarjeta.nombre}
+              expiry={`${tarjeta.mes}${tarjeta.anio.slice(-2)}`}
+              cvc={tarjeta.cvc}
+              focused={foco}
+              placeholders={{ name: "TU NOMBRE" }}
+              locale={{ valid: "vence" }}
+            />
           </div>
-          <p className="text-[11px] leading-relaxed text-slate-400 sm:col-span-2">
-            Tus datos de tarjeta viajan cifrados directo a Conekta — no pasan por
-            nuestros servidores.
-          </p>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Campo
+              label="Número de tarjeta"
+              value={tarjeta.numero}
+              onChange={(v) => set("numero")(v.replace(/[^\d\s]/g, "").slice(0, 19))}
+              onFocus={() => setFoco("number")}
+              inputMode="numeric"
+              placeholder="4242 4242 4242 4242"
+              className="sm:col-span-2"
+            />
+            <Campo
+              label="Nombre en la tarjeta"
+              value={tarjeta.nombre}
+              onChange={set("nombre")}
+              onFocus={() => setFoco("name")}
+              className="sm:col-span-2"
+            />
+            <div className="grid grid-cols-3 gap-2 sm:col-span-2">
+              <Campo label="Mes" value={tarjeta.mes} onChange={(v) => set("mes")(v.replace(/\D/g, "").slice(0, 2))} onFocus={() => setFoco("expiry")} inputMode="numeric" placeholder="12" />
+              <Campo label="Año" value={tarjeta.anio} onChange={(v) => set("anio")(v.replace(/\D/g, "").slice(0, 4))} onFocus={() => setFoco("expiry")} inputMode="numeric" placeholder="2030" />
+              <Campo label="CVC" value={tarjeta.cvc} onChange={(v) => set("cvc")(v.replace(/\D/g, "").slice(0, 4))} onFocus={() => setFoco("cvc")} inputMode="numeric" placeholder="123" />
+            </div>
+            <p className="text-[11px] leading-relaxed text-slate-400 sm:col-span-2">
+              Tus datos de tarjeta viajan cifrados directo a Conekta — no pasan
+              por nuestros servidores.
+            </p>
+          </div>
         </div>
       )}
 
@@ -110,6 +133,7 @@ function Campo({
   label,
   value,
   onChange,
+  onFocus,
   inputMode,
   placeholder,
   className,
@@ -117,6 +141,7 @@ function Campo({
   label: string;
   value: string;
   onChange: (v: string) => void;
+  onFocus?: () => void;
   inputMode?: "text" | "numeric";
   placeholder?: string;
   className?: string;
@@ -127,6 +152,7 @@ function Campo({
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onFocus={onFocus}
         inputMode={inputMode}
         placeholder={placeholder}
         autoComplete="off"
