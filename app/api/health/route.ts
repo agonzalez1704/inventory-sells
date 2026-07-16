@@ -36,15 +36,5 @@ export function GET() {
       openrouter: Boolean(process.env.OPENROUTER_API_KEY),
       whatsapp: Boolean(process.env.KAPSO_API_KEY),
     },
-    // TEMPORARY. Skydropx reads as unconfigured in production while the Vercel
-    // dashboard shows the vars present, correctly named and scoped. This reports
-    // which of those names actually exist in the runtime env and how long each
-    // value is — never a value, never a prefix. Delete once diagnosed.
-    debugEnv: Object.fromEntries(
-      Object.keys(process.env)
-        .filter((k) => /^(SKYDROPX|CONEKTA|VAPID|NEXT_PUBLIC_VAPID|NEXT_PUBLIC_CONEKTA)/.test(k))
-        .sort()
-        .map((k) => [k, (process.env[k] ?? "").length]),
-    ),
   });
 }
