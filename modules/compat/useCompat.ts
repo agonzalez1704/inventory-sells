@@ -29,10 +29,14 @@ export function useCompat<T extends Compat>(
   const q = useDebounced(query, 500);
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(false);
+  // The lookup ran and didn't answer — distinct from "answered: nothing
+  // compatible". Kept out of `data` so we never fabricate a fake result object.
+  const [fallo, setFallo] = useState(false);
 
   // A new query resets the panel — but a cached answer shows immediately, free.
   useEffect(() => {
     setData((CACHE.get(key(q)) as T | undefined) ?? null);
+    setFallo(false);
     setLoading(false);
   }, [q]);
 
@@ -44,14 +48,22 @@ export function useCompat<T extends Compat>(
       return;
     }
     setLoading(true);
+    setFallo(false);
     fetcher(q)
       .then((r) => {
+        if (r.fallo) {
+          // Never cache a failure: it would pin the error for the whole session
+          // and make the retry button a no-op once the cause is fixed.
+          setFallo(true);
+          setData(null);
+          return;
+        }
         CACHE.set(k, r);
         setData(r);
       })
-      .catch(() => setData(null))
+      .catch(() => setFallo(true))
       .finally(() => setLoading(false));
   }, [q, fetcher]);
 
-  return { query: q, data, loading, run };
+  return { query: q, data, loading, fallo, run };
 }

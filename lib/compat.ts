@@ -24,9 +24,23 @@ const MODEL = `${
 // Bump when the model or prompt changes so stale cached answers are ignored.
 const CACHE_VERSION = "v3";
 
-export type Compat = { modelos: string[]; nota: string | null };
+export type Compat = {
+  modelos: string[];
+  nota: string | null;
+  /**
+   * The lookup itself couldn't run (no key, quota exhausted, timeout, garbled
+   * answer) — NOT the same as "this model has no compatible screens". Collapsing
+   * the two told staff "no compatible models" while an OpenRouter 403 quota
+   * error was the real cause, so the UI must be able to say "couldn't check".
+   * Non-optional on purpose: every construction site has to decide which it is.
+   */
+  fallo: boolean;
+};
 
-const EMPTY: Compat = { modelos: [], nota: null };
+/** Nothing to report, and that's the real answer. */
+const SIN_DATOS: Compat = { modelos: [], nota: null, fallo: false };
+/** We never got an answer. Callers must not cache or present this as "none". */
+const FALLO: Compat = { modelos: [], nota: null, fallo: true };
 
 const SYSTEM = `Eres experto en refacciones/pantallas de celular en México. BUSCA EN LA WEB.
 Los proveedores de pantallas agrupan modelos que usan EXACTAMENTE el mismo display
@@ -47,13 +61,14 @@ Reglas:
 Responde ÚNICAMENTE con JSON válido, sin texto antes ni después, sin markdown:
 {"modelos": ["Marca Modelo", ...], "nota": "..."}`;
 
-function parse(text: string): Compat {
+/** null = couldn't read an answer out of the response (caller treats as failure). */
+function parse(text: string): Compat | null {
   try {
     // The model may wrap the JSON in prose or ``` fences — grab the first
     // balanced {...} object.
     const start = text.indexOf("{");
     const end = text.lastIndexOf("}");
-    if (start === -1 || end <= start) return EMPTY;
+    if (start === -1 || end <= start) return null;
     const json = JSON.parse(text.slice(start, end + 1)) as {
       modelos?: unknown;
       nota?: unknown;
@@ -66,9 +81,9 @@ function parse(text: string): Compat {
           .slice(0, 8)
       : [];
     const nota = typeof json.nota === "string" ? json.nota.trim() : null;
-    return { modelos, nota };
+    return { modelos, nota, fallo: false };
   } catch {
-    return EMPTY;
+    return null;
   }
 }
 
@@ -77,9 +92,13 @@ function parse(text: string): Compat {
 export async function modelosCompatibles(query: string): Promise<Compat> {
   const norm = normalize(query);
   // Guardrails: a model name is short. Anything else is noise (or abuse) and
-  // must never reach the model.
-  if (!norm || norm.length < 3 || norm.length > 60) return EMPTY;
-  if (!process.env.OPENROUTER_API_KEY) return EMPTY;
+  // must never reach the model. Not a failure — there was nothing to look up.
+  if (!norm || norm.length < 3 || norm.length > 60) return SIN_DATOS;
+  // Missing key IS a failure: we can't answer, so don't claim "no compatibles".
+  if (!process.env.OPENROUTER_API_KEY) {
+    console.error("[compat] OPENROUTER_API_KEY no configurada");
+    return FALLO;
+  }
 
   // Versioned key so a model/prompt change ignores older cached answers.
   const key = `${CACHE_VERSION}:${norm}`;
@@ -90,10 +109,10 @@ export async function modelosCompatibles(query: string): Promise<Compat> {
     .maybeSingle();
   if (cached) {
     const c = cached as { modelos: string[] | null; nota: string | null };
-    return { modelos: c.modelos ?? [], nota: c.nota };
+    return { modelos: c.modelos ?? [], nota: c.nota, fallo: false };
   }
 
-  let result = EMPTY;
+  let result: Compat | null = null;
   try {
     const { text } = await generateText({
       model: openrouter(MODEL),
@@ -104,12 +123,20 @@ export async function modelosCompatibles(query: string): Promise<Compat> {
       abortSignal: AbortSignal.timeout(25_000), // web search is slower
     });
     result = parse(text);
+    if (!result) console.error("[compat] respuesta ilegible del modelo:", text.slice(0, 300));
   } catch (e) {
-    console.error("modelosCompatibles failed:", e);
-    return EMPTY;
+    // Quota, network, timeout. This is the one that bit us: an OpenRouter 403
+    // ("Key limit exceeded") surfaced to staff as "no compatible models".
+    console.error("[compat] la consulta falló:", e);
+    return FALLO;
   }
+  // Unreadable answer is a failure too — caching it would freeze a garbled
+  // response into a permanent "no compatibles" for that query.
+  if (!result) return FALLO;
 
-  // Cache even an empty answer — it stops repeat calls for nonsense queries.
+  // Cache a real answer, empty included — that stops repeat calls for nonsense
+  // queries. Failures are never cached, so a retry after the quota is topped up
+  // actually re-asks.
   await insforgeAdmin.database
     .from("compat_cache")
     .insert([{ query: key, modelos: result.modelos, nota: result.nota }])

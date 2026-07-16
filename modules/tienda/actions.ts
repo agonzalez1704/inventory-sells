@@ -1,15 +1,11 @@
 "use server";
 
 import { insforgeAdmin } from "@/lib/insforge/admin";
-import { modelosCompatibles } from "@/lib/compat";
+import { modelosCompatibles, type Compat } from "@/lib/compat";
 import { searchProducts } from "@/lib/search";
 import type { PublicProduct } from "./TiendaView";
 
-export type CompatResult = {
-  modelos: string[];
-  nota: string | null;
-  productos: PublicProduct[];
-};
+export type CompatResult = Compat & { productos: PublicProduct[] };
 
 type Row = {
   id: string;
@@ -27,10 +23,13 @@ type Row = {
 // only: never cost, stock counts, SKU or inventory.
 export async function buscarCompatibles(query: string): Promise<CompatResult> {
   const q = query.trim();
-  if (!q) return { modelos: [], nota: null, productos: [] };
+  if (!q) return { modelos: [], nota: null, fallo: false, productos: [] };
 
-  const { modelos, nota } = await modelosCompatibles(q);
-  if (modelos.length === 0) return { modelos, nota, productos: [] };
+  const compat = await modelosCompatibles(q);
+  // Pass the failure through untouched: the box must be able to say "couldn't
+  // check" instead of "no compatible models", which is a different claim.
+  if (compat.fallo || compat.modelos.length === 0) return { ...compat, productos: [] };
+  const { modelos, nota } = compat;
 
   const { data } = await insforgeAdmin.database
     .from("products")
@@ -58,5 +57,5 @@ export async function buscarCompatibles(query: string): Promise<CompatResult> {
   }
   productos.sort((a, b) => Number(b.disponible) - Number(a.disponible));
 
-  return { modelos, nota, productos };
+  return { modelos, nota, fallo: false, productos };
 }

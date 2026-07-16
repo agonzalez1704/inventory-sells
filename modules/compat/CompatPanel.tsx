@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { Sparkles, Loader2, Info } from "lucide-react";
+import { Sparkles, Loader2, Info, AlertTriangle } from "lucide-react";
 import { searchProducts, type Searchable } from "@/lib/search";
 import { Button } from "@/components/ui/button";
 import { compatiblesStaff } from "./actions";
@@ -19,7 +19,7 @@ export function CompatPanel<T extends Searchable & { id: string }>({
   products: T[];
   renderItem: (p: T) => React.ReactNode;
 }) {
-  const { query: q, data, loading, run } = useCompat(query, compatiblesStaff);
+  const { query: q, data, loading, fallo, run } = useCompat(query, compatiblesStaff);
 
   const hits = useMemo(() => {
     if (!data?.modelos.length) return [];
@@ -38,7 +38,7 @@ export function CompatPanel<T extends Searchable & { id: string }>({
   if (!q.trim()) return null;
 
   // Idle — offer the lookup, don't spend on it.
-  if (!data && !loading) {
+  if (!data && !loading && !fallo) {
     return (
       <div className="mt-4 flex flex-col items-center gap-2 rounded-xl border border-dashed border-border px-4 py-4 text-center">
         <p className="text-xs text-muted-foreground">
@@ -57,6 +57,25 @@ export function CompatPanel<T extends Searchable & { id: string }>({
       <div className="mt-4 flex items-center gap-2.5 rounded-xl border border-brand/30 bg-brand-soft/30 px-4 py-3 text-sm text-muted-foreground">
         <Loader2 className="h-4 w-4 animate-spin text-brand-foreground" />
         Buscando modelos compatibles…
+      </div>
+    );
+  }
+
+  // The lookup broke — say so. Claiming "no compatible models" here is a lie
+  // that reads as a catalog fact, and staff quote customers off it.
+  if (fallo) {
+    return (
+      <div className="mt-4 flex flex-col items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-4 text-center">
+        <p className="flex items-center gap-1.5 text-sm text-amber-900">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          No pudimos verificar compatibilidad ahora.
+        </p>
+        <p className="text-xs text-amber-800">
+          Es una falla del servicio, no quiere decir que no haya compatibles.
+        </p>
+        <Button variant="secondary" size="sm" onClick={run}>
+          Reintentar
+        </Button>
       </div>
     );
   }

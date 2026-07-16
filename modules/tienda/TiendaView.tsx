@@ -240,7 +240,7 @@ export function TiendaView({
               </p>
               <p className="text-sm">Prueba con otra marca o modelo.</p>
             </div>
-            {q && <CompatibleBox query={q} />}
+            {q && <CompatibleBox query={q} whatsapp={whatsapp} />}
           </div>
         ) : (
           <>
