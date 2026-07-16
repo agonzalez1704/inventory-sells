@@ -152,11 +152,11 @@ export function ProductoDetalle({
             <p className="flex items-start gap-2">
               <Truck className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" />
               <span>
-                Envío{" "}
+                Envíos a todo México · entrega en{" "}
                 <strong className="text-slate-700">
-                  gratis desde {formatMXN(TIENDA.envioGratisDesdeCents)}
-                </strong>{" "}
-                · entrega en {TIENDA.entregaDias} hábiles. Precio sujeto a
+                  {TIENDA.entregaDias} hábiles
+                </strong>
+                . El costo de envío se calcula según tu destino. Precio sujeto a
                 disponibilidad.
               </span>
             </p>

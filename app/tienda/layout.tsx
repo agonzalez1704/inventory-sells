@@ -69,8 +69,7 @@ export default function TiendaLayout({
         <div className="mx-auto flex h-9 max-w-6xl items-center justify-between px-4 text-xs sm:px-6">
           <span className="inline-flex items-center gap-1.5">
             <ShieldCheck className="h-3.5 w-3.5" />
-            {TIENDA.garantiaDias} días de garantía · Envío gratis desde{" "}
-            {formatMXN(TIENDA.envioGratisDesdeCents)}
+            {TIENDA.garantiaDias} días de garantía · Entrega en {TIENDA.entregaDias}
           </span>
           <div className="flex items-center gap-4">
             <span className="hidden items-center gap-1.5 sm:inline-flex">

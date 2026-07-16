@@ -135,18 +135,17 @@ export function TiendaView({
             </div>
           </div>
 
-          {/* Quantified promises — the single biggest gap vs competitors, who
-              all state a threshold and a delivery time instead of "we ship". */}
+          {/* Quantified promises — competitors state a delivery time instead of
+              just "we ship". No free-shipping claim: see lib/tienda-info.ts. */}
           <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-xs text-blue-100">
-            <span className="inline-flex items-center gap-1.5">
-              <Truck className="h-4 w-4" />
-              Envío gratis desde {formatMXN(TIENDA.envioGratisDesdeCents)}
-            </span>
             <span className="inline-flex items-center gap-1.5">
               <Clock className="h-4 w-4" /> Entrega en {TIENDA.entregaDias}
             </span>
             <span className="inline-flex items-center gap-1.5">
               <ShieldCheck className="h-4 w-4" /> {TIENDA.garantiaDias} días de garantía
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <Truck className="h-4 w-4" /> Envíos a todo México
             </span>
           </div>
         </div>
@@ -252,11 +251,9 @@ export function TiendaView({
           exact terms matter more than the reassurance. */}
       <section className="mt-12 grid gap-3 sm:grid-cols-3">
         <InfoCard icon={Truck} title="Envío">
-          Gratis desde{" "}
-          <strong className="text-slate-900">
-            {formatMXN(TIENDA.envioGratisDesdeCents)}
-          </strong>
-          . Entrega en {TIENDA.entregaDias} hábiles a todo México.
+          A todo México, entrega en{" "}
+          <strong className="text-slate-900">{TIENDA.entregaDias} hábiles</strong>.
+          El costo se calcula según tu destino.
         </InfoCard>
         <InfoCard icon={ShieldCheck} title="Garantía">
           <strong className="text-slate-900">{TIENDA.garantiaDias} días</strong>{" "}
@@ -447,14 +444,6 @@ export function ProductCard({
       >
         {p.disponible ? "Disponible" : "Agotado"}
       </span>
-
-      {/* Only when the item alone clears the threshold — competitors badge every
-          card, which is misleading on a $190 screen. */}
-      {p.precio_cents >= TIENDA.envioGratisDesdeCents && (
-        <span className="absolute right-5 top-5 z-10 rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-semibold text-white">
-          Envío gratis
-        </span>
-      )}
 
       <Link href={`/tienda/${p.id}`} className="flex flex-1 flex-col">
         <div className="mb-3 flex aspect-square items-center justify-center overflow-hidden rounded-xl bg-white">
