@@ -64,47 +64,53 @@ export function PagoSection({
 
       {metodo === "card" && (
         <div className="mt-4">
-          {/* Live preview: brand detection + flip on CVC. Cuts typos, and the
-              familiar card shape is a trust cue at the riskiest step. */}
-          <div className="mb-4">
-            <Cards
-              number={tarjeta.numero}
-              name={tarjeta.nombre}
-              expiry={`${tarjeta.mes}${tarjeta.anio.slice(-2)}`}
-              cvc={tarjeta.cvc}
-              focused={foco}
-              placeholders={{ name: "TU NOMBRE" }}
-              locale={{ valid: "vence" }}
-            />
+          {/* Preview beside the fields so the card reacts in place as they type —
+              brand detection and the CVC flip land in peripheral vision instead
+              of scrolled off above. The card is a fixed 290px (library CSS), so
+              it never flexes: it holds its size and the fields take the rest.
+              Stacks below sm, where 290px + inputs can't share a row. */}
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
+            <div className="shrink-0 self-center sm:self-start">
+              <Cards
+                number={tarjeta.numero}
+                name={tarjeta.nombre}
+                expiry={`${tarjeta.mes}${tarjeta.anio.slice(-2)}`}
+                cvc={tarjeta.cvc}
+                focused={foco}
+                placeholders={{ name: "TU NOMBRE" }}
+                locale={{ valid: "vence" }}
+              />
+            </div>
+
+            {/* min-w-0: without it the flex item refuses to shrink below its
+                content and pushes the card out of the row at lg. */}
+            <div className="min-w-0 flex-1 space-y-3">
+              <Campo
+                label="Número de tarjeta"
+                value={tarjeta.numero}
+                onChange={(v) => set("numero")(v.replace(/[^\d\s]/g, "").slice(0, 19))}
+                onFocus={() => setFoco("number")}
+                inputMode="numeric"
+                placeholder="4242 4242 4242 4242"
+              />
+              <Campo
+                label="Nombre en la tarjeta"
+                value={tarjeta.nombre}
+                onChange={set("nombre")}
+                onFocus={() => setFoco("name")}
+              />
+              <div className="grid grid-cols-3 gap-2">
+                <Campo label="Mes" value={tarjeta.mes} onChange={(v) => set("mes")(v.replace(/\D/g, "").slice(0, 2))} onFocus={() => setFoco("expiry")} inputMode="numeric" placeholder="12" />
+                <Campo label="Año" value={tarjeta.anio} onChange={(v) => set("anio")(v.replace(/\D/g, "").slice(0, 4))} onFocus={() => setFoco("expiry")} inputMode="numeric" placeholder="2030" />
+                <Campo label="CVC" value={tarjeta.cvc} onChange={(v) => set("cvc")(v.replace(/\D/g, "").slice(0, 4))} onFocus={() => setFoco("cvc")} inputMode="numeric" placeholder="123" />
+              </div>
+            </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Campo
-              label="Número de tarjeta"
-              value={tarjeta.numero}
-              onChange={(v) => set("numero")(v.replace(/[^\d\s]/g, "").slice(0, 19))}
-              onFocus={() => setFoco("number")}
-              inputMode="numeric"
-              placeholder="4242 4242 4242 4242"
-              className="sm:col-span-2"
-            />
-            <Campo
-              label="Nombre en la tarjeta"
-              value={tarjeta.nombre}
-              onChange={set("nombre")}
-              onFocus={() => setFoco("name")}
-              className="sm:col-span-2"
-            />
-            <div className="grid grid-cols-3 gap-2 sm:col-span-2">
-              <Campo label="Mes" value={tarjeta.mes} onChange={(v) => set("mes")(v.replace(/\D/g, "").slice(0, 2))} onFocus={() => setFoco("expiry")} inputMode="numeric" placeholder="12" />
-              <Campo label="Año" value={tarjeta.anio} onChange={(v) => set("anio")(v.replace(/\D/g, "").slice(0, 4))} onFocus={() => setFoco("expiry")} inputMode="numeric" placeholder="2030" />
-              <Campo label="CVC" value={tarjeta.cvc} onChange={(v) => set("cvc")(v.replace(/\D/g, "").slice(0, 4))} onFocus={() => setFoco("cvc")} inputMode="numeric" placeholder="123" />
-            </div>
-            <p className="text-[11px] leading-relaxed text-slate-400 sm:col-span-2">
-              Tus datos de tarjeta viajan cifrados directo a Conekta — no pasan
-              por nuestros servidores.
-            </p>
-          </div>
+          <p className="mt-4 text-[11px] leading-relaxed text-slate-400">
+            Tus datos de tarjeta viajan cifrados directo a Conekta — no pasan por
+            nuestros servidores.
+          </p>
         </div>
       )}
 
