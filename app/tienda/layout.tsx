@@ -9,6 +9,8 @@ import {
   MessageCircle,
   MapPin,
 } from "lucide-react";
+import { TIENDA } from "@/lib/tienda-info";
+import { formatMXN } from "@/lib/money";
 
 const display = Poppins({
   subsets: ["latin"],
@@ -67,12 +69,13 @@ export default function TiendaLayout({
         <div className="mx-auto flex h-9 max-w-6xl items-center justify-between px-4 text-xs sm:px-6">
           <span className="inline-flex items-center gap-1.5">
             <ShieldCheck className="h-3.5 w-3.5" />
-            Refacciones con garantía
+            {TIENDA.garantiaDias} días de garantía · Envío gratis desde{" "}
+            {formatMXN(TIENDA.envioGratisDesdeCents)}
           </span>
           <div className="flex items-center gap-4">
             <span className="hidden items-center gap-1.5 sm:inline-flex">
               <Clock className="h-3.5 w-3.5" />
-              Lun–Sáb · 10:00–19:00
+              {TIENDA.horario}
             </span>
             {tel && (
               <a
@@ -96,7 +99,7 @@ export default function TiendaLayout({
           <div className="flex items-center gap-4">
             <span className="hidden items-center gap-1.5 text-xs font-medium text-slate-500 lg:inline-flex">
               <MapPin className="h-3.5 w-3.5 text-blue-500" />
-              Envíos a todo México
+              {TIENDA.ciudad} · Envíos a todo México
             </span>
             <a
               href={waHref(whatsapp)}
@@ -146,9 +149,13 @@ export default function TiendaLayout({
                   {tel}
                 </li>
               )}
+              <li className="flex items-start gap-1.5">
+                <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-500" />
+                {TIENDA.direccion}
+              </li>
               <li className="flex items-center gap-1.5">
                 <Clock className="h-3.5 w-3.5 text-blue-500" />
-                Lun–Sáb · 10:00–19:00
+                {TIENDA.horario}
               </li>
             </ul>
           </div>

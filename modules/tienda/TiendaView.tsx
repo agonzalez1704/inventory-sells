@@ -14,9 +14,12 @@ import {
   ChevronRight,
   MessageCircle,
   Loader2,
+  Clock,
+  MapPin,
 } from "lucide-react";
 import { formatMXN } from "@/lib/money";
 import { cn } from "@/lib/utils";
+import { TIENDA } from "@/lib/tienda-info";
 import { CompatibleBox } from "./CompatibleBox";
 
 export type PublicProduct = {
@@ -40,9 +43,11 @@ export function TiendaView({
   productos,
   marcas,
   categorias,
+  calidades,
   q,
   marca,
   cat,
+  cal,
   page,
   totalPages,
   total,
@@ -51,9 +56,11 @@ export function TiendaView({
   productos: PublicProduct[];
   marcas: Facet[];
   categorias: Facet[];
+  calidades: Facet[];
   q: string;
   marca: string | null;
   cat: string | null;
+  cal: string | null;
   page: number;
   totalPages: number;
   total: number;
@@ -84,7 +91,7 @@ export function TiendaView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [texto]);
 
-  const filtrando = Boolean(q || marca || cat);
+  const filtrando = Boolean(q || marca || cat || cal);
   const sinResultados = productos.length === 0;
 
   return (
@@ -128,15 +135,18 @@ export function TiendaView({
             </div>
           </div>
 
+          {/* Quantified promises — the single biggest gap vs competitors, who
+              all state a threshold and a delivery time instead of "we ship". */}
           <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-xs text-blue-100">
             <span className="inline-flex items-center gap-1.5">
-              <ShieldCheck className="h-4 w-4" /> Garantía
+              <Truck className="h-4 w-4" />
+              Envío gratis desde {formatMXN(TIENDA.envioGratisDesdeCents)}
             </span>
             <span className="inline-flex items-center gap-1.5">
-              <Truck className="h-4 w-4" /> Envíos a todo México
+              <Clock className="h-4 w-4" /> Entrega en {TIENDA.entregaDias}
             </span>
             <span className="inline-flex items-center gap-1.5">
-              <MessageCircle className="h-4 w-4" /> Atención por WhatsApp
+              <ShieldCheck className="h-4 w-4" /> {TIENDA.garantiaDias} días de garantía
             </span>
           </div>
         </div>
@@ -179,7 +189,7 @@ export function TiendaView({
           </h2>
           {filtrando && (
             <button
-              onClick={() => go({ q: null, marca: null, cat: null })}
+              onClick={() => go({ q: null, marca: null, cat: null, cal: null })}
               className="text-xs font-medium text-blue-700 hover:underline"
             >
               Limpiar filtros
@@ -187,8 +197,17 @@ export function TiendaView({
           )}
         </div>
 
-        {/* Facets */}
+        {/* Facets — quality first: it's the customer's #1 question and what
+            competitors surface as top-level nav ("Nuevos" vs "Seminuevos"). */}
         <div className="mt-3 space-y-2.5">
+          {calidades.length > 1 && (
+            <FacetRow
+              label="Calidad"
+              options={calidades}
+              active={cal}
+              onPick={(v) => go({ cal: v })}
+            />
+          )}
           <FacetRow label="Marca" options={marcas} active={marca} onPick={(v) => go({ marca: v })} />
           {categorias.length > 1 && (
             <FacetRow label="Tipo" options={categorias} active={cat} onPick={(v) => go({ cat: v })} />
@@ -228,6 +247,47 @@ export function TiendaView({
           </>
         )}
       </section>
+
+      {/* Objection killers — competitors answer these on a dedicated FAQ; the
+          exact terms matter more than the reassurance. */}
+      <section className="mt-12 grid gap-3 sm:grid-cols-3">
+        <InfoCard icon={Truck} title="Envío">
+          Gratis desde{" "}
+          <strong className="text-slate-900">
+            {formatMXN(TIENDA.envioGratisDesdeCents)}
+          </strong>
+          . Entrega en {TIENDA.entregaDias} hábiles a todo México.
+        </InfoCard>
+        <InfoCard icon={ShieldCheck} title="Garantía">
+          <strong className="text-slate-900">{TIENDA.garantiaDias} días</strong>{" "}
+          por defecto de fábrica, {TIENDA.garantiaCondicion}.
+        </InfoCard>
+        <InfoCard icon={MapPin} title="Recoge en tienda">
+          {TIENDA.direccion}. {TIENDA.horario}.
+        </InfoCard>
+      </section>
+    </div>
+  );
+}
+
+function InfoCard({
+  icon: Icon,
+  title,
+  children,
+}: {
+  icon: typeof Truck;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-4">
+      <div className="flex items-center gap-2">
+        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-50 text-blue-700">
+          <Icon className="h-4 w-4" />
+        </span>
+        <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+      </div>
+      <p className="mt-2 text-xs leading-relaxed text-slate-600">{children}</p>
     </div>
   );
 }
@@ -387,6 +447,14 @@ export function ProductCard({
       >
         {p.disponible ? "Disponible" : "Agotado"}
       </span>
+
+      {/* Only when the item alone clears the threshold — competitors badge every
+          card, which is misleading on a $190 screen. */}
+      {p.precio_cents >= TIENDA.envioGratisDesdeCents && (
+        <span className="absolute right-5 top-5 z-10 rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-semibold text-white">
+          Envío gratis
+        </span>
+      )}
 
       <Link href={`/tienda/${p.id}`} className="flex flex-1 flex-col">
         <div className="mb-3 flex aspect-square items-center justify-center overflow-hidden rounded-xl bg-white">

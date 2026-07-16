@@ -1,5 +1,6 @@
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { searchProducts } from "@/lib/search";
+import { calidadDe } from "@/lib/calidad";
 import { TiendaView, type PublicProduct } from "@/modules/tienda/TiendaView";
 
 export const dynamic = "force-dynamic";
@@ -24,12 +25,19 @@ type Row = {
 export default async function TiendaPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; marca?: string; cat?: string; page?: string }>;
+  searchParams: Promise<{
+    q?: string;
+    marca?: string;
+    cat?: string;
+    cal?: string;
+    page?: string;
+  }>;
 }) {
   const sp = await searchParams;
   const q = (sp.q ?? "").trim();
   const marca = sp.marca ?? null;
   const cat = sp.cat ?? null;
+  const cal = sp.cal ?? null;
   const page = Math.max(1, Number(sp.page ?? 1) || 1);
 
   const { data } = await insforgeAdmin.database
@@ -53,10 +61,24 @@ export default async function TiendaPage({
   const marcas = count(all, "brand");
   const categorias = count(all, "category");
 
+  // Quality (Original/OLED/Incell/AAA) is read from the name — the customer's
+  // first question, so it's a facet like brand.
+  const calCount = new Map<string, number>();
+  for (const p of all) {
+    const c = calidadDe(p.name);
+    if (c) calCount.set(c, (calCount.get(c) ?? 0) + 1);
+  }
+  const calidades = [...calCount.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([value, n]) => ({ value, n }));
+
   // Search (brand-alias aware) → facet filters → in-stock/priced ordering.
   const matched = searchProducts(all, q);
   const filtered = matched.filter(
-    (p) => (!marca || p.brand === marca) && (!cat || p.category === cat),
+    (p) =>
+      (!marca || p.brand === marca) &&
+      (!cat || p.category === cat) &&
+      (!cal || calidadDe(p.name) === cal),
   );
   const ordered = q
     ? filtered // keep relevance order when searching
@@ -87,9 +109,11 @@ export default async function TiendaPage({
       productos={productos}
       marcas={marcas}
       categorias={categorias}
+      calidades={calidades}
       q={q}
       marca={marca}
       cat={cat}
+      cal={cal}
       page={current}
       totalPages={totalPages}
       total={total}

@@ -8,6 +8,8 @@ import {
 } from "lucide-react";
 import { formatMXN } from "@/lib/money";
 import { cn } from "@/lib/utils";
+import { calidadDe, marcoDe, CALIDAD_LABEL } from "@/lib/calidad";
+import { TIENDA } from "@/lib/tienda-info";
 
 export type DetalleProducto = {
   id: string;
@@ -29,20 +31,10 @@ export type RelacionadoProducto = {
   imagen: string | null;
 };
 
-// Derived, customer-facing specs read from the product name.
-function calidadDe(n: string): string | null {
-  const u = n.toUpperCase();
-  if (/\bORIGINAL\b|\bORG\b|\bOEM\b/.test(u)) return "Original";
-  if (/\bOLED\b/.test(u)) return "OLED";
-  if (/\bINCELL\b/.test(u)) return "Incell";
-  if (/\bAAA\b/.test(u)) return "AAA (genérica)";
-  return null;
-}
-function marcoDe(n: string): string | null {
-  const u = n.toUpperCase();
-  if (/\bC\/M\b/.test(u)) return "Con marco";
-  if (/\bS\/M\b/.test(u)) return "Sin marco";
-  return null;
+// Quality/frame are derived from the product name — see lib/calidad.ts.
+function calidadLabel(n: string): string | null {
+  const c = calidadDe(n);
+  return c ? CALIDAD_LABEL[c] : null;
 }
 
 function waHref(nombre: string, whatsapp: string | null) {
@@ -64,7 +56,7 @@ export function ProductoDetalle({
   const specs = [
     ["Marca", p.marca],
     ["Categoría", p.categoria],
-    ["Calidad", calidadDe(p.nombre)],
+    ["Calidad", calidadLabel(p.nombre)],
     ["Marco", marcoDe(p.nombre)],
     ["Color", p.color],
     ["Tamaño", p.talla],
@@ -148,13 +140,25 @@ export function ProductoDetalle({
           </a>
 
           <div className="mt-5 space-y-2 text-xs text-slate-500">
-            <p className="flex items-center gap-2">
-              <ShieldCheck className="h-4 w-4 text-blue-500" />
-              Refacciones con garantía. Precio sujeto a disponibilidad.
+            <p className="flex items-start gap-2">
+              <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" />
+              <span>
+                <strong className="text-slate-700">
+                  {TIENDA.garantiaDias} días de garantía
+                </strong>{" "}
+                por defecto de fábrica, {TIENDA.garantiaCondicion}.
+              </span>
             </p>
-            <p className="flex items-center gap-2">
-              <Truck className="h-4 w-4 text-blue-500" />
-              Envíos y entrega — pregúntanos por WhatsApp.
+            <p className="flex items-start gap-2">
+              <Truck className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" />
+              <span>
+                Envío{" "}
+                <strong className="text-slate-700">
+                  gratis desde {formatMXN(TIENDA.envioGratisDesdeCents)}
+                </strong>{" "}
+                · entrega en {TIENDA.entregaDias} hábiles. Precio sujeto a
+                disponibilidad.
+              </span>
             </p>
           </div>
         </div>
