@@ -13,9 +13,7 @@ import { formatMXN } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import type { PaymentMethod } from "@/lib/types";
 import { Modal } from "@/components/ui/modal";
-import { Drawer } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
-import { useIsMobile } from "@/components/use-is-mobile";
 
 const METODOS: {
   value: PaymentMethod;
@@ -43,13 +41,11 @@ export function PaymentSheet({
   pending: boolean;
   onConfirm: (metodo: PaymentMethod) => void;
 }) {
-  const isMobile = useIsMobile();
-  const Container = isMobile ? Drawer : Modal;
-
+  // Modal is the drawer on phones now — no local switch needed.
   return (
-    <Container open={open} onClose={onClose} title="Cobrar" className={isMobile ? "" : "max-w-md"}>
+    <Modal open={open} onClose={onClose} title="Cobrar" className="max-w-md">
       <PaymentContent total={total} pending={pending} onCancel={onClose} onConfirm={onConfirm} />
-    </Container>
+    </Modal>
   );
 }
 

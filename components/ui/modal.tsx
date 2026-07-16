@@ -3,20 +3,52 @@
 import * as React from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Drawer } from "@/components/ui/drawer";
+import { useIsMobile } from "@/components/use-is-mobile";
 
-export function Modal({
+type ModalProps = {
+  open: boolean;
+  onClose: () => void;
+  title: string;
+  children: React.ReactNode;
+  /**
+   * Desktop panel classes — width, in practice (`max-w-lg`, `max-w-2xl`).
+   * Deliberately NOT forwarded to the drawer: the drawer is `inset-x-0`, so a
+   * `max-w-md` there would pin it to 448px against the left edge instead of
+   * spanning the screen. Width is a desktop concern; a bottom sheet is always
+   * full-width.
+   */
+  className?: string;
+  /** Rare drawer-only override (e.g. a taller sheet). */
+  drawerClassName?: string;
+};
+
+/**
+ * Dialog that picks its own form factor: a bottom Drawer on phones, a centered
+ * modal on desktop. Both halves take the same props, so callers just render
+ * <Modal> and never think about it.
+ */
+export function Modal({ drawerClassName, ...props }: ModalProps) {
+  const isMobile = useIsMobile();
+
+  if (isMobile) {
+    const { open, onClose, title, children } = props;
+    return (
+      <Drawer open={open} onClose={onClose} title={title} className={drawerClassName}>
+        {children}
+      </Drawer>
+    );
+  }
+  return <DesktopModal {...props} />;
+}
+
+function DesktopModal({
   open,
   onClose,
   title,
   children,
   className,
-}: {
-  open: boolean;
-  onClose: () => void;
-  title: string;
-  children: React.ReactNode;
-  className?: string;
-}) {
+}: Omit<ModalProps, "drawerClassName">) {
   React.useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
