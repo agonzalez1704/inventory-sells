@@ -5,6 +5,7 @@ import { isAllowedEmail } from "@/lib/auth/allowlist";
 import { getNegocioInfo } from "@/modules/config/lib";
 import { ConfigPrompt } from "@/modules/config/ConfigPrompt";
 import { PushBanner } from "@/components/push-banner";
+import { VersionWatcher } from "@/components/version-watcher";
 
 export default async function AppLayout({
   children,
@@ -36,6 +37,8 @@ export default async function AppLayout({
       {necesitaConfig && <ConfigPrompt />}
       {isAdmin && <PushBanner />}
       {children}
+      {/* Every staff member, not just admins — anyone can hit a stale action. */}
+      <VersionWatcher />
     </div>
   );
 }
