@@ -29,7 +29,7 @@ import { registerSale, registerLoan } from "./actions";
 
 export type SalesProduct = Pick<
   Product,
-  "id" | "sku" | "name" | "size" | "category" | "price_cents" | "quantity"
+  "id" | "sku" | "name" | "brand" | "size" | "category" | "price_cents" | "quantity"
 > & { inventory_name?: string | null; image_url?: string | null };
 
 const GRID_LIMIT = 30;
@@ -105,6 +105,11 @@ function ProductCard({
       <p className="line-clamp-2 min-h-[2.25rem] text-sm font-medium leading-tight">
         {p.name}
       </p>
+      {(p.brand || p.category) && (
+        <p className="mt-0.5 truncate text-xs capitalize text-muted-foreground">
+          {[p.brand, p.category].filter(Boolean).join(" · ")}
+        </p>
+      )}
       <div className="mt-1 flex items-center justify-between gap-1">
         <span className="font-mono text-sm font-semibold tabular-nums text-accent">
           {formatMXN(p.price_cents)}
@@ -145,7 +150,9 @@ function ProductRow({
       </span>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium">{p.name}</p>
-        <p className="truncate font-mono text-xs text-muted-foreground">{p.sku}</p>
+        <p className="truncate text-xs capitalize text-muted-foreground">
+          {[p.brand, p.category].filter(Boolean).join(" · ") || p.sku}
+        </p>
       </div>
       <span className="shrink-0 font-mono text-sm font-semibold tabular-nums">
         {formatMXN(p.price_cents)}

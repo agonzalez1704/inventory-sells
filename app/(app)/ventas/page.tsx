@@ -21,7 +21,7 @@ export default async function VentasPage() {
     insforge.database
       .from("products")
       .select(
-        "id, inventory_id, sku, name, size, category, price_cents, quantity, image_url",
+        "id, inventory_id, sku, name, brand, size, category, price_cents, quantity, image_url",
       )
       .eq("is_active", true)
       .order("name", { ascending: true }),
