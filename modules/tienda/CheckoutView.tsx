@@ -14,7 +14,12 @@ import {
 import { formatMXN } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { TIENDA } from "@/lib/tienda-info";
+import { useRouter } from "next/navigation";
+import { tokenizarTarjeta, type DatosTarjeta } from "@/lib/conekta-client";
 import { useCart } from "./CartProvider";
+import { PagoSection } from "./PagoSection";
+import type { ConektaMethod } from "./pago-const";
+import { crearOrdenYPagar } from "./pago-actions";
 import {
   validarCarrito,
   cotizarParaCP,
@@ -32,7 +37,7 @@ const ESTADOS = [
 ];
 
 export function CheckoutView() {
-  const { items, setQty, ready } = useCart();
+  const { items, setQty, ready, clear } = useCart();
   const [resumen, setResumen] = useState<Resumen | null>(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -52,6 +57,19 @@ export function CheckoutView() {
   const [envio, setEnvio] = useState<OpcionEnvio | null>(null);
   const [cotizando, start] = useTransition();
   const [errEnvio, setErrEnvio] = useState<string | null>(null);
+
+  // Pago
+  const router = useRouter();
+  const [metodo, setMetodo] = useState<ConektaMethod>("card");
+  const [tarjeta, setTarjeta] = useState<DatosTarjeta>({
+    numero: "",
+    nombre: "",
+    mes: "",
+    anio: "",
+    cvc: "",
+  });
+  const [pagando, setPagando] = useState(false);
+  const [errPago, setErrPago] = useState<string | null>(null);
 
   // Re-price against the catalog — the cart is localStorage and can be stale.
   useEffect(() => {
@@ -96,6 +114,54 @@ export function CheckoutView() {
     estado !== "" &&
     municipio.trim().length > 1 &&
     direccion.trim().length > 5;
+
+  const tarjetaLista =
+    metodo !== "card" ||
+    (tarjeta.numero.replace(/\D/g, "").length >= 15 &&
+      tarjeta.nombre.trim().length > 2 &&
+      tarjeta.mes.length >= 1 &&
+      tarjeta.anio.length === 4 &&
+      tarjeta.cvc.length >= 3);
+
+  async function pagar() {
+    if (!envio || !resumen) return;
+    setErrPago(null);
+    setPagando(true);
+    try {
+      // Card data is tokenized in the browser — it never reaches our server.
+      const token = metodo === "card" ? await tokenizarTarjeta(tarjeta) : undefined;
+
+      const r = await crearOrdenYPagar(
+        resumen.lineas.map((l) => ({ id: l.id, qty: l.qty })),
+        { nombre, email, telefono, cp, estado, municipio, direccion, referencias },
+        {
+          proveedor: envio.proveedor,
+          servicio: envio.servicio,
+          totalCents: envio.totalCents,
+          dias: envio.dias,
+        },
+        metodo,
+        token,
+      );
+      if (!r.ok) {
+        setErrPago(r.error);
+        return;
+      }
+
+      // 3DS challenge / Aplazo: finish the flow at the provider.
+      if (r.data.redirectUrl) {
+        window.location.href = r.data.redirectUrl;
+        return;
+      }
+      // The webhook confirms the sale; the page just shows status + voucher.
+      clear();
+      router.push(`/tienda/orden/${r.data.ordenId}`);
+    } catch (e) {
+      setErrPago(e instanceof Error ? e.message : "No se pudo procesar el pago");
+    } finally {
+      setPagando(false);
+    }
+  }
 
   function cotizar() {
     setErrEnvio(null);
@@ -250,6 +316,13 @@ export function CheckoutView() {
               </div>
             )}
           </Card>
+
+          <PagoSection
+            metodo={metodo}
+            setMetodo={setMetodo}
+            tarjeta={tarjeta}
+            setTarjeta={setTarjeta}
+          />
         </div>
 
         {/* Summary */}
@@ -298,11 +371,31 @@ export function CheckoutView() {
             </dl>
 
             <button
-              disabled={!datosListos || !envio}
-              className="mt-4 flex h-12 w-full cursor-pointer items-center justify-center rounded-xl bg-blue-600 text-sm font-semibold text-white shadow-sm shadow-blue-600/30 transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none"
+              onClick={pagar}
+              disabled={!datosListos || !envio || !tarjetaLista || pagando}
+              className="mt-4 flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-blue-600 text-sm font-semibold text-white shadow-sm shadow-blue-600/30 transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none"
             >
-              {!envio ? "Cotiza el envío para continuar" : "Continuar al pago"}
+              {pagando && <Loader2 className="h-4 w-4 animate-spin" />}
+              {pagando
+                ? "Procesando…"
+                : !envio
+                  ? "Cotiza el envío para continuar"
+                  : !datosListos
+                    ? "Completa tus datos"
+                    : metodo === "card"
+                      ? `Pagar ${formatMXN(total)}`
+                      : metodo === "oxxo"
+                        ? "Generar ficha OXXO"
+                        : metodo === "spei"
+                          ? "Generar CLABE"
+                          : "Continuar con Aplazo"}
             </button>
+
+            {errPago && (
+              <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
+                {errPago}
+              </p>
+            )}
 
             <p className="mt-3 flex items-start gap-1.5 text-[11px] leading-relaxed text-slate-500">
               <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-500" />
