@@ -16,6 +16,7 @@ import {
   Loader2,
   Clock,
   MapPin,
+  Zap,
 } from "lucide-react";
 import { formatMXN } from "@/lib/money";
 import { cn } from "@/lib/utils";
@@ -99,15 +100,25 @@ export function TiendaView({
     <div className="mx-auto max-w-6xl px-4 pb-4 sm:px-6">
       {/* Hero */}
       <section className="relative mt-4 overflow-hidden rounded-3xl bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 text-white">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-blue-400/25 blur-3xl"
-        />
+        {/* Product imagery sits on the right; the copy lives in the empty left
+            third the image was composed around. Hidden on phones, where it
+            would squash the headline. */}
+        <div aria-hidden className="pointer-events-none absolute inset-0 hidden md:block">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/hero.webp"
+            alt=""
+            className="h-full w-full object-cover object-right"
+          />
+          {/* Full-width wash instead of a panel: any hard edge between the flat
+              gradient and the photo reads as a seam. */}
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-700 from-25% via-blue-700/70 via-55% to-transparent" />
+        </div>
         <div
           aria-hidden
           className="pointer-events-none absolute -bottom-28 -left-16 h-80 w-80 rounded-full bg-indigo-400/20 blur-3xl"
         />
-        <div className="relative px-6 py-10 sm:px-10 sm:py-14">
+        <div className="relative px-6 py-10 sm:px-10 sm:py-14 md:max-w-[52%]">
           <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-medium text-blue-50">
             <BadgeCheck className="h-3.5 w-3.5" />
             Calidad original y genérica
@@ -118,6 +129,12 @@ export function TiendaView({
           <p className="mt-3 max-w-xl text-pretty text-sm text-blue-100 sm:text-base">
             Pantallas, baterías y más — busca por marca y modelo. Precios claros,
             disponibilidad al día.
+          </p>
+
+          {/* The one thing no competitor carries — as text, where it converts. */}
+          <p className="mt-4 inline-flex items-center gap-2 rounded-xl border border-amber-300/30 bg-amber-400/15 px-3 py-2 text-xs font-semibold text-amber-100 sm:text-sm">
+            <Zap className="h-4 w-4 shrink-0 text-amber-300" />
+            Baterías diagnóstico (auto-programables) para iPhone
           </p>
 
           <div className="mt-6 max-w-xl">
