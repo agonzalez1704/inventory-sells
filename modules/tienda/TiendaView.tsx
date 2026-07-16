@@ -20,6 +20,7 @@ import {
 import { formatMXN } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { TIENDA } from "@/lib/tienda-info";
+import { AddToCart } from "./AddToCart";
 import { CompatibleBox } from "./CompatibleBox";
 
 export type PublicProduct = {
@@ -475,16 +476,31 @@ export function ProductCard({
         <span className="font-semibold tabular-nums text-blue-800 [font-family:var(--font-display)]">
           {p.precio_cents > 0 ? formatMXN(p.precio_cents) : "A cotizar"}
         </span>
-        <a
-          href={waHref(p.nombre, whatsapp)}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label={`Preguntar por ${p.nombre} en WhatsApp`}
-          title="Preguntar por WhatsApp"
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-green-600 text-white shadow-sm shadow-green-600/30 transition-colors hover:bg-green-700"
-        >
-          <MessageCircle className="h-4 w-4" />
-        </a>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <a
+            href={waHref(p.nombre, whatsapp)}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            aria-label={`Preguntar por ${p.nombre} en WhatsApp`}
+            title="Preguntar por WhatsApp"
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-green-200 bg-green-50 text-green-700 transition-colors hover:bg-green-100"
+          >
+            <MessageCircle className="h-4 w-4" />
+          </a>
+          {/* Priced items only — "A cotizar" has no price to charge. */}
+          {p.precio_cents > 0 && (
+            <AddToCart
+              p={{
+                id: p.id,
+                nombre: p.nombre,
+                precio_cents: p.precio_cents,
+                imagen: p.imagen,
+                disponible: p.disponible,
+              }}
+            />
+          )}
+        </div>
       </div>
     </div>
   );

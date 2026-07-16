@@ -10,6 +10,7 @@ import { formatMXN } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { calidadDe, marcoDe, CALIDAD_LABEL } from "@/lib/calidad";
 import { TIENDA } from "@/lib/tienda-info";
+import { AddToCart } from "./AddToCart";
 
 export type DetalleProducto = {
   id: string;
@@ -128,16 +129,31 @@ export function ProductoDetalle({
             </dl>
           )}
 
-          {/* CTA */}
-          <a
-            href={waHref(p.nombre, whatsapp)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-6 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-green-600 px-5 text-sm font-semibold text-white shadow-sm shadow-green-600/30 transition-colors hover:bg-green-700 sm:w-auto"
-          >
-            <MessageCircle className="h-5 w-5" />
-            Preguntar por WhatsApp
-          </a>
+          {/* CTA — buy online, or ask if you'd rather talk to someone */}
+          <div className="mt-6 flex flex-col gap-2 sm:flex-row">
+            {p.precio_cents > 0 && (
+              <AddToCart
+                size="lg"
+                className="sm:flex-1"
+                p={{
+                  id: p.id,
+                  nombre: p.nombre,
+                  precio_cents: p.precio_cents,
+                  imagen: p.imagen,
+                  disponible: p.disponible,
+                }}
+              />
+            )}
+            <a
+              href={waHref(p.nombre, whatsapp)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-green-200 bg-green-50 px-5 text-sm font-semibold text-green-700 transition-colors hover:bg-green-100 sm:flex-1"
+            >
+              <MessageCircle className="h-5 w-5" />
+              Preguntar por WhatsApp
+            </a>
+          </div>
 
           <div className="mt-5 space-y-2 text-xs text-slate-500">
             <p className="flex items-start gap-2">

@@ -10,7 +10,8 @@ import {
   MapPin,
 } from "lucide-react";
 import { TIENDA } from "@/lib/tienda-info";
-import { formatMXN } from "@/lib/money";
+import { CartProvider } from "@/modules/tienda/CartProvider";
+import { CartButton } from "@/modules/tienda/CartDrawer";
 
 const display = Poppins({
   subsets: ["latin"],
@@ -61,6 +62,7 @@ export default function TiendaLayout({
   const tel = prettyPhone(whatsapp);
 
   return (
+    <CartProvider>
     <div
       className={`${display.variable} flex min-h-screen flex-col bg-[#f5f8ff] text-slate-900`}
     >
@@ -109,6 +111,7 @@ export default function TiendaLayout({
               <MessageCircle className="h-4 w-4" />
               <span className="hidden sm:inline">WhatsApp</span>
             </a>
+            <CartButton />
           </div>
         </div>
       </header>
@@ -166,6 +169,7 @@ export default function TiendaLayout({
         </div>
       </footer>
     </div>
+    </CartProvider>
   );
 }
 
