@@ -181,22 +181,25 @@ function Stepper({
   canInc: boolean;
 }) {
   return (
-    <div className="flex items-center rounded-lg border border-border">
+    // inline-flex, not flex: a block-level flex box stretches to the full width
+    // of its parent, so the fixed-width buttons packed left and left a big empty
+    // bordered gap to the right. inline-flex sizes the control to its contents.
+    <div className="inline-flex items-center overflow-hidden rounded-lg border border-border">
       <button
         onClick={onDec}
         aria-label="Quitar uno"
-        className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-l-lg text-muted-foreground transition-colors hover:bg-muted"
+        className="flex h-8 w-9 cursor-pointer items-center justify-center text-muted-foreground transition-colors hover:bg-muted active:bg-muted"
       >
         <Minus className="h-3.5 w-3.5" />
       </button>
-      <div className="flex h-8 w-9 items-center justify-center border-x border-border text-sm tabular-nums">
+      <div className="flex h-8 min-w-9 items-center justify-center border-x border-border px-1 text-sm font-medium tabular-nums">
         {value}
       </div>
       <button
         onClick={onInc}
         disabled={!canInc}
         aria-label="Agregar uno"
-        className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-r-lg text-muted-foreground transition-colors hover:bg-muted disabled:opacity-40"
+        className="flex h-8 w-9 cursor-pointer items-center justify-center text-muted-foreground transition-colors hover:bg-muted active:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
       >
         <Plus className="h-3.5 w-3.5" />
       </button>
@@ -437,34 +440,42 @@ export function SalesScreen({
               <>
                 <ul className="max-h-[20rem] divide-y divide-border overflow-auto">
                   {lines.map((l) => (
-                    <li key={l.product.id} className="flex items-center gap-3 px-4 py-3">
-                      <span className="h-11 w-11 shrink-0 overflow-hidden rounded-lg border border-border">
+                    <li key={l.product.id} className="flex gap-3 px-4 py-3">
+                      <span className="h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-border">
                         <Thumb src={l.product.image_url} alt={l.product.name} />
                       </span>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium">{l.product.name}</p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          {formatMXN(l.product.price_cents)} × {l.qty} ={" "}
-                          <span className="font-semibold text-accent">
-                            {formatMXN(l.product.price_cents * l.qty)}
-                          </span>
-                        </p>
-                        <div className="mt-1.5">
+                        {/* Name + delete on one row so the trash reads as this
+                            line's, not a control floating off in the margin. */}
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium">{l.product.name}</p>
+                            <p className="mt-0.5 text-xs text-muted-foreground tabular-nums">
+                              {formatMXN(l.product.price_cents)} c/u
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => remove(l.product.id)}
+                            aria-label={`Quitar ${l.product.name}`}
+                            className="-mr-1 -mt-1 shrink-0 cursor-pointer rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-red-50 hover:text-red-600"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                        {/* Stepper left, running line total right — the total
+                            sits where the eye lands after changing quantity. */}
+                        <div className="mt-2 flex items-center justify-between gap-2">
                           <Stepper
                             value={l.qty}
                             onDec={() => setQty(l.product.id, l.qty - 1)}
                             onInc={() => setQty(l.product.id, l.qty + 1)}
                             canInc={l.qty < l.product.quantity}
                           />
+                          <span className="text-sm font-semibold tabular-nums text-accent">
+                            {formatMXN(l.product.price_cents * l.qty)}
+                          </span>
                         </div>
                       </div>
-                      <button
-                        onClick={() => remove(l.product.id)}
-                        aria-label={`Quitar ${l.product.name}`}
-                        className="shrink-0 cursor-pointer rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-red-50 hover:text-red-600"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
                     </li>
                   ))}
                 </ul>
