@@ -9,16 +9,20 @@ import { VOUCHER_HORAS_UI } from "./pago-const";
 import type { ConektaMethod } from "./pago-const";
 import type { DatosTarjeta } from "@/lib/conekta-client";
 
+// Brand logos live in /public/pay. A method either shows its provider logo
+// (which already carries the name) or, for a generic card, a lucide icon + a
+// "Tarjeta" label — there's no single card-brand logo to stand in for it.
 const METODOS: {
   value: ConektaMethod;
   label: string;
   desc: string;
   icon: typeof CreditCard;
+  logo?: string;
 }[] = [
   { value: "card", label: "Tarjeta", desc: "Débito o crédito", icon: CreditCard },
-  { value: "oxxo", label: "OXXO", desc: `Ficha válida ${VOUCHER_HORAS_UI} h`, icon: Store },
-  { value: "spei", label: "Transferencia", desc: "SPEI · CLABE", icon: ArrowLeftRight },
-  { value: "aplazo", label: "Aplazo", desc: "Paga en pagos", icon: CalendarClock },
+  { value: "oxxo", label: "OXXO", desc: `Ficha válida ${VOUCHER_HORAS_UI} h`, icon: Store, logo: "/pay/oxxo.svg" },
+  { value: "spei", label: "Transferencia", desc: "SPEI · CLABE", icon: ArrowLeftRight, logo: "/pay/spei.svg" },
+  { value: "aplazo", label: "A pagos", desc: "Paga después", icon: CalendarClock, logo: "/pay/aplazo.png" },
 ];
 
 export function PagoSection({
@@ -48,14 +52,32 @@ export function PagoSection({
               key={m.value}
               onClick={() => setMetodo(m.value)}
               className={cn(
-                "flex cursor-pointer flex-col items-center gap-1 rounded-xl border p-3 text-center transition-colors",
+                // min-h + justify-center so every tile is the same height and
+                // its content centers, whether it has a logo, an icon+label, or
+                // one line of copy vs two — otherwise the card tile (which keeps
+                // a label) made its whole grid row taller than the rest.
+                "flex min-h-[5.5rem] cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border p-3 text-center transition-colors",
                 activo
                   ? "border-blue-500 bg-blue-50/60 text-blue-800"
                   : "border-slate-200 text-slate-600 hover:border-blue-200",
               )}
             >
-              <m.icon className="h-5 w-5" />
-              <span className="text-xs font-semibold">{m.label}</span>
+              {/* Fixed-height brand row so logos of different aspect ratios and
+                  the card icon all sit on the same baseline across the grid. */}
+              <span className="flex h-6 items-center justify-center">
+                {m.logo ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- static brand asset, no layout shift
+                  <img
+                    src={m.logo}
+                    alt={m.label}
+                    className="max-h-5 w-auto max-w-full object-contain"
+                  />
+                ) : (
+                  <m.icon className="h-5 w-5" />
+                )}
+              </span>
+              {/* The logo already names the method; only the card needs a label. */}
+              {!m.logo && <span className="text-xs font-semibold">{m.label}</span>}
               <span className="text-[10px] leading-tight text-slate-500">{m.desc}</span>
             </button>
           );
