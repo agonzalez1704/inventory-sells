@@ -267,7 +267,7 @@ export function InventoryView({
         </div>
         <div className="flex items-center gap-2">
           {scoped.length > 0 && <ExportMenu isAdmin={isAdmin} />}
-          {isAdmin && selectedInv !== "all" && (
+          {isAdmin && inventories.length > 0 && (
             <Button variant="secondary" onClick={() => setManualOpen(true)}>
               <Plus className="h-4 w-4" />
               Producto
@@ -521,10 +521,10 @@ export function InventoryView({
         <ImportPanel newMode onClose={() => setNewInvOpen(false)} />
       </Modal>
 
-      {manualOpen && selectedInv !== "all" && (
+      {manualOpen && (
         <ManualProductModal
-          inventoryId={selectedInv}
-          inventoryName={invName[selectedInv]}
+          inventories={inventories}
+          defaultInventoryId={selectedInv !== "all" ? selectedInv : undefined}
           onClose={() => setManualOpen(false)}
         />
       )}

@@ -33,16 +33,17 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 export function ManualProductModal({
-  inventoryId,
-  inventoryName,
+  inventories,
+  defaultInventoryId,
   onClose,
 }: {
-  inventoryId: string;
-  inventoryName?: string;
+  inventories: { id: string; name: string }[];
+  defaultInventoryId?: string;
   onClose: () => void;
 }) {
   const router = useRouter();
   const [f, setF] = useState(EMPTY);
+  const [invId, setInvId] = useState(defaultInventoryId ?? inventories[0]?.id ?? "");
   const [pending, start] = useTransition();
   const set = (k: keyof typeof EMPTY, v: string) =>
     setF((s) => ({ ...s, [k]: v }));
@@ -67,7 +68,7 @@ export function ManualProductModal({
     };
     start(async () => {
       try {
-        await addProduct(inventoryId, row);
+        await addProduct(invId, row);
         toast.success("Producto agregado");
         setF(EMPTY);
         router.refresh();
@@ -77,14 +78,29 @@ export function ManualProductModal({
     });
   }
 
+  const invName = inventories.find((i) => i.id === invId)?.name;
+
   return (
     <Modal
       open
       onClose={onClose}
-      title={`Agregar producto${inventoryName ? ` · ${inventoryName}` : ""}`}
+      title={`Agregar producto${invName && inventories.length === 1 ? ` · ${invName}` : ""}`}
       className="max-w-lg"
     >
       <div className="space-y-3">
+        {inventories.length > 1 && (
+          <Field label="Inventario">
+            <select
+              value={invId}
+              onChange={(e) => setInvId(e.target.value)}
+              className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+            >
+              {inventories.map((i) => (
+                <option key={i.id} value={i.id}>{i.name}</option>
+              ))}
+            </select>
+          </Field>
+        )}
         <Field label="Nombre">
           <Input value={f.name} onChange={(e) => set("name", e.target.value)} autoFocus />
         </Field>
