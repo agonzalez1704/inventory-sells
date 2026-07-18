@@ -33,14 +33,12 @@ export function VersionWatcher() {
       toast.info("Nueva versión de la app disponible", {
         id: TOAST_ID,
         description: "Recarga para evitar errores al guardar.",
+        position: "bottom-center",
         duration: Infinity, // a stale tab stays broken until reload — never auto-dismiss
+        dismissible: false, // reloading is the only way out; no swipe/close
         action: {
           label: "Recargar",
           onClick: () => window.location.reload(),
-        },
-        cancel: {
-          label: "Después",
-          onClick: () => {}, // sonner closes it; `avisado` keeps it from returning
         },
       });
     };
