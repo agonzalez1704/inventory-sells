@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Boxes,
   PackageSearch,
@@ -255,6 +255,20 @@ export function InventoryView({
     return arr;
   }, [filtered, sort]);
 
+  // Client-side pagination — the whole catalog already arrives (610 rows today),
+  // so slicing here keeps the DOM light without a round trip. Reset to page 1
+  // when the result set changes underneath; pageSafe clamps the render if a
+  // filter shrinks it before the effect runs.
+  const PER_PAGE = 50;
+  const [page, setPage] = useState(1);
+  useEffect(() => setPage(1), [query, selectedInv, sort]);
+  const totalPages = Math.max(1, Math.ceil(sorted.length / PER_PAGE));
+  const pageSafe = Math.min(page, totalPages);
+  const paged = useMemo(
+    () => sorted.slice((pageSafe - 1) * PER_PAGE, pageSafe * PER_PAGE),
+    [sorted, pageSafe],
+  );
+
   return (
     <section className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -404,7 +418,7 @@ export function InventoryView({
               </tr>
             </thead>
             <tbody>
-              {sorted.map((p) => (
+              {paged.map((p) => (
                 <tr
                   key={p.id}
                   onClick={isAdmin ? () => setEditId(p.id) : undefined}
@@ -500,6 +514,30 @@ export function InventoryView({
           </table>
         )}
       </Card>
+
+      {sorted.length > PER_PAGE && (
+        <div className="flex items-center justify-between gap-3 text-sm">
+          <span className="text-muted-foreground tabular-nums">
+            {(pageSafe - 1) * PER_PAGE + 1}–{Math.min(pageSafe * PER_PAGE, sorted.length)} de {sorted.length}
+          </span>
+          <div className="flex gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={pageSafe <= 1}
+            >
+              Anterior
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={pageSafe >= totalPages}
+            >
+              Siguiente
+            </Button>
+          </div>
+        </div>
+      )}
 
       <Modal
         open={importOpen}
