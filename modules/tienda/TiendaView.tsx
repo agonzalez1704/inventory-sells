@@ -214,55 +214,61 @@ export function TiendaView({
           )}
         </div>
 
-        {/* Facets — quality first: it's the customer's #1 question and what
-            competitors surface as top-level nav ("Nuevos" vs "Seminuevos"). */}
-        <div className="mt-3 space-y-2.5">
-          {calidades.length > 1 && (
-            <FacetRow
-              label="Calidad"
-              options={calidades}
-              active={cal}
-              onPick={(v) => go({ cal: v })}
-            />
-          )}
-          <FacetRow label="Marca" options={marcas} active={marca} onPick={(v) => go({ marca: v })} />
-          {categorias.length > 1 && (
-            <FacetRow label="Tipo" options={categorias} active={cat} onPick={(v) => go({ cat: v })} />
-          )}
-        </div>
+        {/* Filters left, results right. Below lg the aside stacks on top, so
+            phones keep the familiar chips-above-grid flow; from lg it's a
+            sticky 220px rail. Quality first — it's the customer's #1 question
+            and what competitors surface as top-level nav. */}
+        <div className="mt-3 lg:grid lg:grid-cols-[220px_1fr] lg:gap-8">
+          <aside className="mb-4 space-y-4 lg:mb-0 lg:sticky lg:top-4 lg:self-start">
+            {calidades.length > 1 && (
+              <FacetRow
+                label="Calidad"
+                options={calidades}
+                active={cal}
+                onPick={(v) => go({ cal: v })}
+              />
+            )}
+            <FacetRow label="Marca" options={marcas} active={marca} onPick={(v) => go({ marca: v })} />
+            {categorias.length > 1 && (
+              <FacetRow label="Tipo" options={categorias} active={cat} onPick={(v) => go({ cat: v })} />
+            )}
+          </aside>
 
-        {sinResultados ? (
-          <div className="mt-10">
-            <div className="flex flex-col items-center text-center text-slate-500">
-              <PackageSearch className="h-10 w-10 text-slate-300" />
-              <p className="mt-3 text-sm font-medium text-slate-700">
-                Sin resultados{q ? ` para “${q}”` : ""}
-              </p>
-              <p className="text-sm">Prueba con otra marca o modelo.</p>
-            </div>
-            {q && <CompatibleBox query={q} whatsapp={whatsapp} />}
+          <div className="min-w-0">
+            {sinResultados ? (
+              <div className="mt-2">
+                <div className="flex flex-col items-center text-center text-slate-500">
+                  <PackageSearch className="h-10 w-10 text-slate-300" />
+                  <p className="mt-3 text-sm font-medium text-slate-700">
+                    Sin resultados{q ? ` para “${q}”` : ""}
+                  </p>
+                  <p className="text-sm">Prueba con otra marca o modelo.</p>
+                </div>
+                {q && <CompatibleBox query={q} whatsapp={whatsapp} />}
+              </div>
+            ) : (
+              <>
+                <p className="text-xs text-slate-500">
+                  {total} {total === 1 ? "producto" : "productos"}
+                  {q ? ` para “${q}”` : ""}
+                  {marca ? ` · ${marca}` : ""}
+                </p>
+                <div
+                  className={cn(
+                    "mt-3 grid grid-cols-2 gap-3 transition-opacity sm:grid-cols-3",
+                    pending && "opacity-60",
+                  )}
+                >
+                  {productos.map((p) => (
+                    <ProductCard key={p.id} p={p} whatsapp={whatsapp} />
+                  ))}
+                </div>
+
+                <Pagination page={page} totalPages={totalPages} onGo={(n) => go({ page: String(n) })} />
+              </>
+            )}
           </div>
-        ) : (
-          <>
-            <p className="mt-4 text-xs text-slate-500">
-              {total} {total === 1 ? "producto" : "productos"}
-              {q ? ` para “${q}”` : ""}
-              {marca ? ` · ${marca}` : ""}
-            </p>
-            <div
-              className={cn(
-                "mt-3 grid grid-cols-2 gap-3 transition-opacity sm:grid-cols-3 lg:grid-cols-4",
-                pending && "opacity-60",
-              )}
-            >
-              {productos.map((p) => (
-                <ProductCard key={p.id} p={p} whatsapp={whatsapp} />
-              ))}
-            </div>
-
-            <Pagination page={page} totalPages={totalPages} onGo={(n) => go({ page: String(n) })} />
-          </>
-        )}
+        </div>
       </section>
 
       {/* Objection killers — competitors answer these on a dedicated FAQ; the
@@ -320,21 +326,23 @@ function FacetRow({
 }) {
   if (options.length === 0) return null;
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <span className="mr-1 text-xs font-medium text-slate-400">{label}</span>
-      <Chip active={active === null} onClick={() => onPick(null)}>
-        Todas
-      </Chip>
-      {options.map((o) => (
-        <Chip
-          key={o.value}
-          active={active === o.value}
-          onClick={() => onPick(active === o.value ? null : o.value)}
-        >
-          {o.value}
-          <span className="ml-1 text-[10px] opacity-60">{o.n}</span>
+    <div>
+      <span className="mb-1.5 block text-xs font-semibold text-slate-500">{label}</span>
+      <div className="flex flex-wrap gap-1.5">
+        <Chip active={active === null} onClick={() => onPick(null)}>
+          Todas
         </Chip>
-      ))}
+        {options.map((o) => (
+          <Chip
+            key={o.value}
+            active={active === o.value}
+            onClick={() => onPick(active === o.value ? null : o.value)}
+          >
+            {o.value}
+            <span className="ml-1 text-[10px] opacity-60">{o.n}</span>
+          </Chip>
+        ))}
+      </div>
     </div>
   );
 }
