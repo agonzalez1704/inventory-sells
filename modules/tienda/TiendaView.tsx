@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 import { TIENDA } from "@/lib/tienda-info";
 import { AddToCart } from "./AddToCart";
 import { CompatibleBox } from "./CompatibleBox";
+import { logoDeMarca } from "./marca-logo";
 
 export type PublicProduct = {
   id: string;
@@ -178,22 +179,30 @@ export function TiendaView({
             </h2>
           </div>
           <div className="mt-4 flex gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {marcas.slice(0, 10).map((m) => (
-              <button
-                key={m.value}
-                onClick={() => go({ marca: m.value })}
-                className="group flex w-24 shrink-0 flex-col items-center gap-2"
-              >
-                <span className="flex h-20 w-20 items-center justify-center rounded-2xl border border-blue-100 bg-white text-blue-700 shadow-sm transition-all group-hover:-translate-y-0.5 group-hover:border-blue-300 group-hover:shadow-md group-hover:shadow-blue-900/5">
-                  <span className="text-lg font-bold [font-family:var(--font-display)]">
-                    {m.value.slice(0, 2).toUpperCase()}
+            {marcas.slice(0, 10).map((m) => {
+              const logo = logoDeMarca(m.value);
+              return (
+                <button
+                  key={m.value}
+                  onClick={() => go({ marca: m.value })}
+                  className="group flex w-24 shrink-0 flex-col items-center gap-2"
+                >
+                  <span className="flex h-20 w-20 items-center justify-center rounded-2xl border border-blue-100 bg-white p-3.5 text-blue-700 shadow-sm transition-all group-hover:-translate-y-0.5 group-hover:border-blue-300 group-hover:shadow-md group-hover:shadow-blue-900/5">
+                    {logo ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- static brand asset
+                      <img src={logo.src} alt={logo.alt} className="max-h-full max-w-full object-contain" />
+                    ) : (
+                      <span className="text-lg font-bold [font-family:var(--font-display)]">
+                        {m.value.slice(0, 2).toUpperCase()}
+                      </span>
+                    )}
                   </span>
-                </span>
-                <span className="w-full truncate text-center text-xs font-medium text-slate-600 group-hover:text-blue-700">
-                  {m.value}
-                </span>
-              </button>
-            ))}
+                  <span className="w-full truncate text-center text-xs font-medium text-slate-600 group-hover:text-blue-700">
+                    {m.value}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </section>
       )}
