@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { CheckCircle2, Clock, Store, ArrowLeftRight, XCircle, Landmark, MapPin } from "lucide-react";
+import { CheckCircle2, Clock, Store, ArrowLeftRight, XCircle, Landmark } from "lucide-react";
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { getConektaOrder } from "@/lib/conekta";
 import { formatMXN } from "@/lib/money";
 import { TIENDA } from "@/lib/tienda-info";
 import { VOUCHER_HORAS_UI } from "@/modules/tienda/pago-const";
+import { PasePickup } from "@/modules/tienda/PasePickup";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Tu pedido — Lead Displays", robots: { index: false } };
@@ -212,10 +213,7 @@ export default async function OrdenPage({
         </dl>
 
         {recoger ? (
-          <p className="mt-4 flex items-start gap-1.5 text-xs leading-relaxed text-slate-500">
-            <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
-            Recoge en: {TIENDA.direccion} · {TIENDA.horario}
-          </p>
+          <PasePickup folio={o.folio} pagada={pagada} />
         ) : (
           <p className="mt-4 text-xs leading-relaxed text-slate-500">
             Enviamos a: {o.direccion}, {o.municipio}, {o.estado}, CP {o.cp}

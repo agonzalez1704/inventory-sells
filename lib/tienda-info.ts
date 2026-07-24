@@ -12,6 +12,11 @@ export const TIENDA = {
   direccion: "5 de Mayo #216, Col. Centro, León, Guanajuato",
   ciudad: "León, Gto.",
   horario: "Lun–Sáb · 10:00–19:00",
+  // Where an Uber/courier navigates to for a pickup. A search-by-address link
+  // works everywhere; swap for the exact Google Maps place URL when you have it.
+  mapsUrl:
+    "https://www.google.com/maps/search/?api=1&query=" +
+    encodeURIComponent("5 de Mayo 216, Centro, 37000 León, Gto."),
   // Shipping origin. A business fact, not a secret — keeping it in env only
   // meant one more thing to forget in Vercel, and quoting died in production.
   origen: {
