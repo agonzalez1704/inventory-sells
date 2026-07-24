@@ -10,6 +10,8 @@ import {
   ShieldCheck,
   AlertTriangle,
   Check,
+  Store as StoreIcon,
+  MapPin,
 } from "lucide-react";
 import { formatMXN } from "@/lib/money";
 import { cn } from "@/lib/utils";
@@ -18,8 +20,8 @@ import { useRouter } from "next/navigation";
 import { tokenizarTarjeta, type DatosTarjeta } from "@/lib/conekta-client";
 import { useCart } from "./CartProvider";
 import { PagoSection } from "./PagoSection";
-import type { ConektaMethod } from "./pago-const";
-import { crearOrdenYPagar } from "./pago-actions";
+import { esConekta, type MetodoPago } from "./pago-const";
+import { crearOrdenYPagar, crearOrdenTransferencia, type TipoEntrega } from "./pago-actions";
 import {
   validarCarrito,
   cotizarParaCP,
@@ -42,6 +44,11 @@ export function CheckoutView() {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Cómo recibe el pedido: envío a domicilio (foráneo) o recoger (local, manda
+  // su propio Uber/mensajero — sin guía, sin costo de envío).
+  const [tipoEntrega, setTipoEntrega] = useState<TipoEntrega>("envio");
+  const recoger = tipoEntrega === "recoger";
+
   // Datos del cliente
   const [nombre, setNombre] = useState("");
   const [email, setEmail] = useState("");
@@ -60,7 +67,7 @@ export function CheckoutView() {
 
   // Pago
   const router = useRouter();
-  const [metodo, setMetodo] = useState<ConektaMethod>("card");
+  const [metodo, setMetodo] = useState<MetodoPago>("card");
   const [tarjeta, setTarjeta] = useState<DatosTarjeta>({
     numero: "",
     nombre: "",
@@ -104,16 +111,24 @@ export function CheckoutView() {
 
   const piezas = resumen?.lineas.reduce((s, l) => s + l.qty, 0) ?? 0;
   const subtotal = resumen?.subtotal_cents ?? 0;
-  const total = subtotal + (envio?.totalCents ?? 0);
+  const total = subtotal + (recoger ? 0 : envio?.totalCents ?? 0);
 
-  const datosListos =
+  const datosBase =
     nombre.trim().length > 2 &&
     /^\S+@\S+\.\S+$/.test(email) &&
-    telefono.replace(/\D/g, "").length >= 10 &&
-    /^\d{5}$/.test(cp) &&
-    estado !== "" &&
-    municipio.trim().length > 1 &&
-    direccion.trim().length > 5;
+    telefono.replace(/\D/g, "").length >= 10;
+
+  // Pickup needs no address; a shipment needs the full one.
+  const datosListos =
+    datosBase &&
+    (recoger ||
+      (/^\d{5}$/.test(cp) &&
+        estado !== "" &&
+        municipio.trim().length > 1 &&
+        direccion.trim().length > 5));
+
+  // A shipment can't proceed without a chosen rate; pickup has none.
+  const envioListo = recoger || envio !== null;
 
   const tarjetaLista =
     metodo !== "card" ||
@@ -124,30 +139,37 @@ export function CheckoutView() {
       tarjeta.cvc.length >= 3);
 
   async function pagar() {
-    if (!envio || !resumen) return;
+    if (!resumen || !envioListo) return;
     setErrPago(null);
     setPagando(true);
     try {
-      // Card data is tokenized in the browser — it never reaches our server.
-      const token = metodo === "card" ? await tokenizarTarjeta(tarjeta) : undefined;
+      const lineas = resumen.lineas.map((l) => ({ id: l.id, qty: l.qty }));
+      const cliente = { nombre, email, telefono, cp, estado, municipio, direccion, referencias };
+      const envioElegido =
+        recoger || !envio
+          ? null
+          : { proveedor: envio.proveedor, servicio: envio.servicio, totalCents: envio.totalCents, dias: envio.dias };
 
-      const r = await crearOrdenYPagar(
-        resumen.lineas.map((l) => ({ id: l.id, qty: l.qty })),
-        { nombre, email, telefono, cp, estado, municipio, direccion, referencias },
-        {
-          proveedor: envio.proveedor,
-          servicio: envio.servicio,
-          totalCents: envio.totalCents,
-          dias: envio.dias,
-        },
-        metodo,
-        token,
-      );
+      // Direct transfer: no Conekta. Reserve the order and send them to the
+      // confirmation page with the bank data; an admin confirms the deposit.
+      if (!esConekta(metodo)) {
+        const r = await crearOrdenTransferencia(lineas, cliente, envioElegido, tipoEntrega);
+        if (!r.ok) {
+          setErrPago(r.error);
+          return;
+        }
+        clear();
+        router.push(`/tienda/orden/${r.data.ordenId}`);
+        return;
+      }
+
+      // Conekta: card data is tokenized in the browser — it never reaches us.
+      const token = metodo === "card" ? await tokenizarTarjeta(tarjeta) : undefined;
+      const r = await crearOrdenYPagar(lineas, cliente, envioElegido, metodo, tipoEntrega, token);
       if (!r.ok) {
         setErrPago(r.error);
         return;
       }
-
       // 3DS challenge / Aplazo: finish the flow at the provider.
       if (r.data.redirectUrl) {
         window.location.href = r.data.redirectUrl;
@@ -231,6 +253,25 @@ export function CheckoutView() {
       <div className="mt-6 grid gap-6 lg:grid-cols-5">
         {/* Form */}
         <div className="space-y-5 lg:col-span-3">
+          <Card titulo="¿Cómo lo recibes?">
+            <div className="grid grid-cols-2 gap-2">
+              <EntregaTile
+                activo={!recoger}
+                onClick={() => setTipoEntrega("envio")}
+                icon={Truck}
+                titulo="Envío a domicilio"
+                desc="Te lo mandamos por paquetería"
+              />
+              <EntregaTile
+                activo={recoger}
+                onClick={() => setTipoEntrega("recoger")}
+                icon={StoreIcon}
+                titulo="Recoger / mando por mi cuenta"
+                desc="Sin costo de envío"
+              />
+            </div>
+          </Card>
+
           <Card titulo="Tus datos">
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="Nombre completo" value={nombre} onChange={setNombre} className="sm:col-span-2" />
@@ -239,6 +280,22 @@ export function CheckoutView() {
             </div>
           </Card>
 
+          {recoger ? (
+            <Card titulo="Recoger en tienda">
+              <div className="flex items-start gap-3 rounded-xl bg-blue-50/60 p-3">
+                <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
+                <div className="text-sm text-slate-700">
+                  <p className="font-medium text-slate-900">{TIENDA.direccion}</p>
+                  <p className="mt-0.5 text-xs text-slate-500">{TIENDA.horario}</p>
+                  <p className="mt-2 text-xs leading-relaxed text-slate-600">
+                    Prepara tu pedido en cuanto se confirme el pago. Puedes venir tú
+                    o mandar un mensajero/Uber — solo dan tu folio al recoger.
+                  </p>
+                </div>
+              </div>
+            </Card>
+          ) : (
+            <>
           <Card titulo="Dirección de envío">
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="Código postal" value={cp} onChange={(v) => setCp(v.replace(/\D/g, "").slice(0, 5))} inputMode="numeric" />
@@ -316,6 +373,8 @@ export function CheckoutView() {
               </div>
             )}
           </Card>
+            </>
+          )}
 
           <PagoSection
             metodo={metodo}
@@ -359,9 +418,15 @@ export function CheckoutView() {
                 <dd className="tabular-nums">{formatMXN(subtotal)}</dd>
               </div>
               <div className="flex justify-between">
-                <dt className="text-slate-600">Envío</dt>
+                <dt className="text-slate-600">{recoger ? "Entrega" : "Envío"}</dt>
                 <dd className="tabular-nums">
-                  {envio ? formatMXN(envio.totalCents) : <span className="text-xs text-slate-400">Cotiza arriba</span>}
+                  {recoger ? (
+                    <span className="text-xs font-medium text-green-700">Recoger · gratis</span>
+                  ) : envio ? (
+                    formatMXN(envio.totalCents)
+                  ) : (
+                    <span className="text-xs text-slate-400">Cotiza arriba</span>
+                  )}
                 </dd>
               </div>
               <div className="flex items-baseline justify-between border-t border-slate-200 pt-2">
@@ -372,23 +437,25 @@ export function CheckoutView() {
 
             <button
               onClick={pagar}
-              disabled={!datosListos || !envio || !tarjetaLista || pagando}
+              disabled={!datosListos || !envioListo || !tarjetaLista || pagando}
               className="mt-4 flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-blue-600 text-sm font-semibold text-white shadow-sm shadow-blue-600/30 transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none"
             >
               {pagando && <Loader2 className="h-4 w-4 animate-spin" />}
               {pagando
                 ? "Procesando…"
-                : !envio
+                : !envioListo
                   ? "Cotiza el envío para continuar"
                   : !datosListos
                     ? "Completa tus datos"
-                    : metodo === "card"
-                      ? `Pagar ${formatMXN(total)}`
-                      : metodo === "oxxo"
-                        ? "Generar ficha OXXO"
-                        : metodo === "spei"
-                          ? "Generar CLABE"
-                          : "Continuar con Aplazo"}
+                    : metodo === "transferencia"
+                      ? "Apartar con transferencia"
+                      : metodo === "card"
+                        ? `Pagar ${formatMXN(total)}`
+                        : metodo === "oxxo"
+                          ? "Generar ficha OXXO"
+                          : metodo === "spei"
+                            ? "Generar CLABE"
+                            : "Continuar con Aplazo"}
             </button>
 
             {errPago && (
@@ -411,6 +478,34 @@ export function CheckoutView() {
 
 function Wrap({ children }: { children: React.ReactNode }) {
   return <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10">{children}</div>;
+}
+
+function EntregaTile({
+  activo,
+  onClick,
+  icon: Icon,
+  titulo,
+  desc,
+}: {
+  activo: boolean;
+  onClick: () => void;
+  icon: typeof Truck;
+  titulo: string;
+  desc: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "flex cursor-pointer flex-col gap-1 rounded-xl border p-3 text-left transition-colors",
+        activo ? "border-blue-500 bg-blue-50/60 text-blue-800" : "border-slate-200 text-slate-600 hover:border-blue-200",
+      )}
+    >
+      <Icon className="h-5 w-5" />
+      <span className="text-sm font-semibold leading-tight">{titulo}</span>
+      <span className="text-[11px] leading-tight text-slate-500">{desc}</span>
+    </button>
+  );
 }
 
 function Card({ titulo, children }: { titulo: string; children: React.ReactNode }) {

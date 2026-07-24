@@ -3,17 +3,16 @@
 import { useState } from "react";
 import Cards, { type Focused } from "react-credit-cards-2";
 import "react-credit-cards-2/dist/es/styles-compiled.css";
-import { CreditCard, Store, ArrowLeftRight, CalendarClock } from "lucide-react";
+import { CreditCard, Store, ArrowLeftRight, CalendarClock, Landmark } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { VOUCHER_HORAS_UI } from "./pago-const";
-import type { ConektaMethod } from "./pago-const";
+import type { MetodoPago } from "./pago-const";
 import type { DatosTarjeta } from "@/lib/conekta-client";
 
 // Brand logos live in /public/pay. A method either shows its provider logo
-// (which already carries the name) or, for a generic card, a lucide icon + a
-// "Tarjeta" label — there's no single card-brand logo to stand in for it.
+// (which already carries the name) or, for a generic method, a lucide icon.
 const METODOS: {
-  value: ConektaMethod;
+  value: MetodoPago;
   label: string;
   desc: string;
   icon: typeof CreditCard;
@@ -21,8 +20,9 @@ const METODOS: {
 }[] = [
   { value: "card", label: "Tarjeta", desc: "Débito o crédito", icon: CreditCard },
   { value: "oxxo", label: "OXXO", desc: `Ficha válida ${VOUCHER_HORAS_UI} h`, icon: Store, logo: "/pay/oxxo.svg" },
-  { value: "spei", label: "Transferencia", desc: "SPEI · CLABE", icon: ArrowLeftRight, logo: "/pay/spei.svg" },
+  { value: "spei", label: "SPEI", desc: "CLABE al instante", icon: ArrowLeftRight, logo: "/pay/spei.svg" },
   { value: "aplazo", label: "A pagos", desc: "Paga después", icon: CalendarClock, logo: "/pay/aplazo.png" },
+  { value: "transferencia", label: "Transferencia", desc: "A nuestra cuenta", icon: Landmark },
 ];
 
 export function PagoSection({
@@ -31,8 +31,8 @@ export function PagoSection({
   tarjeta,
   setTarjeta,
 }: {
-  metodo: ConektaMethod;
-  setMetodo: (m: ConektaMethod) => void;
+  metodo: MetodoPago;
+  setMetodo: (m: MetodoPago) => void;
   tarjeta: DatosTarjeta;
   setTarjeta: (t: DatosTarjeta) => void;
 }) {
@@ -44,7 +44,7 @@ export function PagoSection({
     <section className="rounded-2xl border border-slate-200 bg-white p-4">
       <h2 className="mb-3 text-sm font-semibold text-slate-900">Método de pago</h2>
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         {METODOS.map((m) => {
           const activo = metodo === m.value;
           return (
@@ -151,6 +151,12 @@ export function PagoSection({
       {metodo === "aplazo" && (
         <p className="mt-3 text-xs leading-relaxed text-slate-500">
           Te llevamos a Aplazo para aprobar tus pagos y regresas aquí.
+        </p>
+      )}
+      {metodo === "transferencia" && (
+        <p className="mt-3 text-xs leading-relaxed text-slate-500">
+          Te damos los datos de nuestra cuenta para que transfieras. Apartamos tu
+          pedido y lo preparamos en cuanto confirmemos el depósito.
         </p>
       )}
     </section>

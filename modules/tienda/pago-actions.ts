@@ -24,6 +24,8 @@ export type EnvioElegido = {
   dias: number | null;
 };
 
+export type TipoEntrega = "envio" | "recoger";
+
 export type ResultadoPago = {
   ordenId: string;
   folio: string;
@@ -40,6 +42,14 @@ export type ResultadoPago = {
   pagada: boolean;
 };
 
+/** Direct bank transfer — no Conekta. Order sits pendiente until an admin
+ *  confirms the deposit; the confirmation page shows the bank data + folio. */
+export type ResultadoTransferencia = {
+  ordenId: string;
+  folio: string;
+  totalCents: number;
+};
+
 async function baseUrl(): Promise<string> {
   const h = await headers();
   const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
@@ -47,78 +57,97 @@ async function baseUrl(): Promise<string> {
   return `${proto}://${host}`;
 }
 
+// Shared order creation: re-price, reserve stock, sanity-check the subtotal.
+// Both the Conekta path and the direct-transfer path start here so the reserve
+// and re-pricing rules can't drift between them.
+async function crearOrden(
+  lineas: CartLinea[],
+  cliente: DatosCliente,
+  tipoEntrega: TipoEntrega,
+  envio: EnvioElegido | null,
+): Promise<{
+  ordenId: string;
+  folio: string;
+  totalCents: number;
+  items: { id: string; nombre: string; precio_cents: number; qty: number }[];
+}> {
+  const val = await validarCarrito(lineas);
+  if (!val.ok) throw new Error(val.error);
+  const { lineas: items, subtotal_cents } = val.data;
+
+  const envioCents = tipoEntrega === "recoger" ? 0 : envio?.totalCents ?? 0;
+  if (!Number.isInteger(envioCents) || envioCents < 0) throw new Error("Envío inválido");
+  const envioDesc =
+    tipoEntrega === "recoger"
+      ? "Recoger en tienda"
+      : `${envio!.proveedor} · ${envio!.servicio}${envio!.dias ? ` · ${envio!.dias} día(s)` : ""}`;
+
+  const { data, error } = await insforgeAdmin.database.rpc("crear_orden_web", {
+    p_items: items.map((l) => ({ product_id: l.id, qty: l.qty })),
+    p_nombre: cliente.nombre,
+    p_email: cliente.email,
+    p_telefono: cliente.telefono,
+    p_cp: cliente.cp || null,
+    p_estado: cliente.estado || null,
+    p_municipio: cliente.municipio || null,
+    p_direccion: cliente.direccion || null,
+    p_referencias: cliente.referencias || null,
+    p_envio_cents: envioCents,
+    p_envio_desc: envioDesc,
+    p_tipo_entrega: tipoEntrega,
+  });
+  if (error) throw new Error(error.message ?? "No se pudo crear la orden");
+
+  const row = (Array.isArray(data) ? data[0] : data) as
+    | { orden_id: string; folio: string; subtotal_cents: number; total_cents: number }
+    | undefined;
+  if (!row?.orden_id) throw new Error("No se pudo crear la orden");
+
+  // The RPC recomputed the subtotal from the catalog; a mismatch means prices
+  // moved under us — release the reserve, don't proceed.
+  if (row.subtotal_cents !== subtotal_cents) {
+    await insforgeAdmin.database.rpc("cancelar_orden_web", { p_orden_id: row.orden_id });
+    throw new Error("Los precios cambiaron. Vuelve a intentar.");
+  }
+
+  return { ordenId: row.orden_id, folio: row.folio, totalCents: row.total_cents, items };
+}
+
 // Creates our order (RESERVING stock), then charges it with Conekta. If Conekta
 // fails we release the reserve immediately — otherwise a failed card attempt
-// would strand inventory nobody can sell.
+// would strand inventory nobody can sell. `envio` is null for a pickup.
 export async function crearOrdenYPagar(
   lineas: CartLinea[],
   cliente: DatosCliente,
-  envio: EnvioElegido,
+  envio: EnvioElegido | null,
   metodo: ConektaMethod,
+  tipoEntrega: TipoEntrega,
   cardTokenId?: string,
 ): Promise<ActionResult<ResultadoPago>> {
   return attempt("crearOrdenYPagar", async () => {
-    // Re-price from the catalog; the client's numbers never reach Conekta.
-    const val = await validarCarrito(lineas);
-    if (!val.ok) throw new Error(val.error);
-    const { lineas: items, subtotal_cents } = val.data;
-
-    if (!Number.isInteger(envio.totalCents) || envio.totalCents < 0)
-      throw new Error("Envío inválido");
-
-    const { data, error } = await insforgeAdmin.database.rpc("crear_orden_web", {
-      p_items: items.map((l) => ({ product_id: l.id, qty: l.qty })),
-      p_nombre: cliente.nombre,
-      p_email: cliente.email,
-      p_telefono: cliente.telefono,
-      p_cp: cliente.cp,
-      p_estado: cliente.estado,
-      p_municipio: cliente.municipio,
-      p_direccion: cliente.direccion,
-      p_referencias: cliente.referencias || null,
-      p_envio_cents: envio.totalCents,
-      p_envio_desc: `${envio.proveedor} · ${envio.servicio}${envio.dias ? ` · ${envio.dias} día(s)` : ""}`,
-    });
-    if (error) throw new Error(error.message ?? "No se pudo crear la orden");
-
-    const row = (Array.isArray(data) ? data[0] : data) as
-      | { orden_id: string; folio: string; subtotal_cents: number; total_cents: number }
-      | undefined;
-    if (!row?.orden_id) throw new Error("No se pudo crear la orden");
-
-    const ordenId = row.orden_id;
-    const totalCents = row.total_cents;
-
-    // Sanity: the RPC recomputed the subtotal from the catalog. If it disagrees
-    // with what we just validated, something moved underneath us — don't charge.
-    if (row.subtotal_cents !== subtotal_cents) {
-      await insforgeAdmin.database.rpc("cancelar_orden_web", { p_orden_id: ordenId });
-      throw new Error("Los precios cambiaron. Vuelve a intentar.");
-    }
+    const { ordenId, folio, totalCents, items } = await crearOrden(
+      lineas,
+      cliente,
+      tipoEntrega,
+      envio,
+    );
+    const envioCents = tipoEntrega === "recoger" ? 0 : envio?.totalCents ?? 0;
 
     try {
       const url = await baseUrl();
       const co = await createConektaOrder({
         amountCents: totalCents,
         method: metodo,
-        customer: {
-          name: cliente.nombre,
-          email: cliente.email,
-          phone: cliente.telefono,
-        },
+        customer: { name: cliente.nombre, email: cliente.email, phone: cliente.telefono },
         // Shipping rides as a line so Conekta's total matches ours exactly.
         lineItems: [
-          ...items.map((l) => ({
-            name: l.nombre,
-            unit_price: l.precio_cents,
-            quantity: l.qty,
-          })),
-          ...(envio.totalCents > 0
-            ? [{ name: `Envío · ${envio.proveedor}`, unit_price: envio.totalCents, quantity: 1 }]
+          ...items.map((l) => ({ name: l.nombre, unit_price: l.precio_cents, quantity: l.qty })),
+          ...(envioCents > 0 && envio
+            ? [{ name: `Envío · ${envio.proveedor}`, unit_price: envioCents, quantity: 1 }]
             : []),
         ],
         cardTokenId,
-        orderNumber: row.folio,
+        orderNumber: folio,
         returnUrl: `${url}/tienda/orden/${ordenId}`,
         cancelUrl: `${url}/tienda/orden/${ordenId}?cancelado=1`,
       });
@@ -133,7 +162,7 @@ export async function crearOrdenYPagar(
 
       return {
         ordenId,
-        folio: row.folio,
+        folio,
         metodo,
         totalCents,
         referencia: pm?.reference ?? null,
@@ -154,5 +183,28 @@ export async function crearOrdenYPagar(
       }
       throw e;
     }
+  });
+}
+
+// Direct bank transfer: reserve the order, mark the method, and stop. No charge
+// is created — the deposit lands in the store's own account and an admin
+// confirms it from the panel, which is what finally commits the sale. Stock
+// stays reserved meanwhile.
+// ponytail: unpaid direct-transfer orders hold stock until an admin cancels
+// them — no auto-expiry yet. Add a cron to release stale pendientes if the
+// reservation surface ever gets abused.
+export async function crearOrdenTransferencia(
+  lineas: CartLinea[],
+  cliente: DatosCliente,
+  envio: EnvioElegido | null,
+  tipoEntrega: TipoEntrega,
+): Promise<ActionResult<ResultadoTransferencia>> {
+  return attempt("crearOrdenTransferencia", async () => {
+    const { ordenId, folio, totalCents } = await crearOrden(lineas, cliente, tipoEntrega, envio);
+    await insforgeAdmin.database
+      .from("ordenes_web")
+      .update({ metodo: "transferencia" })
+      .eq("id", ordenId);
+    return { ordenId, folio, totalCents };
   });
 }

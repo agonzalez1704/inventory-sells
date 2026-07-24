@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { CheckCircle2, Clock, Store, ArrowLeftRight, XCircle } from "lucide-react";
+import { CheckCircle2, Clock, Store, ArrowLeftRight, XCircle, Landmark, MapPin } from "lucide-react";
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { getConektaOrder } from "@/lib/conekta";
 import { formatMXN } from "@/lib/money";
@@ -22,10 +22,20 @@ type Orden = {
   envio_cents: number;
   total_cents: number;
   envio_desc: string | null;
-  direccion: string;
-  municipio: string;
-  estado: string;
-  cp: string;
+  tipo_entrega: string;
+  direccion: string | null;
+  municipio: string | null;
+  estado: string | null;
+  cp: string | null;
+};
+
+// Store's receiving account for direct transfers. In env, not committed — it's
+// shared with the customer on the confirmation page. Absent → we tell them we'll
+// send the data by WhatsApp instead of showing a blank.
+const BANK = {
+  titular: process.env.BANK_TITULAR ?? null,
+  banco: process.env.BANK_BANCO ?? null,
+  clabe: process.env.BANK_CLABE ?? null,
 };
 
 // The order id is an unguessable uuid, which is what gates this page — there are
@@ -41,7 +51,7 @@ export default async function OrdenPage({
   const { data } = await insforgeAdmin.database
     .from("ordenes_web")
     .select(
-      "id, folio, nombre, status, metodo, conekta_order_id, subtotal_cents, envio_cents, total_cents, envio_desc, direccion, municipio, estado, cp",
+      "id, folio, nombre, status, metodo, conekta_order_id, subtotal_cents, envio_cents, total_cents, envio_desc, tipo_entrega, direccion, municipio, estado, cp",
     )
     .eq("id", id)
     .maybeSingle();
@@ -72,6 +82,8 @@ export default async function OrdenPage({
 
   const pagada = o.status === "pagada";
   const cancelada = o.status === "cancelada";
+  const recoger = o.tipo_entrega === "recoger";
+  const esTransferencia = o.metodo === "transferencia";
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
@@ -98,9 +110,15 @@ export default async function OrdenPage({
 
         <p className="mt-4 text-sm leading-relaxed text-slate-600">
           {pagada ? (
-            <>Gracias, {o.nombre.split(" ")[0]}. Preparamos tu envío y te contactamos por WhatsApp con tu guía. Entrega en {TIENDA.entregaDias} hábiles.</>
+            recoger ? (
+              <>Gracias, {o.nombre.split(" ")[0]}. Tu pedido está listo para recoger. Ven tú o manda tu Uber/mensajero — solo dan el folio <strong>{o.folio}</strong> al llegar.</>
+            ) : (
+              <>Gracias, {o.nombre.split(" ")[0]}. Preparamos tu envío y te contactamos por WhatsApp con tu guía. Entrega en {TIENDA.entregaDias} hábiles.</>
+            )
           ) : cancelada ? (
             <>Este pedido se canceló y los productos volvieron al catálogo. Si fue un error, vuelve a intentarlo o escríbenos.</>
+          ) : recoger ? (
+            <>Apartamos tus piezas. En cuanto confirmemos tu pago queda listo para recoger — recibirás aviso por WhatsApp.</>
           ) : (
             <>Apartamos tus piezas. En cuanto confirmemos tu pago preparamos el envío — recibirás aviso por WhatsApp.</>
           )}
@@ -136,6 +154,31 @@ export default async function OrdenPage({
           </div>
         )}
 
+        {/* Direct bank transfer: our own account, confirmed by staff. */}
+        {!pagada && !cancelada && esTransferencia && (
+          <div className="mt-5 rounded-xl border border-blue-200 bg-blue-50/60 p-4">
+            <p className="flex items-center gap-2 text-sm font-semibold text-blue-900">
+              <Landmark className="h-4 w-4" /> Transfiere a nuestra cuenta
+            </p>
+            {BANK.clabe ? (
+              <div className="mt-2 space-y-1.5 text-sm text-blue-950">
+                {BANK.banco && <p className="text-xs text-blue-800">{BANK.banco}</p>}
+                <p className="select-all font-mono text-xl font-bold tracking-wider">{BANK.clabe}</p>
+                {BANK.titular && <p className="text-xs text-blue-800">A nombre de {BANK.titular}</p>}
+              </div>
+            ) : (
+              <p className="mt-2 text-xs text-blue-800">
+                Te enviamos los datos de la cuenta por WhatsApp.
+              </p>
+            )}
+            <p className="mt-3 text-xs leading-relaxed text-blue-800">
+              Monto exacto: <strong>{formatMXN(o.total_cents)}</strong>. Manda tu
+              comprobante por WhatsApp y apartamos tu pedido; lo preparamos en
+              cuanto confirmemos el depósito. Referencia: <strong>{o.folio}</strong>.
+            </p>
+          </div>
+        )}
+
         {/* Detalle */}
         <ul className="mt-5 divide-y divide-slate-100 border-t border-slate-200 pt-2">
           {items.map((i, n) => (
@@ -155,8 +198,10 @@ export default async function OrdenPage({
             <dd className="tabular-nums">{formatMXN(o.subtotal_cents)}</dd>
           </div>
           <div className="flex justify-between">
-            <dt className="text-slate-600">Envío{o.envio_desc ? ` · ${o.envio_desc}` : ""}</dt>
-            <dd className="tabular-nums">{formatMXN(o.envio_cents)}</dd>
+            <dt className="text-slate-600">{recoger ? "Entrega" : `Envío${o.envio_desc ? ` · ${o.envio_desc}` : ""}`}</dt>
+            <dd className="tabular-nums">
+              {recoger ? <span className="text-green-700">Recoger · gratis</span> : formatMXN(o.envio_cents)}
+            </dd>
           </div>
           <div className="flex items-baseline justify-between border-t border-slate-200 pt-1.5">
             <dt className="font-semibold text-slate-900">Total</dt>
@@ -166,9 +211,16 @@ export default async function OrdenPage({
           </div>
         </dl>
 
-        <p className="mt-4 text-xs leading-relaxed text-slate-500">
-          Enviamos a: {o.direccion}, {o.municipio}, {o.estado}, CP {o.cp}
-        </p>
+        {recoger ? (
+          <p className="mt-4 flex items-start gap-1.5 text-xs leading-relaxed text-slate-500">
+            <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
+            Recoge en: {TIENDA.direccion} · {TIENDA.horario}
+          </p>
+        ) : (
+          <p className="mt-4 text-xs leading-relaxed text-slate-500">
+            Enviamos a: {o.direccion}, {o.municipio}, {o.estado}, CP {o.cp}
+          </p>
+        )}
 
         <Link
           href="/tienda"

@@ -3,3 +3,11 @@
 export const VOUCHER_HORAS_UI = 48;
 
 export type ConektaMethod = "card" | "oxxo" | "spei" | "aplazo";
+
+// Everything the checkout can offer. "transferencia" is a direct bank transfer
+// that bypasses Conekta and is confirmed by an admin — not a Conekta method.
+export type MetodoPago = ConektaMethod | "transferencia";
+
+export function esConekta(m: MetodoPago): m is ConektaMethod {
+  return m !== "transferencia";
+}
