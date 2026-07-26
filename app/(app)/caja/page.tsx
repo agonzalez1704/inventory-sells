@@ -31,6 +31,7 @@ type VentaRow = {
       cost_cents: number;
       name: string;
       sku: string;
+      inventory_id: string | null;
     } | null;
   }[];
 };
@@ -77,7 +78,7 @@ export default async function CajaPage({
     insforge.database
       .from("sales")
       .select(
-        "id, total_cents, payment_method, created_at, sale_items(qty, unit_price_cents, products(etiqueta, cost_cents, name, sku))",
+        "id, total_cents, payment_method, created_at, sale_items(qty, unit_price_cents, products(etiqueta, cost_cents, name, sku, inventory_id))",
       )
       .eq("status", "completed")
       .is("settled_at", null)
@@ -88,7 +89,7 @@ export default async function CajaPage({
     insforge.database
       .from("sales")
       .select(
-        "id, total_cents, payment_method, settled_at, sale_items(qty, unit_price_cents, products(etiqueta, cost_cents, name, sku))",
+        "id, total_cents, payment_method, settled_at, sale_items(qty, unit_price_cents, products(etiqueta, cost_cents, name, sku, inventory_id))",
       )
       .eq("status", "completed")
       .gte("settled_at", startISO)
@@ -134,6 +135,12 @@ export default async function CajaPage({
       .gte("entregado_at", startISO)
       .lt("entregado_at", endISO),
   ]);
+  const { data: inventoriesData } = await insforge.database
+    .from("inventories")
+    .select("id, name");
+  const invName = new Map(
+    ((inventoriesData ?? []) as { id: string; name: string }[]).map((i) => [i.id, i.name]),
+  );
 
   const directasV = (directas ?? []) as unknown as VentaRow[];
   const fiadosV = (fiadosComp ?? []) as unknown as VentaRow[];
@@ -242,6 +249,38 @@ export default async function CajaPage({
   }
   const ganancia = isAdmin ? gananciaVentas - gananciaDevuelta : null;
 
+  // --- Corte por inventario: revenue + margin attributed to each inventory via
+  // sale_items -> product -> inventory. Same recognized sales as above (direct +
+  // fiados completed). Non-product cash (extra income, gastos) isn't
+  // inventory-specific, so it stays out of this split by design.
+  type InvAgg = {
+    inventoryId: string;
+    nombre: string;
+    unidades: number;
+    ventaCents: number;
+    gananciaCents: number;
+  };
+  const porInvMap = new Map<string, InvAgg>();
+  const acumInv = (rows: VentaRow[]) => {
+    for (const v of rows)
+      for (const it of v.sale_items ?? []) {
+        const invId = it.products?.inventory_id ?? "sin";
+        const nombre = it.products?.inventory_id
+          ? invName.get(it.products.inventory_id) ?? "Otro inventario"
+          : "Sin inventario";
+        const a =
+          porInvMap.get(invId) ??
+          { inventoryId: invId, nombre, unidades: 0, ventaCents: 0, gananciaCents: 0 };
+        a.unidades += it.qty;
+        a.ventaCents += it.unit_price_cents * it.qty;
+        a.gananciaCents += (it.unit_price_cents - (it.products?.cost_cents ?? 0)) * it.qty;
+        porInvMap.set(invId, a);
+      }
+  };
+  acumInv(directasV);
+  acumInv(fiadosV);
+  const porInventario = [...porInvMap.values()].sort((a, b) => b.ventaCents - a.ventaCents);
+
   const gastosPorMetodo = cero();
   let gastosTotal = 0;
   for (const g of gastos) {
@@ -337,6 +376,7 @@ export default async function CajaPage({
         etiquetado,
         ganancia,
         ingresosDetalle,
+        porInventario,
       }}
     />
   );

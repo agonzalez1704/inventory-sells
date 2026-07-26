@@ -90,6 +90,13 @@ export type CajaData = {
   }[];
   ganancia: number | null; // net sales profit; null for non-admins
   ingresosDetalle: IngresoLinea[]; // every cash-in event; sums to ingresosTotal
+  porInventario: {
+    inventoryId: string;
+    nombre: string;
+    unidades: number;
+    ventaCents: number;
+    gananciaCents: number;
+  }[];
 };
 
 function ymd(d: Date): string {
@@ -452,6 +459,59 @@ export function CajaView({ data }: { data: CajaData }) {
               </li>
             ))}
           </ul>
+        </Card>
+      )}
+
+      {/* Corte por inventario — venta y ganancia atribuidas a cada inventario */}
+      {data.porInventario.length > 0 && (
+        <Card className="overflow-hidden">
+          <div className="border-b border-border px-4 py-3">
+            <h2 className="text-sm font-semibold">Corte por inventario</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Venta{data.isAdmin ? " y ganancia" : ""} de las ventas del periodo,
+              repartida por inventario. No incluye ingresos extra ni gastos.
+            </p>
+          </div>
+          <ul className="divide-y divide-border">
+            {data.porInventario.map((inv) => (
+              <li key={inv.inventoryId} className="px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{inv.nombre}</p>
+                    <p className="text-xs text-muted-foreground tabular-nums">
+                      {inv.unidades} {inv.unidades === 1 ? "unidad" : "unidades"}
+                    </p>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <p className="font-mono text-sm font-semibold tabular-nums">
+                      {formatMXN(inv.ventaCents)}
+                    </p>
+                    {data.isAdmin && (
+                      <p className="font-mono text-xs tabular-nums text-emerald-600">
+                        +{formatMXN(inv.gananciaCents)} ganancia
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+          {/* Totals row so the split visibly reconciles with the sale figures. */}
+          <div className="flex items-center justify-between gap-3 border-t border-border bg-muted/40 px-4 py-2.5">
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Total
+            </span>
+            <div className="text-right">
+              <p className="font-mono text-sm font-semibold tabular-nums">
+                {formatMXN(data.porInventario.reduce((s, i) => s + i.ventaCents, 0))}
+              </p>
+              {data.isAdmin && (
+                <p className="font-mono text-xs tabular-nums text-emerald-600">
+                  +{formatMXN(data.porInventario.reduce((s, i) => s + i.gananciaCents, 0))} ganancia
+                </p>
+              )}
+            </div>
+          </div>
         </Card>
       )}
 
