@@ -170,7 +170,8 @@ export async function notifyNuevaVenta(
     await notifyAdmins(tipo, {
       title: tipo === "fiado" ? `Nuevo fiado · ${total}` : `Nueva venta · ${total}`,
       body: lines.filter(Boolean).join("\n"),
-      url: tipo === "fiado" ? "/fiados" : "/ventas",
+      // Deep-link to the specific movement so tapping the notification opens it.
+      url: tipo === "fiado" ? `/fiados?fiado=${saleId}` : `/ventas?venta=${saleId}`,
       tag: saleId,
     });
   } catch (e) {
@@ -203,7 +204,7 @@ export async function notifyAbono(saleId: string): Promise<void> {
     await notifyAdmins("abono", {
       title: `Abono a fiado · ${formatMXN(p.monto_cents)}`,
       body: lines.filter(Boolean).join("\n"),
-      url: "/fiados",
+      url: `/fiados?fiado=${saleId}`,
       tag: `abono-${saleId}`,
     });
   } catch (e) {
@@ -228,7 +229,7 @@ export async function notifyCancelacion(
           ? `Fiado cancelado · ${formatMXN(s.total_cents)}`
           : `Venta anulada · ${formatMXN(s.total_cents)}`,
       body: lines.filter(Boolean).join("\n"),
-      url: tipo === "fiado" ? "/fiados" : "/ventas",
+      url: tipo === "fiado" ? `/fiados?fiado=${saleId}` : `/ventas?venta=${saleId}`,
       tag: `void-${saleId}`,
     });
   } catch (e) {

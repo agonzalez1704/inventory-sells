@@ -235,16 +235,31 @@ export function RecentSales({
   products,
   titulo = "Ventas recientes",
   subtitulo = "Toca una venta para ver sus productos.",
+  abrirId,
 }: {
   sales: SaleWithItems[];
   isAdmin: boolean;
   products: SwapProduct[];
   titulo?: string;
   subtitulo?: string;
+  abrirId?: string | null;
 }) {
   const [edit, setEdit] = useState<SaleWithItems | null>(null);
   const [returnSale, setReturnSale] = useState<SaleWithItems | null>(null);
-  const [open, setOpen] = useState<Set<string>>(new Set());
+  // Deep-link from a push notification: open + scroll to + briefly flash that
+  // sale so it's obvious which one the notification was about.
+  const [open, setOpen] = useState<Set<string>>(() => new Set(abrirId ? [abrirId] : []));
+  const [flash, setFlash] = useState<string | null>(abrirId ?? null);
+  useEffect(() => {
+    if (!abrirId) return;
+    // Also set here (not just via the initializers) so a soft navigation to a
+    // new ?venta= — without a remount — still opens and flashes the right row.
+    setOpen((prev) => new Set(prev).add(abrirId));
+    setFlash(abrirId);
+    document.getElementById(`venta-${abrirId}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
+    const t = setTimeout(() => setFlash(null), 2500);
+    return () => clearTimeout(t);
+  }, [abrirId]);
 
   // Local copy so a return can update the list optimistically; re-syncs when
   // the server data (props) arrives after router.refresh().
@@ -371,8 +386,12 @@ export function RecentSales({
                 return (
                   <Fragment key={s.id}>
                     <tr
+                      id={`venta-${s.id}`}
                       onClick={() => toggle(s.id)}
-                      className="cursor-pointer border-b border-border/60 transition-colors last:border-0 hover:bg-muted/40"
+                      className={cn(
+                        "cursor-pointer border-b border-border/60 transition-colors last:border-0 hover:bg-muted/40",
+                        flash === s.id && "bg-amber-50",
+                      )}
                     >
                       <td className="px-2 py-2.5 text-muted-foreground">
                         <ChevronRight

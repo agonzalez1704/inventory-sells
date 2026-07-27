@@ -2,7 +2,12 @@ import { createInsForgeServerClient } from "@/lib/insforge/server";
 import { LoansView, type Loan, type SwapProduct } from "@/modules/loans/LoansView";
 import type { PickerCustomer } from "@/modules/customers/CustomerPicker";
 
-export default async function FiadosPage() {
+export default async function FiadosPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ fiado?: string }>;
+}) {
+  const abrirId = (await searchParams).fiado ?? null;
   const insforge = await createInsForgeServerClient();
 
   const [
@@ -71,7 +76,7 @@ export default async function FiadosPage() {
           {error.message}
         </p>
       )}
-      <LoansView loans={loans} products={products} customers={customers} />
+      <LoansView loans={loans} products={products} customers={customers} abrirId={abrirId} />
     </>
   );
 }

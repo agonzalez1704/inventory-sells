@@ -17,11 +17,18 @@ const CANALES = ["mostrador", "online"] as const;
 export default async function VentasPage({
   searchParams,
 }: {
-  searchParams: Promise<{ from?: string; to?: string; metodo?: string; canal?: string }>;
+  searchParams: Promise<{
+    from?: string;
+    to?: string;
+    metodo?: string;
+    canal?: string;
+    venta?: string;
+  }>;
 }) {
   const sp = await searchParams;
   const from = sp.from ?? mxHoy();
   const to = sp.to ?? from;
+  const abrirId = sp.venta ?? null;
   const metodo = METODOS.includes(sp.metodo as PaymentMethod) ? (sp.metodo as PaymentMethod) : null;
   const canal = (CANALES as readonly string[]).includes(sp.canal ?? "") ? sp.canal! : null;
   const { startISO, endISO } = rangoUTC(from, to);
@@ -116,6 +123,28 @@ export default async function VentasPage({
     })
     .filter((s) => s.sale_items.length > 0);
 
+  // Deep-link from a push notification: if the sale isn't in the current range
+  // (e.g. the notification was tapped the next day), fetch it and pin it on top
+  // so the link always lands on the right sale.
+  let lista = netSales;
+  if (abrirId && !netSales.some((s) => s.id === abrirId)) {
+    const { data: one } = await insforge.database
+      .from("sales")
+      .select(
+        "id, total_cents, payment_method, customer_name, canal, created_at, sold_by, sale_items(product_id, qty, unit_price_cents, products(name, sku))",
+      )
+      .eq("id", abrirId)
+      .eq("status", "completed")
+      .maybeSingle();
+    if (one) {
+      const s = one as unknown as SaleWithItems;
+      lista = [
+        { ...s, vendedor: (s.sold_by ? sellerName.get(s.sold_by) : null) ?? null },
+        ...netSales,
+      ];
+    }
+  }
+
   const totalPeriodo = netSales.reduce((a, s) => a + s.total_cents, 0);
 
   return (
@@ -138,9 +167,10 @@ export default async function VentasPage({
       />
 
       <RecentSales
-        sales={netSales}
+        sales={lista}
         isAdmin={isAdmin}
         products={products}
+        abrirId={abrirId}
         titulo="Ventas del periodo"
         subtitulo="Toca una venta para ver sus productos. La búsqueda abarca todas las ventas."
       />

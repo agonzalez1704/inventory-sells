@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { HandCoins, User, Pencil } from "lucide-react";
@@ -61,15 +61,27 @@ export function LoansView({
   loans,
   products,
   customers,
+  abrirId,
 }: {
   loans: Loan[];
   products: SwapProduct[];
   customers: PickerCustomer[];
+  abrirId?: string | null;
 }) {
   const total = loans.reduce(
     (s, l) => s + Math.max(0, l.total_cents - l.pagado_cents),
     0,
   );
+
+  // Deep-link from a push notification: scroll to + briefly flash that fiado.
+  const [flash, setFlash] = useState<string | null>(abrirId ?? null);
+  useEffect(() => {
+    if (!abrirId) return;
+    setFlash(abrirId);
+    document.getElementById(`fiado-${abrirId}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
+    const t = setTimeout(() => setFlash(null), 2500);
+    return () => clearTimeout(t);
+  }, [abrirId]);
 
   return (
     <section className="space-y-6">
@@ -99,7 +111,13 @@ export function LoansView({
       ) : (
         <div className="space-y-2.5">
           {loans.map((l) => (
-            <LoanRow key={l.id} loan={l} products={products} customers={customers} />
+            <LoanRow
+              key={l.id}
+              loan={l}
+              products={products}
+              customers={customers}
+              resaltar={flash === l.id}
+            />
           ))}
         </div>
       )}
@@ -111,10 +129,12 @@ function LoanRow({
   loan,
   products,
   customers,
+  resaltar = false,
 }: {
   loan: Loan;
   products: SwapProduct[];
   customers: PickerCustomer[];
+  resaltar?: boolean;
 }) {
   const router = useRouter();
   const [payment, setPayment] = useState<PaymentMethod>("efectivo");
@@ -172,7 +192,10 @@ function LoanRow({
   }
 
   return (
-    <Card className="p-4">
+    <Card
+      id={`fiado-${loan.id}`}
+      className={cn("p-4 transition-shadow", resaltar && "ring-2 ring-amber-400")}
+    >
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="flex items-center gap-1.5 font-medium">
