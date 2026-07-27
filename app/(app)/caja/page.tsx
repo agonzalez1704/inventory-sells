@@ -89,7 +89,7 @@ export default async function CajaPage({
     insforge.database
       .from("sales")
       .select(
-        "id, total_cents, payment_method, settled_at, sale_items(qty, unit_price_cents, products(etiqueta, cost_cents, name, sku, inventory_id))",
+        "id, total_cents, payment_method, created_at, settled_at, sale_items(qty, unit_price_cents, products(etiqueta, cost_cents, name, sku, inventory_id))",
       )
       .eq("status", "completed")
       .gte("settled_at", startISO)
@@ -253,12 +253,21 @@ export default async function CajaPage({
   // sale_items -> product -> inventory. Same recognized sales as above (direct +
   // fiados completed). Non-product cash (extra income, gastos) isn't
   // inventory-specific, so it stays out of this split by design.
+  type InvMov = {
+    fecha: string;
+    producto: string;
+    sku: string;
+    qty: number;
+    costoCents: number; // unit cost to us
+    precioCents: number; // unit price it sold at
+  };
   type InvAgg = {
     inventoryId: string;
     nombre: string;
     unidades: number;
     ventaCents: number;
     gananciaCents: number;
+    movimientos: InvMov[];
   };
   const porInvMap = new Map<string, InvAgg>();
   const acumInv = (rows: VentaRow[]) => {
@@ -270,16 +279,36 @@ export default async function CajaPage({
           : "Sin inventario";
         const a =
           porInvMap.get(invId) ??
-          { inventoryId: invId, nombre, unidades: 0, ventaCents: 0, gananciaCents: 0 };
+          {
+            inventoryId: invId,
+            nombre,
+            unidades: 0,
+            ventaCents: 0,
+            gananciaCents: 0,
+            movimientos: [] as InvMov[],
+          };
         a.unidades += it.qty;
         a.ventaCents += it.unit_price_cents * it.qty;
         a.gananciaCents += (it.unit_price_cents - (it.products?.cost_cents ?? 0)) * it.qty;
+        a.movimientos.push({
+          fecha: v.created_at ?? v.settled_at ?? "",
+          producto: it.products?.name ?? "—",
+          sku: it.products?.sku ?? "—",
+          qty: it.qty,
+          costoCents: it.products?.cost_cents ?? 0,
+          precioCents: it.unit_price_cents,
+        });
         porInvMap.set(invId, a);
       }
   };
   acumInv(directasV);
   acumInv(fiadosV);
-  const porInventario = [...porInvMap.values()].sort((a, b) => b.ventaCents - a.ventaCents);
+  const porInventario = [...porInvMap.values()]
+    .map((a) => ({
+      ...a,
+      movimientos: a.movimientos.sort((x, y) => (x.fecha < y.fecha ? 1 : -1)),
+    }))
+    .sort((a, b) => b.ventaCents - a.ventaCents);
 
   const gastosPorMetodo = cero();
   let gastosTotal = 0;

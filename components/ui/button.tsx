@@ -2,7 +2,7 @@ import * as React from "react";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type Variant = "primary" | "secondary" | "ghost" | "danger" | "accent";
+type Variant = "primary" | "secondary" | "ghost" | "danger" | "accent" | "brand";
 type Size = "sm" | "md" | "lg" | "icon";
 
 const variants: Record<Variant, string> = {
@@ -11,6 +11,7 @@ const variants: Record<Variant, string> = {
   ghost: "text-muted-foreground hover:bg-muted hover:text-foreground",
   danger: "bg-red-600 text-white hover:bg-red-700",
   accent: "bg-accent text-accent-foreground hover:bg-accent/90",
+  brand: "bg-brand text-brand-foreground hover:bg-brand/90",
 };
 
 const sizes: Record<Size, string> = {

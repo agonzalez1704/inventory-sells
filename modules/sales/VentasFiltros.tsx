@@ -121,7 +121,7 @@ export function VentasFiltros({
       </div>
 
       <div className="flex justify-end">
-        <Button variant="secondary" className="h-9" onClick={() => go(desde, hasta, metodo, canal)}>
+        <Button variant="brand" className="h-9" onClick={() => go(desde, hasta, metodo, canal)}>
           Aplicar fechas
         </Button>
       </div>

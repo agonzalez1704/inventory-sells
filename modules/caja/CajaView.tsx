@@ -90,13 +90,24 @@ export type CajaData = {
   }[];
   ganancia: number | null; // net sales profit; null for non-admins
   ingresosDetalle: IngresoLinea[]; // every cash-in event; sums to ingresosTotal
-  porInventario: {
-    inventoryId: string;
-    nombre: string;
-    unidades: number;
-    ventaCents: number;
-    gananciaCents: number;
-  }[];
+  porInventario: InvAgg[];
+};
+
+export type InvMov = {
+  fecha: string;
+  producto: string;
+  sku: string;
+  qty: number;
+  costoCents: number;
+  precioCents: number;
+};
+export type InvAgg = {
+  inventoryId: string;
+  nombre: string;
+  unidades: number;
+  ventaCents: number;
+  gananciaCents: number;
+  movimientos: InvMov[];
 };
 
 function ymd(d: Date): string {
@@ -139,7 +150,15 @@ function Kpi({
         <span className="text-xs font-medium text-muted-foreground">{label}</span>
         {onClick && <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground" />}
       </div>
-      <p className="mt-2.5 font-mono text-2xl font-semibold tabular-nums tracking-tight">
+      {/* Colour the figure by meaning so the eye lands on money-in first, then
+          money-out — the flat all-black numbers gave no reading order. */}
+      <p
+        className={cn(
+          "mt-2.5 font-mono text-2xl font-semibold tabular-nums tracking-tight",
+          tone === "in" && "text-accent",
+          tone === "out" && "text-red-600",
+        )}
+      >
         {value}
       </p>
     </Card>
@@ -153,6 +172,7 @@ export function CajaView({ data }: { data: CajaData }) {
   const [gastoOpen, setGastoOpen] = useState(false);
   const [ingresoOpen, setIngresoOpen] = useState(false);
   const [ventasOpen, setVentasOpen] = useState(false);
+  const [invSel, setInvSel] = useState<InvAgg | null>(null);
   const [usbOk, setUsbOk] = useState(false);
   const [usbBusy, setUsbBusy] = useState(false);
 
@@ -320,7 +340,7 @@ export function CajaView({ data }: { data: CajaData }) {
             />
           </label>
           <Button
-            variant="secondary"
+            variant="brand"
             className="h-9 w-full sm:w-auto"
             onClick={() => go(from, to)}
           >
@@ -373,13 +393,13 @@ export function CajaView({ data }: { data: CajaData }) {
         </div>
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
-              <th className="px-4 py-2 font-medium">Método</th>
-              <th className="px-4 py-2 text-right font-medium">Ingresos</th>
-              <th className="px-4 py-2 text-right font-medium">Adelantos</th>
-              <th className="px-4 py-2 text-right font-medium">Gastos</th>
-              <th className="px-4 py-2 text-right font-medium">Devol.</th>
-              <th className="px-4 py-2 text-right font-medium">Neto</th>
+            <tr className="border-b border-border bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
+              <th className="px-4 py-2.5 font-medium">Método</th>
+              <th className="px-4 py-2.5 text-right font-medium">Ingresos</th>
+              <th className="px-4 py-2.5 text-right font-medium">Adelantos</th>
+              <th className="px-4 py-2.5 text-right font-medium">Gastos</th>
+              <th className="px-4 py-2.5 text-right font-medium">Devol.</th>
+              <th className="px-4 py-2.5 text-right font-semibold text-foreground">Neto</th>
             </tr>
           </thead>
           <tbody>
@@ -389,21 +409,24 @@ export function CajaView({ data }: { data: CajaData }) {
               const gas = data.gastosPorMetodo[m] ?? 0;
               const dev = data.devolucionesPorMetodo[m] ?? 0;
               if (ing === 0 && gas === 0 && dev === 0) return null;
+              const neto = ing - gas - dev;
               return (
                 <tr key={m} className="border-b border-border/60 last:border-0">
-                  <td className="px-4 py-2">{label}</td>
-                  <td className="px-4 py-2 text-right font-mono tabular-nums">{formatMXN(ing)}</td>
-                  <td className="px-4 py-2 text-right font-mono tabular-nums text-muted-foreground">
+                  <td className="px-4 py-2.5 font-medium">{label}</td>
+                  <td className="px-4 py-2.5 text-right font-mono tabular-nums text-accent">
+                    {ing ? formatMXN(ing) : "—"}
+                  </td>
+                  <td className="px-4 py-2.5 text-right font-mono tabular-nums text-muted-foreground">
                     {adel ? formatMXN(adel) : "—"}
                   </td>
-                  <td className="px-4 py-2 text-right font-mono tabular-nums text-muted-foreground">
+                  <td className="px-4 py-2.5 text-right font-mono tabular-nums text-muted-foreground">
                     {gas ? `−${formatMXN(gas)}` : "—"}
                   </td>
-                  <td className="px-4 py-2 text-right font-mono tabular-nums text-muted-foreground">
+                  <td className="px-4 py-2.5 text-right font-mono tabular-nums text-muted-foreground">
                     {dev ? `−${formatMXN(dev)}` : "—"}
                   </td>
-                  <td className="px-4 py-2 text-right font-mono font-medium tabular-nums">
-                    {formatMXN(ing - gas - dev)}
+                  <td className="px-4 py-2.5 text-right font-mono font-semibold tabular-nums">
+                    {formatMXN(neto)}
                   </td>
                 </tr>
               );
@@ -418,6 +441,28 @@ export function CajaView({ data }: { data: CajaData }) {
                 </tr>
               )}
           </tbody>
+          {(data.ingresosTotal > 0 || data.gastosTotal > 0 || data.devolucionesTotal > 0) && (
+            <tfoot>
+              <tr className="border-t-2 border-border bg-muted/30 text-sm">
+                <td className="px-4 py-2.5 font-semibold uppercase tracking-wide text-muted-foreground">
+                  Total
+                </td>
+                <td className="px-4 py-2.5 text-right font-mono font-semibold tabular-nums text-accent">
+                  {formatMXN(data.ingresosTotal)}
+                </td>
+                <td className="px-4 py-2.5" />
+                <td className="px-4 py-2.5 text-right font-mono tabular-nums text-muted-foreground">
+                  {data.gastosTotal ? `−${formatMXN(data.gastosTotal)}` : "—"}
+                </td>
+                <td className="px-4 py-2.5 text-right font-mono tabular-nums text-muted-foreground">
+                  {data.devolucionesTotal ? `−${formatMXN(data.devolucionesTotal)}` : "—"}
+                </td>
+                <td className="px-4 py-2.5 text-right font-mono text-base font-bold tabular-nums">
+                  {formatMXN(data.ingresosTotal - data.gastosTotal - data.devolucionesTotal)}
+                </td>
+              </tr>
+            </tfoot>
+          )}
         </table>
       </Card>
 
@@ -474,25 +519,31 @@ export function CajaView({ data }: { data: CajaData }) {
           </div>
           <ul className="divide-y divide-border">
             {data.porInventario.map((inv) => (
-              <li key={inv.inventoryId} className="px-4 py-3">
-                <div className="flex items-center justify-between gap-3">
+              <li key={inv.inventoryId}>
+                <button
+                  onClick={() => setInvSel(inv)}
+                  className="flex w-full cursor-pointer items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/40"
+                >
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium">{inv.nombre}</p>
                     <p className="text-xs text-muted-foreground tabular-nums">
-                      {inv.unidades} {inv.unidades === 1 ? "unidad" : "unidades"}
+                      {inv.unidades} {inv.unidades === 1 ? "unidad" : "unidades"} · ver ventas
                     </p>
                   </div>
-                  <div className="shrink-0 text-right">
-                    <p className="font-mono text-sm font-semibold tabular-nums">
-                      {formatMXN(inv.ventaCents)}
-                    </p>
-                    {data.isAdmin && (
-                      <p className="font-mono text-xs tabular-nums text-emerald-600">
-                        +{formatMXN(inv.gananciaCents)} ganancia
+                  <div className="flex shrink-0 items-center gap-2">
+                    <div className="text-right">
+                      <p className="font-mono text-sm font-semibold tabular-nums">
+                        {formatMXN(inv.ventaCents)}
                       </p>
-                    )}
+                      {data.isAdmin && (
+                        <p className="font-mono text-xs tabular-nums text-emerald-600">
+                          +{formatMXN(inv.gananciaCents)} ganancia
+                        </p>
+                      )}
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
                   </div>
-                </div>
+                </button>
               </li>
             ))}
           </ul>
@@ -593,7 +644,100 @@ export function CajaView({ data }: { data: CajaData }) {
         lineas={data.ingresosDetalle}
         total={data.ingresosTotal}
       />
+      <InventarioModal
+        inv={invSel}
+        isAdmin={data.isAdmin}
+        onClose={() => setInvSel(null)}
+      />
     </section>
+  );
+}
+
+// Per-inventory sale detail. Modal on desktop, drawer on phones (the shared
+// Modal switches). Shows each line: product, human-readable date, quantity, the
+// price it sold at, and (admin) our unit cost + line profit.
+function InventarioModal({
+  inv,
+  isAdmin,
+  onClose,
+}: {
+  inv: InvAgg | null;
+  isAdmin: boolean;
+  onClose: () => void;
+}) {
+  if (!inv) return null;
+  const fmtFecha = (iso: string) =>
+    iso
+      ? new Date(iso).toLocaleString("es-MX", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+      : "—";
+
+  return (
+    <Modal open onClose={onClose} title={`Ventas · ${inv.nombre}`} className="max-w-2xl">
+      <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+        <span className="text-muted-foreground">
+          {inv.unidades} {inv.unidades === 1 ? "unidad" : "unidades"} ·{" "}
+          <span className="font-mono font-semibold text-foreground">
+            {formatMXN(inv.ventaCents)}
+          </span>
+        </span>
+        {isAdmin && (
+          <span className="font-mono text-sm font-semibold text-emerald-600">
+            +{formatMXN(inv.gananciaCents)} ganancia
+          </span>
+        )}
+      </div>
+
+      <div className="-mx-1 overflow-x-auto">
+        <table className="w-full min-w-[34rem] text-sm">
+          <thead>
+            <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
+              <th className="px-2 py-2 font-medium">Producto</th>
+              <th className="px-2 py-2 font-medium">Fecha de venta</th>
+              <th className="px-2 py-2 text-right font-medium">Cant.</th>
+              <th className="px-2 py-2 text-right font-medium">Precio</th>
+              {isAdmin && <th className="px-2 py-2 text-right font-medium">Costo</th>}
+              {isAdmin && <th className="px-2 py-2 text-right font-medium">Ganancia</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {inv.movimientos.map((m, i) => {
+              const ganLinea = (m.precioCents - m.costoCents) * m.qty;
+              return (
+                <tr key={i} className="border-b border-border/60 last:border-0">
+                  <td className="px-2 py-2">
+                    <span className="font-medium">{m.producto}</span>
+                    <span className="ml-1.5 font-mono text-xs text-muted-foreground">{m.sku}</span>
+                  </td>
+                  <td className="whitespace-nowrap px-2 py-2 text-muted-foreground">
+                    {fmtFecha(m.fecha)}
+                  </td>
+                  <td className="px-2 py-2 text-right font-mono tabular-nums">{m.qty}</td>
+                  <td className="px-2 py-2 text-right font-mono tabular-nums">
+                    {formatMXN(m.precioCents)}
+                  </td>
+                  {isAdmin && (
+                    <td className="px-2 py-2 text-right font-mono tabular-nums text-muted-foreground">
+                      {formatMXN(m.costoCents)}
+                    </td>
+                  )}
+                  {isAdmin && (
+                    <td className="px-2 py-2 text-right font-mono tabular-nums text-emerald-600">
+                      +{formatMXN(ganLinea)}
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </Modal>
   );
 }
 
