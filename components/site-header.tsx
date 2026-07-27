@@ -14,6 +14,7 @@ import {
   Wallet,
   Users,
   Package,
+  ScanBarcode,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/logo";
@@ -21,6 +22,7 @@ import { AsesorNavBadge } from "@/components/asesor-nav-badge";
 
 const links = [
   { href: "/inventario", label: "Inventario", icon: Boxes },
+  { href: "/pos", label: "POS", icon: ScanBarcode },
   { href: "/ventas", label: "Ventas", icon: ShoppingCart },
   { href: "/pedidos", label: "Pedidos", icon: Package },
   { href: "/fiados", label: "Fiados", icon: HandCoins },

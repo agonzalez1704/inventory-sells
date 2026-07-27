@@ -1,23 +1,57 @@
 import { auth } from "@clerk/nextjs/server";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
 import { getProfile } from "@/lib/auth/profile";
-import { SalesScreen, type SalesProduct } from "@/modules/sales/SalesScreen";
+import { mxHoy, rangoUTC } from "@/lib/caja-range";
 import { RecentSales, type SaleWithItems } from "@/modules/sales/RecentSales";
+import { VentasFiltros } from "@/modules/sales/VentasFiltros";
+import type { SalesProduct } from "@/modules/sales/SalesScreen";
+import type { PaymentMethod } from "@/lib/types";
 
-export default async function VentasPage() {
+export const dynamic = "force-dynamic";
+
+const METODOS: PaymentMethod[] = ["efectivo", "tarjeta", "transferencia", "otro"];
+const CANALES = ["mostrador", "online"] as const;
+
+// The sales browser: filter by date range, payment method and channel, review a
+// sale's items, and correct or return it. The register itself lives in /pos.
+export default async function VentasPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ from?: string; to?: string; metodo?: string; canal?: string }>;
+}) {
+  const sp = await searchParams;
+  const from = sp.from ?? mxHoy();
+  const to = sp.to ?? from;
+  const metodo = METODOS.includes(sp.metodo as PaymentMethod) ? (sp.metodo as PaymentMethod) : null;
+  const canal = (CANALES as readonly string[]).includes(sp.canal ?? "") ? sp.canal! : null;
+  const { startISO, endISO } = rangoUTC(from, to);
+
   const { userId } = await auth();
   const profile = userId ? await getProfile(userId) : null;
   const isAdmin = profile?.role === "admin";
 
   const insforge = await createInsForgeServerClient();
 
+  let ventasQuery = insforge.database
+    .from("sales")
+    .select(
+      "id, total_cents, payment_method, customer_name, canal, created_at, sold_by, sale_items(product_id, qty, unit_price_cents, products(name, sku))",
+    )
+    .eq("status", "completed")
+    .gte("created_at", startISO)
+    .lt("created_at", endISO)
+    .order("created_at", { ascending: false })
+    .limit(300);
+  if (metodo) ventasQuery = ventasQuery.eq("payment_method", metodo);
+  if (canal) ventasQuery = ventasQuery.eq("canal", canal);
+
   const [
-    { data: productData },
     { data: salesData },
+    { data: productData },
     { data: invData },
     { data: profileData },
-    { data: customerData },
   ] = await Promise.all([
+    ventasQuery,
     insforge.database
       .from("products")
       .select(
@@ -25,30 +59,9 @@ export default async function VentasPage() {
       )
       .eq("is_active", true)
       .order("name", { ascending: true }),
-    insforge.database
-      .from("sales")
-      .select(
-        "id, total_cents, payment_method, customer_name, created_at, sold_by, sale_items(product_id, qty, unit_price_cents, products(name, sku))",
-      )
-      .eq("status", "completed")
-      .order("created_at", { ascending: false })
-      .limit(8),
     insforge.database.from("inventories").select("id, name"),
     insforge.database.from("profiles").select("id, full_name"),
-    insforge.database
-      .from("customers")
-      .select("id, nombre, telefono, is_system")
-      .eq("is_active", true)
-      .order("is_system", { ascending: false })
-      .order("nombre", { ascending: true }),
   ]);
-
-  const customers = (customerData ?? []) as {
-    id: string;
-    nombre: string;
-    telefono: string;
-    is_system: boolean;
-  }[];
 
   const invName = new Map(
     ((invData ?? []) as { id: string; name: string }[]).map((i) => [i.id, i.name]),
@@ -57,21 +70,18 @@ export default async function VentasPage() {
     (productData ?? []) as (SalesProduct & { inventory_id: string })[]
   ).map((p) => ({ ...p, inventory_name: invName.get(p.inventory_id) ?? null }));
 
-  // sold_by is a Clerk user id (no FK to profiles), so resolve the name here.
   const sellerName = new Map(
-    ((profileData ?? []) as { id: string; full_name: string | null }[]).map(
-      (p) => [p.id, p.full_name],
-    ),
+    ((profileData ?? []) as { id: string; full_name: string | null }[]).map((p) => [
+      p.id,
+      p.full_name,
+    ]),
   );
-  // PostgREST returns the to-one `products` embed as an object; the SDK types
-  // it as an array, so cast through unknown.
   const sales = ((salesData ?? []) as unknown as SaleWithItems[]).map((s) => ({
     ...s,
     vendedor: (s.sold_by ? sellerName.get(s.sold_by) : null) ?? null,
   }));
 
-  // Returned quantities per sale/product — Recent Sales shows items NET of
-  // returns (the sale itself stays intact; only the display is reduced).
+  // Show items NET of returns; a fully-returned sale drops off the list.
   const saleIds = sales.map((s) => s.id);
   const returnedBySale = new Map<string, Map<string, number>>();
   if (saleIds.length) {
@@ -98,31 +108,42 @@ export default async function VentasPage() {
       const sale_items = s.sale_items
         .map((it) => ({
           ...it,
-          qty: it.qty - (it.product_id ? (ret.get(it.product_id) ?? 0) : 0),
+          qty: it.qty - (it.product_id ? ret.get(it.product_id) ?? 0 : 0),
         }))
         .filter((it) => it.qty > 0);
-      const total_cents = sale_items.reduce(
-        (a, it) => a + it.unit_price_cents * it.qty,
-        0,
-      );
+      const total_cents = sale_items.reduce((a, it) => a + it.unit_price_cents * it.qty, 0);
       return { ...s, sale_items, total_cents };
     })
-    // Fully-returned sales disappear from the list.
     .filter((s) => s.sale_items.length > 0);
 
+  const totalPeriodo = netSales.reduce((a, s) => a + s.total_cents, 0);
+
   return (
-    <section className="space-y-8">
+    <section className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Ventas</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Busca, agrega al carrito y cobra. El stock se descuenta solo.
-          {isAdmin && " Toca una venta reciente para corregir el pago."}
+          Filtra por fecha, método y canal. Toca una venta para ver sus productos
+          {isAdmin ? ", corregir el pago o registrar una devolución" : ""}.
         </p>
       </div>
 
-      <SalesScreen products={products} customers={customers} />
+      <VentasFiltros
+        from={from}
+        to={to}
+        metodo={metodo}
+        canal={canal}
+        count={netSales.length}
+        totalCents={totalPeriodo}
+      />
 
-      <RecentSales sales={netSales} isAdmin={isAdmin} products={products} />
+      <RecentSales
+        sales={netSales}
+        isAdmin={isAdmin}
+        products={products}
+        titulo="Ventas del periodo"
+        subtitulo="Toca una venta para ver sus productos. La búsqueda abarca todas las ventas."
+      />
     </section>
   );
 }
