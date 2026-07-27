@@ -85,20 +85,24 @@ export function VentasFiltros({
       </div>
 
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 lg:items-end">
-        <label className="block">
+        {/* min-w-0 on each grid cell: a grid item defaults to min-width:auto and
+            won't shrink below its content, and an iOS date input's intrinsic
+            width is wide — without this the row overflowed the card (and the
+            page) on a phone. */}
+        <label className="block min-w-0">
           <span className="mb-1 block text-xs text-muted-foreground">Desde</span>
-          <Input type="date" value={desde} max={hasta} onChange={(e) => setDesde(e.target.value)} className="h-9 w-full" />
+          <Input type="date" value={desde} max={hasta} onChange={(e) => setDesde(e.target.value)} className="h-9 w-full min-w-0" />
         </label>
-        <label className="block">
+        <label className="block min-w-0">
           <span className="mb-1 block text-xs text-muted-foreground">Hasta</span>
-          <Input type="date" value={hasta} min={desde} onChange={(e) => setHasta(e.target.value)} className="h-9 w-full" />
+          <Input type="date" value={hasta} min={desde} onChange={(e) => setHasta(e.target.value)} className="h-9 w-full min-w-0" />
         </label>
-        <label className="block">
+        <label className="block min-w-0">
           <span className="mb-1 block text-xs text-muted-foreground">Método</span>
           <Select
             value={metodo ?? ""}
             onChange={(e) => go(desde, hasta, e.target.value || null, canal)}
-            className="h-9 w-full"
+            className="h-9 w-full min-w-0"
           >
             <option value="">Todos</option>
             {METODOS.map((m) => (
@@ -106,12 +110,12 @@ export function VentasFiltros({
             ))}
           </Select>
         </label>
-        <label className="block">
+        <label className="block min-w-0">
           <span className="mb-1 block text-xs text-muted-foreground">Canal</span>
           <Select
             value={canal ?? ""}
             onChange={(e) => go(desde, hasta, metodo, e.target.value || null)}
-            className="h-9 w-full"
+            className="h-9 w-full min-w-0"
           >
             <option value="">Todos</option>
             <option value="mostrador">Mostrador</option>

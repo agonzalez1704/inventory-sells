@@ -364,7 +364,7 @@ export function RecentSales({
           className="mt-3"
         />
       ) : (
-        <Card className="mt-3 overflow-hidden">
+        <Card className="mt-3 overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
