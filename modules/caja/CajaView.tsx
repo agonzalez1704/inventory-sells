@@ -735,6 +735,26 @@ function InventarioModal({
               );
             })}
           </tbody>
+          <tfoot>
+            <tr className="border-t-2 border-border bg-muted/30 text-sm font-semibold">
+              <td className="px-2 py-2.5">Total</td>
+              <td className="px-2 py-2.5" />
+              <td className="px-2 py-2.5 text-right font-mono tabular-nums">{inv.unidades}</td>
+              <td className="px-2 py-2.5 text-right font-mono tabular-nums">
+                {formatMXN(inv.ventaCents)}
+              </td>
+              {isAdmin && (
+                <td className="px-2 py-2.5 text-right font-mono tabular-nums text-muted-foreground">
+                  {formatMXN(inv.movimientos.reduce((s, m) => s + m.costoCents * m.qty, 0))}
+                </td>
+              )}
+              {isAdmin && (
+                <td className="px-2 py-2.5 text-right font-mono tabular-nums text-emerald-600">
+                  +{formatMXN(inv.gananciaCents)}
+                </td>
+              )}
+            </tr>
+          </tfoot>
         </table>
       </div>
     </Modal>
