@@ -95,7 +95,7 @@ export function CotizacionBuilder({
         const res = await crearCotizacion(items, customerId, null, notas, "mostrador", estado);
         if (!res.ok) return void toast.error(res.error);
         toast.success(`Cotización ${res.data.folio} creada`);
-        router.push(`/cotizaciones/${res.data.id}`);
+        router.push("/cotizaciones");
       }
       router.refresh();
     });
