@@ -1,7 +1,7 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { ensureProfile } from "@/lib/auth/profile";
-import { isAllowedEmail } from "@/lib/auth/allowlist";
+import { emailTieneAcceso } from "@/lib/auth/allowlist";
 import { getNegocioInfo } from "@/modules/config/lib";
 import { ConfigPrompt } from "@/modules/config/ConfigPrompt";
 import { PushBanner } from "@/components/push-banner";
@@ -17,16 +17,16 @@ export default async function AppLayout({
 
   const user = await currentUser();
   const email = user?.primaryEmailAddress?.emailAddress ?? null;
-  // Only allow-listed emails may use the app.
-  if (!isAllowedEmail(email)) redirect("/sin-acceso");
+  // Allow-listed (env bootstrap) or invited emails may use the app.
+  if (!(await emailTieneAcceso(email))) redirect("/sin-acceso");
 
   const fullName =
     user && (user.firstName || user.lastName)
       ? [user.firstName, user.lastName].filter(Boolean).join(" ")
       : null;
 
-  // First user becomes admin; row is created if missing.
-  const profile = await ensureProfile(userId, fullName);
+  // First user becomes admin; invited users get their assigned role.
+  const profile = await ensureProfile(userId, fullName, email);
   const isAdmin = profile.role === "admin";
 
   // Nudge admins to configure the business info (needed by the WhatsApp agent).

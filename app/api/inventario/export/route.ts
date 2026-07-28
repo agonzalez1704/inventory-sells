@@ -3,7 +3,7 @@ import { renderToBuffer } from "@react-pdf/renderer";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
 import { getProfile } from "@/lib/auth/profile";
-import { isAllowedEmail } from "@/lib/auth/allowlist";
+import { emailTieneAcceso } from "@/lib/auth/allowlist";
 import {
   InventoryPdf,
   type PdfRow,
@@ -17,7 +17,7 @@ export async function GET(request: Request) {
   if (!userId) return new Response("Unauthorized", { status: 401 });
 
   const user = await currentUser();
-  if (!isAllowedEmail(user?.primaryEmailAddress?.emailAddress)) {
+  if (!(await emailTieneAcceso(user?.primaryEmailAddress?.emailAddress))) {
     return new Response("Forbidden", { status: 403 });
   }
 

@@ -1,16 +1,17 @@
 "use server";
 
-import { auth } from "@clerk/nextjs/server";
+import { auth, clerkClient } from "@clerk/nextjs/server";
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { tienePermiso } from "@/lib/auth/profile";
 import { attempt, type ActionResult } from "@/lib/errors";
 import { PERMISOS, type Permiso } from "@/lib/permissions";
 
-async function requireGestionUsuarios(): Promise<void> {
+async function requireGestionUsuarios(): Promise<string> {
   const { userId } = await auth();
   if (!userId) throw new Error("No autenticado");
   if (!(await tienePermiso(userId, "usuarios_gestionar")))
     throw new Error("Sin permiso para gestionar usuarios");
+  return userId;
 }
 
 const limpiaPermisos = (p: string[]): Permiso[] =>
@@ -141,6 +142,93 @@ export async function eliminarRol(roleId: string): Promise<ActionResult<null>> {
 
     const { error } = await insforgeAdmin.database.from("roles").delete().eq("id", roleId);
     if (error) throw new Error(error.message ?? "No se pudo eliminar el rol");
+    return null;
+  });
+}
+
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+
+// Invite an email with a preassigned role. Sends a Clerk invitation and records
+// the invite (which allow-lists the email + carries the role for first sign-in).
+export async function invitarUsuario(email: string, roleId: string): Promise<ActionResult<null>> {
+  return attempt("invitarUsuario", async () => {
+    const inviter = await requireGestionUsuarios();
+    const e = email.trim().toLowerCase();
+    if (!EMAIL_RE.test(e)) throw new Error("Correo inválido");
+
+    const { data: role } = await insforgeAdmin.database
+      .from("roles")
+      .select("slug")
+      .eq("id", roleId)
+      .maybeSingle();
+    const roleSlug = (role as { slug: string } | null)?.slug;
+    if (!roleSlug) throw new Error("Rol inválido");
+
+    // Send the Clerk invitation. If the person already has a Clerk account it
+    // rejects — that's fine, we still allow-list + role them below.
+    let invitationId: string | null = null;
+    try {
+      const client = await clerkClient();
+      const inv = await client.invitations.createInvitation({
+        emailAddress: e,
+        publicMetadata: { role_slug: roleSlug },
+        redirectUrl: process.env.NEXT_PUBLIC_APP_URL,
+        notify: true,
+        ignoreExisting: true,
+      });
+      invitationId = inv.id;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (!/already|exists|duplicate|taken/i.test(msg))
+        throw new Error(msg || "No se pudo enviar la invitación");
+    }
+
+    // Upsert the invite row (manual — email is unique).
+    const { data: prev } = await insforgeAdmin.database
+      .from("user_invites")
+      .select("id")
+      .eq("email", e)
+      .maybeSingle();
+    const patch = {
+      role_slug: roleSlug,
+      invited_by: inviter,
+      clerk_invitation_id: invitationId,
+      status: "pending" as const,
+    };
+    const { error } = prev
+      ? await insforgeAdmin.database.from("user_invites").update(patch).eq("email", e)
+      : await insforgeAdmin.database.from("user_invites").insert([{ email: e, ...patch }]);
+    if (error) throw new Error(error.message ?? "No se pudo guardar la invitación");
+    return null;
+  });
+}
+
+// Revoke an invite: pulls the Clerk invitation (if still pending) and marks the
+// row revoked, which also removes the email's access.
+export async function revocarInvitacion(email: string): Promise<ActionResult<null>> {
+  return attempt("revocarInvitacion", async () => {
+    await requireGestionUsuarios();
+    const e = email.trim().toLowerCase();
+    const { data } = await insforgeAdmin.database
+      .from("user_invites")
+      .select("clerk_invitation_id, status")
+      .eq("email", e)
+      .maybeSingle();
+    const inv = data as { clerk_invitation_id: string | null; status: string } | null;
+    if (!inv) throw new Error("Invitación no encontrada");
+
+    if (inv.clerk_invitation_id && inv.status === "pending") {
+      try {
+        await (await clerkClient()).invitations.revokeInvitation(inv.clerk_invitation_id);
+      } catch {
+        // Already accepted/expired — the row status below still cuts access.
+      }
+    }
+    const { error } = await insforgeAdmin.database
+      .from("user_invites")
+      .update({ status: "revoked" })
+      .eq("email", e);
+    if (error) throw new Error(error.message ?? "No se pudo revocar");
     return null;
   });
 }

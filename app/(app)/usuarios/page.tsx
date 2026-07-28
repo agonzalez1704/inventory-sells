@@ -6,6 +6,7 @@ import {
   UsuariosView,
   type RolRow,
   type UsuarioRow,
+  type InviteRow,
 } from "@/modules/usuarios/UsuariosView";
 
 export const dynamic = "force-dynamic";
@@ -14,17 +15,39 @@ export default async function UsuariosPage() {
   const { userId } = await auth();
   if (!userId || !(await tienePermiso(userId, "usuarios_gestionar"))) redirect("/");
 
-  const [{ data: rolesData }, { data: usersData }] = await Promise.all([
+  const [{ data: rolesData }, { data: usersData }, { data: invitesData }] = await Promise.all([
     insforgeAdmin.database
       .from("roles")
-      .select("id, name, description, is_system, role_permissions(permiso)")
+      .select("id, slug, name, description, is_system, role_permissions(permiso)")
       .order("is_system", { ascending: false })
       .order("name", { ascending: true }),
     insforgeAdmin.database
       .from("profiles")
       .select("id, full_name, role_id, roles(name)")
       .order("created_at", { ascending: true }),
+    insforgeAdmin.database
+      .from("user_invites")
+      .select("email, role_slug, status, created_at")
+      .neq("status", "revoked")
+      .order("created_at", { ascending: false }),
   ]);
+
+  const slugToName = new Map(
+    ((rolesData ?? []) as { slug: string; name: string }[]).map((r) => [r.slug, r.name]),
+  );
+  const invitaciones = ((invitesData ?? []) as {
+    email: string;
+    role_slug: string;
+    status: string;
+    created_at: string;
+  }[]).map(
+    (i): InviteRow => ({
+      email: i.email,
+      roleName: slugToName.get(i.role_slug) ?? i.role_slug,
+      status: i.status,
+      created_at: i.created_at,
+    }),
+  );
 
   const usuarios = ((usersData ?? []) as unknown as {
     id: string;
@@ -60,5 +83,5 @@ export default async function UsuariosPage() {
     }),
   );
 
-  return <UsuariosView usuarios={usuarios} roles={roles} />;
+  return <UsuariosView usuarios={usuarios} roles={roles} invitaciones={invitaciones} />;
 }

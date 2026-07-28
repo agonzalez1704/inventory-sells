@@ -80,12 +80,27 @@ export async function getAsignables(): Promise<{ id: string; nombre: string }[]>
     .sort((a, b) => a.nombre.localeCompare(b.nombre));
 }
 
-// Ensure a profiles row exists for the given Clerk user. The first user to sign
-// in (when no admin exists yet) becomes 'admin'; everyone after is 'seller'.
+// Does a role grant admin_total? The legacy `role` text is kept in sync with
+// this so `role = 'admin'` checks stay consistent with the permission model.
+async function rolEsAdmin(roleId: string | null): Promise<boolean> {
+  if (!roleId) return false;
+  const { data } = await insforgeAdmin.database
+    .from("role_permissions")
+    .select("permiso")
+    .eq("role_id", roleId)
+    .eq("permiso", "admin_total")
+    .maybeSingle();
+  return Boolean(data);
+}
+
+// Ensure a profiles row exists for the given Clerk user. Role resolution:
+//   1) a pending/accepted invite for this email → the admin-chosen role,
+//   2) else the first user ever → Dueño, everyone after → Vendedor.
 // Uses the admin client (bypasses RLS) — profiles are not client-writable.
 export async function ensureProfile(
   userId: string,
   fullName?: string | null,
+  email?: string | null,
 ): Promise<Profile> {
   const { data: existing, error } = await insforgeAdmin.database
     .from("profiles")
@@ -96,31 +111,55 @@ export async function ensureProfile(
   if (error) throw new Error(error.message ?? "profile lookup failed");
   if (existing) return existing as Profile;
 
-  const { data: anyAdmin } = await insforgeAdmin.database
-    .from("profiles")
-    .select("id")
-    .eq("role", "admin")
-    .limit(1)
-    .maybeSingle();
+  // Invited role (by email) wins over the default.
+  let roleSlug: string | null = null;
+  let inviteEmail: string | null = null;
+  const e = email?.trim().toLowerCase() || null;
+  if (e) {
+    const { data: inv } = await insforgeAdmin.database
+      .from("user_invites")
+      .select("role_slug, status")
+      .eq("email", e)
+      .maybeSingle();
+    const row = inv as { role_slug: string; status: string } | null;
+    if (row && row.status !== "revoked") {
+      roleSlug = row.role_slug;
+      inviteEmail = e;
+    }
+  }
 
-  // First user ever → Dueño (admin); everyone after → Vendedor. role text stays
-  // in sync with role_id for the built-in roles so legacy `role` checks hold.
-  const esPrimero = !anyAdmin;
-  const roleSlug = esPrimero ? "dueno" : "vendedor";
-  const role: Profile["role"] = esPrimero ? "admin" : "seller";
+  if (!roleSlug) {
+    const { data: anyAdmin } = await insforgeAdmin.database
+      .from("profiles")
+      .select("id")
+      .eq("role", "admin")
+      .limit(1)
+      .maybeSingle();
+    roleSlug = anyAdmin ? "vendedor" : "dueno";
+  }
+
   const { data: r } = await insforgeAdmin.database
     .from("roles")
     .select("id")
     .eq("slug", roleSlug)
     .maybeSingle();
   const roleId = (r as { id: string } | null)?.id ?? null;
+  const role: Profile["role"] = (await rolEsAdmin(roleId)) ? "admin" : "seller";
 
   const { data: created, error: insErr } = await insforgeAdmin.database
     .from("profiles")
     .insert([{ id: userId, full_name: fullName ?? null, role, role_id: roleId }])
     .select("id, full_name, role")
     .maybeSingle();
-
   if (insErr) throw new Error(insErr.message ?? "profile create failed");
+
+  // Mark the invite consumed (keep the row so the email stays allow-listed).
+  if (inviteEmail) {
+    await insforgeAdmin.database
+      .from("user_invites")
+      .update({ status: "accepted", accepted_at: new Date().toISOString() })
+      .eq("email", inviteEmail);
+  }
+
   return created as Profile;
 }

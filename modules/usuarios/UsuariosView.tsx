@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ShieldCheck, Plus, Pencil, Trash2, Lock } from "lucide-react";
+import { ShieldCheck, Plus, Pencil, Trash2, Lock, Mail, UserPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,14 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { CATALOGO_PERMISOS, type Permiso } from "@/lib/permissions";
-import { cambiarRolUsuario, crearRol, actualizarRol, eliminarRol } from "./actions";
+import {
+  cambiarRolUsuario,
+  crearRol,
+  actualizarRol,
+  eliminarRol,
+  invitarUsuario,
+  revocarInvitacion,
+} from "./actions";
 
 export type RolRow = {
   id: string;
@@ -27,18 +34,40 @@ export type UsuarioRow = {
   role_id: string | null;
   roleName: string | null;
 };
+export type InviteRow = {
+  email: string;
+  roleName: string;
+  status: string;
+  created_at: string;
+};
 
 export function UsuariosView({
   usuarios,
   roles,
+  invitaciones,
 }: {
   usuarios: UsuarioRow[];
   roles: RolRow[];
+  invitaciones: InviteRow[];
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [editando, setEditando] = useState<RolRow | null>(null);
   const [creando, setCreando] = useState(false);
+  const [invitando, setInvitando] = useState(false);
+
+  function revocar(email: string) {
+    if (!confirm(`¿Revocar la invitación de ${email}? Perderá el acceso.`)) return;
+    start(async () => {
+      const r = await revocarInvitacion(email);
+      if (!r.ok) {
+        toast.error(r.error);
+        return;
+      }
+      toast.success("Invitación revocada");
+      router.refresh();
+    });
+  }
 
   function reasignar(userId: string, roleId: string) {
     start(async () => {
@@ -76,7 +105,13 @@ export function UsuariosView({
 
       {/* USUARIOS */}
       <div>
-        <h2 className="mb-3 text-sm font-semibold text-muted-foreground">Usuarios</h2>
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold text-muted-foreground">Usuarios</h2>
+          <Button size="sm" onClick={() => setInvitando(true)}>
+            <UserPlus className="h-4 w-4" />
+            Invitar
+          </Button>
+        </div>
         <Card className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -111,8 +146,37 @@ export function UsuariosView({
           </table>
         </Card>
         <p className="mt-2 text-xs text-muted-foreground">
-          Los usuarios aparecen aquí al iniciar sesión por primera vez.
+          Invita por correo con un rol; el usuario aparece aquí al aceptar e iniciar sesión.
         </p>
+
+        {invitaciones.length > 0 && (
+          <div className="mt-4">
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Invitaciones
+            </h3>
+            <Card className="divide-y divide-border">
+              {invitaciones.map((i) => (
+                <div key={i.email} className="flex items-center gap-3 px-4 py-2.5 text-sm">
+                  <Mail className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <span className="min-w-0 flex-1 truncate">{i.email}</span>
+                  <Badge tone="neutral">{i.roleName}</Badge>
+                  <Badge tone={i.status === "accepted" ? "success" : "warning"}>
+                    {i.status === "accepted" ? "Aceptada" : "Pendiente"}
+                  </Badge>
+                  <button
+                    onClick={() => revocar(i.email)}
+                    disabled={pending}
+                    className="shrink-0 cursor-pointer rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                    aria-label={`Revocar ${i.email}`}
+                    title="Revocar acceso"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </Card>
+          </div>
+        )}
       </div>
 
       {/* ROLES */}
@@ -180,7 +244,73 @@ export function UsuariosView({
           }}
         />
       )}
+
+      {invitando && <InvitarModal roles={roles} onClose={() => setInvitando(false)} />}
     </section>
+  );
+}
+
+function InvitarModal({ roles, onClose }: { roles: RolRow[]; onClose: () => void }) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [email, setEmail] = useState("");
+  // Default to the first non-admin role (usually Vendedor).
+  const noAdmin = roles.filter((r) => !r.permisos.includes("admin_total"));
+  const [roleId, setRoleId] = useState((noAdmin[0] ?? roles[0])?.id ?? "");
+
+  function enviar() {
+    start(async () => {
+      const r = await invitarUsuario(email, roleId);
+      if (!r.ok) {
+        toast.error(r.error);
+        return;
+      }
+      toast.success("Invitación enviada");
+      onClose();
+      router.refresh();
+    });
+  }
+
+  return (
+    <Modal open onClose={onClose} title="Invitar usuario">
+      <div className="space-y-3">
+        <div>
+          <label className="mb-1 block text-sm font-medium">Correo</label>
+          <Input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="vendedor@correo.com"
+            autoFocus
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium">Rol</label>
+          <select
+            value={roleId}
+            onChange={(e) => setRoleId(e.target.value)}
+            className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm"
+          >
+            {roles.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Le llega un correo para crear su cuenta; entra ya con el rol elegido.
+        </p>
+        <div className="flex justify-end gap-2 pt-1">
+          <Button variant="ghost" onClick={onClose} disabled={pending}>
+            Cancelar
+          </Button>
+          <Button onClick={enviar} loading={pending} disabled={!email.trim() || !roleId}>
+            <Mail className="h-4 w-4" /> Enviar invitación
+          </Button>
+        </div>
+      </div>
+    </Modal>
   );
 }
 
