@@ -1,4 +1,5 @@
 import { createInsForgeServerClient } from "@/lib/insforge/server";
+import { requirePagePermiso } from "@/lib/auth/profile";
 import { SalesScreen, type SalesProduct } from "@/modules/sales/SalesScreen";
 
 export const dynamic = "force-dynamic";
@@ -6,6 +7,7 @@ export const dynamic = "force-dynamic";
 // The register: search products, build the cart, cobrar. The sales history lives
 // in its own tab (/ventas) so this screen stays focused on ringing up a sale.
 export default async function PosPage() {
+  await requirePagePermiso("pos_vender");
   const insforge = await createInsForgeServerClient();
 
   const [{ data: productData }, { data: invData }, { data: customerData }] =

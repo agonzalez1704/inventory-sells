@@ -1,5 +1,5 @@
 import { auth } from "@clerk/nextjs/server";
-import { getProfile } from "@/lib/auth/profile";
+import { getProfile, requirePagePermiso } from "@/lib/auth/profile";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
 import { mxHoy, rangoUTC } from "@/lib/caja-range";
 import {
@@ -54,6 +54,7 @@ export default async function CajaPage({
   const to = sp.to ?? from;
   const { startISO, endISO } = rangoUTC(from, to);
 
+  await requirePagePermiso("corte_ver");
   const { userId } = await auth();
   const profile = userId ? await getProfile(userId) : null;
   const isAdmin = profile?.role === "admin";

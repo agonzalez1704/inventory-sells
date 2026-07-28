@@ -1,7 +1,19 @@
 import "server-only";
+import { auth } from "@clerk/nextjs/server";
+import { redirect } from "next/navigation";
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import type { Profile } from "@/lib/types";
 import type { Permiso } from "@/lib/permissions";
+
+// Page guard: redirect out unless the signed-in user's role grants `permiso`
+// (admin_total passes everything). Server components only.
+export async function requirePagePermiso(permiso: Permiso, to = "/"): Promise<string> {
+  const { userId } = await auth();
+  if (!userId) redirect("/");
+  const perms = await getPermisos(userId);
+  if (!perms.has("admin_total") && !perms.has(permiso)) redirect(to);
+  return userId;
+}
 
 // Read a profile by Clerk user id (null if none yet). Admin client → no RLS.
 export async function getProfile(userId: string): Promise<Profile | null> {

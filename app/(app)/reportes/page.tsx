@@ -1,7 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { TrendingUp, Coins, HandCoins, AlertTriangle } from "lucide-react";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
-import { getProfile } from "@/lib/auth/profile";
+import { getProfile, requirePagePermiso } from "@/lib/auth/profile";
 import { formatMXN } from "@/lib/money";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -50,6 +50,7 @@ function Kpi({
 }
 
 export default async function ReportesPage() {
+  await requirePagePermiso("corte_ver");
   const { userId } = await auth();
   const profile = userId ? await getProfile(userId) : null;
   const isAdmin = profile?.role === "admin";

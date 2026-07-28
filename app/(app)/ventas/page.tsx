@@ -1,6 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
-import { getProfile } from "@/lib/auth/profile";
+import { getProfile, requirePagePermiso } from "@/lib/auth/profile";
 import { mxHoy, rangoUTC } from "@/lib/caja-range";
 import { RecentSales, type SaleWithItems } from "@/modules/sales/RecentSales";
 import { VentasFiltros } from "@/modules/sales/VentasFiltros";
@@ -33,6 +33,7 @@ export default async function VentasPage({
   const canal = (CANALES as readonly string[]).includes(sp.canal ?? "") ? sp.canal! : null;
   const { startISO, endISO } = rangoUTC(from, to);
 
+  await requirePagePermiso("pos_vender");
   const { userId } = await auth();
   const profile = userId ? await getProfile(userId) : null;
   const isAdmin = profile?.role === "admin";

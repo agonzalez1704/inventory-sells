@@ -22,52 +22,63 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { Permiso } from "@/lib/permissions";
 import { Logo } from "@/components/logo";
 import { AsesorNavBadge } from "@/components/asesor-nav-badge";
 
 // Nav grouped into sections — a flat list of 12 got unwieldy in a top bar, and a
-// sidebar has the vertical room to label the groups.
-const GRUPOS = [
+// sidebar has the vertical room to label the groups. Each link names the permiso
+// that reveals it (admin_total always sees everything); links/groups the user's
+// role doesn't grant are hidden.
+const GRUPOS: {
+  label: string;
+  links: { href: string; label: string; icon: typeof Boxes; permiso?: Permiso }[];
+}[] = [
   {
     label: "Operación",
     links: [
-      { href: "/pos", label: "POS", icon: ScanBarcode },
-      { href: "/ventas", label: "Ventas", icon: ShoppingCart },
-      { href: "/cotizaciones", label: "Cotizaciones", icon: FileText },
-      { href: "/pedidos", label: "Pedidos", icon: Package },
-      { href: "/fiados", label: "Fiados", icon: HandCoins },
-      { href: "/adelantos", label: "Adelantos", icon: Wallet },
-      { href: "/asesor", label: "Asesor", icon: Headset },
+      { href: "/pos", label: "POS", icon: ScanBarcode, permiso: "pos_vender" },
+      { href: "/ventas", label: "Ventas", icon: ShoppingCart, permiso: "pos_vender" },
+      { href: "/cotizaciones", label: "Cotizaciones", icon: FileText, permiso: "cotizar" },
+      { href: "/pedidos", label: "Pedidos", icon: Package, permiso: "surtir" },
+      { href: "/fiados", label: "Fiados", icon: HandCoins, permiso: "pos_vender" },
+      { href: "/adelantos", label: "Adelantos", icon: Wallet, permiso: "pos_vender" },
+      { href: "/asesor", label: "Asesor", icon: Headset, permiso: "pos_vender" },
     ],
   },
   {
     label: "Catálogo",
     links: [
-      { href: "/inventario", label: "Inventario", icon: Boxes },
-      { href: "/clientes", label: "Clientes", icon: Users },
+      { href: "/inventario", label: "Inventario", icon: Boxes, permiso: "inventario_ver" },
+      { href: "/clientes", label: "Clientes", icon: Users, permiso: "pos_vender" },
     ],
   },
   {
     label: "Finanzas",
     links: [
-      { href: "/caja", label: "Caja", icon: Calculator },
-      { href: "/reportes", label: "Reportes", icon: BarChart3 },
+      { href: "/caja", label: "Caja", icon: Calculator, permiso: "corte_ver" },
+      { href: "/reportes", label: "Reportes", icon: BarChart3, permiso: "corte_ver" },
     ],
   },
   {
     label: "Sistema",
     links: [
-      { href: "/usuarios", label: "Usuarios", icon: ShieldCheck },
+      { href: "/usuarios", label: "Usuarios", icon: ShieldCheck, permiso: "usuarios_gestionar" },
+      // No permiso: everyone needs their own device push + notification prefs.
       { href: "/configuracion", label: "Configuración", icon: Settings },
     ],
   },
 ];
 
-function NavList({ onNavigate }: { onNavigate?: () => void }) {
+function NavList({ permisos, onNavigate }: { permisos: Set<string>; onNavigate?: () => void }) {
   const pathname = usePathname();
+  const puede = (p?: Permiso) => !p || permisos.has("admin_total") || permisos.has(p);
+  const grupos = GRUPOS.map((g) => ({ ...g, links: g.links.filter((l) => puede(l.permiso)) })).filter(
+    (g) => g.links.length > 0,
+  );
   return (
     <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-4">
-      {GRUPOS.map((g) => (
+      {grupos.map((g) => (
         <div key={g.label}>
           <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
             {g.label}
@@ -101,10 +112,17 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({
+  children,
+  permisos = [],
+}: {
+  children: React.ReactNode;
+  permisos?: string[];
+}) {
   const pathname = usePathname();
   const { isSignedIn } = useAuth();
   const [open, setOpen] = useState(false);
+  const permSet = new Set(permisos);
 
   useEffect(() => setOpen(false), [pathname]);
   useEffect(() => {
@@ -130,7 +148,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <Logo className="h-6 w-auto text-foreground" />
               </Link>
             </div>
-            <NavList />
+            <NavList permisos={permSet} />
             <div className="shrink-0 border-t border-border p-3">
               <UserButton showName />
             </div>
@@ -173,7 +191,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     <X className="h-4 w-4" />
                   </button>
                 </div>
-                <NavList onNavigate={() => setOpen(false)} />
+                <NavList permisos={permSet} onNavigate={() => setOpen(false)} />
               </div>
             </div>
           )}
