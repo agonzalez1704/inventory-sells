@@ -35,7 +35,10 @@ export default async function AppLayout({
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
       {necesitaConfig && <ConfigPrompt />}
-      {isAdmin && <PushBanner />}
+      {/* Every staff member needs push — sellers get quote assignments +
+          unassigned broadcasts, not just admins. The banner self-hides once
+          enabled/dismissed/unsupported. */}
+      <PushBanner />
       {children}
       {/* Every staff member, not just admins — anyone can hit a stale action. */}
       <VersionWatcher />

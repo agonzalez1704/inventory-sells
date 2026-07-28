@@ -5,7 +5,8 @@ import { Bell, X, Share } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePush } from "@/components/use-push";
 
-// Shown to admins who haven't enabled push on this device — activate right here.
+// Shown to any staff member who hasn't enabled push on this device — activate
+// right here. Sellers need it too (quote assignments + unassigned broadcasts).
 export function PushBanner() {
   const { supported, enabled, busy, ready, iosNeedsInstall, enable } = usePush();
   const [dismissed, setDismissed] = useState(false);
@@ -26,7 +27,7 @@ export function PushBanner() {
               “Agregar a inicio”, abre la app desde el ícono y actívalas ahí.
             </>
           ) : (
-            "Recibe un aviso en este teléfono por cada venta y nota de crédito."
+            "Recibe avisos en este teléfono: ventas, notas de crédito y cotizaciones que te asignen."
           )}
         </p>
       </div>
