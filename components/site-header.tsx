@@ -15,6 +15,7 @@ import {
   Users,
   Package,
   ScanBarcode,
+  ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/logo";
@@ -31,6 +32,7 @@ const links = [
   { href: "/asesor", label: "Asesor", icon: Headset },
   { href: "/caja", label: "Caja", icon: Calculator },
   { href: "/reportes", label: "Reportes", icon: BarChart3 },
+  { href: "/usuarios", label: "Usuarios", icon: ShieldCheck },
   { href: "/configuracion", label: "Configuración", icon: Settings },
 ];
 
