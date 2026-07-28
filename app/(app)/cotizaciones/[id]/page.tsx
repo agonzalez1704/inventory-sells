@@ -1,7 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect, notFound } from "next/navigation";
 import { insforgeAdmin } from "@/lib/insforge/admin";
-import { getPermisos } from "@/lib/auth/profile";
+import { getPermisos, getAsignables } from "@/lib/auth/profile";
 import { CotizacionDetalle, type CotDetalle, type CotItem } from "@/modules/cotizaciones/CotizacionDetalle";
 
 export const dynamic = "force-dynamic";
@@ -39,7 +39,7 @@ export default async function CotizacionPage({ params }: { params: Promise<{ id:
   const propia = c.created_by === userId || c.vendedor_id === userId;
   if (!verTodas && !propia) redirect("/cotizaciones");
 
-  const [{ data: itemData }, { data: cust }, { data: profs }] = await Promise.all([
+  const [{ data: itemData }, { data: cust }, { data: profs }, asignables] = await Promise.all([
     insforgeAdmin.database
       .from("cotizacion_items")
       .select("nombre, sku, qty, unit_price_cents, cost_cents, line_total_cents")
@@ -48,13 +48,14 @@ export default async function CotizacionPage({ params }: { params: Promise<{ id:
       ? insforgeAdmin.database.from("customers").select("nombre").eq("id", c.customer_id).maybeSingle()
       : Promise.resolve({ data: null }),
     insforgeAdmin.database.from("profiles").select("id, full_name"),
+    perms.has("cotizaciones_reasignar") ? getAsignables() : Promise.resolve([]),
   ]);
 
-  const profList = ((profs ?? []) as { id: string; full_name: string | null }[]).map((p) => ({
-    id: p.id,
-    nombre: p.full_name ?? "—",
-  }));
-  const vendName = new Map(profList.map((p) => [p.id, p.nombre]));
+  // All profiles resolve the current assignee's name (even if their role no
+  // longer grants cotizar); the reassign dropdown only lists real sellers.
+  const vendName = new Map(
+    ((profs ?? []) as { id: string; full_name: string | null }[]).map((p) => [p.id, p.full_name ?? "—"]),
+  );
 
   const cot: CotDetalle = {
     id: c.id,
@@ -84,7 +85,7 @@ export default async function CotizacionPage({ params }: { params: Promise<{ id:
         reasignar: perms.has("cotizaciones_reasignar"),
         costos: perms.has("costos_ver"),
       }}
-      vendedores={profList}
+      vendedores={asignables}
     />
   );
 }

@@ -32,6 +32,25 @@ export async function tienePermiso(userId: string, permiso: Permiso): Promise<bo
   return (await getPermisos(userId)).has(permiso);
 }
 
+// Users a quote can be assigned to: anyone whose role grants `cotizar` (i.e. can
+// own and work a quote). Used by the quote builder + detail reassign.
+export async function getAsignables(): Promise<{ id: string; nombre: string }[]> {
+  const { data: rp } = await insforgeAdmin.database
+    .from("role_permissions")
+    .select("role_id")
+    .eq("permiso", "cotizar");
+  const roleIds = [...new Set(((rp ?? []) as { role_id: string }[]).map((r) => r.role_id))];
+  if (roleIds.length === 0) return [];
+
+  const { data: profs } = await insforgeAdmin.database
+    .from("profiles")
+    .select("id, full_name")
+    .in("role_id", roleIds);
+  return ((profs ?? []) as { id: string; full_name: string | null }[])
+    .map((p) => ({ id: p.id, nombre: p.full_name ?? "—" }))
+    .sort((a, b) => a.nombre.localeCompare(b.nombre));
+}
+
 // Ensure a profiles row exists for the given Clerk user. The first user to sign
 // in (when no admin exists yet) becomes 'admin'; everyone after is 'seller'.
 // Uses the admin client (bypasses RLS) — profiles are not client-writable.

@@ -39,10 +39,14 @@ export function CotizacionBuilder({
   products,
   customers,
   initial,
+  vendedores = [],
+  puedeAsignar = false,
 }: {
   products: SalesProduct[];
   customers: PickerCustomer[];
   initial?: CotizacionInicial;
+  vendedores?: { id: string; nombre: string }[];
+  puedeAsignar?: boolean;
 }) {
   const router = useRouter();
   const mostrador = useMemo(() => customers.find((c) => c.is_system) ?? customers[0], [customers]);
@@ -56,7 +60,12 @@ export function CotizacionBuilder({
     () => (initial?.customerId && customers.find((c) => c.id === initial.customerId)) || mostrador,
   );
   const [notas, setNotas] = useState(initial?.notas ?? "");
+  const [vendedorId, setVendedorId] = useState("");
   const [pending, startTransition] = useTransition();
+
+  // Vendedor picker only when creating and the user may assign; editing keeps
+  // assignment to the detail's reassign control.
+  const mostrarVendedor = !initial && puedeAsignar && vendedores.length > 0;
 
   // Quote lines are not stock-bound (no reserve until conversion) — allow any qty
   // the seller types, catalog stock is only a hint shown on the card.
@@ -92,7 +101,7 @@ export function CotizacionBuilder({
         toast.success("Cotización actualizada");
         router.push(`/cotizaciones/${initial.id}`);
       } else {
-        const res = await crearCotizacion(items, customerId, null, notas, "mostrador", estado);
+        const res = await crearCotizacion(items, customerId, vendedorId || null, notas, "mostrador", estado);
         if (!res.ok) return void toast.error(res.error);
         toast.success(`Cotización ${res.data.folio} creada`);
         router.push("/cotizaciones");
@@ -262,6 +271,21 @@ export function CotizacionBuilder({
 
               <div className="space-y-3 border-t border-border p-4">
                 <CustomerPicker customers={customers} value={customer} onChange={setCustomer} />
+                {mostrarVendedor && (
+                  <select
+                    value={vendedorId}
+                    onChange={(e) => setVendedorId(e.target.value)}
+                    className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm"
+                    aria-label="Asignar vendedor"
+                  >
+                    <option value="">Asignar vendedor (opcional)</option>
+                    {vendedores.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.nombre}
+                      </option>
+                    ))}
+                  </select>
+                )}
                 <Input value={notas} onChange={(e) => setNotas(e.target.value)} placeholder="Notas (opcional)" />
 
                 <div className="space-y-1.5 border-t border-dashed border-border pt-3">

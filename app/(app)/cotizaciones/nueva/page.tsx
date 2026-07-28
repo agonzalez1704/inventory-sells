@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
-import { getPermisos } from "@/lib/auth/profile";
+import { getPermisos, getAsignables } from "@/lib/auth/profile";
 import { CotizacionBuilder } from "@/modules/cotizaciones/CotizacionBuilder";
 import type { SalesProduct } from "@/modules/sales/SalesScreen";
 import type { PickerCustomer } from "@/modules/customers/CustomerPicker";
@@ -13,10 +13,12 @@ export const dynamic = "force-dynamic";
 export default async function NuevaCotizacionPage() {
   const { userId } = await auth();
   if (!userId) redirect("/");
-  if (!(await getPermisos(userId)).has("cotizar")) redirect("/cotizaciones");
+  const perms = await getPermisos(userId);
+  if (!perms.has("cotizar")) redirect("/cotizaciones");
+  const puedeAsignar = perms.has("cotizaciones_reasignar");
 
   const insforge = await createInsForgeServerClient();
-  const [{ data: productData }, { data: customerData }] = await Promise.all([
+  const [{ data: productData }, { data: customerData }, vendedores] = await Promise.all([
     insforge.database
       .from("products")
       .select("id, sku, name, brand, size, category, price_cents, quantity, image_url")
@@ -28,6 +30,7 @@ export default async function NuevaCotizacionPage() {
       .eq("is_active", true)
       .order("is_system", { ascending: false })
       .order("nombre", { ascending: true }),
+    puedeAsignar ? getAsignables() : Promise.resolve([]),
   ]);
 
   return (
@@ -44,6 +47,8 @@ export default async function NuevaCotizacionPage() {
       <CotizacionBuilder
         products={(productData ?? []) as SalesProduct[]}
         customers={(customerData ?? []) as PickerCustomer[]}
+        vendedores={vendedores}
+        puedeAsignar={puedeAsignar}
       />
     </section>
   );
