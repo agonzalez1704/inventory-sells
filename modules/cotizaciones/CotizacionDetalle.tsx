@@ -1,0 +1,338 @@
+"use client";
+
+import { useState, useTransition } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { ArrowLeft, Send, Check, ShoppingCart, X, Pencil, UserCog } from "lucide-react";
+import { formatMXN } from "@/lib/money";
+import { cn } from "@/lib/utils";
+import type { PaymentMethod } from "@/lib/types";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Modal } from "@/components/ui/modal";
+import { Input } from "@/components/ui/input";
+import { PaymentSheet } from "@/modules/sales/PaymentSheet";
+import {
+  enviarCotizacion,
+  autorizarCotizacion,
+  convertirCotizacion,
+  cancelarCotizacion,
+  asignarCotizacion,
+} from "./actions";
+
+export type CotItem = {
+  nombre: string;
+  sku: string | null;
+  qty: number;
+  unit_price_cents: number;
+  cost_cents: number;
+  line_total_cents: number;
+};
+
+export type CotDetalle = {
+  id: string;
+  folio: string;
+  estado: string;
+  canal: string;
+  cliente: string;
+  vendedor: string | null;
+  vendedor_id: string | null;
+  subtotal_cents: number;
+  total_cents: number;
+  notas: string | null;
+  created_at: string;
+  expires_at: string | null;
+  autorizada_at: string | null;
+  sale_id: string | null;
+  cancel_motivo: string | null;
+};
+
+type Tone = "neutral" | "success" | "warning" | "danger" | "accent";
+
+function estadoMeta(c: CotDetalle): { label: string; tone: Tone } {
+  if (c.estado === "pendiente" && c.expires_at && new Date(c.expires_at) < new Date())
+    return { label: "Vencida", tone: "danger" };
+  const map: Record<string, { label: string; tone: Tone }> = {
+    borrador: { label: "Borrador", tone: "neutral" },
+    pendiente: { label: "Pendiente", tone: "warning" },
+    autorizada: { label: "Autorizada", tone: "accent" },
+    convertida: { label: "Convertida", tone: "success" },
+    cancelada: { label: "Cancelada", tone: "neutral" },
+  };
+  return map[c.estado] ?? { label: c.estado, tone: "neutral" };
+}
+
+function fechaHora(iso: string) {
+  return new Date(iso).toLocaleString("es-MX", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+export function CotizacionDetalle({
+  cot,
+  items,
+  perms,
+  vendedores,
+}: {
+  cot: CotDetalle;
+  items: CotItem[];
+  perms: { editar: boolean; autorizar: boolean; reasignar: boolean; costos: boolean };
+  vendedores: { id: string; nombre: string }[];
+}) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [pagoOpen, setPagoOpen] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [motivo, setMotivo] = useState("");
+  const [asignado, setAsignado] = useState(cot.vendedor_id ?? "");
+
+  const est = estadoMeta(cot);
+  const terminal = cot.estado === "convertida" || cot.estado === "cancelada";
+  const editable = cot.estado === "borrador" || cot.estado === "pendiente";
+  const margen = cot.total_cents - items.reduce((s, i) => s + i.cost_cents * i.qty, 0);
+
+  function run(fn: () => Promise<{ ok: boolean; error?: string }>, okMsg: string) {
+    startTransition(async () => {
+      const res = await fn();
+      if (!res.ok) {
+        toast.error(res.error ?? "Error");
+        return;
+      }
+      toast.success(okMsg);
+      router.refresh();
+    });
+  }
+
+  function convertir(metodo: PaymentMethod) {
+    startTransition(async () => {
+      const res = await convertirCotizacion(cot.id, metodo);
+      if (!res.ok) {
+        toast.error(res.error);
+        return;
+      }
+      setPagoOpen(false);
+      toast.success("Cotización convertida en venta");
+      router.refresh();
+    });
+  }
+
+  return (
+    <section className="mx-auto max-w-3xl space-y-5">
+      <div>
+        <Link
+          href="/cotizaciones"
+          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <ArrowLeft className="h-4 w-4" /> Cotizaciones
+        </Link>
+        <div className="mt-2 flex flex-wrap items-center gap-3">
+          <h1 className="font-mono text-2xl font-semibold tracking-tight">{cot.folio}</h1>
+          <Badge tone={est.tone}>{est.label}</Badge>
+        </div>
+      </div>
+
+      {/* Meta */}
+      <Card className="grid grid-cols-2 gap-x-4 gap-y-3 p-4 text-sm sm:grid-cols-3">
+        <Meta label="Cliente" value={cot.cliente} />
+        <Meta label="Vendedor" value={cot.vendedor ?? "Sin asignar"} />
+        <Meta label="Canal" value={cot.canal} />
+        <Meta label="Creada" value={fechaHora(cot.created_at)} />
+        {cot.expires_at && <Meta label="Vigencia" value={fechaHora(cot.expires_at)} />}
+        {cot.autorizada_at && <Meta label="Autorizada" value={fechaHora(cot.autorizada_at)} />}
+      </Card>
+
+      {cot.notas && (
+        <Card className="p-4 text-sm">
+          <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">Notas</p>
+          <p>{cot.notas}</p>
+        </Card>
+      )}
+
+      {cot.estado === "cancelada" && cot.cancel_motivo && (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          <span className="font-medium">Cancelada:</span> {cot.cancel_motivo}
+        </div>
+      )}
+
+      {cot.sale_id && (
+        <Link
+          href="/ventas"
+          className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800 transition-colors hover:bg-emerald-100"
+        >
+          <ShoppingCart className="h-4 w-4" /> Se generó una venta a partir de esta cotización. Ver en Ventas →
+        </Link>
+      )}
+
+      {/* Items */}
+      <Card className="overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                <th className="px-4 py-2.5 font-medium">Producto</th>
+                <th className="px-2 py-2.5 text-right font-medium">Cant.</th>
+                <th className="px-2 py-2.5 text-right font-medium">Precio</th>
+                <th className="px-4 py-2.5 text-right font-medium">Importe</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {items.map((it, i) => (
+                <tr key={i}>
+                  <td className="px-4 py-2.5">
+                    <p className="font-medium">{it.nombre}</p>
+                    {it.sku && <p className="text-xs text-muted-foreground">{it.sku}</p>}
+                  </td>
+                  <td className="px-2 py-2.5 text-right tabular-nums">{it.qty}</td>
+                  <td className="px-2 py-2.5 text-right tabular-nums">{formatMXN(it.unit_price_cents)}</td>
+                  <td className="px-4 py-2.5 text-right font-medium tabular-nums">
+                    {formatMXN(it.line_total_cents)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="border-t border-border">
+                <td colSpan={3} className="px-4 py-3 text-right text-sm font-medium">
+                  Total
+                </td>
+                <td className="px-4 py-3 text-right font-mono text-lg font-semibold tabular-nums">
+                  {formatMXN(cot.total_cents)}
+                </td>
+              </tr>
+              {perms.costos && (
+                <tr className="text-xs text-muted-foreground">
+                  <td colSpan={3} className="px-4 pb-3 text-right">
+                    Margen estimado
+                  </td>
+                  <td className="px-4 pb-3 text-right tabular-nums">{formatMXN(margen)}</td>
+                </tr>
+              )}
+            </tfoot>
+          </table>
+        </div>
+      </Card>
+
+      {/* Reassign */}
+      {perms.reasignar && !terminal && vendedores.length > 0 && (
+        <Card className="flex flex-wrap items-end gap-3 p-4">
+          <div className="min-w-0 flex-1">
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Asignar vendedor
+            </label>
+            <select
+              value={asignado}
+              onChange={(e) => setAsignado(e.target.value)}
+              className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm"
+            >
+              <option value="">Sin asignar</option>
+              {vendedores.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+          <Button
+            variant="secondary"
+            onClick={() => run(() => asignarCotizacion(cot.id, asignado), "Vendedor asignado")}
+            disabled={pending || asignado === (cot.vendedor_id ?? "")}
+          >
+            <UserCog className="h-4 w-4" /> Asignar
+          </Button>
+        </Card>
+      )}
+
+      {/* State actions */}
+      {!terminal && (
+        <div className="flex flex-wrap gap-2">
+          {perms.editar && editable && (
+            <Button asChild variant="secondary">
+              <Link href={`/cotizaciones/${cot.id}/editar`}>
+                <Pencil className="h-4 w-4" /> Editar
+              </Link>
+            </Button>
+          )}
+          {perms.editar && cot.estado === "borrador" && (
+            <Button
+              variant="primary"
+              onClick={() => run(() => enviarCotizacion(cot.id), "Cotización enviada")}
+              loading={pending}
+            >
+              <Send className="h-4 w-4" /> Enviar
+            </Button>
+          )}
+          {perms.autorizar && cot.estado === "pendiente" && (
+            <Button
+              variant="accent"
+              onClick={() => run(() => autorizarCotizacion(cot.id), "Cotización autorizada")}
+              loading={pending}
+            >
+              <Check className="h-4 w-4" /> Autorizar
+            </Button>
+          )}
+          {perms.autorizar && cot.estado === "autorizada" && (
+            <Button variant="accent" onClick={() => setPagoOpen(true)} disabled={pending}>
+              <ShoppingCart className="h-4 w-4" /> Convertir en venta
+            </Button>
+          )}
+          {perms.editar && (
+            <Button
+              variant="ghost"
+              className="text-red-600 hover:bg-red-50 hover:text-red-700"
+              onClick={() => setCancelOpen(true)}
+              disabled={pending}
+            >
+              <X className="h-4 w-4" /> Cancelar
+            </Button>
+          )}
+        </div>
+      )}
+
+      <PaymentSheet
+        open={pagoOpen}
+        onClose={() => setPagoOpen(false)}
+        total={cot.total_cents}
+        pending={pending}
+        onConfirm={convertir}
+      />
+
+      <Modal open={cancelOpen} onClose={() => setCancelOpen(false)} title="Cancelar cotización">
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            La cotización quedará cancelada. Opcional: indica el motivo.
+          </p>
+          <Input value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Motivo (opcional)" />
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setCancelOpen(false)} disabled={pending}>
+              Volver
+            </Button>
+            <Button
+              variant="danger"
+              loading={pending}
+              onClick={() =>
+                run(() => cancelarCotizacion(cot.id, motivo), "Cotización cancelada")
+              }
+            >
+              Cancelar cotización
+            </Button>
+          </div>
+        </div>
+      </Modal>
+    </section>
+  );
+}
+
+function Meta({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className={cn("mt-0.5 truncate capitalize")}>{value}</p>
+    </div>
+  );
+}

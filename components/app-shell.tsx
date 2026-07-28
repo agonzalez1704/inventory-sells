@@ -17,6 +17,7 @@ import {
   Package,
   ScanBarcode,
   ShieldCheck,
+  FileText,
   Menu,
   X,
 } from "lucide-react";
@@ -32,6 +33,7 @@ const GRUPOS = [
     links: [
       { href: "/pos", label: "POS", icon: ScanBarcode },
       { href: "/ventas", label: "Ventas", icon: ShoppingCart },
+      { href: "/cotizaciones", label: "Cotizaciones", icon: FileText },
       { href: "/pedidos", label: "Pedidos", icon: Package },
       { href: "/fiados", label: "Fiados", icon: HandCoins },
       { href: "/adelantos", label: "Adelantos", icon: Wallet },
