@@ -142,7 +142,7 @@ export default async function ReportesPage() {
             sub="Precio − costo actual"
           />
         )}
-        <Kpi icon={HandCoins} label="Fiado por cobrar" value={formatMXN(fiadosTotal)} sub={`${pending.length} pendientes`} />
+        <Kpi icon={HandCoins} label="Crédito por cobrar" value={formatMXN(fiadosTotal)} sub={`${pending.length} pendientes`} />
         {!isAdmin && (
           <Kpi
             icon={AlertTriangle}

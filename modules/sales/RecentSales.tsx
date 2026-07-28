@@ -88,14 +88,14 @@ function EditModal({
   function aFiado() {
     if (
       !confirm(
-        "¿Convertir esta venta en fiado? Pasará a pendientes de pago (el stock no cambia).",
+        "¿Convertir esta venta en nota de crédito? Pasará a pendientes de pago (el stock no cambia).",
       )
     )
       return;
     start(async () => {
       try {
         await convertirAFiado(sale.id, customer);
-        toast.success("Convertida a fiado");
+        toast.success("Convertida a nota de crédito");
         onClose();
         router.refresh();
       } catch (e) {
@@ -170,7 +170,7 @@ function EditModal({
         </div>
 
         <div className="rounded-lg border border-border bg-muted/30 p-3">
-          <p className="text-xs font-medium">¿Era un fiado?</p>
+          <p className="text-xs font-medium">¿Era a crédito?</p>
           <p className="mt-0.5 text-xs text-muted-foreground">
             Pásala a pendientes de pago. El campo “Cliente” se usa como la nota
             de a quién. El stock no cambia.
@@ -183,7 +183,7 @@ function EditModal({
             disabled={pending}
           >
             <HandCoins className="h-4 w-4" />
-            Convertir a fiado
+            Convertir a nota de crédito
           </Button>
         </div>
 

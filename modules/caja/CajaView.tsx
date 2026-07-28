@@ -766,7 +766,7 @@ const TIPO_META: Record<
   { label: string; tone: "neutral" | "warning" | "accent" | "success" }
 > = {
   venta: { label: "Venta", tone: "neutral" },
-  abono: { label: "Abono fiado", tone: "warning" },
+  abono: { label: "Abono nota", tone: "warning" },
   adelanto: { label: "Adelanto", tone: "accent" },
   extra: { label: "Ingreso extra", tone: "success" },
 };

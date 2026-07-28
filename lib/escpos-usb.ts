@@ -102,7 +102,7 @@ export function buildEscPos(d: TicketData): Uint8Array {
   p.raw(0x1b, 0x40); // init
   p.align("center").size(true).bold(true).line("FIABLE").size(false).bold(false);
   p.line("Celulares y refacciones");
-  if (esFiado) p.bold(true).line("FIADO - PENDIENTE DE PAGO").bold(false);
+  if (esFiado) p.bold(true).line("NOTA DE CREDITO - PENDIENTE DE PAGO").bold(false);
   p.align("left").sep();
   p.lr(`Folio: ${folio}`, fecha);
   if (d.cliente) p.line(`Cliente: ${d.cliente}`);
@@ -115,7 +115,7 @@ export function buildEscPos(d: TicketData): Uint8Array {
   p.bold(true).lr("TOTAL", formatMXN(d.total)).bold(false);
   if (d.metodoPago && !esFiado) p.line(`Pago: ${PAGO[d.metodoPago] ?? d.metodoPago}`);
   p.sep();
-  p.align("center").line(esFiado ? "Comprobante de fiado" : "Gracias por su compra!");
+  p.align("center").line(esFiado ? "Comprobante de nota de credito" : "Gracias por su compra!");
   p.line("fiable.vercel.app");
   p.raw(0x0a, 0x0a, 0x0a); // feed
   p.raw(0x1d, 0x56, 0x00); // full cut

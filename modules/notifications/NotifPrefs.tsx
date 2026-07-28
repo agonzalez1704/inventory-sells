@@ -7,12 +7,12 @@ import { saveNotifPrefs, type NotifPrefs as Prefs } from "./actions";
 
 const EVENTS: { key: keyof Prefs; label: string; desc: string }[] = [
   { key: "venta", label: "Ventas", desc: "Cada venta nueva" },
-  { key: "fiado", label: "Fiados", desc: "Cada fiado nuevo" },
-  { key: "abono", label: "Abonos y cobros", desc: "Pagos a un fiado" },
+  { key: "fiado", label: "Notas de crédito", desc: "Cada nota de crédito nueva" },
+  { key: "abono", label: "Abonos y cobros", desc: "Pagos a una nota de crédito" },
   {
     key: "cancelacion",
     label: "Cancelaciones",
-    desc: "Ventas anuladas y fiados cancelados",
+    desc: "Ventas anuladas y notas de crédito canceladas",
   },
 ];
 

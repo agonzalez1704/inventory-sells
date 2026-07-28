@@ -357,7 +357,7 @@ export default async function CajaPage({
       tipo: "abono" as const,
       concepto: p.sales?.customer_name?.trim()
         ? p.sales.customer_name.trim()
-        : prodList(p.sales?.sale_items) || "Fiado",
+        : prodList(p.sales?.sale_items) || "Nota de crédito",
       monto_cents: p.monto_cents,
       metodo: p.metodo,
       fecha: p.created_at,

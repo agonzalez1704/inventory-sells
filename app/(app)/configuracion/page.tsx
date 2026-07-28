@@ -31,7 +31,7 @@ export default async function ConfiguracionPage() {
             <div>
               <h2 className="text-sm font-semibold">Notificaciones</h2>
               <p className="text-xs text-muted-foreground">
-                Recibe un aviso en tu teléfono por cada venta y fiado. Actívalo
+                Recibe un aviso en tu teléfono por cada venta y nota de crédito. Actívalo
                 en cada dispositivo donde quieras recibirlas.
               </p>
             </div>

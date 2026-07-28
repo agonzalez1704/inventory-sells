@@ -106,7 +106,7 @@ export async function registerLoan(
     p_note: note?.trim() || null,
   });
 
-  if (error) throw new Error(error.message ?? "Error al registrar el fiado");
+  if (error) throw new Error(error.message ?? "Error al registrar la nota de crédito");
   const saleId = String(data);
   after(() => notifyNuevaVenta(saleId, "fiado"));
   return { saleId };
@@ -241,7 +241,7 @@ export async function cambiarFiado(
     p_sale_id: saleId,
     p_items: items.map((i) => ({ product_id: i.product_id, qty: i.qty })),
   });
-  if (error) throw new Error(error.message ?? "Error al cambiar el fiado");
+  if (error) throw new Error(error.message ?? "Error al cambiar la nota de crédito");
 }
 
 // Void a completed sale (e.g. a duplicate). Admin only: restores stock, removes
@@ -275,7 +275,7 @@ export async function convertirAFiado(
     p_sale_id: saleId,
     p_note: note?.trim() || null,
   });
-  if (error) throw new Error(error.message ?? "Error al convertir a fiado");
+  if (error) throw new Error(error.message ?? "Error al convertir a nota de crédito");
 }
 
 // Cancel a pending loan: item returned without payment → stock restored.

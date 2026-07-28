@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Fiable",
     short_name: "Fiable",
-    description: "Inventario, ventas y fiados",
+    description: "Inventario, ventas y notas de crédito",
     start_url: "/pos",
     display: "standalone",
     background_color: "#ffffff",

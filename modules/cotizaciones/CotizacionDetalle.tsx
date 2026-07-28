@@ -171,7 +171,7 @@ export function CotizacionDetalle({
           href={`/fiados?fiado=${cot.sale_id}`}
           className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800 transition-colors hover:bg-emerald-100"
         >
-          <ShoppingCart className="h-4 w-4" /> Venta a crédito generada. Se cobra y concilia en Fiados →
+          <ShoppingCart className="h-4 w-4" /> Venta a crédito generada. Se cobra y concilia en Notas de crédito →
         </Link>
       )}
 

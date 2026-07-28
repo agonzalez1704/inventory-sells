@@ -97,9 +97,9 @@ export function LoansView({
     <section className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Fiados</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Notas de crédito</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Productos prestados, pago pendiente.
+            Ventas a crédito, pago pendiente.
           </p>
         </div>
         {loans.length > 0 && (
@@ -115,8 +115,8 @@ export function LoansView({
       {loans.length === 0 ? (
         <EmptyState
           icon={HandCoins}
-          title="Sin fiados pendientes"
-          description="Cuando prestes un producto desde Ventas, aparecerá aquí para cobrarlo después."
+          title="Sin notas de crédito pendientes"
+          description="Cuando vendas a crédito o entregues una cotización, aparecerá aquí para cobrarla después."
         />
       ) : (
         <>
@@ -203,11 +203,11 @@ function LoanRow({
   }
 
   function cancel() {
-    if (!confirm("¿Cancelar fiado y devolver el producto al stock?")) return;
+    if (!confirm("¿Cancelar nota de crédito y devolver el producto al stock?")) return;
     startTransition(async () => {
       try {
         await cancelLoan(loan.id);
-        toast.success("Fiado cancelado, stock restaurado");
+        toast.success("Nota de crédito cancelada, stock restaurado");
         router.refresh();
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Error al cancelar");
@@ -301,12 +301,12 @@ function LoanRow({
       <ItemSwapModal
         open={swapOpen}
         onClose={() => setSwapOpen(false)}
-        title="Editar productos del fiado"
-        description="Agrega, quita o cambia productos de este fiado. El stock se ajusta solo: lo que quites regresa al inventario, lo nuevo se descuenta."
+        title="Editar productos de la nota"
+        description="Agrega, quita o cambia productos de esta nota de crédito. El stock se ajusta solo: lo que quites regresa al inventario, lo nuevo se descuenta."
         currentItems={loan.sale_items}
         products={products}
         onSubmit={(items) => cambiarFiado(loan.id, items)}
-        successMsg={(t) => `Fiado actualizado · ${formatMXN(t)}`}
+        successMsg={(t) => `Nota de crédito actualizada · ${formatMXN(t)}`}
       />
 
       {abonar && (
@@ -360,10 +360,10 @@ function AbonarFiadoModal({
   }
 
   return (
-    <Modal open onClose={onClose} title="Abono al fiado" className="max-w-sm">
+    <Modal open onClose={onClose} title="Abono a la nota de crédito" className="max-w-sm">
       <div className="space-y-3">
         <p className="text-sm text-muted-foreground">
-          {loan.note || "Fiado"} · falta{" "}
+          {loan.note || "Nota de crédito"} · falta{" "}
           <span className="font-medium text-foreground">{formatMXN(resta)}</span>
         </p>
         <label className="block">

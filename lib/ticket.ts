@@ -78,7 +78,7 @@ export function buildTicketHTML(d: TicketData): string {
 <body>
   <div class="center brand">FIABLE</div>
   <div class="center muted">Celulares y refacciones</div>
-  ${esFiado ? `<div class="center" style="margin-top:4px"><span class="tag">FIADO · PENDIENTE DE PAGO</span></div>` : ""}
+  ${esFiado ? `<div class="center" style="margin-top:4px"><span class="tag">NOTA DE CRÉDITO · PENDIENTE DE PAGO</span></div>` : ""}
   <div class="sep"></div>
   <div class="meta"><span>Folio: ${folioCorto(d.folio)}</span><span>${esc(fecha)}</span></div>
   ${d.cliente ? `<div>Cliente: ${esc(d.cliente)}</div>` : ""}
@@ -88,7 +88,7 @@ export function buildTicketHTML(d: TicketData): string {
   <div class="total"><span>TOTAL</span><span>${formatMXN(d.total)}</span></div>
   ${d.metodoPago && !esFiado ? `<div>Pago: ${PAGO[d.metodoPago] ?? d.metodoPago}</div>` : ""}
   <div class="sep"></div>
-  <div class="center foot">${esFiado ? "Comprobante de fiado" : "¡Gracias por su compra!"}</div>
+  <div class="center foot">${esFiado ? "Comprobante de nota de crédito" : "¡Gracias por su compra!"}</div>
   <div class="center muted">fiable.vercel.app</div>
 </body></html>`;
 }

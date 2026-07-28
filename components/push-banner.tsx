@@ -26,7 +26,7 @@ export function PushBanner() {
               “Agregar a inicio”, abre la app desde el ícono y actívalas ahí.
             </>
           ) : (
-            "Recibe un aviso en este teléfono por cada venta y fiado."
+            "Recibe un aviso en este teléfono por cada venta y nota de crédito."
           )}
         </p>
       </div>

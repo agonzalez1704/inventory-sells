@@ -65,7 +65,7 @@ const handler = createMcpHandler(
 
     server.tool(
       "fiados_pendientes",
-      "Fiados pendientes de cobro: cliente, total, pagado (abonos), resta, días y productos.",
+      "Notas de crédito pendientes de cobro: cliente, total, pagado (abonos), resta, días y productos.",
       {},
       async () => json(await fiadosPendientes()),
     );

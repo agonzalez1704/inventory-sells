@@ -254,7 +254,7 @@ export async function notifyNuevaVenta(
     if (q) lines.push(`Cliente: ${q}`);
     if (vendedor) lines.push(`Vendió: ${vendedor}`);
     await notifyAdmins(tipo, {
-      title: tipo === "fiado" ? `Nuevo fiado · ${total}` : `Nueva venta · ${total}`,
+      title: tipo === "fiado" ? `Nueva nota de crédito · ${total}` : `Nueva venta · ${total}`,
       body: lines.filter(Boolean).join("\n"),
       // Deep-link to the specific movement so tapping the notification opens it.
       url: tipo === "fiado" ? `/fiados?fiado=${saleId}` : `/ventas?venta=${saleId}`,
@@ -288,7 +288,7 @@ export async function notifyAbono(saleId: string): Promise<void> {
       if (prods) lines.push(prods);
     }
     await notifyAdmins("abono", {
-      title: `Abono a fiado · ${formatMXN(p.monto_cents)}`,
+      title: `Abono a nota de crédito · ${formatMXN(p.monto_cents)}`,
       body: lines.filter(Boolean).join("\n"),
       url: `/fiados?fiado=${saleId}`,
       tag: `abono-${saleId}`,
@@ -312,7 +312,7 @@ export async function notifyCancelacion(
     await notifyAdmins("cancelacion", {
       title:
         tipo === "fiado"
-          ? `Fiado cancelado · ${formatMXN(s.total_cents)}`
+          ? `Nota de crédito cancelada · ${formatMXN(s.total_cents)}`
           : `Venta anulada · ${formatMXN(s.total_cents)}`,
       body: lines.filter(Boolean).join("\n"),
       url: tipo === "fiado" ? `/fiados?fiado=${saleId}` : `/ventas?venta=${saleId}`,

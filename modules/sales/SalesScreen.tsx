@@ -320,7 +320,7 @@ export function SalesScreen({
           tipo: esFiado ? "fiado" : "venta",
         };
         toast.success(
-          `${esFiado ? "Fiado registrado" : "Venta registrada"} · ${formatMXN(ticketTotal)}`,
+          `${esFiado ? "Nota de crédito registrada" : "Venta registrada"} · ${formatMXN(ticketTotal)}`,
           { action: { label: "Imprimir", onClick: () => imprimirTicketNavegador(ticket) } },
         );
         setCart({});
@@ -342,7 +342,7 @@ export function SalesScreen({
     else setPaymentOpen(true);
   }
 
-  const cta = mode === "prestamo" ? "Registrar fiado" : "Cobrar";
+  const cta = mode === "prestamo" ? "Registrar crédito" : "Cobrar";
 
   return (
     <>
@@ -421,7 +421,7 @@ export function SalesScreen({
                         : "text-muted-foreground hover:text-foreground",
                     )}
                   >
-                    {m === "venta" ? "Venta" : "Fiado"}
+                    {m === "venta" ? "Venta" : "Crédito"}
                   </button>
                 ))}
               </div>
@@ -532,7 +532,7 @@ export function SalesScreen({
           <div className="mx-auto flex max-w-6xl items-center gap-3">
             <div className="leading-tight">
               <p className="text-xs text-muted-foreground">
-                {count} art. · {mode === "prestamo" ? "Fiado" : "Total"}
+                {count} art. · {mode === "prestamo" ? "Crédito" : "Total"}
               </p>
               <p className="font-mono text-lg font-semibold tabular-nums">
                 {formatMXN(total)}

@@ -16,7 +16,7 @@ const mono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: "Fiable",
-  description: "Inventario, ventas y fiados",
+  description: "Inventario, ventas y notas de crédito",
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, title: "Fiable", statusBarStyle: "default" },
   icons: { icon: "/icon.svg", apple: "/icon.svg" },
