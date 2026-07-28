@@ -4,7 +4,34 @@ import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { z } from "zod";
 import { buscarProducto } from "@/modules/analytics/queries";
 import { getNegocioInfo } from "@/modules/config/lib";
+import { insforgeAdmin } from "@/lib/insforge/admin";
+import { notifyCotizacionSinAsignar } from "@/lib/push";
 import type { Turno } from "./memoria";
+
+// The agent creates a real quote (unassigned, canal='whatsapp') on the
+// customer's behalf and returns the public authorize link. Items are resolved
+// by SKU in the RPC; broadcast to sellers so one of them claims it.
+async function crearCotizacionAgente(
+  items: { sku: string; qty: number }[],
+  telefono: string,
+): Promise<{ folio: string; url: string; total_cents: number } | { error: string }> {
+  try {
+    const { data, error } = await insforgeAdmin.database.rpc("crear_cotizacion_whatsapp", {
+      p_items: items.map((i) => ({ sku: i.sku, qty: i.qty })),
+      p_telefono: telefono,
+    });
+    if (error) return { error: error.message ?? "no se pudo crear" };
+    const row = (Array.isArray(data) ? data[0] : data) as
+      | { id: string; folio: string; share_token: string; total_cents: number }
+      | undefined;
+    if (!row?.id) return { error: "no se pudo crear" };
+    await notifyCotizacionSinAsignar(row.id, "agente_whatsapp");
+    const base = process.env.NEXT_PUBLIC_APP_URL ?? "";
+    return { folio: row.folio, url: `${base}/cotizacion#${row.share_token}`, total_cents: row.total_cents };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "error" };
+  }
+}
 
 const openrouter = createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY! });
 const MODEL =
@@ -96,9 +123,17 @@ Reglas de conversación:
 Datos del negocio (envíos, pagos, transferencia, Uber, ubicación, horario):
 - Responde SOLO con la "Información del negocio" de abajo. Si la pregunta no está cubierta ahí, di que un asesor lo confirma; no inventes.
 
-Cuándo pasar a un asesor (ÚSALA POCO — tu trabajo es contestar, no derivar):
+Cuando el cliente quiere COMPRAR / PEDIR / APARTAR (crear_cotizacion):
+- Cuando el cliente confirma qué producto(s) quiere llevar (ya le diste precio disponible), usa crear_cotizacion con los SKU exactos (los del campo "sku" de buscar_producto) y las cantidades. NO uses pasar_a_asesor para esto.
+- Si pide varias cosas, júntalas en un solo crear_cotizacion (varios items).
+- Solo mete productos con precio disponible. Si eligió una versión con precio por confirmar (0), esa NO va en la cotización: para esa usa pasar_a_asesor.
+- Después de crearla, dale al cliente su folio y el enlace TAL CUAL para que la autorice, y dile que al autorizarla un vendedor lo contacta para el envío/pago. Ej: "¡Listo! Tu cotización COT-000123 por $980. Ábrela y autorízala aquí: <enlace>. En cuanto la autorices, un vendedor te contacta para el envío."
+- Los SKU son para la herramienta; NUNCA se los dictes al cliente en el chat.
+
+Cuándo pasar a un asesor (ÚSALA POCO — tu trabajo es contestar/cotizar, no derivar):
 - REGLA #1: SIEMPRE responde primero la disponibilidad (y el precio si lo tienes). NUNCA contestes solo "un asesor te atiende" sin antes buscar el producto y decir si está disponible.
-- Llama pasar_a_asesor SOLO si: el cliente quiere apartar/separar/comprar/pagar, elige una versión cuyo precio está por confirmar (en 0), pide hablar con una persona, o es garantía/cambio/reclamo.
+- Llama pasar_a_asesor SOLO si: el cliente ELIGE una versión cuyo precio está por confirmar (en 0), pide hablar con una persona, o es garantía/cambio/reclamo.
+- Para "quiero comprar/pedir/apartar" con precio disponible NO derives: crea la cotización (crear_cotizacion).
 - NO la llames por: precio en $0 (di "sí, disponible; el precio te lo confirma un asesor" y sigue tú), producto no encontrado (pide el modelo o SKU exacto, NO derives), ni dudas del negocio (contesta con la info de abajo, o di que un asesor confirma SIN usar la herramienta).
 - Cuando SÍ la uses, dile al cliente cálido y breve que un asesor lo atiende en seguida (nada técnico).`;
 
@@ -109,6 +144,7 @@ export type RespuestaAgente = {
 
 export async function responderMensaje(
   messages: Turno[],
+  telefono: string,
 ): Promise<RespuestaAgente> {
   const info = await getNegocioInfo();
   const system = info
@@ -162,6 +198,7 @@ export async function responderMensaje(
             };
           }
           return rows.map((r) => ({
+            sku: r.sku, // for crear_cotizacion — no se lo dices al cliente
             nombre: r.nombre,
             categoria: r.categoria,
             marca: r.marca,
@@ -171,6 +208,35 @@ export async function responderMensaje(
             precio_mxn: r.precio_mxn,
             disponible: r.stock > 0,
           }));
+        },
+      }),
+      crear_cotizacion: tool({
+        description:
+          "Crea una cotización formal cuando el cliente CONFIRMA qué producto(s) quiere pedir/comprar (con cantidades) y ya tienen precio disponible. Devuelve un folio y un enlace para que el cliente la autorice él mismo. Usa los SKU exactos que te dio buscar_producto. NO la uses para productos con precio por confirmar (0).",
+        inputSchema: z.object({
+          items: z
+            .array(
+              z.object({
+                sku: z.string().describe("SKU exacto del producto (de buscar_producto)"),
+                qty: z.number().int().positive().describe("cantidad"),
+              }),
+            )
+            .min(1),
+        }),
+        execute: async ({ items }) => {
+          const res = await crearCotizacionAgente(items, telefono);
+          if ("error" in res)
+            return {
+              ok: false,
+              nota: "No se pudo crear la cotización. Dile al cliente que un asesor lo atenderá en seguida.",
+            };
+          return {
+            ok: true,
+            folio: res.folio,
+            url: res.url,
+            total_mxn: res.total_cents / 100,
+            nota: "Dale al cliente su folio y el enlace para autorizar (tal cual). Dile que al autorizarla un vendedor lo contacta para el envío/pago.",
+          };
         },
       }),
       buscar_compatibilidad: tool({

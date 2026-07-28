@@ -115,10 +115,10 @@ export async function POST(req: Request) {
 
   try {
     const historial = await cargarHistorial(numero, 10);
-    const { texto: respuesta, escalar } = await responderMensaje([
-      ...historial,
-      { role: "user", content: texto },
-    ]);
+    const { texto: respuesta, escalar } = await responderMensaje(
+      [...historial, { role: "user", content: texto }],
+      numero,
+    );
     await guardarMensaje(numero, "user", texto);
     await guardarMensaje(numero, "assistant", respuesta);
     await enviarTexto(phoneNumberId, numero, respuesta);
