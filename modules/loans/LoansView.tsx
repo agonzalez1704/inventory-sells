@@ -73,6 +73,16 @@ export function LoansView({
     0,
   );
 
+  // Search so caja can find a fiado by quote folio (in the note), customer or
+  // seller — the manager reconciles the returned cash against the folio.
+  const [q, setQ] = useState("");
+  const filtered = q.trim()
+    ? loans.filter((l) => {
+        const hay = `${l.note ?? ""} ${l.cliente?.nombre ?? ""} ${l.vendedor ?? ""}`.toLowerCase();
+        return hay.includes(q.trim().toLowerCase());
+      })
+    : loans;
+
   // Deep-link from a push notification: scroll to + briefly flash that fiado.
   const [flash, setFlash] = useState<string | null>(abrirId ?? null);
   useEffect(() => {
@@ -109,17 +119,31 @@ export function LoansView({
           description="Cuando prestes un producto desde Ventas, aparecerá aquí para cobrarlo después."
         />
       ) : (
-        <div className="space-y-2.5">
-          {loans.map((l) => (
-            <LoanRow
-              key={l.id}
-              loan={l}
-              products={products}
-              customers={customers}
-              resaltar={flash === l.id}
-            />
-          ))}
-        </div>
+        <>
+          <Input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Buscar por folio (COT-…), cliente o vendedor"
+            className="max-w-sm"
+          />
+          {filtered.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              Nada coincide con «{q}».
+            </p>
+          ) : (
+            <div className="space-y-2.5">
+              {filtered.map((l) => (
+                <LoanRow
+                  key={l.id}
+                  loan={l}
+                  products={products}
+                  customers={customers}
+                  resaltar={flash === l.id}
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
     </section>
   );

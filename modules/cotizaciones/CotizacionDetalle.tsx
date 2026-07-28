@@ -7,13 +7,11 @@ import { toast } from "sonner";
 import { ArrowLeft, Send, Check, ShoppingCart, X, Pencil, UserCog, Hand } from "lucide-react";
 import { formatMXN } from "@/lib/money";
 import { cn } from "@/lib/utils";
-import type { PaymentMethod } from "@/lib/types";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
-import { PaymentSheet } from "@/modules/sales/PaymentSheet";
 import {
   enviarCotizacion,
   autorizarCotizacion,
@@ -95,7 +93,7 @@ export function CotizacionDetalle({
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [pagoOpen, setPagoOpen] = useState(false);
+  const [convertOpen, setConvertOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [motivo, setMotivo] = useState("");
   const [asignado, setAsignado] = useState(cot.vendedor_id ?? "");
@@ -117,15 +115,15 @@ export function CotizacionDetalle({
     });
   }
 
-  function convertir(metodo: PaymentMethod) {
+  function convertir() {
     startTransition(async () => {
-      const res = await convertirCotizacion(cot.id, metodo);
+      const res = await convertirCotizacion(cot.id);
       if (!res.ok) {
         toast.error(res.error);
         return;
       }
-      setPagoOpen(false);
-      toast.success("Cotización convertida en venta");
+      setConvertOpen(false);
+      toast.success("Venta a crédito generada");
       router.refresh();
     });
   }
@@ -170,10 +168,10 @@ export function CotizacionDetalle({
 
       {cot.sale_id && (
         <Link
-          href="/ventas"
+          href={`/fiados?fiado=${cot.sale_id}`}
           className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800 transition-colors hover:bg-emerald-100"
         >
-          <ShoppingCart className="h-4 w-4" /> Se generó una venta a partir de esta cotización. Ver en Ventas →
+          <ShoppingCart className="h-4 w-4" /> Venta a crédito generada. Se cobra y concilia en Fiados →
         </Link>
       )}
 
@@ -294,8 +292,8 @@ export function CotizacionDetalle({
             </Button>
           )}
           {perms.convertir && cot.estado === "autorizada" && (
-            <Button variant="accent" onClick={() => setPagoOpen(true)} disabled={pending}>
-              <ShoppingCart className="h-4 w-4" /> Convertir en venta
+            <Button variant="accent" onClick={() => setConvertOpen(true)} disabled={pending}>
+              <ShoppingCart className="h-4 w-4" /> Marcar venta (crédito)
             </Button>
           )}
           {perms.editar && (
@@ -311,13 +309,24 @@ export function CotizacionDetalle({
         </div>
       )}
 
-      <PaymentSheet
-        open={pagoOpen}
-        onClose={() => setPagoOpen(false)}
-        total={cot.total_cents}
-        pending={pending}
-        onConfirm={convertir}
-      />
+      <Modal open={convertOpen} onClose={() => setConvertOpen(false)} title="Marcar como venta">
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Se genera una <span className="font-medium text-foreground">venta a crédito</span> por{" "}
+            <span className="font-medium text-foreground">{formatMXN(cot.total_cents)}</span>. El producto
+            sale y baja del inventario; el cobro se concilia después en caja con el folio{" "}
+            <span className="font-mono">{cot.folio}</span>.
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setConvertOpen(false)} disabled={pending}>
+              Cancelar
+            </Button>
+            <Button variant="accent" loading={pending} onClick={convertir}>
+              <ShoppingCart className="h-4 w-4" /> Confirmar venta a crédito
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       <Modal open={cancelOpen} onClose={() => setCancelOpen(false)} title="Cancelar cotización">
         <div className="space-y-3">

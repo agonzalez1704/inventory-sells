@@ -4,7 +4,7 @@ import { auth } from "@clerk/nextjs/server";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { getPermisos } from "@/lib/auth/profile";
-import { notifyAsignacion, notifyCotizacionSinAsignar } from "@/lib/push";
+import { notifyAsignacion, notifyCotizacionSinAsignar, notifyNuevaVenta } from "@/lib/push";
 import { attempt, type ActionResult } from "@/lib/errors";
 import type { Permiso } from "@/lib/permissions";
 
@@ -217,20 +217,19 @@ export async function reclamarCotizacion(id: string): Promise<ActionResult<null>
   });
 }
 
-export async function convertirCotizacion(
-  id: string,
-  metodo: string,
-): Promise<ActionResult<{ saleId: string }>> {
+export async function convertirCotizacion(id: string): Promise<ActionResult<{ saleId: string }>> {
   return attempt("convertirCotizacion", async () => {
     // Marking the sale is a higher-level action than authorizing — an authorized
     // quote is not a sale until someone with cotizaciones_convertir converts it.
+    // The result is a CREDIT sale (fiado): ships now, cash reconciled later at
+    // caja by folio.
     const userId = await requirePermiso("cotizaciones_convertir");
     await loadYAutoriza(id, userId);
-    const { data, error } = await insforgeAdmin.database.rpc("convertir_cotizacion", {
-      p_id: id,
-      p_metodo: metodo,
-    });
+    const { data, error } = await insforgeAdmin.database.rpc("convertir_cotizacion", { p_id: id });
     if (error) throw new Error(error.message ?? "No se pudo convertir");
-    return { saleId: String(data) };
+    const saleId = String(data);
+    // Ping caja/admins that a credit sale went out (a delivery to reconcile).
+    await notifyNuevaVenta(saleId, "fiado");
+    return { saleId };
   });
 }
