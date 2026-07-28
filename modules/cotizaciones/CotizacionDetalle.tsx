@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeft, Send, Check, ShoppingCart, X, Pencil, UserCog, Hand } from "lucide-react";
+import { ArrowLeft, Send, Check, ShoppingCart, X, Pencil, UserCog, Hand, Copy, MessageCircle } from "lucide-react";
 import { formatMXN } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
@@ -46,6 +46,7 @@ export type CotDetalle = {
   autorizada_at: string | null;
   sale_id: string | null;
   cancel_motivo: string | null;
+  share_token: string;
 };
 
 type Tone = "neutral" | "success" | "warning" | "danger" | "accent";
@@ -97,10 +98,30 @@ export function CotizacionDetalle({
   const [cancelOpen, setCancelOpen] = useState(false);
   const [motivo, setMotivo] = useState("");
   const [asignado, setAsignado] = useState(cot.vendedor_id ?? "");
+  const [copied, setCopied] = useState(false);
 
   const est = estadoMeta(cot);
   const terminal = cot.estado === "convertida" || cot.estado === "cancelada";
   const editable = cot.estado === "borrador" || cot.estado === "pendiente";
+  // Public accept link — live once sent (pendiente) and while authorized.
+  const compartible = cot.estado === "pendiente" || cot.estado === "autorizada";
+  const base = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== "undefined" ? window.location.origin : "");
+  // Token in the URL fragment (#) — the browser never sends it to the server,
+  // so it stays out of logs / Referer / link previews.
+  const shareUrl = `${base}/cotizacion#${cot.share_token}`;
+  const waHref = `https://wa.me/?text=${encodeURIComponent(
+    `Hola, aquí está tu cotización ${cot.folio} por ${formatMXN(cot.total_cents)}. Ábrela y autorízala aquí: ${shareUrl}`,
+  )}`;
+
+  async function copiarLink() {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      toast.error("No se pudo copiar");
+    }
+  }
   const margen = cot.total_cents - items.reduce((s, i) => s + i.cost_cents * i.qty, 0);
 
   function run(fn: () => Promise<{ ok: boolean; error?: string }>, okMsg: string) {
@@ -152,6 +173,29 @@ export function CotizacionDetalle({
         {cot.expires_at && <Meta label="Vigencia" value={fechaHora(cot.expires_at)} />}
         {cot.autorizada_at && <Meta label="Autorizada" value={fechaHora(cot.autorizada_at)} />}
       </Card>
+
+      {compartible && (
+        <Card className="space-y-3 p-4">
+          <div>
+            <p className="text-sm font-medium">Compartir con el cliente</p>
+            <p className="text-xs text-muted-foreground">
+              Enlace público para que el cliente vea y autorice la cotización él mismo.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Input readOnly value={shareUrl} className="font-mono text-xs" onFocus={(e) => e.currentTarget.select()} />
+            <Button variant="secondary" onClick={copiarLink}>
+              {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+              {copied ? "Copiado" : "Copiar"}
+            </Button>
+          </div>
+          <Button asChild variant="primary" className="bg-green-600 hover:bg-green-700">
+            <a href={waHref} target="_blank" rel="noopener noreferrer">
+              <MessageCircle className="h-4 w-4" /> Enviar por WhatsApp
+            </a>
+          </Button>
+        </Card>
+      )}
 
       {cot.notas && (
         <Card className="p-4 text-sm">

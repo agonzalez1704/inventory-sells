@@ -157,6 +157,48 @@ export async function notifyCotizacionSinAsignar(
   }
 }
 
+// The customer authorized a quote via the public share link. Ping the assigned
+// vendedor and the creator so someone surtes/converts it. No self-exclusion —
+// the actor here is the customer, not a staff user.
+export async function notifyCotizacionAutorizada(cotizacionId: string): Promise<void> {
+  try {
+    const { data } = await insforgeAdmin.database
+      .from("cotizaciones")
+      .select("folio, total_cents, customer_id, vendedor_id, created_by")
+      .eq("id", cotizacionId)
+      .maybeSingle();
+    const c = data as
+      | { folio: string; total_cents: number; customer_id: string | null; vendedor_id: string | null; created_by: string }
+      | null;
+    if (!c) return;
+
+    const targets = [...new Set([c.vendedor_id, c.created_by].filter(Boolean) as string[])];
+    if (targets.length === 0) return;
+
+    let cliente: string | null = null;
+    if (c.customer_id) {
+      const { data: cust } = await insforgeAdmin.database
+        .from("customers")
+        .select("nombre")
+        .eq("id", c.customer_id)
+        .maybeSingle();
+      cliente = (cust as { nombre?: string } | null)?.nombre ?? null;
+    }
+    const lines = [`Total: ${formatMXN(c.total_cents)}`];
+    if (cliente) lines.push(`Cliente: ${cliente}`);
+    lines.push("El cliente la autorizó. Lista para surtir.");
+
+    await pushToUsers(targets, {
+      title: `Cotización autorizada · ${c.folio}`,
+      body: lines.join("\n"),
+      url: `/cotizaciones/${cotizacionId}`,
+      tag: `cot-autoriza-${cotizacionId}`,
+    });
+  } catch (e) {
+    console.error("notifyCotizacionAutorizada failed:", e);
+  }
+}
+
 // Admins who opted into this event kind (falling back to DEFAULT_PREFS).
 async function adminsForKind(kind: NotifKind): Promise<string[]> {
   const { data: admins } = await insforgeAdmin.database

@@ -22,6 +22,7 @@ type Row = {
   autorizada_at: string | null;
   sale_id: string | null;
   cancel_motivo: string | null;
+  share_token: string;
 };
 
 export default async function CotizacionPage({ params }: { params: Promise<{ id: string }> }) {
@@ -76,6 +77,7 @@ export default async function CotizacionPage({ params }: { params: Promise<{ id:
     autorizada_at: c.autorizada_at,
     sale_id: c.sale_id,
     cancel_motivo: c.cancel_motivo,
+    share_token: c.share_token,
   };
 
   return (

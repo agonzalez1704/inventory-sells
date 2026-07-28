@@ -133,8 +133,9 @@ export function AppShell({
     };
   }, [open]);
 
-  // The public storefront has its own header + brand.
-  if (pathname.startsWith("/tienda")) return <>{children}</>;
+  // Public, customer-facing pages carry their own branding and must never show
+  // the app chrome or sign-in prompts: the storefront and the shareable quote.
+  if (pathname.startsWith("/tienda") || pathname === "/cotizacion") return <>{children}</>;
 
   return (
     <>
