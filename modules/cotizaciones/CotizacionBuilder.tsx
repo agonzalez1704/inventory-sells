@@ -287,15 +287,15 @@ export function CotizacionBuilder({
         </Card>
       </div>
 
-      {/* Fixed bottom bar — mobile only (desktop actions live in the panel) */}
-      {lines.length > 0 && (
-        <div
-          className="fixed inset-x-0 bottom-0 z-30 flex gap-2 border-t border-border bg-background/95 px-4 py-3 backdrop-blur lg:hidden"
-          style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
-        >
-          {actionButtons}
-        </div>
-      )}
+      {/* Fixed bottom bar — mobile/narrow only (desktop actions live in the
+          sticky panel). Always shown so the CTA never disappears below the
+          single-column product grid; disabled while the cart is empty. */}
+      <div
+        className="fixed inset-x-0 bottom-0 z-30 flex gap-2 border-t border-border bg-background/95 px-4 py-3 backdrop-blur lg:hidden"
+        style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+      >
+        {actionButtons}
+      </div>
     </div>
   );
 }
