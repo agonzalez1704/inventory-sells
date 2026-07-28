@@ -1,6 +1,7 @@
 import "server-only";
 import webpush from "web-push";
 import { insforgeAdmin } from "@/lib/insforge/admin";
+import { getAsignables } from "@/lib/auth/profile";
 import { formatMXN } from "@/lib/money";
 
 let configured: boolean | null = null;
@@ -108,6 +109,51 @@ export async function notifyAsignacion(
     });
   } catch (e) {
     console.error("notifyAsignacion failed:", e);
+  }
+}
+
+// An unassigned quote (typically from the WhatsApp agent) — broadcast to every
+// seller/encargado/admin so one of them claims it. `exclude` skips the creator.
+export async function notifyCotizacionSinAsignar(
+  cotizacionId: string,
+  exclude?: string,
+): Promise<void> {
+  try {
+    const { data } = await insforgeAdmin.database
+      .from("cotizaciones")
+      .select("folio, total_cents, customer_id, canal")
+      .eq("id", cotizacionId)
+      .maybeSingle();
+    const c = data as
+      | { folio: string; total_cents: number; customer_id: string | null; canal: string }
+      | null;
+    if (!c) return;
+
+    const targets = (await getAsignables()).map((v) => v.id).filter((id) => id !== exclude);
+    if (targets.length === 0) return;
+
+    let cliente: string | null = null;
+    if (c.customer_id) {
+      const { data: cust } = await insforgeAdmin.database
+        .from("customers")
+        .select("nombre")
+        .eq("id", c.customer_id)
+        .maybeSingle();
+      cliente = (cust as { nombre?: string } | null)?.nombre ?? null;
+    }
+    const origen = c.canal === "whatsapp" ? "WhatsApp" : "Nueva";
+    const lines = [`Total: ${formatMXN(c.total_cents)}`];
+    if (cliente) lines.push(`Cliente: ${cliente}`);
+    lines.push("Tócala para asignártela.");
+
+    await pushToUsers(targets, {
+      title: `Cotización sin asignar · ${c.folio} (${origen})`,
+      body: lines.join("\n"),
+      url: `/cotizaciones/${cotizacionId}`,
+      tag: `cot-libre-${cotizacionId}`,
+    });
+  } catch (e) {
+    console.error("notifyCotizacionSinAsignar failed:", e);
   }
 }
 

@@ -20,6 +20,7 @@ export type CotizacionRow = {
   created_at: string;
   expires_at: string | null;
   esPropia: boolean;
+  sinAsignar: boolean;
 };
 
 type Tone = "neutral" | "success" | "warning" | "danger" | "accent";
@@ -49,7 +50,7 @@ function fechaCorta(iso: string) {
   return new Date(iso).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-const FILTROS = ["todas", "pendiente", "autorizada", "convertida", "borrador", "cancelada"] as const;
+const FILTROS = ["todas", "sin asignar", "pendiente", "autorizada", "convertida", "borrador", "cancelada"] as const;
 type Filtro = (typeof FILTROS)[number];
 
 export function CotizacionesView({ cotizaciones }: { cotizaciones: CotizacionRow[] }) {
@@ -61,7 +62,14 @@ export function CotizacionesView({ cotizaciones }: { cotizaciones: CotizacionRow
     return m;
   }, [cotizaciones]);
 
-  const rows = filtro === "todas" ? cotizaciones : cotizaciones.filter((c) => c.estado === filtro);
+  const activa = (c: CotizacionRow) => c.estado !== "convertida" && c.estado !== "cancelada";
+  const sinAsignarCount = cotizaciones.filter((c) => c.sinAsignar && activa(c)).length;
+  const rows =
+    filtro === "todas"
+      ? cotizaciones
+      : filtro === "sin asignar"
+        ? cotizaciones.filter((c) => c.sinAsignar && activa(c))
+        : cotizaciones.filter((c) => c.estado === filtro);
 
   return (
     <section className="space-y-5">
@@ -81,7 +89,12 @@ export function CotizacionesView({ cotizaciones }: { cotizaciones: CotizacionRow
 
       <div className="flex flex-wrap gap-1.5">
         {FILTROS.map((f) => {
-          const n = f === "todas" ? cotizaciones.length : conteos.get(f) ?? 0;
+          const n =
+            f === "todas"
+              ? cotizaciones.length
+              : f === "sin asignar"
+                ? sinAsignarCount
+                : conteos.get(f) ?? 0;
           return (
             <button
               key={f}
@@ -119,6 +132,7 @@ export function CotizacionesView({ cotizaciones }: { cotizaciones: CotizacionRow
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-sm font-semibold">{c.folio}</span>
                       <Badge tone={est.tone}>{est.label}</Badge>
+                      {c.sinAsignar && activa(c) && <Badge tone="accent">Sin asignar</Badge>}
                     </div>
                     <p className="mt-0.5 truncate text-sm text-muted-foreground">
                       {c.cliente}

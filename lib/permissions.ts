@@ -13,6 +13,7 @@ export const PERMISOS = [
   "cotizaciones_ver_todas",
   "cotizaciones_reasignar",
   "autorizar",
+  "cotizaciones_convertir",
   "surtir",
   "inventario_ver",
   "inventario_gestionar",
@@ -38,7 +39,8 @@ export const CATALOGO_PERMISOS: {
       { key: "cotizar", label: "Cotizar", desc: "Crear cotizaciones." },
       { key: "cotizaciones_ver_todas", label: "Ver todas las cotizaciones", desc: "No solo las asignadas a él." },
       { key: "cotizaciones_reasignar", label: "Reasignar cotizaciones", desc: "Pasar una cotización a otro vendedor." },
-      { key: "autorizar", label: "Autorizar pedidos", desc: "Convertir una cotización en nota." },
+      { key: "autorizar", label: "Autorizar cotización", desc: "Marcar una cotización como aceptada por el cliente." },
+      { key: "cotizaciones_convertir", label: "Marcar la venta", desc: "Convertir una cotización autorizada en venta. Requiere un rol de mayor nivel." },
     ],
   },
   {

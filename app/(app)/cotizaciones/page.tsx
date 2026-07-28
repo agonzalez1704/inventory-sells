@@ -51,11 +51,13 @@ export default async function CotizacionesPage() {
       created_at: c.created_at,
       expires_at: c.expires_at,
       esPropia: c.created_by === userId || c.vendedor_id === userId,
+      sinAsignar: c.vendedor_id === null,
     }),
   );
 
-  // Sellers without cotizaciones_ver_todas only see their own.
-  if (!verTodas) cots = cots.filter((c) => c.esPropia);
+  // Sellers without cotizaciones_ver_todas see their own PLUS any unassigned
+  // quote (e.g. from the WhatsApp agent) so they can claim it.
+  if (!verTodas) cots = cots.filter((c) => c.esPropia || c.sinAsignar);
 
   return <CotizacionesView cotizaciones={cots} />;
 }

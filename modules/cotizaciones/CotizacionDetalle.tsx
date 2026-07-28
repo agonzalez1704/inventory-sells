@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeft, Send, Check, ShoppingCart, X, Pencil, UserCog } from "lucide-react";
+import { ArrowLeft, Send, Check, ShoppingCart, X, Pencil, UserCog, Hand } from "lucide-react";
 import { formatMXN } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import type { PaymentMethod } from "@/lib/types";
@@ -20,6 +20,7 @@ import {
   convertirCotizacion,
   cancelarCotizacion,
   asignarCotizacion,
+  reclamarCotizacion,
 } from "./actions";
 
 export type CotItem = {
@@ -82,7 +83,14 @@ export function CotizacionDetalle({
 }: {
   cot: CotDetalle;
   items: CotItem[];
-  perms: { editar: boolean; autorizar: boolean; reasignar: boolean; costos: boolean };
+  perms: {
+    editar: boolean;
+    autorizar: boolean;
+    convertir: boolean;
+    reasignar: boolean;
+    reclamar: boolean;
+    costos: boolean;
+  };
   vendedores: { id: string; nombre: string }[];
 }) {
   const router = useRouter();
@@ -251,6 +259,15 @@ export function CotizacionDetalle({
       {/* State actions */}
       {!terminal && (
         <div className="flex flex-wrap gap-2">
+          {perms.reclamar && cot.vendedor_id === null && (
+            <Button
+              variant="primary"
+              onClick={() => run(() => reclamarCotizacion(cot.id), "Cotización tomada")}
+              loading={pending}
+            >
+              <Hand className="h-4 w-4" /> Tomar cotización
+            </Button>
+          )}
           {perms.editar && editable && (
             <Button asChild variant="secondary">
               <Link href={`/cotizaciones/${cot.id}/editar`}>
@@ -276,7 +293,7 @@ export function CotizacionDetalle({
               <Check className="h-4 w-4" /> Autorizar
             </Button>
           )}
-          {perms.autorizar && cot.estado === "autorizada" && (
+          {perms.convertir && cot.estado === "autorizada" && (
             <Button variant="accent" onClick={() => setPagoOpen(true)} disabled={pending}>
               <ShoppingCart className="h-4 w-4" /> Convertir en venta
             </Button>

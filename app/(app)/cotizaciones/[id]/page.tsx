@@ -37,7 +37,10 @@ export default async function CotizacionPage({ params }: { params: Promise<{ id:
 
   const verTodas = perms.has("cotizaciones_ver_todas");
   const propia = c.created_by === userId || c.vendedor_id === userId;
-  if (!verTodas && !propia) redirect("/cotizaciones");
+  // Unassigned quotes (e.g. from the WhatsApp agent) are visible to any cotizar
+  // holder so they can claim them.
+  const reclamable = c.vendedor_id === null;
+  if (!verTodas && !propia && !reclamable) redirect("/cotizaciones");
 
   const [{ data: itemData }, { data: cust }, { data: profs }, asignables] = await Promise.all([
     insforgeAdmin.database
@@ -82,7 +85,9 @@ export default async function CotizacionPage({ params }: { params: Promise<{ id:
       perms={{
         editar: perms.has("cotizar"),
         autorizar: perms.has("autorizar"),
+        convertir: perms.has("admin_total") || perms.has("cotizaciones_convertir"),
         reasignar: perms.has("cotizaciones_reasignar"),
+        reclamar: perms.has("cotizar"),
         costos: perms.has("costos_ver"),
       }}
       vendedores={asignables}

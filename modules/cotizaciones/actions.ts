@@ -4,7 +4,7 @@ import { auth } from "@clerk/nextjs/server";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { getPermisos } from "@/lib/auth/profile";
-import { notifyAsignacion } from "@/lib/push";
+import { notifyAsignacion, notifyCotizacionSinAsignar } from "@/lib/push";
 import { attempt, type ActionResult } from "@/lib/errors";
 import type { Permiso } from "@/lib/permissions";
 
@@ -65,8 +65,14 @@ export async function crearCotizacion(
     if (error) throw new Error(error.message ?? "No se pudo crear la cotización");
     const row = (Array.isArray(data) ? data[0] : data) as { id: string; folio: string } | undefined;
     if (!row?.id) throw new Error("No se pudo crear la cotización");
-    // Assigned to someone else at creation → ping them.
-    await notifyAsignacion(row.id, vendedorId, userId);
+    // Explicit assignee → ping them. A WhatsApp-agent quote is unassigned →
+    // broadcast so a vendedor claims it. A vendedor's own quote (auto-assigned to
+    // the creator) notifies no one.
+    if (vendedorId) {
+      await notifyAsignacion(row.id, vendedorId, userId);
+    } else if (canal === "whatsapp") {
+      await notifyCotizacionSinAsignar(row.id, userId);
+    }
     return row;
   });
 }
@@ -186,12 +192,39 @@ export async function asignarCotizacion(id: string, vendedorId: string): Promise
   });
 }
 
+// A vendedor takes an unassigned quote (e.g. one the WhatsApp agent created) for
+// themselves. Only cotizar is needed — you're claiming your own work, not
+// reassigning someone else's (that needs cotizaciones_reasignar).
+export async function reclamarCotizacion(id: string): Promise<ActionResult<null>> {
+  return attempt("reclamarCotizacion", async () => {
+    const userId = await requirePermiso("cotizar");
+    const { data } = await insforgeAdmin.database
+      .from("cotizaciones")
+      .select("vendedor_id, estado")
+      .eq("id", id)
+      .maybeSingle();
+    const c = data as { vendedor_id: string | null; estado: string } | null;
+    if (!c) throw new Error("Cotización no encontrada");
+    if (c.vendedor_id) throw new Error("Esta cotización ya tiene vendedor asignado");
+    if (c.estado === "convertida" || c.estado === "cancelada")
+      throw new Error("La cotización ya está cerrada");
+    const { error } = await insforgeAdmin.database
+      .from("cotizaciones")
+      .update({ vendedor_id: userId, updated_at: new Date().toISOString() })
+      .eq("id", id);
+    if (error) throw new Error(error.message ?? "No se pudo tomar la cotización");
+    return null;
+  });
+}
+
 export async function convertirCotizacion(
   id: string,
   metodo: string,
 ): Promise<ActionResult<{ saleId: string }>> {
   return attempt("convertirCotizacion", async () => {
-    const userId = await requirePermiso("autorizar");
+    // Marking the sale is a higher-level action than authorizing — an authorized
+    // quote is not a sale until someone with cotizaciones_convertir converts it.
+    const userId = await requirePermiso("cotizaciones_convertir");
     await loadYAutoriza(id, userId);
     const { data, error } = await insforgeAdmin.database.rpc("convertir_cotizacion", {
       p_id: id,
