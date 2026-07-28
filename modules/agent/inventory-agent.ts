@@ -1,6 +1,6 @@
 import "server-only";
 import { generateText, tool, stepCountIs } from "ai";
-import { createOpenRouter } from "@openrouter/ai-sdk-provider";
+import { createOpenAI } from "@ai-sdk/openai";
 import { z } from "zod";
 import { buscarProducto } from "@/modules/analytics/queries";
 import { getNegocioInfo } from "@/modules/config/lib";
@@ -33,11 +33,11 @@ async function crearCotizacionAgente(
   }
 }
 
-const openrouter = createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY! });
+const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 const MODEL =
-  process.env.OPENROUTER_AGENT_MODEL ??
-  process.env.OPENROUTER_CHAT_MODEL ??
-  "anthropic/claude-sonnet-4.6";
+  process.env.OPENAI_AGENT_MODEL ??
+  process.env.OPENAI_CHAT_MODEL ??
+  "gpt-4o";
 
 // Screen quality read from the product name so the agent can group results by
 // quality (Original / OLED / Incell / AAA). Not the frame (C/M = con marco).
@@ -54,10 +54,10 @@ function calidadDe(nombre: string): string | null {
 // the same display as `modelo`, so we can match the customer's model to a
 // compatible product we actually stock.
 async function modelosCompatibles(modelo: string): Promise<string[]> {
-  const webModel = `${process.env.OPENROUTER_WEB_MODEL ?? MODEL}:online`;
+  const webModel = process.env.OPENAI_WEB_MODEL ?? MODEL;
   try {
     const { text } = await generateText({
-      model: openrouter(webModel),
+      model: openai(webModel),
       system:
         "Eres experto en refacciones de celulares. Dado un modelo, lista TODOS los modelos cuyo display/pantalla es físicamente intercambiable (el mismo display sirve en todos), incluyendo equivalencias entre marcas (Oppo, Realme, OnePlus, etc.). Responde SOLO los nombres de los modelos separados por coma, sin explicación ni códigos.",
       prompt: `Modelos con pantalla compatible/intercambiable con ${modelo}:`,
@@ -155,7 +155,7 @@ export async function responderMensaje(
   let escalar: { motivo: string } | null = null;
 
   const { text } = await generateText({
-    model: openrouter(MODEL),
+    model: openai(MODEL),
     system,
     messages,
     maxOutputTokens: 600,

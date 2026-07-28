@@ -1,6 +1,6 @@
 import "server-only";
 import { generateText } from "ai";
-import { createOpenRouter } from "@openrouter/ai-sdk-provider";
+import { createOpenAI } from "@ai-sdk/openai";
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { normalize } from "@/lib/search";
 
@@ -8,18 +8,12 @@ import { normalize } from "@/lib/search";
 // panel across models (shared chassis + flex). Ask Gemini which models share the
 // part, then re-search the catalog with those names.
 
-const openrouter = createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY! });
-// ":online" enables OpenRouter's web-search plugin — without it the model
-// answers from stale parametric memory and wrongly calls many screens "unique"
-// (e.g. Honor X7b, which actually shares its panel with the Honor 90/20 Smart).
-// Web-grounded compat needs a model that reasons over supplier listings — the
-// conservative flash model wrongly calls screens "unique". Sonnet:online cites
-// real repair suppliers (matches Honor X7b ↔ Honor 90/20 Smart).
-const MODEL = `${
-  process.env.OPENROUTER_COMPAT_MODEL ??
-  process.env.OPENROUTER_WEB_MODEL ??
-  "anthropic/claude-sonnet-4.6"
-}:online`;
+const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY! });
+// Compatibility is answered from the model's parametric knowledge (no web
+// search on the OpenAI provider). Good for common phones; obscure/very new
+// models may be missed — re-add web grounding via OpenAI's web_search tool if
+// accuracy on new models matters.
+const MODEL = process.env.OPENAI_COMPAT_MODEL ?? "gpt-4o";
 
 // Bump when the model or prompt changes so stale cached answers are ignored.
 const CACHE_VERSION = "v3";
@@ -95,8 +89,8 @@ export async function modelosCompatibles(query: string): Promise<Compat> {
   // must never reach the model. Not a failure — there was nothing to look up.
   if (!norm || norm.length < 3 || norm.length > 60) return SIN_DATOS;
   // Missing key IS a failure: we can't answer, so don't claim "no compatibles".
-  if (!process.env.OPENROUTER_API_KEY) {
-    console.error("[compat] OPENROUTER_API_KEY no configurada");
+  if (!process.env.OPENAI_API_KEY) {
+    console.error("[compat] OPENAI_API_KEY no configurada");
     return FALLO;
   }
 
@@ -115,7 +109,7 @@ export async function modelosCompatibles(query: string): Promise<Compat> {
   let result: Compat | null = null;
   try {
     const { text } = await generateText({
-      model: openrouter(MODEL),
+      model: openai(MODEL),
       system: SYSTEM,
       prompt: `Modelo buscado: "${query}"`,
       temperature: 0.2,
