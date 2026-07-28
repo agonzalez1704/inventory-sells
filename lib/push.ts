@@ -71,6 +71,46 @@ export async function pushToUsers(
   );
 }
 
+// A quote was assigned to a vendedor — push straight to that seller so they
+// know they own it. Skips self-assignment (no point pinging yourself).
+export async function notifyAsignacion(
+  cotizacionId: string,
+  vendedorId: string | null,
+  actorId: string,
+): Promise<void> {
+  try {
+    if (!vendedorId || vendedorId === actorId) return;
+    const { data } = await insforgeAdmin.database
+      .from("cotizaciones")
+      .select("folio, total_cents, customer_id")
+      .eq("id", cotizacionId)
+      .maybeSingle();
+    const c = data as { folio: string; total_cents: number; customer_id: string | null } | null;
+    if (!c) return;
+
+    let cliente: string | null = null;
+    if (c.customer_id) {
+      const { data: cust } = await insforgeAdmin.database
+        .from("customers")
+        .select("nombre")
+        .eq("id", c.customer_id)
+        .maybeSingle();
+      cliente = (cust as { nombre?: string } | null)?.nombre ?? null;
+    }
+    const lines = [`Total: ${formatMXN(c.total_cents)}`];
+    if (cliente) lines.push(`Cliente: ${cliente}`);
+
+    await pushToUsers([vendedorId], {
+      title: `Cotización asignada · ${c.folio}`,
+      body: lines.join("\n"),
+      url: `/cotizaciones/${cotizacionId}`,
+      tag: `cot-asig-${cotizacionId}`,
+    });
+  } catch (e) {
+    console.error("notifyAsignacion failed:", e);
+  }
+}
+
 // Admins who opted into this event kind (falling back to DEFAULT_PREFS).
 async function adminsForKind(kind: NotifKind): Promise<string[]> {
   const { data: admins } = await insforgeAdmin.database

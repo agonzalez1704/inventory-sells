@@ -4,6 +4,7 @@ import { auth } from "@clerk/nextjs/server";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { getPermisos } from "@/lib/auth/profile";
+import { notifyAsignacion } from "@/lib/push";
 import { attempt, type ActionResult } from "@/lib/errors";
 import type { Permiso } from "@/lib/permissions";
 
@@ -48,7 +49,7 @@ export async function crearCotizacion(
   estado: "borrador" | "pendiente",
 ): Promise<ActionResult<{ id: string; folio: string }>> {
   return attempt("crearCotizacion", async () => {
-    await requirePermiso("cotizar");
+    const userId = await requirePermiso("cotizar");
     if (items.length === 0) throw new Error("Agrega al menos un producto");
     // Authenticated client → requesting_user_id() resolves for created_by.
     const insforge = await createInsForgeServerClient();
@@ -64,6 +65,8 @@ export async function crearCotizacion(
     if (error) throw new Error(error.message ?? "No se pudo crear la cotización");
     const row = (Array.isArray(data) ? data[0] : data) as { id: string; folio: string } | undefined;
     if (!row?.id) throw new Error("No se pudo crear la cotización");
+    // Assigned to someone else at creation → ping them.
+    await notifyAsignacion(row.id, vendedorId, userId);
     return row;
   });
 }
@@ -172,12 +175,13 @@ export async function cancelarCotizacion(id: string, motivo: string): Promise<Ac
 
 export async function asignarCotizacion(id: string, vendedorId: string): Promise<ActionResult<null>> {
   return attempt("asignarCotizacion", async () => {
-    await requirePermiso("cotizaciones_reasignar");
+    const userId = await requirePermiso("cotizaciones_reasignar");
     const { error } = await insforgeAdmin.database
       .from("cotizaciones")
       .update({ vendedor_id: vendedorId || null, updated_at: new Date().toISOString() })
       .eq("id", id);
     if (error) throw new Error(error.message ?? "No se pudo asignar");
+    await notifyAsignacion(id, vendedorId || null, userId);
     return null;
   });
 }
