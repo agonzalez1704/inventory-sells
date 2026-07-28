@@ -101,6 +101,42 @@ export function CotizacionBuilder({
     });
   }
 
+  const vacio = lines.length === 0;
+  const actionButtons = initial ? (
+    <Button
+      variant="accent"
+      size="lg"
+      className="w-full"
+      onClick={() => guardar("pendiente")}
+      loading={pending}
+      disabled={vacio}
+    >
+      Guardar cambios
+    </Button>
+  ) : (
+    <>
+      <Button
+        variant="secondary"
+        size="lg"
+        className="flex-1"
+        onClick={() => guardar("borrador")}
+        disabled={pending || vacio}
+      >
+        Borrador
+      </Button>
+      <Button
+        variant="accent"
+        size="lg"
+        className="flex-[2]"
+        onClick={() => guardar("pendiente")}
+        loading={pending}
+        disabled={vacio}
+      >
+        {vacio ? "Crear cotización" : `Crear · ${formatMXN(total)}`}
+      </Button>
+    </>
+  );
+
   return (
     <div className="gap-5 pb-28 lg:grid lg:grid-cols-5 lg:pb-0">
       {/* Product picker */}
@@ -243,44 +279,21 @@ export function CotizacionBuilder({
               </div>
             </>
           )}
+
+          {/* Desktop actions live inside the sticky panel and are ALWAYS shown
+              (disabled while empty) — never buried at the end of a long product
+              scroll, never invisible. */}
+          <div className="hidden gap-2 border-t border-border p-4 lg:flex">{actionButtons}</div>
         </Card>
       </div>
 
-      {/* Actions — fixed bottom on mobile, inline on desktop */}
+      {/* Fixed bottom bar — mobile only (desktop actions live in the panel) */}
       {lines.length > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-30 flex gap-2 border-t border-border bg-background/95 px-4 py-3 backdrop-blur lg:static lg:col-span-5 lg:mt-4 lg:border-0 lg:bg-transparent lg:px-0 lg:backdrop-blur-none">
-          {initial ? (
-            <Button
-              variant="accent"
-              size="lg"
-              className="w-full"
-              onClick={() => guardar("pendiente")}
-              loading={pending}
-            >
-              Guardar cambios
-            </Button>
-          ) : (
-            <>
-              <Button
-                variant="secondary"
-                size="lg"
-                className="flex-1"
-                onClick={() => guardar("borrador")}
-                disabled={pending}
-              >
-                Borrador
-              </Button>
-              <Button
-                variant="accent"
-                size="lg"
-                className="flex-[2]"
-                onClick={() => guardar("pendiente")}
-                loading={pending}
-              >
-                Crear cotización · {formatMXN(total)}
-              </Button>
-            </>
-          )}
+        <div
+          className="fixed inset-x-0 bottom-0 z-30 flex gap-2 border-t border-border bg-background/95 px-4 py-3 backdrop-blur lg:hidden"
+          style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+        >
+          {actionButtons}
         </div>
       )}
     </div>
