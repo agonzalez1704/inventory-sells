@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Toaster } from "sonner";
-import { SiteHeader } from "@/components/site-header";
+import { AppShell } from "@/components/app-shell";
 import "./globals.css";
 
 const sans = Inter({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
@@ -33,10 +33,7 @@ export default function RootLayout({
     <html lang="es-MX" className={`${sans.variable} ${mono.variable}`}>
       <body className="min-h-screen font-sans antialiased">
         <ClerkProvider>
-          <div className="flex min-h-screen flex-col">
-            <SiteHeader />
-            <main className="flex-1">{children}</main>
-          </div>
+          <AppShell>{children}</AppShell>
           <Toaster
             position="top-right"
             richColors
