@@ -1,18 +1,14 @@
 "use server";
 
-import { auth } from "@clerk/nextjs/server";
-import { getProfile } from "@/lib/auth/profile";
+import { assertPermiso } from "@/lib/auth/profile";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
 import { toCents } from "@/lib/money";
 import { type ExtractedRow, type ImportSource } from "./schema";
 import { extractRowsFromImage, extractRowsFromPdf } from "./extract";
 
+// Inventory import/creation needs inventory management (admin_total passes).
 async function requireAdmin(): Promise<string> {
-  const { userId } = await auth();
-  if (!userId) throw new Error("No autenticado");
-  const profile = await getProfile(userId);
-  if (profile?.role !== "admin") throw new Error("Solo administradores");
-  return userId;
+  return assertPermiso("inventario_gestionar");
 }
 
 export type ExtractResult = {

@@ -41,9 +41,13 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 export function ProductEditModal({
   productId,
+  verCostos,
+  puedePrecios,
   onClose,
 }: {
   productId: string;
+  verCostos: boolean;
+  puedePrecios: boolean;
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -162,24 +166,28 @@ export function ProductEditModal({
             <Field label="Color">
               <Input value={form.color} onChange={(e) => set("color", e.target.value)} />
             </Field>
-            <Field label="Costo (pesos)">
-              <Input
-                type="number"
-                min={0}
-                step="0.01"
-                value={form.cost}
-                onChange={(e) => set("cost", e.target.value)}
-              />
-            </Field>
-            <Field label="Precio de venta (pesos)">
-              <Input
-                type="number"
-                min={0}
-                step="0.01"
-                value={form.price}
-                onChange={(e) => set("price", e.target.value)}
-              />
-            </Field>
+            {verCostos && (
+              <Field label="Costo (pesos)">
+                <Input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={form.cost}
+                  onChange={(e) => set("cost", e.target.value)}
+                />
+              </Field>
+            )}
+            {puedePrecios && (
+              <Field label="Precio de venta (pesos)">
+                <Input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={form.price}
+                  onChange={(e) => set("price", e.target.value)}
+                />
+              </Field>
+            )}
           </div>
 
           <Field label="Etiqueta (opcional)">

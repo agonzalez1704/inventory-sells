@@ -15,6 +15,23 @@ export async function requirePagePermiso(permiso: Permiso, to = "/"): Promise<st
   return userId;
 }
 
+// Server-action guard: throws (not redirect) unless the user's role grants
+// `permiso` (admin_total passes everything). Returns the user id.
+export async function assertPermiso(permiso: Permiso): Promise<string> {
+  const { userId } = await auth();
+  if (!userId) throw new Error("No autenticado");
+  const perms = await getPermisos(userId);
+  if (!perms.has("admin_total") && !perms.has(permiso)) throw new Error("Sin permiso");
+  return userId;
+}
+
+// Convenience for actions that need to branch on several permisos.
+export async function permisosDe(): Promise<Set<Permiso>> {
+  const { userId } = await auth();
+  if (!userId) throw new Error("No autenticado");
+  return getPermisos(userId);
+}
+
 // Read a profile by Clerk user id (null if none yet). Admin client → no RLS.
 export async function getProfile(userId: string): Promise<Profile | null> {
   const { data } = await insforgeAdmin.database

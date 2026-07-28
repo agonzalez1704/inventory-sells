@@ -64,7 +64,7 @@ function Kpi({ label, value }: { label: string; value: string }) {
   );
 }
 
-function ExportMenu({ isAdmin }: { isAdmin: boolean }) {
+function ExportMenu({ verCostos }: { verCostos: boolean }) {
   const [open, setOpen] = useState(false);
   const item =
     "block rounded-md px-3 py-2 transition-colors hover:bg-muted cursor-pointer";
@@ -89,7 +89,7 @@ function ExportMenu({ isAdmin }: { isAdmin: boolean }) {
                 Solo precios de venta
               </p>
             </a>
-            {isAdmin && (
+            {verCostos && (
               <a
                 href="/api/inventario/export?variant=internal"
                 onClick={() => setOpen(false)}
@@ -193,11 +193,15 @@ function InvTab({
 export function InventoryView({
   products,
   inventories,
-  isAdmin,
+  puedeGestionar,
+  verCostos,
+  puedePrecios,
 }: {
   products: InventoryRow[];
   inventories: Inventory[];
-  isAdmin: boolean;
+  puedeGestionar: boolean;
+  verCostos: boolean;
+  puedePrecios: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<Sort | null>(null);
@@ -276,18 +280,18 @@ export function InventoryView({
           <h1 className="text-2xl font-semibold tracking-tight">Inventario</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {scoped.length} productos · {stats.units} unidades
-            {isAdmin && " · toca un producto para editar"}
+            {puedeGestionar && " · toca un producto para editar"}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {scoped.length > 0 && <ExportMenu isAdmin={isAdmin} />}
-          {isAdmin && inventories.length > 0 && (
+          {scoped.length > 0 && <ExportMenu verCostos={verCostos} />}
+          {puedeGestionar && inventories.length > 0 && (
             <Button variant="secondary" onClick={() => setManualOpen(true)}>
               <Plus className="h-4 w-4" />
               Producto
             </Button>
           )}
-          {isAdmin && (
+          {puedeGestionar && (
             <Button onClick={() => setImportOpen(true)}>
               <Upload className="h-4 w-4" />
               Importar
@@ -310,7 +314,7 @@ export function InventoryView({
             {inv.name}
           </InvTab>
         ))}
-        {isAdmin && (
+        {puedeGestionar && (
           <button
             onClick={() => setNewInvOpen(true)}
             className="flex cursor-pointer items-center gap-1 rounded-full border border-dashed border-border px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-ring/40 hover:text-foreground"
@@ -347,12 +351,12 @@ export function InventoryView({
               icon={Boxes}
               title="Sin productos"
               description={
-                isAdmin
+                puedeGestionar
                   ? "Importa una foto o un Excel para cargar tu catálogo."
                   : "Pide a un administrador que cargue inventario."
               }
               action={
-                isAdmin ? (
+                puedeGestionar ? (
                   <Button onClick={() => setImportOpen(true)}>
                     <Upload className="h-4 w-4" />
                     Importar inventario
@@ -421,10 +425,10 @@ export function InventoryView({
               {paged.map((p) => (
                 <tr
                   key={p.id}
-                  onClick={isAdmin ? () => setEditId(p.id) : undefined}
+                  onClick={puedeGestionar ? () => setEditId(p.id) : undefined}
                   className={cn(
                     "border-b border-border/60 transition-colors last:border-0 hover:bg-muted/40",
-                    isAdmin && "cursor-pointer",
+                    puedeGestionar && "cursor-pointer",
                   )}
                 >
                   {/* Photo — open to every staff member (no cost/stock here),
@@ -563,12 +567,18 @@ export function InventoryView({
         <ManualProductModal
           inventories={inventories}
           defaultInventoryId={selectedInv !== "all" ? selectedInv : undefined}
+          verCostos={verCostos}
           onClose={() => setManualOpen(false)}
         />
       )}
 
       {editId && (
-        <ProductEditModal productId={editId} onClose={() => setEditId(null)} />
+        <ProductEditModal
+          productId={editId}
+          verCostos={verCostos}
+          puedePrecios={puedePrecios}
+          onClose={() => setEditId(null)}
+        />
       )}
 
       {foto && (

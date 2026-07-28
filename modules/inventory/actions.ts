@@ -1,7 +1,7 @@
 "use server";
 
 import { auth } from "@clerk/nextjs/server";
-import { getProfile } from "@/lib/auth/profile";
+import { assertPermiso, permisosDe } from "@/lib/auth/profile";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { toCents } from "@/lib/money";
@@ -34,13 +34,6 @@ export type ProductPatch = {
   is_active: boolean;
   etiqueta: string | null;
 };
-
-async function requireAdmin(): Promise<void> {
-  const { userId } = await auth();
-  if (!userId) throw new Error("No autenticado");
-  const profile = await getProfile(userId);
-  if (profile?.role !== "admin") throw new Error("Solo administradores");
-}
 
 const BUCKET = "product-images";
 const MAX_BYTES = 5 * 1024 * 1024;
@@ -137,10 +130,10 @@ export async function quitarImagenProducto(
   });
 }
 
-// Full product (incl. cost) for the edit screen — admin only, so cost never
-// reaches a seller's client.
+// Full product (incl. cost) for the edit screen — needs inventory management, so
+// cost never reaches a plain seller's client.
 export async function getProductForEdit(id: string): Promise<EditableProduct> {
-  await requireAdmin();
+  await assertPermiso("inventario_gestionar");
   const { data, error } = await insforgeAdmin.database
     .from("products")
     .select(
@@ -156,11 +149,29 @@ export async function updateProduct(
   id: string,
   patch: ProductPatch,
 ): Promise<void> {
-  await requireAdmin();
+  await assertPermiso("inventario_gestionar");
+  const perms = await permisosDe();
+  const admin = perms.has("admin_total");
+  const puedePrecios = admin || perms.has("precios_gestionar");
+  const puedeCostos = admin || perms.has("costos_ver");
+
   const etiqueta = patch.etiqueta?.trim() || null;
   if (etiqueta !== null && !esEtiquetaValida(etiqueta)) {
     throw new Error("Etiqueta no válida");
   }
+
+  // Price/cost are separately gated. If the user can't change them, keep the
+  // stored value — the UI hides these fields, this is the server backstop.
+  const { data: cur } = await insforgeAdmin.database
+    .from("products")
+    .select("price_cents, cost_cents")
+    .eq("id", id)
+    .maybeSingle();
+  const stored = (cur as { price_cents: number; cost_cents: number } | null) ?? {
+    price_cents: 0,
+    cost_cents: 0,
+  };
+
   const insforge = await createInsForgeServerClient();
   const { error } = await insforge.database
     .from("products")
@@ -170,8 +181,8 @@ export async function updateProduct(
       brand: patch.brand?.trim() || null,
       size: patch.size?.trim() || null,
       color: patch.color?.trim() || null,
-      cost_cents: Math.max(0, toCents(patch.cost || 0)),
-      price_cents: Math.max(0, toCents(patch.price || 0)),
+      cost_cents: puedeCostos ? Math.max(0, toCents(patch.cost || 0)) : stored.cost_cents,
+      price_cents: puedePrecios ? Math.max(0, toCents(patch.price || 0)) : stored.price_cents,
       is_active: patch.is_active,
       etiqueta,
     })
@@ -187,6 +198,7 @@ export async function adjustStock(
   reason: "adjustment" | "return",
   note: string | null,
 ): Promise<number> {
+  await assertPermiso("inventario_gestionar");
   if (!Number.isInteger(delta) || delta === 0)
     throw new Error("Ajuste inválido");
   const insforge = await createInsForgeServerClient();

@@ -35,10 +35,12 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 export function ManualProductModal({
   inventories,
   defaultInventoryId,
+  verCostos,
   onClose,
 }: {
   inventories: { id: string; name: string }[];
   defaultInventoryId?: string;
+  verCostos: boolean;
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -120,9 +122,11 @@ export function ManualProductModal({
           <Field label="Color">
             <Input value={f.color} onChange={(e) => set("color", e.target.value)} />
           </Field>
-          <Field label="Costo (pesos)">
-            <Input type="number" min={0} step="0.01" value={f.cost} onChange={(e) => set("cost", e.target.value)} />
-          </Field>
+          {verCostos && (
+            <Field label="Costo (pesos)">
+              <Input type="number" min={0} step="0.01" value={f.cost} onChange={(e) => set("cost", e.target.value)} />
+            </Field>
+          )}
           <Field label="Precio (pesos)">
             <Input type="number" min={0} step="0.01" value={f.price} onChange={(e) => set("price", e.target.value)} />
           </Field>

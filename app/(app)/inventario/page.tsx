@@ -1,6 +1,5 @@
-import { auth } from "@clerk/nextjs/server";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
-import { getProfile } from "@/lib/auth/profile";
+import { getPermisos, requirePagePermiso } from "@/lib/auth/profile";
 import type { Inventory } from "@/lib/types";
 import {
   InventoryView,
@@ -8,9 +7,12 @@ import {
 } from "@/modules/inventory/InventoryView";
 
 export default async function InventarioPage() {
-  const { userId } = await auth();
-  const profile = userId ? await getProfile(userId) : null;
-  const isAdmin = profile?.role === "admin";
+  const userId = await requirePagePermiso("inventario_ver");
+  const perms = await getPermisos(userId);
+  const admin = perms.has("admin_total");
+  const puedeGestionar = admin || perms.has("inventario_gestionar");
+  const verCostos = admin || perms.has("costos_ver");
+  const puedePrecios = admin || perms.has("precios_gestionar");
 
   const insforge = await createInsForgeServerClient();
   const [{ data: productData, error }, { data: invData }] = await Promise.all([
@@ -39,7 +41,9 @@ export default async function InventarioPage() {
       <InventoryView
         products={products}
         inventories={inventories}
-        isAdmin={isAdmin}
+        puedeGestionar={puedeGestionar}
+        verCostos={verCostos}
+        puedePrecios={puedePrecios}
       />
     </>
   );
