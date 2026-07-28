@@ -38,7 +38,7 @@ for (const group of ALIAS_GROUPS) {
   }
 }
 
-function expand(token: string): string[] {
+export function expand(token: string): string[] {
   return [token, ...(ALIASES.get(token) ?? [])];
 }
 

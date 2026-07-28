@@ -1,6 +1,16 @@
 import "server-only";
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { rangoUTC } from "@/lib/caja-range";
+import { expand } from "@/lib/search";
+
+// Match a token against a product haystack, expanding brand nicknames so a
+// customer's "iphone" hits the catalog's abbreviated "IPH" (and moto↔motorola,
+// etc.). Only aliases ≥3 chars are used for substring matching — a 2-char alias
+// like "mi" would match inside unrelated words.
+function tokenEnHaystack(hay: string, t: string): boolean {
+  const variantes = [t, ...expand(t).slice(1).filter((a) => a.length >= 3)];
+  return variantes.some((v) => hay.includes(v));
+}
 
 // Analytics over InsForge for the MCP server. The bearer token already gates
 // access (owner = full access), so these run with the admin client and include
@@ -309,13 +319,32 @@ export async function buscarProducto(q: string) {
     hay: strip([p.name, p.sku, p.brand, p.category, p.color, p.size].filter(Boolean).join(" ")),
   }));
 
-  // Keep only tokens that exist in at least one product; an unsatisfiable token
-  // can only ever return zero rows, so dropping it gives the best-effort answer.
-  const tokens = raw.filter((t) => indexed.some((h) => h.hay.includes(t)));
+  // Keep only tokens that exist in at least one product (alias-aware).
+  const tokens = raw.filter((t) => indexed.some((h) => tokenEnHaystack(h.hay, t)));
   if (tokens.length === 0) return [];
 
-  return indexed
-    .filter((h) => tokens.every((t) => h.hay.includes(t)))
+  // Strict: every token matches.
+  let hits = indexed.filter((h) => tokens.every((t) => tokenEnHaystack(h.hay, t)));
+
+  // Fallback for an over-constrained query — e.g. "batería 15 pro max de
+  // diagnóstico" when we stock the plain 15 pro max battery but not a
+  // "diagnóstico" grade for that model (the word exists on OTHER products, so it
+  // isn't dropped as noise). Keep the MODEL NUMBERS mandatory (14 ≠ 15) and rank
+  // by how many of the remaining words match, so we surface the closest model
+  // instead of "no encontré".
+  if (hits.length === 0) {
+    const esNum = (t: string) => /^\d+$/.test(t);
+    const nums = tokens.filter(esNum);
+    const rest = tokens.filter((t) => !esNum(t));
+    const cand = indexed
+      .filter((h) => nums.every((t) => tokenEnHaystack(h.hay, t)))
+      .map((h) => ({ h, score: rest.filter((t) => tokenEnHaystack(h.hay, t)).length }))
+      .filter((c) => c.score > 0);
+    const top = cand.reduce((m, c) => Math.max(m, c.score), 0);
+    hits = cand.filter((c) => c.score === top).map((c) => c.h);
+  }
+
+  return hits
     .map((h) => h.p)
     // In-stock first, then alphabetical — so the agent leads with what's sellable.
     .sort((a, b) => Number(b.quantity > 0) - Number(a.quantity > 0) || a.name.localeCompare(b.name))
