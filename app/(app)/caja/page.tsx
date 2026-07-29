@@ -85,13 +85,12 @@ export default async function CajaPage({
       .is("settled_at", null)
       .gte("created_at", startISO)
       .lt("created_at", endISO),
-    // Fiados completed in range — for profit/tagged revenue only (cash comes
-    // from sale_pagos, not from re-counting the total here).
+    // Credit notes completed in range — ONLY for the sales count. All their
+    // money (cash, tags, profit, inventory split) comes from sale_pagos,
+    // prorated per abono.
     insforge.database
       .from("sales")
-      .select(
-        "id, total_cents, payment_method, created_at, settled_at, sale_items(qty, unit_price_cents, products(etiqueta, cost_cents, name, sku, inventory_id))",
-      )
+      .select("id")
       .eq("status", "completed")
       .gte("settled_at", startISO)
       .lt("settled_at", endISO),
@@ -118,7 +117,7 @@ export default async function CajaPage({
     insforge.database
       .from("sale_pagos")
       .select(
-        "monto_cents, metodo, created_at, sales(customer_name, sale_items(qty, products(name)))",
+        "monto_cents, metodo, created_at, sales(customer_name, total_cents, sale_items(qty, unit_price_cents, products(etiqueta, cost_cents, name, sku, inventory_id)))",
       )
       .gte("created_at", startISO)
       .lt("created_at", endISO),
@@ -144,7 +143,7 @@ export default async function CajaPage({
   );
 
   const directasV = (directas ?? []) as unknown as VentaRow[];
-  const fiadosV = (fiadosComp ?? []) as unknown as VentaRow[];
+  const fiadosCount = (fiadosComp ?? []).length;
   const gastos = (gastosData ?? []) as Gasto[];
   const ingresos = (ingresosData ?? []) as Ingreso[];
   const devoluciones = (devolucionesData ?? []) as Devolucion[];
@@ -154,7 +153,8 @@ export default async function CajaPage({
     created_at: string;
     sales: {
       customer_name: string | null;
-      sale_items: { qty: number; products: { name: string } | null }[];
+      total_cents: number;
+      sale_items: VentaRow["sale_items"];
     } | null;
   }[];
   const adelantoPagos = (adelantoPagosData ?? []) as unknown as {
@@ -200,12 +200,16 @@ export default async function CajaPage({
     productos: Map<string, { nombre: string; sku: string; qty: number; monto: number }>;
   };
   const etiquetadoMap: Record<string, TagAgg> = {};
-  const tagRev = (rows: VentaRow[]) => {
+  // `factor` prorates a credit note's items by the day's abono (abono/total) so
+  // the tag money matches the cash that actually came in today — counting the
+  // whole note at completion made the caja descuadrar whenever a note was paid
+  // across days.
+  const tagRev = (rows: VentaRow[], factor = 1) => {
     for (const v of rows)
       for (const it of v.sale_items ?? []) {
         const t = it.products?.etiqueta;
         if (!t) continue;
-        const monto = it.unit_price_cents * it.qty;
+        const monto = Math.round(it.unit_price_cents * it.qty * factor);
         const agg = (etiquetadoMap[t] ??= { monto: 0, productos: new Map() });
         agg.monto += monto;
         const sku = it.products?.sku ?? "—";
@@ -215,30 +219,34 @@ export default async function CajaPage({
           qty: 0,
           monto: 0,
         };
-        p.qty += it.qty;
+        p.qty += it.qty * factor;
         p.monto += monto;
         agg.productos.set(sku, p);
       }
   };
   tagRev(directasV);
-  tagRev(fiadosV);
-  const etiquetado = Object.entries(etiquetadoMap)
-    .map(([tag, a]) => ({
-      tag,
-      monto: a.monto,
-      productos: [...a.productos.values()].sort((x, y) => y.monto - x.monto),
-    }))
-    .sort((a, b) => b.monto - a.monto);
+  const etiquetadoOut = () =>
+    Object.entries(etiquetadoMap)
+      .map(([tag, a]) => ({
+        tag,
+        monto: a.monto,
+        productos: [...a.productos.values()]
+          .map((p) => ({ ...p, qty: Math.round(p.qty) }))
+          .sort((x, y) => y.monto - x.monto),
+      }))
+      .sort((a, b) => b.monto - a.monto);
 
-  // --- Net profit (admin): margin at completion/delivery, less returns ---
+  // --- Net profit (admin): cash basis — direct sales in full, credit notes
+  // prorated by each day's abonos — less returns ---
   let gananciaVentas = 0;
-  const margen = (rows: VentaRow[]) => {
+  const margen = (rows: VentaRow[], factor = 1) => {
     for (const v of rows)
       for (const it of v.sale_items ?? [])
-        gananciaVentas += (it.unit_price_cents - (it.products?.cost_cents ?? 0)) * it.qty;
+        gananciaVentas += Math.round(
+          (it.unit_price_cents - (it.products?.cost_cents ?? 0)) * it.qty * factor,
+        );
   };
   margen(directasV);
-  margen(fiadosV);
   for (const a of adelantosEnt) {
     gananciaVentas += a.precio_cents - (a.products?.cost_cents ?? 0) * a.qty;
   }
@@ -251,9 +259,9 @@ export default async function CajaPage({
   const ganancia = isAdmin ? gananciaVentas - gananciaDevuelta : null;
 
   // --- Corte por inventario: revenue + margin attributed to each inventory via
-  // sale_items -> product -> inventory. Same recognized sales as above (direct +
-  // fiados completed). Non-product cash (extra income, gastos) isn't
-  // inventory-specific, so it stays out of this split by design.
+  // sale_items -> product -> inventory. Cash basis: direct sales in full, credit
+  // notes prorated by the day's abonos. Non-product cash (extra income, gastos)
+  // isn't inventory-specific, so it stays out of this split by design.
   type InvMov = {
     fecha: string;
     producto: string;
@@ -271,7 +279,7 @@ export default async function CajaPage({
     movimientos: InvMov[];
   };
   const porInvMap = new Map<string, InvAgg>();
-  const acumInv = (rows: VentaRow[]) => {
+  const acumInv = (rows: VentaRow[], factor = 1) => {
     for (const v of rows)
       for (const it of v.sale_items ?? []) {
         const invId = it.products?.inventory_id ?? "sin";
@@ -288,25 +296,50 @@ export default async function CajaPage({
             gananciaCents: 0,
             movimientos: [] as InvMov[],
           };
-        a.unidades += it.qty;
-        a.ventaCents += it.unit_price_cents * it.qty;
-        a.gananciaCents += (it.unit_price_cents - (it.products?.cost_cents ?? 0)) * it.qty;
+        a.unidades += it.qty * factor;
+        a.ventaCents += Math.round(it.unit_price_cents * it.qty * factor);
+        a.gananciaCents += Math.round(
+          (it.unit_price_cents - (it.products?.cost_cents ?? 0)) * it.qty * factor,
+        );
         a.movimientos.push({
+          // Prorated lines carry the scaled unit money so qty × precio matches
+          // the cash attributed today; the name flags it as an abono.
           fecha: v.created_at ?? v.settled_at ?? "",
-          producto: it.products?.name ?? "—",
+          producto: (it.products?.name ?? "—") + (factor < 1 ? " · abono" : ""),
           sku: it.products?.sku ?? "—",
           qty: it.qty,
-          costoCents: it.products?.cost_cents ?? 0,
-          precioCents: it.unit_price_cents,
+          costoCents: Math.round((it.products?.cost_cents ?? 0) * factor),
+          precioCents: Math.round(it.unit_price_cents * factor),
         });
         porInvMap.set(invId, a);
       }
   };
   acumInv(directasV);
-  acumInv(fiadosV);
+
+  // Credit-note items, prorated by the day's abonos (cash basis). Each abono
+  // contributes abono/total of the note's items to the tag, profit and
+  // inventory splits — so every section sums to the cash that actually entered
+  // today, and across days the note adds up to its full value.
+  for (const p of salePagos) {
+    const s = p.sales;
+    if (!s || !s.total_cents || s.total_cents <= 0) continue;
+    const factor = p.monto_cents / s.total_cents;
+    const row = {
+      total_cents: p.monto_cents,
+      payment_method: p.metodo,
+      created_at: p.created_at,
+      sale_items: s.sale_items ?? [],
+    } as VentaRow;
+    tagRev([row], factor);
+    margen([row], factor);
+    acumInv([row], factor);
+  }
+
+  const etiquetado = etiquetadoOut();
   const porInventario = [...porInvMap.values()]
     .map((a) => ({
       ...a,
+      unidades: Math.round(a.unidades),
       movimientos: a.movimientos.sort((x, y) => (x.fecha < y.fecha ? 1 : -1)),
     }))
     .sort((a, b) => b.ventaCents - a.ventaCents);
@@ -331,7 +364,7 @@ export default async function CajaPage({
       devolucionesTotal += p.monto_cents;
     }
 
-  const ventasCount = directasV.length + fiadosV.length;
+  const ventasCount = directasV.length + fiadosCount;
 
   // Breakdown of the Ingresos KPI: every cash-in event, so the lines sum to
   // ingresosTotal exactly. Same four sources as the KPI — direct sales, abonos a
