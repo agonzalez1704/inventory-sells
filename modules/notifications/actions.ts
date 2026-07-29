@@ -12,17 +12,15 @@ export type WebPushSub = {
 
 export type NotifPrefs = Record<NotifKind, boolean>;
 
-// Store this device's push subscription. Admin-only: notifications are for
-// admins, so only they can subscribe.
+// Store this device's push subscription. Any signed-in staff member — sellers
+// receive quote assignments + unassigned broadcasts, not only admins. RLS pins
+// the row to their own user_id.
 export async function subscribeToPush(
   sub: WebPushSub,
   userAgent: string | null,
 ): Promise<void> {
   const { userId } = await auth();
   if (!userId) throw new Error("No autenticado");
-  const profile = await getProfile(userId);
-  if (profile?.role !== "admin")
-    throw new Error("Solo administradores reciben notificaciones");
   if (!sub?.endpoint || !sub.keys?.p256dh || !sub.keys?.auth)
     throw new Error("Suscripción inválida");
 
@@ -55,12 +53,10 @@ export async function unsubscribeFromPush(endpoint: string): Promise<void> {
   if (error) throw new Error(error.message ?? "No se pudo cancelar");
 }
 
-// Send a test push to THIS admin's own devices to confirm delivery.
+// Send a test push to THIS user's own devices to confirm delivery.
 export async function sendTestPush(): Promise<void> {
   const { userId } = await auth();
   if (!userId) throw new Error("No autenticado");
-  const profile = await getProfile(userId);
-  if (profile?.role !== "admin") throw new Error("Solo administradores");
 
   await pushToUsers([userId], {
     title: "Prueba · Fiable",

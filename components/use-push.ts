@@ -48,6 +48,22 @@ export function usePush() {
       .then(async (reg) => {
         const sub = await reg.pushManager.getSubscription();
         setEnabled(!!sub);
+        // Heal a device that subscribed in the browser but whose SERVER row is
+        // missing — e.g. a first attempt that errored before it was stored (the
+        // old admin-only gate did exactly that to sellers). Idempotent: the
+        // action replaces any row for this endpoint.
+        if (sub) {
+          const j = sub.toJSON() as {
+            endpoint?: string;
+            keys?: { p256dh?: string; auth?: string };
+          };
+          if (j.endpoint && j.keys?.p256dh && j.keys?.auth) {
+            subscribeToPush(
+              { endpoint: j.endpoint, keys: { p256dh: j.keys.p256dh, auth: j.keys.auth } },
+              navigator.userAgent,
+            ).catch(() => {});
+          }
+        }
       })
       .catch(() => {})
       .finally(() => setReady(true));
