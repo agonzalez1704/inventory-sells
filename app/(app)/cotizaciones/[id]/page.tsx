@@ -43,6 +43,11 @@ export default async function CotizacionPage({ params }: { params: Promise<{ id:
   const reclamable = c.vendedor_id === null;
   if (!verTodas && !propia && !reclamable) redirect("/cotizaciones");
 
+  // Reassign: admin/encargado (any quote) OR the current assignee passing their
+  // own along to another vendedor.
+  const puedeReasignar =
+    perms.has("admin_total") || perms.has("cotizaciones_reasignar") || c.vendedor_id === userId;
+
   const [{ data: itemData }, { data: cust }, { data: profs }, asignables] = await Promise.all([
     insforgeAdmin.database
       .from("cotizacion_items")
@@ -52,7 +57,7 @@ export default async function CotizacionPage({ params }: { params: Promise<{ id:
       ? insforgeAdmin.database.from("customers").select("nombre").eq("id", c.customer_id).maybeSingle()
       : Promise.resolve({ data: null }),
     insforgeAdmin.database.from("profiles").select("id, full_name"),
-    perms.has("cotizaciones_reasignar") ? getAsignables() : Promise.resolve([]),
+    puedeReasignar ? getAsignables() : Promise.resolve([]),
   ]);
 
   // All profiles resolve the current assignee's name (even if their role no
@@ -88,7 +93,7 @@ export default async function CotizacionPage({ params }: { params: Promise<{ id:
         editar: perms.has("cotizar"),
         autorizar: perms.has("autorizar"),
         convertir: perms.has("admin_total") || perms.has("cotizaciones_convertir"),
-        reasignar: perms.has("cotizaciones_reasignar"),
+        reasignar: puedeReasignar,
         reclamar: perms.has("cotizar"),
         costos: perms.has("costos_ver"),
       }}

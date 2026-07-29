@@ -4,7 +4,12 @@ import { auth } from "@clerk/nextjs/server";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { getPermisos } from "@/lib/auth/profile";
-import { notifyAsignacion, notifyCotizacionSinAsignar, notifyNuevaVenta } from "@/lib/push";
+import {
+  notifyAsignacion,
+  notifyCotizacionSinAsignar,
+  notifyCotizacionTomada,
+  notifyNuevaVenta,
+} from "@/lib/push";
 import { attempt, type ActionResult } from "@/lib/errors";
 import type { Permiso } from "@/lib/permissions";
 
@@ -179,9 +184,21 @@ export async function cancelarCotizacion(id: string, motivo: string): Promise<Ac
   });
 }
 
+// Reassign a quote to another vendedor. Allowed for cotizaciones_reasignar
+// (admin/encargado — any quote) OR the current assignee passing their own along.
 export async function asignarCotizacion(id: string, vendedorId: string): Promise<ActionResult<null>> {
   return attempt("asignarCotizacion", async () => {
-    const userId = await requirePermiso("cotizaciones_reasignar");
+    const userId = await requireUser();
+    const { data } = await insforgeAdmin.database
+      .from("cotizaciones")
+      .select("vendedor_id")
+      .eq("id", id)
+      .maybeSingle();
+    const actual = (data as { vendedor_id: string | null } | null)?.vendedor_id ?? null;
+    const perms = await getPermisos(userId);
+    const puede = perms.has("admin_total") || perms.has("cotizaciones_reasignar") || actual === userId;
+    if (!puede) throw new Error("Solo puedes reasignar una cotización que tengas asignada");
+
     const { error } = await insforgeAdmin.database
       .from("cotizaciones")
       .update({ vendedor_id: vendedorId || null, updated_at: new Date().toISOString() })
@@ -213,6 +230,8 @@ export async function reclamarCotizacion(id: string): Promise<ActionResult<null>
       .update({ vendedor_id: userId, updated_at: new Date().toISOString() })
       .eq("id", id);
     if (error) throw new Error(error.message ?? "No se pudo tomar la cotización");
+    // Tell the admins who took it.
+    await notifyCotizacionTomada(id, userId);
     return null;
   });
 }

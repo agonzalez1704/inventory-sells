@@ -157,6 +157,46 @@ export async function notifyCotizacionSinAsignar(
   }
 }
 
+// A vendedor claimed an unassigned quote. Tell the admins who took it.
+export async function notifyCotizacionTomada(
+  cotizacionId: string,
+  vendedorId: string,
+): Promise<void> {
+  try {
+    const { data } = await insforgeAdmin.database
+      .from("cotizaciones")
+      .select("folio, total_cents")
+      .eq("id", cotizacionId)
+      .maybeSingle();
+    const c = data as { folio: string; total_cents: number } | null;
+    if (!c) return;
+
+    const { data: v } = await insforgeAdmin.database
+      .from("profiles")
+      .select("full_name")
+      .eq("id", vendedorId)
+      .maybeSingle();
+    const nombre = (v as { full_name?: string } | null)?.full_name ?? "Un vendedor";
+
+    // Admins, minus the claimer (an admin claiming their own needs no ping).
+    const { data: admins } = await insforgeAdmin.database
+      .from("profiles")
+      .select("id")
+      .eq("role", "admin");
+    const targets = ((admins ?? []) as { id: string }[]).map((a) => a.id).filter((id) => id !== vendedorId);
+    if (targets.length === 0) return;
+
+    await pushToUsers(targets, {
+      title: `Cotización tomada · ${c.folio}`,
+      body: `${nombre} tomó la cotización (${formatMXN(c.total_cents)}).`,
+      url: `/cotizaciones/${cotizacionId}`,
+      tag: `cot-tomada-${cotizacionId}`,
+    });
+  } catch (e) {
+    console.error("notifyCotizacionTomada failed:", e);
+  }
+}
+
 // The customer authorized a quote via the public share link. Ping the assigned
 // vendedor and the creator so someone surtes/converts it. No self-exclusion —
 // the actor here is the customer, not a staff user.
