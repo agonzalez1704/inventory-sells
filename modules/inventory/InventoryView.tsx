@@ -47,7 +47,7 @@ export type InventoryRow = Pick<
 function StockCell({ qty }: { qty: number }) {
   // Color carries the meaning: red = sold out, amber = low, default = healthy.
   const color =
-    qty === 0 ? "text-red-600" : qty <= 5 ? "text-amber-600" : "text-foreground";
+    qty === 0 ? "text-red-600 dark:text-red-400" : qty <= 5 ? "text-amber-600 dark:text-amber-400" : "text-foreground";
   return (
     <span className={cn("font-medium tabular-nums", color)}>{qty}</span>
   );
@@ -442,7 +442,7 @@ export function InventoryView({
                       aria-label={`Foto de ${p.name}`}
                       title={p.image_url ? "Cambiar foto" : "Agregar foto"}
                       className={cn(
-                        "flex h-11 w-11 cursor-pointer items-center justify-center overflow-hidden rounded-lg border bg-white transition-colors",
+                        "flex h-11 w-11 cursor-pointer items-center justify-center overflow-hidden rounded-lg border bg-background transition-colors",
                         p.image_url
                           ? "border-border hover:border-ring/40"
                           : "border-dashed border-border text-muted-foreground hover:border-ring/40 hover:text-foreground",

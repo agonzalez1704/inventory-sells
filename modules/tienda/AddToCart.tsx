@@ -38,7 +38,7 @@ export function AddToCart({
         disabled
         aria-label="Agotado"
         className={cn(
-          "flex items-center justify-center rounded-xl bg-slate-100 font-semibold text-slate-400",
+          "flex items-center justify-center rounded-xl bg-muted font-semibold text-muted-foreground",
           size === "lg" ? "h-12 w-full text-sm" : "h-9 w-9",
           className,
         )}
@@ -69,7 +69,7 @@ export function AddToCart({
       aria-label={`Agregar ${p.nombre} al carrito`}
       title={maxed ? "Máximo por pieza en línea" : "Agregar al carrito"}
       className={cn(
-        "flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-blue-600 font-semibold text-white shadow-sm shadow-blue-600/30 transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none",
+        "flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-blue-600 font-semibold text-white shadow-sm shadow-blue-600/30 transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-muted disabled:shadow-none",
         size === "lg" ? "h-12 w-full text-sm" : "h-9 w-9",
         className,
       )}

@@ -67,7 +67,7 @@ export function ProductoDetalle({
     <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
       <Link
         href="/tienda"
-        className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 transition-colors hover:text-blue-700"
+        className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-blue-700 dark:text-blue-300"
       >
         <ArrowLeft className="h-4 w-4" />
         Catálogo
@@ -75,7 +75,7 @@ export function ProductoDetalle({
 
       <div className="mt-5 grid gap-8 md:grid-cols-2">
         {/* Image */}
-        <div className="flex aspect-square items-center justify-center overflow-hidden rounded-3xl border border-blue-100 bg-white">
+        <div className="flex aspect-square items-center justify-center overflow-hidden rounded-3xl border border-blue-100 dark:border-blue-900 bg-background">
           {p.imagen ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -93,24 +93,24 @@ export function ProductoDetalle({
         {/* Info */}
         <div>
           {p.categoria && (
-            <span className="text-xs font-medium uppercase tracking-wide text-blue-600">
+            <span className="text-xs font-medium uppercase tracking-wide text-blue-600 dark:text-blue-400">
               {p.categoria}
             </span>
           )}
-          <h1 className="mt-1 text-balance text-2xl font-semibold leading-tight tracking-tight text-slate-900 [font-family:var(--font-display)] sm:text-3xl">
+          <h1 className="mt-1 text-balance text-2xl font-semibold leading-tight tracking-tight text-foreground [font-family:var(--font-display)] sm:text-3xl">
             {p.nombre}
           </h1>
 
           <div className="mt-4 flex flex-wrap items-center gap-3">
-            <span className="text-3xl font-semibold tabular-nums text-blue-800 [font-family:var(--font-display)]">
+            <span className="text-3xl font-semibold tabular-nums text-blue-800 dark:text-blue-300 [font-family:var(--font-display)]">
               {p.precio_cents > 0 ? formatMXN(p.precio_cents) : "A cotizar"}
             </span>
             <span
               className={cn(
                 "rounded-full px-2.5 py-1 text-xs font-medium",
                 p.disponible
-                  ? "bg-green-100 text-green-700"
-                  : "bg-slate-100 text-slate-500",
+                  ? "bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300"
+                  : "bg-muted text-muted-foreground",
               )}
             >
               {p.disponible ? "Disponible" : "Agotado"}
@@ -119,11 +119,11 @@ export function ProductoDetalle({
 
           {/* Specs */}
           {specs.length > 0 && (
-            <dl className="mt-6 grid grid-cols-2 gap-x-4 gap-y-3 rounded-2xl border border-slate-200 bg-white p-4">
+            <dl className="mt-6 grid grid-cols-2 gap-x-4 gap-y-3 rounded-2xl border border-border bg-background p-4">
               {specs.map(([k, v]) => (
                 <div key={k}>
-                  <dt className="text-xs text-slate-500">{k}</dt>
-                  <dd className="text-sm font-medium text-slate-900">{v}</dd>
+                  <dt className="text-xs text-muted-foreground">{k}</dt>
+                  <dd className="text-sm font-medium text-foreground">{v}</dd>
                 </div>
               ))}
             </dl>
@@ -148,18 +148,18 @@ export function ProductoDetalle({
               href={waHref(p.nombre, whatsapp)}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-green-200 bg-green-50 px-5 text-sm font-semibold text-green-700 transition-colors hover:bg-green-100 sm:flex-1"
+              className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-950/40 px-5 text-sm font-semibold text-green-700 dark:text-green-300 transition-colors hover:bg-green-100 dark:bg-green-900/40 sm:flex-1"
             >
               <MessageCircle className="h-5 w-5" />
               Preguntar por WhatsApp
             </a>
           </div>
 
-          <div className="mt-5 space-y-2 text-xs text-slate-500">
+          <div className="mt-5 space-y-2 text-xs text-muted-foreground">
             <p className="flex items-start gap-2">
               <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" />
               <span>
-                <strong className="text-slate-700">
+                <strong className="text-foreground">
                   {TIENDA.garantiaDias} días de garantía
                 </strong>{" "}
                 por defecto de fábrica, {TIENDA.garantiaCondicion}.
@@ -169,7 +169,7 @@ export function ProductoDetalle({
               <Truck className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" />
               <span>
                 Envíos a todo México · entrega en{" "}
-                <strong className="text-slate-700">
+                <strong className="text-foreground">
                   {TIENDA.entregaDias} hábiles
                 </strong>
                 . El costo de envío se calcula según tu destino. Precio sujeto a
@@ -183,7 +183,7 @@ export function ProductoDetalle({
       {/* Related */}
       {relacionados.length > 0 && (
         <section className="mt-14">
-          <h2 className="text-lg font-semibold tracking-tight text-slate-900 [font-family:var(--font-display)]">
+          <h2 className="text-lg font-semibold tracking-tight text-foreground [font-family:var(--font-display)]">
             También te puede interesar
           </h2>
           <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -192,11 +192,11 @@ export function ProductoDetalle({
                 key={r.id}
                 href={`/tienda/${r.id}`}
                 className={cn(
-                  "group flex flex-col rounded-2xl border border-slate-200 bg-white p-3 transition-all hover:border-blue-300 hover:shadow-lg hover:shadow-blue-900/5",
+                  "group flex flex-col rounded-2xl border border-border bg-background p-3 transition-all hover:border-blue-300 dark:border-blue-800 hover:shadow-lg hover:shadow-blue-900/5",
                   !r.disponible && "opacity-75",
                 )}
               >
-                <div className="mb-3 flex aspect-square items-center justify-center overflow-hidden rounded-xl bg-white">
+                <div className="mb-3 flex aspect-square items-center justify-center overflow-hidden rounded-xl bg-background">
                   {r.imagen ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
@@ -211,10 +211,10 @@ export function ProductoDetalle({
                     </div>
                   )}
                 </div>
-                <p className="line-clamp-2 min-h-[2.5rem] text-sm font-medium leading-tight text-slate-900">
+                <p className="line-clamp-2 min-h-[2.5rem] text-sm font-medium leading-tight text-foreground">
                   {r.nombre}
                 </p>
-                <span className="mt-1 font-semibold tabular-nums text-blue-800 [font-family:var(--font-display)]">
+                <span className="mt-1 font-semibold tabular-nums text-blue-800 dark:text-blue-300 [font-family:var(--font-display)]">
                   {r.precio_cents > 0 ? formatMXN(r.precio_cents) : "A cotizar"}
                 </span>
               </Link>

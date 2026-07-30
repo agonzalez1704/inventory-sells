@@ -25,6 +25,7 @@ import { cn } from "@/lib/utils";
 import type { Permiso } from "@/lib/permissions";
 import { Logo } from "@/components/logo";
 import { AsesorNavBadge } from "@/components/asesor-nav-badge";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 // Nav grouped into sections — a flat list of 12 got unwieldy in a top bar, and a
 // sidebar has the vertical room to label the groups. Each link names the permiso
@@ -150,8 +151,9 @@ export function AppShell({
               </Link>
             </div>
             <NavList permisos={permSet} />
-            <div className="shrink-0 border-t border-border p-3">
+            <div className="flex shrink-0 items-center justify-between gap-2 border-t border-border p-3">
               <UserButton showName />
+              <ThemeToggle />
             </div>
           </aside>
 
@@ -168,7 +170,8 @@ export function AppShell({
             <Link href="/" className="flex items-center" aria-label="Fiable — inicio">
               <Logo className="h-6 w-auto text-foreground" />
             </Link>
-            <div className="ml-auto">
+            <div className="ml-auto flex items-center gap-1">
+              <ThemeToggle />
               <UserButton />
             </div>
           </header>
@@ -208,6 +211,7 @@ export function AppShell({
                 <Logo className="h-6 w-auto text-foreground" />
               </Link>
               <div className="ml-auto flex items-center gap-2">
+                <ThemeToggle />
                 <Link
                   href="/tienda"
                   className="cursor-pointer rounded-lg px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"

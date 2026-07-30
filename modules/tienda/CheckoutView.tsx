@@ -202,7 +202,7 @@ export function CheckoutView() {
   if (!ready || cargando) {
     return (
       <Wrap>
-        <div className="flex items-center justify-center gap-2 py-24 text-sm text-slate-500">
+        <div className="flex items-center justify-center gap-2 py-24 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" />
           Preparando tu pedido…
         </div>
@@ -214,7 +214,7 @@ export function CheckoutView() {
     return (
       <Wrap>
         <div className="flex flex-col items-center gap-3 py-24 text-center">
-          <p className="text-sm font-medium text-slate-700">
+          <p className="text-sm font-medium text-foreground">
             {error ?? "Tu carrito está vacío"}
           </p>
           <Link
@@ -232,18 +232,18 @@ export function CheckoutView() {
     <Wrap>
       <Link
         href="/tienda"
-        className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 transition-colors hover:text-blue-700"
+        className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-blue-700 dark:text-blue-300"
       >
         <ArrowLeft className="h-4 w-4" />
         Seguir comprando
       </Link>
 
-      <h1 className="mt-4 text-2xl font-semibold tracking-tight text-slate-900 [font-family:var(--font-display)]">
+      <h1 className="mt-4 text-2xl font-semibold tracking-tight text-foreground [font-family:var(--font-display)]">
         Finalizar compra
       </h1>
 
       {resumen && resumen.removidos.length > 0 && (
-        <p className="mt-3 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+        <p className="mt-3 flex items-start gap-2 rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/40 p-3 text-xs text-amber-800 dark:text-amber-300">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           Quitamos de tu carrito lo que ya no está disponible:{" "}
           {resumen.removidos.join(", ")}.
@@ -282,12 +282,12 @@ export function CheckoutView() {
 
           {recoger ? (
             <Card titulo="Recoger en tienda">
-              <div className="flex items-start gap-3 rounded-xl bg-blue-50/60 p-3">
-                <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
-                <div className="text-sm text-slate-700">
-                  <p className="font-medium text-slate-900">{TIENDA.direccion}</p>
-                  <p className="mt-0.5 text-xs text-slate-500">{TIENDA.horario}</p>
-                  <p className="mt-2 text-xs leading-relaxed text-slate-600">
+              <div className="flex items-start gap-3 rounded-xl bg-blue-50/60 dark:bg-blue-950/40 p-3">
+                <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
+                <div className="text-sm text-foreground">
+                  <p className="font-medium text-foreground">{TIENDA.direccion}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{TIENDA.horario}</p>
+                  <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
                     Prepara tu pedido en cuanto se confirme el pago. Puedes venir tú
                     o mandar un mensajero/Uber — solo dan tu folio al recoger.
                   </p>
@@ -300,11 +300,11 @@ export function CheckoutView() {
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="Código postal" value={cp} onChange={(v) => setCp(v.replace(/\D/g, "").slice(0, 5))} inputMode="numeric" />
               <label className="block">
-                <span className="mb-1 block text-xs font-medium text-slate-600">Estado</span>
+                <span className="mb-1 block text-xs font-medium text-muted-foreground">Estado</span>
                 <select
                   value={estado}
                   onChange={(e) => setEstado(e.target.value)}
-                  className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-blue-400"
+                  className="h-11 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-blue-400"
                 >
                   <option value="">Elige…</option>
                   {ESTADOS.map((e) => (
@@ -321,19 +321,19 @@ export function CheckoutView() {
           <Card titulo="Envío">
             {!opciones ? (
               <>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-muted-foreground">
                   Calculamos el costo real con tu código postal.
                 </p>
                 <button
                   onClick={cotizar}
                   disabled={!/^\d{5}$/.test(cp) || !estado || municipio.trim().length < 2 || cotizando}
-                  className="mt-3 inline-flex h-11 cursor-pointer items-center gap-2 rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
+                  className="mt-3 inline-flex h-11 cursor-pointer items-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
                 >
                   {cotizando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Truck className="h-4 w-4" />}
                   Cotizar envío
                 </button>
                 {errEnvio && (
-                  <p className="mt-2 text-xs text-red-600">{errEnvio}</p>
+                  <p className="mt-2 text-xs text-red-600 dark:text-red-400">{errEnvio}</p>
                 )}
               </>
             ) : (
@@ -346,28 +346,28 @@ export function CheckoutView() {
                       onClick={() => setEnvio(o)}
                       className={cn(
                         "flex w-full cursor-pointer items-center gap-3 rounded-xl border p-3 text-left transition-colors",
-                        sel ? "border-blue-500 bg-blue-50/60" : "border-slate-200 hover:border-blue-200",
+                        sel ? "border-blue-500 bg-blue-50/60 dark:bg-blue-950/40" : "border-border hover:border-blue-200 dark:border-blue-900",
                       )}
                     >
-                      <span className={cn("flex h-5 w-5 shrink-0 items-center justify-center rounded-full border", sel ? "border-blue-600 bg-blue-600 text-white" : "border-slate-300")}>
+                      <span className={cn("flex h-5 w-5 shrink-0 items-center justify-center rounded-full border", sel ? "border-blue-600 bg-blue-600 text-white" : "border-border")}>
                         {sel && <Check className="h-3 w-3" />}
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium text-slate-900">
+                        <span className="block truncate text-sm font-medium text-foreground">
                           {o.proveedor} · {o.servicio}
                         </span>
-                        <span className="block text-xs text-slate-500">
+                        <span className="block text-xs text-muted-foreground">
                           {o.dias ? `Entrega estimada ${o.dias} día${o.dias > 1 ? "s" : ""}` : "Entrega estimada según destino"}
                           {i === 0 && " · más económico"}
                         </span>
                       </span>
-                      <span className="shrink-0 text-sm font-semibold tabular-nums text-slate-900">
+                      <span className="shrink-0 text-sm font-semibold tabular-nums text-foreground">
                         {formatMXN(o.totalCents)}
                       </span>
                     </button>
                   );
                 })}
-                <button onClick={cotizar} disabled={cotizando} className="cursor-pointer text-xs font-medium text-blue-700 hover:underline">
+                <button onClick={cotizar} disabled={cotizando} className="cursor-pointer text-xs font-medium text-blue-700 dark:text-blue-300 hover:underline">
                   Volver a cotizar
                 </button>
               </div>
@@ -386,12 +386,12 @@ export function CheckoutView() {
 
         {/* Summary */}
         <div className="lg:col-span-2">
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 lg:sticky lg:top-24">
-            <h2 className="text-sm font-semibold text-slate-900">Tu pedido</h2>
-            <ul className="mt-3 divide-y divide-slate-100">
+          <div className="rounded-2xl border border-border bg-background p-4 lg:sticky lg:top-24">
+            <h2 className="text-sm font-semibold text-foreground">Tu pedido</h2>
+            <ul className="mt-3 divide-y divide-border">
               {resumen?.lineas.map((l) => (
                 <li key={l.id} className="flex gap-3 py-2.5">
-                  <span className="h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-white">
+                  <span className="h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-border bg-background">
                     {l.imagen ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={l.imagen} alt={l.nombre} className="h-full w-full object-contain" />
@@ -402,43 +402,43 @@ export function CheckoutView() {
                     )}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-xs font-medium text-slate-900">{l.nombre}</span>
-                    <span className="block text-xs text-slate-500">{l.qty} × {formatMXN(l.precio_cents)}</span>
+                    <span className="block truncate text-xs font-medium text-foreground">{l.nombre}</span>
+                    <span className="block text-xs text-muted-foreground">{l.qty} × {formatMXN(l.precio_cents)}</span>
                   </span>
-                  <span className="shrink-0 text-xs font-semibold tabular-nums text-slate-900">
+                  <span className="shrink-0 text-xs font-semibold tabular-nums text-foreground">
                     {formatMXN(l.precio_cents * l.qty)}
                   </span>
                 </li>
               ))}
             </ul>
 
-            <dl className="mt-3 space-y-1.5 border-t border-slate-200 pt-3 text-sm">
+            <dl className="mt-3 space-y-1.5 border-t border-border pt-3 text-sm">
               <div className="flex justify-between">
-                <dt className="text-slate-600">Subtotal</dt>
+                <dt className="text-muted-foreground">Subtotal</dt>
                 <dd className="tabular-nums">{formatMXN(subtotal)}</dd>
               </div>
               <div className="flex justify-between">
-                <dt className="text-slate-600">{recoger ? "Entrega" : "Envío"}</dt>
+                <dt className="text-muted-foreground">{recoger ? "Entrega" : "Envío"}</dt>
                 <dd className="tabular-nums">
                   {recoger ? (
-                    <span className="text-xs font-medium text-green-700">Recoger · gratis</span>
+                    <span className="text-xs font-medium text-green-700 dark:text-green-300">Recoger · gratis</span>
                   ) : envio ? (
                     formatMXN(envio.totalCents)
                   ) : (
-                    <span className="text-xs text-slate-400">Cotiza arriba</span>
+                    <span className="text-xs text-muted-foreground">Cotiza arriba</span>
                   )}
                 </dd>
               </div>
-              <div className="flex items-baseline justify-between border-t border-slate-200 pt-2">
-                <dt className="font-semibold text-slate-900">Total</dt>
-                <dd className="text-xl font-semibold tabular-nums text-blue-800">{formatMXN(total)}</dd>
+              <div className="flex items-baseline justify-between border-t border-border pt-2">
+                <dt className="font-semibold text-foreground">Total</dt>
+                <dd className="text-xl font-semibold tabular-nums text-blue-800 dark:text-blue-300">{formatMXN(total)}</dd>
               </div>
             </dl>
 
             <button
               onClick={pagar}
               disabled={!datosListos || !envioListo || !tarjetaLista || pagando}
-              className="mt-4 flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-blue-600 text-sm font-semibold text-white shadow-sm shadow-blue-600/30 transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none"
+              className="mt-4 flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-blue-600 text-sm font-semibold text-white shadow-sm shadow-blue-600/30 transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none"
             >
               {pagando && <Loader2 className="h-4 w-4 animate-spin" />}
               {pagando
@@ -459,12 +459,12 @@ export function CheckoutView() {
             </button>
 
             {errPago && (
-              <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
+              <p className="mt-2 rounded-lg bg-red-50 dark:bg-red-950/40 px-3 py-2 text-xs text-red-700 dark:text-red-300">
                 {errPago}
               </p>
             )}
 
-            <p className="mt-3 flex items-start gap-1.5 text-[11px] leading-relaxed text-slate-500">
+            <p className="mt-3 flex items-start gap-1.5 text-[11px] leading-relaxed text-muted-foreground">
               <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-500" />
               {TIENDA.garantiaDias} días de garantía por defecto de fábrica,{" "}
               {TIENDA.garantiaCondicion}.
@@ -498,20 +498,20 @@ function EntregaTile({
       onClick={onClick}
       className={cn(
         "flex cursor-pointer flex-col gap-1 rounded-xl border p-3 text-left transition-colors",
-        activo ? "border-blue-500 bg-blue-50/60 text-blue-800" : "border-slate-200 text-slate-600 hover:border-blue-200",
+        activo ? "border-blue-500 bg-blue-50/60 dark:bg-blue-950/40 text-blue-800 dark:text-blue-300" : "border-border text-muted-foreground hover:border-blue-200 dark:border-blue-900",
       )}
     >
       <Icon className="h-5 w-5" />
       <span className="text-sm font-semibold leading-tight">{titulo}</span>
-      <span className="text-[11px] leading-tight text-slate-500">{desc}</span>
+      <span className="text-[11px] leading-tight text-muted-foreground">{desc}</span>
     </button>
   );
 }
 
 function Card({ titulo, children }: { titulo: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-4">
-      <h2 className="mb-3 text-sm font-semibold text-slate-900">{titulo}</h2>
+    <section className="rounded-2xl border border-border bg-background p-4">
+      <h2 className="mb-3 text-sm font-semibold text-foreground">{titulo}</h2>
       {children}
     </section>
   );
@@ -536,15 +536,15 @@ function Field({
 }) {
   return (
     <label className={cn("block", className)}>
-      <span className="mb-1 block text-xs font-medium text-slate-600">{label}</span>
+      <span className="mb-1 block text-xs font-medium text-muted-foreground">{label}</span>
       <input
         type={type}
         inputMode={inputMode}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none placeholder:text-slate-400 focus:ring-2 focus:ring-blue-400"
+        className="h-11 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-blue-400"
       />
-      {hint && <span className="mt-1 block text-[11px] text-slate-400">{hint}</span>}
+      {hint && <span className="mt-1 block text-[11px] text-muted-foreground">{hint}</span>}
     </label>
   );
 }

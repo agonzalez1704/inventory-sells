@@ -166,7 +166,7 @@ export function UsuariosView({
                   <button
                     onClick={() => revocar(i.email)}
                     disabled={pending}
-                    className="shrink-0 cursor-pointer rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                    className="shrink-0 cursor-pointer rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-red-50 dark:bg-red-950/40 hover:text-red-600 dark:text-red-400 disabled:opacity-50"
                     aria-label={`Revocar ${i.email}`}
                     title="Revocar acceso"
                   >

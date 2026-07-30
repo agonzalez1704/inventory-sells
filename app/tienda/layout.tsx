@@ -33,8 +33,8 @@ function Wordmark({ light = false }: { light?: boolean }) {
         <MonitorSmartphone className="h-5 w-5" />
       </span>
       <span className="text-lg font-semibold tracking-tight [font-family:var(--font-display)]">
-        <span className={light ? "text-blue-300" : "text-blue-700"}>Lead</span>{" "}
-        <span className={light ? "text-white" : "text-slate-900"}>Displays</span>
+        <span className={light ? "text-blue-300" : "text-blue-700 dark:text-blue-300"}>Lead</span>{" "}
+        <span className={light ? "text-white" : "text-foreground"}>Displays</span>
       </span>
     </Link>
   );
@@ -64,7 +64,7 @@ export default function TiendaLayout({
   return (
     <CartProvider>
     <div
-      className={`${display.variable} flex min-h-screen flex-col bg-[#f5f8ff] text-slate-900`}
+      className={`${display.variable} flex min-h-screen flex-col bg-[#f5f8ff] text-foreground`}
     >
       {/* Utility bar */}
       <div className="bg-gradient-to-r from-blue-800 to-indigo-900 text-blue-50">
@@ -94,11 +94,11 @@ export default function TiendaLayout({
       </div>
 
       {/* Header */}
-      <header className="sticky top-0 z-30 border-b border-blue-100 bg-white/85 backdrop-blur">
+      <header className="sticky top-0 z-30 border-b border-blue-100 dark:border-blue-900 bg-white/85 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
           <Wordmark />
           <div className="flex items-center gap-4">
-            <span className="hidden items-center gap-1.5 text-xs font-medium text-slate-500 lg:inline-flex">
+            <span className="hidden items-center gap-1.5 text-xs font-medium text-muted-foreground lg:inline-flex">
               <MapPin className="h-3.5 w-3.5 text-blue-500" />
               {TIENDA.ciudad} · Envíos a todo México
             </span>
@@ -119,11 +119,11 @@ export default function TiendaLayout({
       <main className="flex-1">{children}</main>
 
       {/* Footer */}
-      <footer className="mt-8 border-t border-blue-100 bg-white">
+      <footer className="mt-8 border-t border-blue-100 dark:border-blue-900 bg-background">
         <div className="mx-auto grid max-w-6xl gap-6 px-4 py-10 sm:grid-cols-2 sm:px-6 lg:grid-cols-4">
           <div className="sm:col-span-2 lg:col-span-1">
             <Wordmark />
-            <p className="mt-3 max-w-xs text-xs leading-relaxed text-slate-500">
+            <p className="mt-3 max-w-xs text-xs leading-relaxed text-muted-foreground">
               Pantallas, baterías y refacciones para celular. Calidad original y
               genérica, con garantía.
             </p>
@@ -143,8 +143,8 @@ export default function TiendaLayout({
             ]}
           />
           <div>
-            <h3 className="text-sm font-semibold text-slate-900">Contacto</h3>
-            <ul className="mt-3 space-y-2 text-xs text-slate-500">
+            <h3 className="text-sm font-semibold text-foreground">Contacto</h3>
+            <ul className="mt-3 space-y-2 text-xs text-muted-foreground">
               {tel && (
                 <li className="flex items-center gap-1.5">
                   <Phone className="h-3.5 w-3.5 text-blue-500" />
@@ -162,8 +162,8 @@ export default function TiendaLayout({
             </ul>
           </div>
         </div>
-        <div className="border-t border-blue-100">
-          <p className="mx-auto max-w-6xl px-4 py-4 text-center text-xs text-slate-400 sm:px-6">
+        <div className="border-t border-blue-100 dark:border-blue-900">
+          <p className="mx-auto max-w-6xl px-4 py-4 text-center text-xs text-muted-foreground sm:px-6">
             © Lead Displays. Precios sujetos a disponibilidad.
           </p>
         </div>
@@ -182,13 +182,13 @@ function FooterCol({
 }) {
   return (
     <div>
-      <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
-      <ul className="mt-3 space-y-2 text-xs text-slate-500">
+      <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+      <ul className="mt-3 space-y-2 text-xs text-muted-foreground">
         {items.map(([label, href]) => (
           <li key={label}>
             <Link
               href={href}
-              className="transition-colors hover:text-blue-700"
+              className="transition-colors hover:text-blue-700 dark:text-blue-300"
               target={href.startsWith("http") ? "_blank" : undefined}
             >
               {label}

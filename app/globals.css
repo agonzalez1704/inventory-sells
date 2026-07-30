@@ -23,6 +23,28 @@
     --brand-foreground: 30 65% 24%;
   }
 
+  /* Dark theme — toggled by the `dark` class on <html> (see ThemeToggle + the
+     no-FOUC script in layout.tsx). Surfaces are lifted slates; primary flips to
+     a light chip (dark text) so `bg-primary` buttons stay visible on dark. */
+  .dark {
+    --page: 222 34% 8%;
+    --background: 222 30% 12%;
+    --foreground: 210 38% 96%;
+    --muted: 222 24% 17%;
+    --muted-foreground: 217 15% 65%;
+    --border: 220 18% 22%;
+    --ring: 210 40% 80%;
+    --primary: 210 38% 96%;
+    --primary-foreground: 222 47% 11%;
+    --accent: 158 60% 45%; /* emerald, lifted for dark contrast */
+    --accent-foreground: 158 90% 8%;
+    --accent-soft: 158 45% 15%;
+    --brand: 40 92% 60%;
+    --brand-strong: 45 100% 55%;
+    --brand-soft: 40 45% 15%;
+    --brand-foreground: 45 90% 80%;
+  }
+
   * {
     border-color: hsl(var(--border));
   }

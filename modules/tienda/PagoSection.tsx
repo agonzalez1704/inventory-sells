@@ -41,8 +41,8 @@ export function PagoSection({
   const [foco, setFoco] = useState<Focused | undefined>(undefined);
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-4">
-      <h2 className="mb-3 text-sm font-semibold text-slate-900">Método de pago</h2>
+    <section className="rounded-2xl border border-border bg-background p-4">
+      <h2 className="mb-3 text-sm font-semibold text-foreground">Método de pago</h2>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         {METODOS.map((m) => {
@@ -58,8 +58,8 @@ export function PagoSection({
                 // a label) made its whole grid row taller than the rest.
                 "flex min-h-[5.5rem] cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border p-3 text-center transition-colors",
                 activo
-                  ? "border-blue-500 bg-blue-50/60 text-blue-800"
-                  : "border-slate-200 text-slate-600 hover:border-blue-200",
+                  ? "border-blue-500 bg-blue-50/60 dark:bg-blue-950/40 text-blue-800 dark:text-blue-300"
+                  : "border-border text-muted-foreground hover:border-blue-200 dark:border-blue-900",
               )}
             >
               {/* Fixed-height brand row so logos of different aspect ratios and
@@ -78,7 +78,7 @@ export function PagoSection({
               </span>
               {/* The logo already names the method; only the card needs a label. */}
               {!m.logo && <span className="text-xs font-semibold">{m.label}</span>}
-              <span className="text-[10px] leading-tight text-slate-500">{m.desc}</span>
+              <span className="text-[10px] leading-tight text-muted-foreground">{m.desc}</span>
             </button>
           );
         })}
@@ -129,7 +129,7 @@ export function PagoSection({
             </div>
           </div>
 
-          <p className="mt-4 text-[11px] leading-relaxed text-slate-400">
+          <p className="mt-4 text-[11px] leading-relaxed text-muted-foreground">
             Tus datos de tarjeta viajan cifrados directo a Conekta — no pasan por
             nuestros servidores.
           </p>
@@ -137,24 +137,24 @@ export function PagoSection({
       )}
 
       {metodo === "oxxo" && (
-        <p className="mt-3 text-xs leading-relaxed text-slate-500">
+        <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
           Te damos una ficha con referencia para pagar en cualquier OXXO. Tu
           pedido se aparta y la ficha vence en {VOUCHER_HORAS_UI} horas.
         </p>
       )}
       {metodo === "spei" && (
-        <p className="mt-3 text-xs leading-relaxed text-slate-500">
+        <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
           Te damos una CLABE para transferir desde tu banco. Tu pedido se aparta
           y la referencia vence en {VOUCHER_HORAS_UI} horas.
         </p>
       )}
       {metodo === "aplazo" && (
-        <p className="mt-3 text-xs leading-relaxed text-slate-500">
+        <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
           Te llevamos a Aplazo para aprobar tus pagos y regresas aquí.
         </p>
       )}
       {metodo === "transferencia" && (
-        <p className="mt-3 text-xs leading-relaxed text-slate-500">
+        <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
           Te damos los datos de nuestra cuenta para que transfieras. Apartamos tu
           pedido y lo preparamos en cuanto confirmemos el depósito.
         </p>
@@ -182,7 +182,7 @@ function Campo({
 }) {
   return (
     <label className={cn("block", className)}>
-      <span className="mb-1 block text-xs font-medium text-slate-600">{label}</span>
+      <span className="mb-1 block text-xs font-medium text-muted-foreground">{label}</span>
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -190,7 +190,7 @@ function Campo({
         inputMode={inputMode}
         placeholder={placeholder}
         autoComplete="off"
-        className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none placeholder:text-slate-300 focus:ring-2 focus:ring-blue-400"
+        className="h-11 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-blue-400"
       />
     </label>
   );

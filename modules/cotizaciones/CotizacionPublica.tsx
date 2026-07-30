@@ -16,7 +16,7 @@ function fecha(iso: string) {
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-[#f5f8ff] px-4 py-8 text-slate-900">
+    <div className="min-h-screen bg-[#f5f8ff] px-4 py-8 text-foreground">
       <div className="mx-auto max-w-lg space-y-4">
         <div className="text-center">
           <h1 className="text-lg font-semibold tracking-tight">Lead Displays</h1>
@@ -78,7 +78,7 @@ export function CotizacionPublica() {
   if (phase === "loading")
     return (
       <Shell>
-        <div className="flex items-center justify-center py-16 text-slate-400">
+        <div className="flex items-center justify-center py-16 text-muted-foreground">
           <Loader2 className="h-6 w-6 animate-spin" />
         </div>
       </Shell>
@@ -100,22 +100,22 @@ export function CotizacionPublica() {
 
   return (
     <Shell>
-      <p className="-mt-3 text-center text-sm text-slate-500">
+      <p className="-mt-3 text-center text-sm text-muted-foreground">
         Cotización <span className="font-mono">{cot.folio}</span>
       </p>
 
       <Estado cot={cot} />
 
-      <div className="overflow-hidden rounded-2xl border border-blue-100 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-2xl border border-blue-100 dark:border-blue-900 bg-background shadow-sm">
         {cot.cliente && (
           <div className="border-b border-blue-50 px-5 py-3 text-sm">
-            <span className="text-slate-500">Cliente: </span>
+            <span className="text-muted-foreground">Cliente: </span>
             <span className="font-medium">{cot.cliente}</span>
           </div>
         )}
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-blue-50 text-left text-xs text-slate-500">
+            <tr className="border-b border-blue-50 text-left text-xs text-muted-foreground">
               <th className="px-5 py-2.5 font-medium">Producto</th>
               <th className="px-2 py-2.5 text-right font-medium">Cant.</th>
               <th className="px-5 py-2.5 text-right font-medium">Importe</th>
@@ -126,7 +126,7 @@ export function CotizacionPublica() {
               <tr key={i}>
                 <td className="px-5 py-3">
                   <p className="font-medium">{it.nombre}</p>
-                  <p className="text-xs text-slate-400">{formatMXN(it.unit_price_cents)} c/u</p>
+                  <p className="text-xs text-muted-foreground">{formatMXN(it.unit_price_cents)} c/u</p>
                 </td>
                 <td className="px-2 py-3 text-right tabular-nums">{it.qty}</td>
                 <td className="px-5 py-3 text-right font-medium tabular-nums">
@@ -136,7 +136,7 @@ export function CotizacionPublica() {
             ))}
           </tbody>
           <tfoot>
-            <tr className="border-t border-blue-100 bg-blue-50/40">
+            <tr className="border-t border-blue-100 dark:border-blue-900 bg-blue-50/40 dark:bg-blue-950/40">
               <td colSpan={2} className="px-5 py-3 text-right font-medium">
                 Total
               </td>
@@ -149,8 +149,8 @@ export function CotizacionPublica() {
       </div>
 
       {cot.notas && (
-        <div className="rounded-2xl border border-blue-100 bg-white p-4 text-sm">
-          <p className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-400">Notas</p>
+        <div className="rounded-2xl border border-blue-100 dark:border-blue-900 bg-background p-4 text-sm">
+          <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">Notas</p>
           <p>{cot.notas}</p>
         </div>
       )}
@@ -165,12 +165,12 @@ export function CotizacionPublica() {
             <ShoppingCart className="h-4 w-4" />
             {pending ? "Autorizando…" : "Autorizar cotización"}
           </button>
-          {error && <p className="text-center text-sm text-red-600">{error}</p>}
-          <p className="flex items-center justify-center gap-1.5 text-center text-xs text-slate-400">
+          {error && <p className="text-center text-sm text-red-600 dark:text-red-400">{error}</p>}
+          <p className="flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground">
             <ShieldCheck className="h-3.5 w-3.5" /> Al autorizar confirmas los productos y el total.
           </p>
           {cot.expires_at && (
-            <p className="text-center text-xs text-slate-400">Válida hasta el {fecha(cot.expires_at)}.</p>
+            <p className="text-center text-xs text-muted-foreground">Válida hasta el {fecha(cot.expires_at)}.</p>
           )}
         </div>
       )}
@@ -221,9 +221,9 @@ function Banner({
   body: string;
 }) {
   const styles = {
-    success: "border-emerald-200 bg-emerald-50 text-emerald-800",
-    warning: "border-amber-200 bg-amber-50 text-amber-800",
-    neutral: "border-slate-200 bg-slate-50 text-slate-700",
+    success: "border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300",
+    warning: "border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300",
+    neutral: "border-border bg-muted text-foreground",
   }[tone];
   return (
     <div className={`flex items-start gap-3 rounded-2xl border p-4 ${styles}`}>

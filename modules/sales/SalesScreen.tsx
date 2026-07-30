@@ -89,7 +89,7 @@ function ProductCard({
           {inCart}
         </span>
       )}
-      <div className="relative mb-2 aspect-square overflow-hidden rounded-xl bg-white">
+      <div className="relative mb-2 aspect-square overflow-hidden rounded-xl bg-background">
         <Thumb src={p.image_url} alt={p.name} className="transition-transform duration-300 group-hover:scale-105" />
         {soldOut && (
           <span className="absolute inset-x-0 bottom-0 bg-red-600/90 py-0.5 text-center text-[10px] font-semibold text-white">
@@ -457,7 +457,7 @@ export function SalesScreen({
                           <button
                             onClick={() => remove(l.product.id)}
                             aria-label={`Quitar ${l.product.name}`}
-                            className="-mr-1 -mt-1 shrink-0 cursor-pointer rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-red-50 hover:text-red-600"
+                            className="-mr-1 -mt-1 shrink-0 cursor-pointer rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-red-50 dark:bg-red-950/40 hover:text-red-600 dark:text-red-400"
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>

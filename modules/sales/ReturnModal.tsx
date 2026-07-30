@@ -177,7 +177,7 @@ export function ReturnModal({
             <p className="text-xs text-muted-foreground">
               {count} art. · a reembolsar
             </p>
-            <p className="font-mono text-xl font-semibold tabular-nums text-red-600">
+            <p className="font-mono text-xl font-semibold tabular-nums text-red-600 dark:text-red-400">
               {formatMXN(total)}
             </p>
           </div>

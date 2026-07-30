@@ -177,7 +177,7 @@ export function CotizacionBuilder({
                       {inCart}
                     </span>
                   )}
-                  <div className="relative mb-2 aspect-square overflow-hidden rounded-xl bg-white">
+                  <div className="relative mb-2 aspect-square overflow-hidden rounded-xl bg-background">
                     <Thumb src={p.image_url} alt={p.name} />
                     <span className="absolute bottom-1.5 right-1.5 flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md transition-transform group-hover:scale-110">
                       <Plus className="h-4 w-4" />
@@ -235,7 +235,7 @@ export function CotizacionBuilder({
                         <button
                           onClick={() => setQty(l.product.id, 0)}
                           aria-label={`Quitar ${l.product.name}`}
-                          className="-mr-1 -mt-1 shrink-0 cursor-pointer rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-red-50 hover:text-red-600"
+                          className="-mr-1 -mt-1 shrink-0 cursor-pointer rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-red-50 dark:bg-red-950/40 hover:text-red-600 dark:text-red-400"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>

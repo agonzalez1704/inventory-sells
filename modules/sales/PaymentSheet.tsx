@@ -136,7 +136,7 @@ function PaymentContent({
           <div
             className={cn(
               "flex h-14 items-center justify-end rounded-xl border px-4 font-mono text-2xl font-semibold tabular-nums",
-              insuficiente ? "border-red-300 text-red-600" : "border-border",
+              insuficiente ? "border-red-300 dark:border-red-800 text-red-600 dark:text-red-400" : "border-border",
             )}
           >
             {recibido === "" ? (
@@ -227,7 +227,7 @@ function Row({
           "font-mono tabular-nums",
           strong && "text-base font-semibold",
           tone === "accent" && "text-accent",
-          tone === "danger" && "text-red-600",
+          tone === "danger" && "text-red-600 dark:text-red-400",
         )}
       >
         {value}

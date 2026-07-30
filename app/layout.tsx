@@ -23,7 +23,10 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0f172a",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#0f172a" },
+  ],
 };
 
 export default async function RootLayout({
@@ -37,8 +40,17 @@ export default async function RootLayout({
   const permisos = userId ? [...(await getPermisos(userId))] : [];
 
   return (
-    <html lang="es-MX" className={`${sans.variable} ${mono.variable}`}>
+    <html lang="es-MX" className={`${sans.variable} ${mono.variable}`} suppressHydrationWarning>
       <body className="min-h-screen font-sans antialiased">
+        {/* Set the theme class before paint — no flash of the wrong theme.
+            Stored choice wins, else the OS preference. Customer-facing pages
+            (storefront + shareable quote) stay light and on-brand. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "(function(){try{var p=location.pathname;if(p.indexOf('/tienda')===0||p==='/cotizacion')return;var t=localStorage.getItem('theme');var d=t?t==='dark':matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.classList.toggle('dark',d);}catch(e){}})();",
+          }}
+        />
         <ClerkProvider>
           <AppShell permisos={permisos}>{children}</AppShell>
           <Toaster

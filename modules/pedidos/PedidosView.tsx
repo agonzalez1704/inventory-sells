@@ -125,7 +125,7 @@ function PedidoRow({ p, isAdmin }: { p: PedidoWeb; isAdmin: boolean }) {
     <li
       className={cn(
         "rounded-2xl border bg-card p-4",
-        pendiente && esTransferencia ? "border-amber-300" : "border-border",
+        pendiente && esTransferencia ? "border-amber-300 dark:border-amber-800" : "border-border",
       )}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">

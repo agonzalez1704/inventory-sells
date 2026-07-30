@@ -20,11 +20,11 @@ export function PushToggle() {
 
   if (iosNeedsInstall && !enabled) {
     return (
-      <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-sm text-amber-800">
+      <div className="flex items-start gap-3 rounded-lg border border-amber-200 dark:border-amber-900 bg-amber-50/60 dark:bg-amber-950/40 p-3 text-sm text-amber-800 dark:text-amber-300">
         <Smartphone className="mt-0.5 h-5 w-5 shrink-0" />
         <div>
           <p className="font-medium">Primero agrega la app a tu inicio (iPhone)</p>
-          <p className="mt-0.5 text-amber-700">
+          <p className="mt-0.5 text-amber-700 dark:text-amber-300">
             En Safari toca <Share className="inline h-3.5 w-3.5" /> Compartir →
             “Agregar a inicio”, abre la app desde el ícono y regresa aquí para
             activar.

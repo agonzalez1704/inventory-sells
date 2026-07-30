@@ -205,7 +205,7 @@ export function CotizacionDetalle({
       )}
 
       {cot.estado === "cancelada" && cot.cancel_motivo && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        <div className="rounded-xl border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/40 p-4 text-sm text-red-700 dark:text-red-300">
           <span className="font-medium">Cancelada:</span> {cot.cancel_motivo}
         </div>
       )}
@@ -213,7 +213,7 @@ export function CotizacionDetalle({
       {cot.sale_id && (
         <Link
           href={`/fiados?fiado=${cot.sale_id}`}
-          className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800 transition-colors hover:bg-emerald-100"
+          className="flex items-center gap-2 rounded-xl border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/40 p-4 text-sm text-emerald-800 dark:text-emerald-300 transition-colors hover:bg-emerald-100 dark:bg-emerald-900/40"
         >
           <ShoppingCart className="h-4 w-4" /> Venta a crédito generada. Se cobra y concilia en Notas de crédito →
         </Link>
@@ -343,7 +343,7 @@ export function CotizacionDetalle({
           {perms.editar && (
             <Button
               variant="ghost"
-              className="text-red-600 hover:bg-red-50 hover:text-red-700"
+              className="text-red-600 dark:text-red-400 hover:bg-red-50 dark:bg-red-950/40 hover:text-red-700 dark:text-red-300"
               onClick={() => setCancelOpen(true)}
               disabled={pending}
             >

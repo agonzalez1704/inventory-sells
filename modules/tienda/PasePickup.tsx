@@ -33,16 +33,16 @@ export function PasePickup({ folio, pagada }: { folio: string; pagada: boolean }
   }
 
   return (
-    <div className="mt-5 overflow-hidden rounded-2xl border border-blue-200 bg-blue-50/50">
-      <div className="flex items-center justify-between gap-3 border-b border-blue-100 px-4 py-3">
-        <span className="text-xs font-semibold uppercase tracking-wide text-blue-700">
+    <div className="mt-5 overflow-hidden rounded-2xl border border-blue-200 dark:border-blue-900 bg-blue-50/50 dark:bg-blue-950/40">
+      <div className="flex items-center justify-between gap-3 border-b border-blue-100 dark:border-blue-900 px-4 py-3">
+        <span className="text-xs font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-300">
           Pase de recolección
         </span>
         <span
           className={
             pagada
-              ? "rounded-full bg-green-100 px-2.5 py-1 text-[11px] font-semibold text-green-700"
-              : "rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-700"
+              ? "rounded-full bg-green-100 dark:bg-green-900/40 px-2.5 py-1 text-[11px] font-semibold text-green-700 dark:text-green-300"
+              : "rounded-full bg-amber-100 dark:bg-amber-900/40 px-2.5 py-1 text-[11px] font-semibold text-amber-700 dark:text-amber-300"
           }
         >
           {pagada ? "Pagado · listo para recoger" : "Pendiente de pago"}
@@ -50,17 +50,17 @@ export function PasePickup({ folio, pagada }: { folio: string; pagada: boolean }
       </div>
 
       <div className="px-4 py-4">
-        <p className="text-xs text-slate-500">Muestra este folio al recoger</p>
-        <p className="select-all font-mono text-2xl font-bold tracking-wider text-slate-900">
+        <p className="text-xs text-muted-foreground">Muestra este folio al recoger</p>
+        <p className="select-all font-mono text-2xl font-bold tracking-wider text-foreground">
           {folio}
         </p>
 
-        <div className="mt-4 flex items-start gap-2 text-sm text-slate-700">
-          <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
+        <div className="mt-4 flex items-start gap-2 text-sm text-foreground">
+          <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
           <span>{TIENDA.direccion}</span>
         </div>
-        <div className="mt-1.5 flex items-center gap-2 text-xs text-slate-500">
-          <Clock className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+        <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">
+          <Clock className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
           {TIENDA.horario}
         </div>
 
@@ -76,14 +76,14 @@ export function PasePickup({ folio, pagada }: { folio: string; pagada: boolean }
           </a>
           <button
             onClick={compartir}
-            className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition-colors hover:border-blue-300 hover:text-blue-700"
+            className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-xl border border-border bg-background px-4 text-sm font-semibold text-foreground transition-colors hover:border-blue-300 dark:border-blue-800 hover:text-blue-700 dark:text-blue-300"
           >
-            {copiado ? <Check className="h-4 w-4 text-green-600" /> : <Share2 className="h-4 w-4" />}
+            {copiado ? <Check className="h-4 w-4 text-green-600 dark:text-green-400" /> : <Share2 className="h-4 w-4" />}
             {copiado ? "Copiado" : "Compartir con quien recoge"}
           </button>
         </div>
 
-        <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
+        <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
           Puedes venir tú o mandar un mensajero/Uber. Reenvíale este pase: trae
           cómo llegar y el folio que damos al entregar.
         </p>

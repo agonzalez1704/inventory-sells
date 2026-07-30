@@ -133,20 +133,20 @@ export function TiendaView({
           </p>
 
           {/* The one thing no competitor carries — as text, where it converts. */}
-          <p className="mt-4 inline-flex items-center gap-2 rounded-xl border border-amber-300/30 bg-amber-400/15 px-3 py-2 text-xs font-semibold text-amber-100 sm:text-sm">
+          <p className="mt-4 inline-flex items-center gap-2 rounded-xl border border-amber-300/30 dark:border-amber-800 bg-amber-400/15 px-3 py-2 text-xs font-semibold text-amber-100 sm:text-sm">
             <Zap className="h-4 w-4 shrink-0 text-amber-300" />
             Baterías diagnóstico (auto-programables) para iPhone
           </p>
 
           <div className="mt-6 max-w-xl">
             <div className="relative">
-              <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+              <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
               <input
                 value={texto}
                 onChange={(e) => setTexto(e.target.value)}
                 placeholder="Busca tu modelo (ej: moto g42, redmi note 7…)"
                 aria-label="Buscar producto"
-                className="h-[3.25rem] w-full rounded-2xl border border-white/10 bg-white py-3.5 pl-11 pr-11 text-base text-slate-900 shadow-lg shadow-blue-950/25 outline-none placeholder:text-slate-400 focus:ring-2 focus:ring-blue-300"
+                className="h-[3.25rem] w-full rounded-2xl border border-white/10 bg-background py-3.5 pl-11 pr-11 text-base text-foreground shadow-lg shadow-blue-950/25 outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-blue-300"
               />
               {pending && (
                 <Loader2 className="absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 animate-spin text-blue-500" />
@@ -174,7 +174,7 @@ export function TiendaView({
       {!filtrando && marcas.length > 1 && (
         <section className="mt-8">
           <div className="flex items-baseline justify-between">
-            <h2 className="text-lg font-semibold tracking-tight text-slate-900 [font-family:var(--font-display)]">
+            <h2 className="text-lg font-semibold tracking-tight text-foreground [font-family:var(--font-display)]">
               Marcas populares
             </h2>
           </div>
@@ -187,7 +187,7 @@ export function TiendaView({
                   onClick={() => go({ marca: m.value })}
                   className="group flex w-24 shrink-0 flex-col items-center gap-2"
                 >
-                  <span className="flex h-20 w-20 items-center justify-center rounded-2xl border border-blue-100 bg-white p-3.5 text-blue-700 shadow-sm transition-all group-hover:-translate-y-0.5 group-hover:border-blue-300 group-hover:shadow-md group-hover:shadow-blue-900/5">
+                  <span className="flex h-20 w-20 items-center justify-center rounded-2xl border border-blue-100 dark:border-blue-900 bg-background p-3.5 text-blue-700 dark:text-blue-300 shadow-sm transition-all group-hover:-translate-y-0.5 group-hover:border-blue-300 dark:border-blue-800 group-hover:shadow-md group-hover:shadow-blue-900/5">
                     {logo ? (
                       // eslint-disable-next-line @next/next/no-img-element -- static brand asset
                       <img src={logo.src} alt={logo.alt} className="max-h-full max-w-full object-contain" />
@@ -197,7 +197,7 @@ export function TiendaView({
                       </span>
                     )}
                   </span>
-                  <span className="w-full truncate text-center text-xs font-medium text-slate-600 group-hover:text-blue-700">
+                  <span className="w-full truncate text-center text-xs font-medium text-muted-foreground group-hover:text-blue-700 dark:text-blue-300">
                     {m.value}
                   </span>
                 </button>
@@ -210,13 +210,13 @@ export function TiendaView({
       {/* Catálogo */}
       <section className="mt-8">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-lg font-semibold tracking-tight text-slate-900 [font-family:var(--font-display)]">
+          <h2 className="text-lg font-semibold tracking-tight text-foreground [font-family:var(--font-display)]">
             {filtrando ? "Resultados" : "Catálogo"}
           </h2>
           {filtrando && (
             <button
               onClick={() => go({ q: null, marca: null, cat: null, cal: null })}
-              className="text-xs font-medium text-blue-700 hover:underline"
+              className="text-xs font-medium text-blue-700 dark:text-blue-300 hover:underline"
             >
               Limpiar filtros
             </button>
@@ -246,9 +246,9 @@ export function TiendaView({
           <div className="min-w-0">
             {sinResultados ? (
               <div className="mt-2">
-                <div className="flex flex-col items-center text-center text-slate-500">
-                  <PackageSearch className="h-10 w-10 text-slate-300" />
-                  <p className="mt-3 text-sm font-medium text-slate-700">
+                <div className="flex flex-col items-center text-center text-muted-foreground">
+                  <PackageSearch className="h-10 w-10 text-muted-foreground" />
+                  <p className="mt-3 text-sm font-medium text-foreground">
                     Sin resultados{q ? ` para “${q}”` : ""}
                   </p>
                   <p className="text-sm">Prueba con otra marca o modelo.</p>
@@ -257,7 +257,7 @@ export function TiendaView({
               </div>
             ) : (
               <>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-muted-foreground">
                   {total} {total === 1 ? "producto" : "productos"}
                   {q ? ` para “${q}”` : ""}
                   {marca ? ` · ${marca}` : ""}
@@ -285,11 +285,11 @@ export function TiendaView({
       <section className="mt-12 grid gap-3 sm:grid-cols-3">
         <InfoCard icon={Truck} title="Envío">
           A todo México, entrega en{" "}
-          <strong className="text-slate-900">{TIENDA.entregaDias} hábiles</strong>.
+          <strong className="text-foreground">{TIENDA.entregaDias} hábiles</strong>.
           El costo se calcula según tu destino.
         </InfoCard>
         <InfoCard icon={ShieldCheck} title="Garantía">
-          <strong className="text-slate-900">{TIENDA.garantiaDias} días</strong>{" "}
+          <strong className="text-foreground">{TIENDA.garantiaDias} días</strong>{" "}
           por defecto de fábrica, {TIENDA.garantiaCondicion}.
         </InfoCard>
         <InfoCard icon={MapPin} title="Recoge en tienda">
@@ -310,14 +310,14 @@ function InfoCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4">
+    <div className="rounded-2xl border border-border bg-background p-4">
       <div className="flex items-center gap-2">
-        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-50 text-blue-700">
+        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300">
           <Icon className="h-4 w-4" />
         </span>
-        <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
       </div>
-      <p className="mt-2 text-xs leading-relaxed text-slate-600">{children}</p>
+      <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{children}</p>
     </div>
   );
 }
@@ -336,7 +336,7 @@ function FacetRow({
   if (options.length === 0) return null;
   return (
     <div>
-      <span className="mb-1.5 block text-xs font-semibold text-slate-500">{label}</span>
+      <span className="mb-1.5 block text-xs font-semibold text-muted-foreground">{label}</span>
       <div className="flex flex-wrap gap-1.5">
         <Chip active={active === null} onClick={() => onPick(null)}>
           Todas
@@ -379,7 +379,7 @@ function Pagination({
       {nums[0] > 1 && (
         <>
           <PageBtn onClick={() => onGo(1)}>1</PageBtn>
-          {nums[0] > 2 && <span className="px-1 text-slate-400">…</span>}
+          {nums[0] > 2 && <span className="px-1 text-muted-foreground">…</span>}
         </>
       )}
       {nums.map((n) => (
@@ -389,7 +389,7 @@ function Pagination({
       ))}
       {nums[nums.length - 1] < totalPages && (
         <>
-          {nums[nums.length - 1] < totalPages - 1 && <span className="px-1 text-slate-400">…</span>}
+          {nums[nums.length - 1] < totalPages - 1 && <span className="px-1 text-muted-foreground">…</span>}
           <PageBtn onClick={() => onGo(totalPages)}>{totalPages}</PageBtn>
         </>
       )}
@@ -423,8 +423,8 @@ function PageBtn({
         "flex h-9 min-w-9 cursor-pointer items-center justify-center rounded-lg px-3 text-sm font-medium transition-colors",
         active
           ? "bg-blue-600 text-white shadow-sm shadow-blue-600/30"
-          : "border border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:text-blue-700",
-        disabled && "cursor-not-allowed opacity-40 hover:border-slate-200 hover:text-slate-600",
+          : "border border-border bg-background text-muted-foreground hover:border-blue-200 dark:border-blue-900 hover:text-blue-700 dark:text-blue-300",
+        disabled && "cursor-not-allowed opacity-40 hover:border-border hover:text-muted-foreground",
       )}
     >
       {children}
@@ -448,7 +448,7 @@ function Chip({
         "cursor-pointer rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
         active
           ? "bg-blue-600 text-white shadow-sm shadow-blue-600/30"
-          : "border border-blue-100 bg-white text-slate-600 hover:border-blue-200 hover:text-blue-700",
+          : "border border-blue-100 dark:border-blue-900 bg-background text-muted-foreground hover:border-blue-200 dark:border-blue-900 hover:text-blue-700 dark:text-blue-300",
       )}
     >
       {children}
@@ -466,7 +466,7 @@ export function ProductCard({
   return (
     <div
       className={cn(
-        "group relative flex flex-col rounded-2xl border border-slate-200 bg-white p-3 transition-all hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-lg hover:shadow-blue-900/5",
+        "group relative flex flex-col rounded-2xl border border-border bg-background p-3 transition-all hover:-translate-y-0.5 hover:border-blue-300 dark:border-blue-800 hover:shadow-lg hover:shadow-blue-900/5",
         !p.disponible && "opacity-80",
       )}
     >
@@ -474,14 +474,14 @@ export function ProductCard({
       <span
         className={cn(
           "absolute left-5 top-5 z-10 rounded-full px-2 py-0.5 text-[10px] font-semibold",
-          p.disponible ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-500",
+          p.disponible ? "bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300" : "bg-muted text-muted-foreground",
         )}
       >
         {p.disponible ? "Disponible" : "Agotado"}
       </span>
 
       <Link href={`/tienda/${p.id}`} className="flex flex-1 flex-col">
-        <div className="mb-3 flex aspect-square items-center justify-center overflow-hidden rounded-xl bg-white">
+        <div className="mb-3 flex aspect-square items-center justify-center overflow-hidden rounded-xl bg-background">
           {p.imagen ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -496,18 +496,18 @@ export function ProductCard({
             </div>
           )}
         </div>
-        <p className="line-clamp-2 min-h-[2.5rem] text-sm font-medium leading-tight text-slate-900 group-hover:text-blue-800">
+        <p className="line-clamp-2 min-h-[2.5rem] text-sm font-medium leading-tight text-foreground group-hover:text-blue-800 dark:text-blue-300">
           {p.nombre}
         </p>
         {(p.marca || p.categoria) && (
-          <p className="mt-0.5 truncate text-xs text-slate-500">
+          <p className="mt-0.5 truncate text-xs text-muted-foreground">
             {[p.marca, p.categoria].filter(Boolean).join(" · ")}
           </p>
         )}
       </Link>
 
       <div className="mt-2 flex items-center justify-between gap-2">
-        <span className="font-semibold tabular-nums text-blue-800 [font-family:var(--font-display)]">
+        <span className="font-semibold tabular-nums text-blue-800 dark:text-blue-300 [font-family:var(--font-display)]">
           {p.precio_cents > 0 ? formatMXN(p.precio_cents) : "A cotizar"}
         </span>
         <div className="flex shrink-0 items-center gap-1.5">
@@ -518,7 +518,7 @@ export function ProductCard({
             onClick={(e) => e.stopPropagation()}
             aria-label={`Preguntar por ${p.nombre} en WhatsApp`}
             title="Preguntar por WhatsApp"
-            className="flex h-9 w-9 items-center justify-center rounded-xl border border-green-200 bg-green-50 text-green-700 transition-colors hover:bg-green-100"
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-300 transition-colors hover:bg-green-100 dark:bg-green-900/40"
           >
             <MessageCircle className="h-4 w-4" />
           </a>

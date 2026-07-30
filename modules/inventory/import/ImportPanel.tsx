@@ -439,7 +439,7 @@ function ReviewStep({
                     <button
                       onClick={() => onRemove(i)}
                       aria-label="Quitar fila"
-                      className="cursor-pointer rounded p-1 text-muted-foreground transition-colors hover:bg-red-50 hover:text-red-600"
+                      className="cursor-pointer rounded p-1 text-muted-foreground transition-colors hover:bg-red-50 dark:bg-red-950/40 hover:text-red-600 dark:text-red-400"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>

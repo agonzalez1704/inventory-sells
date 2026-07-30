@@ -20,7 +20,7 @@ export default function RouteError({
 
   return (
     <div className="mx-auto flex max-w-md flex-col items-center px-4 py-20 text-center">
-      <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-red-50 text-red-600">
+      <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400">
         <AlertTriangle className="h-6 w-6" />
       </span>
       <h1 className="mt-4 text-lg font-semibold tracking-tight">

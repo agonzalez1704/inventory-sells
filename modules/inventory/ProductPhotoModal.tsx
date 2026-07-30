@@ -75,7 +75,7 @@ export function ProductPhotoModal({
       <div className="space-y-3">
         <p className="truncate text-sm text-muted-foreground">{nombre}</p>
 
-        <div className="relative flex aspect-square items-center justify-center overflow-hidden rounded-xl border border-border bg-white">
+        <div className="relative flex aspect-square items-center justify-center overflow-hidden rounded-xl border border-border bg-background">
           {preview ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img

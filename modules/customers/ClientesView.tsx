@@ -145,7 +145,7 @@ function ClienteRow({ c, onEdit }: { c: Customer; onEdit: () => void }) {
               <Badge tone={TIPO_TONE[c.tipo]}>{TIPO_LABEL[c.tipo]}</Badge>
             )}
             {descuento > 0 && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-300 ring-1 ring-inset ring-emerald-600/20">
                 <Percent className="h-3 w-3" />
                 {descuento}% desc.
               </span>
@@ -184,7 +184,7 @@ function ClienteRow({ c, onEdit }: { c: Customer; onEdit: () => void }) {
               onClick={archivar}
               disabled={pending}
               aria-label="Archivar cliente"
-              className="shrink-0 cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-red-600"
+              className="shrink-0 cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-red-600 dark:text-red-400"
             >
               <Archive className="h-4 w-4" />
             </button>

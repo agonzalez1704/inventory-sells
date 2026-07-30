@@ -141,7 +141,7 @@ function Kpi({
             tone === "in"
               ? "flex h-7 w-7 items-center justify-center rounded-lg bg-accent-soft text-accent"
               : tone === "out"
-                ? "flex h-7 w-7 items-center justify-center rounded-lg bg-red-50 text-red-600"
+                ? "flex h-7 w-7 items-center justify-center rounded-lg bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400"
                 : "flex h-7 w-7 items-center justify-center rounded-lg bg-brand-soft text-brand-foreground"
           }
         >
@@ -156,7 +156,7 @@ function Kpi({
         className={cn(
           "mt-2.5 font-mono text-2xl font-semibold tabular-nums tracking-tight",
           tone === "in" && "text-accent",
-          tone === "out" && "text-red-600",
+          tone === "out" && "text-red-600 dark:text-red-400",
         )}
       >
         {value}
@@ -536,7 +536,7 @@ export function CajaView({ data }: { data: CajaData }) {
                         {formatMXN(inv.ventaCents)}
                       </p>
                       {data.isAdmin && (
-                        <p className="font-mono text-xs tabular-nums text-emerald-600">
+                        <p className="font-mono text-xs tabular-nums text-emerald-600 dark:text-emerald-400">
                           +{formatMXN(inv.gananciaCents)} ganancia
                         </p>
                       )}
@@ -557,7 +557,7 @@ export function CajaView({ data }: { data: CajaData }) {
                 {formatMXN(data.porInventario.reduce((s, i) => s + i.ventaCents, 0))}
               </p>
               {data.isAdmin && (
-                <p className="font-mono text-xs tabular-nums text-emerald-600">
+                <p className="font-mono text-xs tabular-nums text-emerald-600 dark:text-emerald-400">
                   +{formatMXN(data.porInventario.reduce((s, i) => s + i.gananciaCents, 0))} ganancia
                 </p>
               )}
@@ -590,7 +590,7 @@ export function CajaView({ data }: { data: CajaData }) {
                     </span>
                   </div>
                 </div>
-                <span className="shrink-0 font-mono text-sm font-semibold tabular-nums text-red-600">
+                <span className="shrink-0 font-mono text-sm font-semibold tabular-nums text-red-600 dark:text-red-400">
                   −{formatMXN(d.monto_cents)}
                 </span>
               </li>
@@ -687,7 +687,7 @@ function InventarioModal({
           </span>
         </span>
         {isAdmin && (
-          <span className="font-mono text-sm font-semibold text-emerald-600">
+          <span className="font-mono text-sm font-semibold text-emerald-600 dark:text-emerald-400">
             +{formatMXN(inv.gananciaCents)} ganancia
           </span>
         )}
@@ -727,7 +727,7 @@ function InventarioModal({
                     </td>
                   )}
                   {isAdmin && (
-                    <td className="px-2 py-2 text-right font-mono tabular-nums text-emerald-600">
+                    <td className="px-2 py-2 text-right font-mono tabular-nums text-emerald-600 dark:text-emerald-400">
                       +{formatMXN(ganLinea)}
                     </td>
                   )}
@@ -749,7 +749,7 @@ function InventarioModal({
                 </td>
               )}
               {isAdmin && (
-                <td className="px-2 py-2.5 text-right font-mono tabular-nums text-emerald-600">
+                <td className="px-2 py-2.5 text-right font-mono tabular-nums text-emerald-600 dark:text-emerald-400">
                   +{formatMXN(inv.gananciaCents)}
                 </td>
               )}
@@ -898,7 +898,7 @@ function MovRow({
       <span
         className={cn(
           "shrink-0 font-mono text-sm font-semibold tabular-nums",
-          esIngreso ? "text-accent" : "text-red-600",
+          esIngreso ? "text-accent" : "text-red-600 dark:text-red-400",
         )}
       >
         {esIngreso ? "+" : "−"}
@@ -909,7 +909,7 @@ function MovRow({
           onClick={borrar}
           disabled={pending}
           aria-label={`Eliminar ${tipo}`}
-          className="shrink-0 cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-red-600"
+          className="shrink-0 cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-red-600 dark:text-red-400"
         >
           <Trash2 className="h-4 w-4" />
         </button>

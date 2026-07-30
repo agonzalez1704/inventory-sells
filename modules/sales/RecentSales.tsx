@@ -187,8 +187,8 @@ function EditModal({
           </Button>
         </div>
 
-        <div className="rounded-lg border border-red-200 bg-red-50/50 p-3">
-          <p className="text-xs font-medium text-red-700">¿Venta duplicada o por error?</p>
+        <div className="rounded-lg border border-red-200 dark:border-red-900 bg-red-50/50 dark:bg-red-950/40 p-3">
+          <p className="text-xs font-medium text-red-700 dark:text-red-300">¿Venta duplicada o por error?</p>
           <p className="mt-0.5 text-xs text-muted-foreground">
             Anúlala: regresa el stock y quita su dinero del corte. No se puede
             deshacer.
@@ -390,7 +390,7 @@ export function RecentSales({
                       onClick={() => toggle(s.id)}
                       className={cn(
                         "cursor-pointer border-b border-border/60 transition-colors last:border-0 hover:bg-muted/40",
-                        flash === s.id && "bg-amber-50",
+                        flash === s.id && "bg-amber-50 dark:bg-amber-950/40",
                       )}
                     >
                       <td className="px-2 py-2.5 text-muted-foreground">

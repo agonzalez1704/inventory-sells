@@ -65,12 +65,12 @@ export function CompatPanel<T extends Searchable & { id: string }>({
   // that reads as a catalog fact, and staff quote customers off it.
   if (fallo) {
     return (
-      <div className="mt-4 flex flex-col items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-4 text-center">
-        <p className="flex items-center gap-1.5 text-sm text-amber-900">
+      <div className="mt-4 flex flex-col items-center gap-2 rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-4 py-4 text-center">
+        <p className="flex items-center gap-1.5 text-sm text-amber-900 dark:text-amber-200">
           <AlertTriangle className="h-4 w-4 shrink-0" />
           No pudimos verificar compatibilidad ahora.
         </p>
-        <p className="text-xs text-amber-800">
+        <p className="text-xs text-amber-800 dark:text-amber-300">
           Es una falla del servicio, no quiere decir que no haya compatibles.
         </p>
         <Button variant="secondary" size="sm" onClick={run}>

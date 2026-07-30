@@ -88,28 +88,28 @@ export default async function OrdenPage({
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
-      <div className="rounded-2xl border border-slate-200 bg-white p-6">
+      <div className="rounded-2xl border border-border bg-background p-6">
         <div className="flex items-center gap-3">
           <span
             className={
               pagada
-                ? "flex h-11 w-11 items-center justify-center rounded-xl bg-green-100 text-green-700"
+                ? "flex h-11 w-11 items-center justify-center rounded-xl bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300"
                 : cancelada
-                  ? "flex h-11 w-11 items-center justify-center rounded-xl bg-slate-100 text-slate-500"
-                  : "flex h-11 w-11 items-center justify-center rounded-xl bg-amber-100 text-amber-700"
+                  ? "flex h-11 w-11 items-center justify-center rounded-xl bg-muted text-muted-foreground"
+                  : "flex h-11 w-11 items-center justify-center rounded-xl bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300"
             }
           >
             {pagada ? <CheckCircle2 className="h-6 w-6" /> : cancelada ? <XCircle className="h-6 w-6" /> : <Clock className="h-6 w-6" />}
           </span>
           <div>
-            <h1 className="text-lg font-semibold tracking-tight text-slate-900 [font-family:var(--font-display)]">
+            <h1 className="text-lg font-semibold tracking-tight text-foreground [font-family:var(--font-display)]">
               {pagada ? "¡Pago confirmado!" : cancelada ? "Pedido cancelado" : "Pedido apartado"}
             </h1>
-            <p className="text-xs text-slate-500">Folio {o.folio}</p>
+            <p className="text-xs text-muted-foreground">Folio {o.folio}</p>
           </div>
         </div>
 
-        <p className="mt-4 text-sm leading-relaxed text-slate-600">
+        <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
           {pagada ? (
             recoger ? (
               <>Gracias, {o.nombre.split(" ")[0]}. Tu pedido está listo para recoger. Ven tú o manda tu Uber/mensajero — solo dan el folio <strong>{o.folio}</strong> al llegar.</>
@@ -127,29 +127,29 @@ export default async function OrdenPage({
 
         {/* Voucher */}
         {!pagada && !cancelada && referencia && (
-          <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50/60 p-4">
-            <p className="flex items-center gap-2 text-sm font-semibold text-amber-900">
+          <div className="mt-5 rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50/60 dark:bg-amber-950/40 p-4">
+            <p className="flex items-center gap-2 text-sm font-semibold text-amber-900 dark:text-amber-200">
               <Store className="h-4 w-4" /> Paga en cualquier OXXO
             </p>
-            <p className="mt-2 text-xs text-amber-800">Referencia</p>
-            <p className="select-all font-mono text-xl font-bold tracking-wider text-amber-950">
+            <p className="mt-2 text-xs text-amber-800 dark:text-amber-300">Referencia</p>
+            <p className="select-all font-mono text-xl font-bold tracking-wider text-amber-950 dark:text-amber-200">
               {referencia}
             </p>
-            <p className="mt-2 text-xs text-amber-800">
+            <p className="mt-2 text-xs text-amber-800 dark:text-amber-300">
               Monto: <strong>{formatMXN(o.total_cents)}</strong> · vence en {VOUCHER_HORAS_UI} h
             </p>
           </div>
         )}
         {!pagada && !cancelada && clabe && (
-          <div className="mt-5 rounded-xl border border-blue-200 bg-blue-50/60 p-4">
-            <p className="flex items-center gap-2 text-sm font-semibold text-blue-900">
+          <div className="mt-5 rounded-xl border border-blue-200 dark:border-blue-900 bg-blue-50/60 dark:bg-blue-950/40 p-4">
+            <p className="flex items-center gap-2 text-sm font-semibold text-blue-900 dark:text-blue-200">
               <ArrowLeftRight className="h-4 w-4" /> Transferencia SPEI
             </p>
-            <p className="mt-2 text-xs text-blue-800">CLABE {banco ? `· ${banco}` : ""}</p>
-            <p className="select-all font-mono text-xl font-bold tracking-wider text-blue-950">
+            <p className="mt-2 text-xs text-blue-800 dark:text-blue-300">CLABE {banco ? `· ${banco}` : ""}</p>
+            <p className="select-all font-mono text-xl font-bold tracking-wider text-blue-950 dark:text-blue-200">
               {clabe}
             </p>
-            <p className="mt-2 text-xs text-blue-800">
+            <p className="mt-2 text-xs text-blue-800 dark:text-blue-300">
               Monto exacto: <strong>{formatMXN(o.total_cents)}</strong> · vence en {VOUCHER_HORAS_UI} h
             </p>
           </div>
@@ -157,22 +157,22 @@ export default async function OrdenPage({
 
         {/* Direct bank transfer: our own account, confirmed by staff. */}
         {!pagada && !cancelada && esTransferencia && (
-          <div className="mt-5 rounded-xl border border-blue-200 bg-blue-50/60 p-4">
-            <p className="flex items-center gap-2 text-sm font-semibold text-blue-900">
+          <div className="mt-5 rounded-xl border border-blue-200 dark:border-blue-900 bg-blue-50/60 dark:bg-blue-950/40 p-4">
+            <p className="flex items-center gap-2 text-sm font-semibold text-blue-900 dark:text-blue-200">
               <Landmark className="h-4 w-4" /> Transfiere a nuestra cuenta
             </p>
             {BANK.clabe ? (
-              <div className="mt-2 space-y-1.5 text-sm text-blue-950">
-                {BANK.banco && <p className="text-xs text-blue-800">{BANK.banco}</p>}
+              <div className="mt-2 space-y-1.5 text-sm text-blue-950 dark:text-blue-200">
+                {BANK.banco && <p className="text-xs text-blue-800 dark:text-blue-300">{BANK.banco}</p>}
                 <p className="select-all font-mono text-xl font-bold tracking-wider">{BANK.clabe}</p>
-                {BANK.titular && <p className="text-xs text-blue-800">A nombre de {BANK.titular}</p>}
+                {BANK.titular && <p className="text-xs text-blue-800 dark:text-blue-300">A nombre de {BANK.titular}</p>}
               </div>
             ) : (
-              <p className="mt-2 text-xs text-blue-800">
+              <p className="mt-2 text-xs text-blue-800 dark:text-blue-300">
                 Te enviamos los datos de la cuenta por WhatsApp.
               </p>
             )}
-            <p className="mt-3 text-xs leading-relaxed text-blue-800">
+            <p className="mt-3 text-xs leading-relaxed text-blue-800 dark:text-blue-300">
               Monto exacto: <strong>{formatMXN(o.total_cents)}</strong>. Manda tu
               comprobante por WhatsApp y apartamos tu pedido; lo preparamos en
               cuanto confirmemos el depósito. Referencia: <strong>{o.folio}</strong>.
@@ -181,32 +181,32 @@ export default async function OrdenPage({
         )}
 
         {/* Detalle */}
-        <ul className="mt-5 divide-y divide-slate-100 border-t border-slate-200 pt-2">
+        <ul className="mt-5 divide-y divide-border border-t border-border pt-2">
           {items.map((i, n) => (
             <li key={n} className="flex justify-between gap-3 py-2 text-sm">
-              <span className="min-w-0 flex-1 truncate text-slate-700">
+              <span className="min-w-0 flex-1 truncate text-foreground">
                 {i.qty} × {i.nombre}
               </span>
-              <span className="shrink-0 tabular-nums text-slate-900">
+              <span className="shrink-0 tabular-nums text-foreground">
                 {formatMXN(i.unit_price_cents * i.qty)}
               </span>
             </li>
           ))}
         </ul>
-        <dl className="mt-2 space-y-1 border-t border-slate-200 pt-2 text-sm">
+        <dl className="mt-2 space-y-1 border-t border-border pt-2 text-sm">
           <div className="flex justify-between">
-            <dt className="text-slate-600">Subtotal</dt>
+            <dt className="text-muted-foreground">Subtotal</dt>
             <dd className="tabular-nums">{formatMXN(o.subtotal_cents)}</dd>
           </div>
           <div className="flex justify-between">
-            <dt className="text-slate-600">{recoger ? "Entrega" : `Envío${o.envio_desc ? ` · ${o.envio_desc}` : ""}`}</dt>
+            <dt className="text-muted-foreground">{recoger ? "Entrega" : `Envío${o.envio_desc ? ` · ${o.envio_desc}` : ""}`}</dt>
             <dd className="tabular-nums">
-              {recoger ? <span className="text-green-700">Recoger · gratis</span> : formatMXN(o.envio_cents)}
+              {recoger ? <span className="text-green-700 dark:text-green-300">Recoger · gratis</span> : formatMXN(o.envio_cents)}
             </dd>
           </div>
-          <div className="flex items-baseline justify-between border-t border-slate-200 pt-1.5">
-            <dt className="font-semibold text-slate-900">Total</dt>
-            <dd className="text-lg font-semibold tabular-nums text-blue-800">
+          <div className="flex items-baseline justify-between border-t border-border pt-1.5">
+            <dt className="font-semibold text-foreground">Total</dt>
+            <dd className="text-lg font-semibold tabular-nums text-blue-800 dark:text-blue-300">
               {formatMXN(o.total_cents)}
             </dd>
           </div>
@@ -215,14 +215,14 @@ export default async function OrdenPage({
         {recoger ? (
           <PasePickup folio={o.folio} pagada={pagada} />
         ) : (
-          <p className="mt-4 text-xs leading-relaxed text-slate-500">
+          <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
             Enviamos a: {o.direccion}, {o.municipio}, {o.estado}, CP {o.cp}
           </p>
         )}
 
         <Link
           href="/tienda"
-          className="mt-5 inline-flex h-11 items-center rounded-xl border border-slate-200 px-4 text-sm font-medium text-slate-700 transition-colors hover:border-blue-300 hover:text-blue-700"
+          className="mt-5 inline-flex h-11 items-center rounded-xl border border-border px-4 text-sm font-medium text-foreground transition-colors hover:border-blue-300 dark:border-blue-800 hover:text-blue-700 dark:text-blue-300"
         >
           Volver al catálogo
         </Link>
