@@ -12,6 +12,7 @@ import {
   Pencil,
   Archive,
   Percent,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
@@ -24,8 +25,11 @@ import {
   crearCliente,
   editarCliente,
   archivarCliente,
+  agregarTelefono,
+  quitarTelefono,
   type Customer,
   type CustomerInput,
+  type CustomerPhone,
   type CustomerTipo,
 } from "./actions";
 
@@ -56,7 +60,8 @@ export function ClientesView({ initial }: { initial: Customer[] }) {
     if (!q) return initial;
     const tokens = q.split(/\s+/).filter(Boolean);
     return initial.filter((c) => {
-      const hay = `${c.nombre} ${c.telefono ?? ""} ${c.email ?? ""}`.toLowerCase();
+      const extras = (c.customer_phones ?? []).map((p) => p.telefono).join(" ");
+      const hay = `${c.nombre} ${c.telefono ?? ""} ${extras} ${c.email ?? ""}`.toLowerCase();
       return tokens.every((t) => hay.includes(t));
     });
   }, [initial, query]);
@@ -163,6 +168,19 @@ function ClienteRow({ c, onEdit }: { c: Customer; onEdit: () => void }) {
                 {c.telefono}
               </a>
             )}
+            {(c.customer_phones ?? []).map((p) => (
+              <a
+                key={p.id}
+                href={`https://wa.me/${p.telefono.replace(/\D/g, "")}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 hover:text-foreground"
+              >
+                <Phone className="h-3.5 w-3.5" />
+                {p.telefono}
+                {p.etiqueta && <span className="text-muted-foreground/70">({p.etiqueta})</span>}
+              </a>
+            ))}
             {c.email && (
               <span className="inline-flex items-center gap-1">
                 <Mail className="h-3.5 w-3.5" />
@@ -213,6 +231,10 @@ function ClienteModal({
   );
   const [notas, setNotas] = useState(cliente?.notas ?? "");
   const [pending, start] = useTransition();
+  // Pending extra-phone input lives here so Guardar can flush it — typing a
+  // number and hitting Guardar without pressing + must not silently drop it.
+  const [telExtra, setTelExtra] = useState("");
+  const [etiquetaExtra, setEtiquetaExtra] = useState("");
 
   function save() {
     const payload: CustomerInput = {
@@ -230,10 +252,21 @@ function ClienteModal({
     if (!Number.isFinite(d) || d < 0 || d > 100)
       return toast.error("Descuento inválido (0–100)");
 
+    // A typed-but-not-added extra phone must be valid or explicitly cleared —
+    // silently dropping it is how numbers get lost.
+    const extraPendiente = telExtra.trim();
+    if (esEdit && extraPendiente && extraPendiente.replace(/\D/g, "").length < 10)
+      return toast.error("El teléfono adicional es inválido: agrégalo con + o bórralo");
+
     start(async () => {
       try {
-        if (esEdit) await editarCliente(cliente!.id, payload);
-        else await crearCliente(payload);
+        if (esEdit) {
+          await editarCliente(cliente!.id, payload);
+          if (extraPendiente)
+            await agregarTelefono(cliente!.id, extraPendiente, etiquetaExtra || null);
+        } else {
+          await crearCliente(payload);
+        }
         toast.success(esEdit ? "Cliente actualizado" : "Cliente registrado");
         onClose();
         router.refresh();
@@ -317,6 +350,15 @@ function ClienteModal({
             placeholder="Referencia, preferencias, historial…"
           />
         </label>
+        {esEdit && (
+          <TelefonosExtra
+            cliente={cliente!}
+            tel={telExtra}
+            setTel={setTelExtra}
+            etiqueta={etiquetaExtra}
+            setEtiqueta={setEtiquetaExtra}
+          />
+        )}
         <div className="flex justify-end gap-2 border-t border-border pt-3">
           <Button variant="ghost" onClick={onClose} disabled={pending}>
             Cancelar
@@ -327,5 +369,99 @@ function ClienteModal({
         </div>
       </div>
     </Modal>
+  );
+}
+
+// Additional phones, managed inline while editing. Saves on the spot (each
+// add/remove is its own server action). The add-input state is owned by the
+// parent modal so Guardar can flush a typed-but-not-added number.
+function TelefonosExtra({
+  cliente,
+  tel,
+  setTel,
+  etiqueta,
+  setEtiqueta,
+}: {
+  cliente: Customer;
+  tel: string;
+  setTel: (v: string) => void;
+  etiqueta: string;
+  setEtiqueta: (v: string) => void;
+}) {
+  const router = useRouter();
+  const [phones, setPhones] = useState<CustomerPhone[]>(cliente.customer_phones ?? []);
+  const [pending, start] = useTransition();
+
+  function add() {
+    if (tel.replace(/\D/g, "").length < 10)
+      return toast.error("Teléfono inválido (al menos 10 dígitos)");
+    start(async () => {
+      try {
+        const row = await agregarTelefono(cliente.id, tel, etiqueta || null);
+        setPhones((p) => [...p, row]);
+        setTel("");
+        setEtiqueta("");
+        router.refresh();
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Error al agregar");
+      }
+    });
+  }
+
+  function remove(id: string) {
+    start(async () => {
+      try {
+        await quitarTelefono(id);
+        setPhones((p) => p.filter((x) => x.id !== id));
+        router.refresh();
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Error al quitar");
+      }
+    });
+  }
+
+  return (
+    <div className="space-y-2 rounded-lg border border-border p-3">
+      <span className="block text-xs font-medium text-muted-foreground">
+        Teléfonos adicionales
+      </span>
+      {phones.map((p) => (
+        <div key={p.id} className="flex items-center gap-2 text-sm">
+          <Phone className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          <span className="min-w-0 flex-1 truncate">
+            {p.telefono}
+            {p.etiqueta && (
+              <span className="text-muted-foreground"> ({p.etiqueta})</span>
+            )}
+          </span>
+          <button
+            onClick={() => remove(p.id)}
+            disabled={pending}
+            aria-label={`Quitar ${p.telefono}`}
+            className="cursor-pointer rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-red-600 dark:hover:text-red-400"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      ))}
+      <div className="flex gap-2">
+        <Input
+          value={tel}
+          onChange={(e) => setTel(e.target.value)}
+          inputMode="tel"
+          placeholder="55 1234 5678"
+          className="flex-1"
+        />
+        <Input
+          value={etiqueta}
+          onChange={(e) => setEtiqueta(e.target.value)}
+          placeholder="Etiqueta"
+          className="w-28"
+        />
+        <Button variant="ghost" onClick={add} loading={pending}>
+          <Plus className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
   );
 }

@@ -9,7 +9,7 @@ export default async function ClientesPage() {
   const { data } = await insforge.database
     .from("customers")
     .select(
-      "id, nombre, telefono, email, descuento_pct, tipo, notas, is_active, is_system, created_at",
+      "id, nombre, telefono, email, descuento_pct, tipo, notas, is_active, is_system, created_at, customer_phones(id, telefono, etiqueta)",
     )
     .eq("is_active", true)
     .order("is_system", { ascending: false })

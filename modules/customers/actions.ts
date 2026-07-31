@@ -5,6 +5,12 @@ import { createInsForgeServerClient } from "@/lib/insforge/server";
 
 export type CustomerTipo = "publico" | "mayoreo" | "tecnico";
 
+export type CustomerPhone = {
+  id: string;
+  telefono: string;
+  etiqueta: string | null;
+};
+
 export type Customer = {
   id: string;
   nombre: string;
@@ -16,6 +22,7 @@ export type Customer = {
   is_active: boolean;
   is_system: boolean;
   created_at: string;
+  customer_phones?: CustomerPhone[];
 };
 
 // The seeded "Mostrador" walk-in is a system row — not editable/archivable.
@@ -114,6 +121,44 @@ export async function archivarCliente(id: string, activo: boolean): Promise<void
   if (error) throw new Error(error.message ?? "Error al archivar");
 }
 
+// Additional phones (the primary lives in customers.telefono). DB triggers
+// enforce that a normalized number exists only once across both tables.
+export async function agregarTelefono(
+  customerId: string,
+  telefono: string,
+  etiqueta: string | null,
+): Promise<CustomerPhone> {
+  const { userId } = await auth();
+  if (!userId) throw new Error("No autenticado");
+  const tel = telefono.trim();
+  if (tel.replace(/\D/g, "").length < 10)
+    throw new Error("Teléfono inválido (al menos 10 dígitos)");
+
+  const insforge = await createInsForgeServerClient();
+  const { data, error } = await insforge.database
+    .from("customer_phones")
+    .insert([{ customer_id: customerId, telefono: tel, etiqueta: etiqueta?.trim() || null }])
+    .select("id, telefono, etiqueta")
+    .single();
+  if (error || !data) {
+    if (/duplicate|unique|already registered/i.test(error?.message ?? ""))
+      throw new Error("Ese teléfono ya está registrado");
+    throw new Error(error?.message ?? "Error al agregar el teléfono");
+  }
+  return data as CustomerPhone;
+}
+
+export async function quitarTelefono(phoneId: string): Promise<void> {
+  const { userId } = await auth();
+  if (!userId) throw new Error("No autenticado");
+  const insforge = await createInsForgeServerClient();
+  const { error } = await insforge.database
+    .from("customer_phones")
+    .delete()
+    .eq("id", phoneId);
+  if (error) throw new Error(error.message ?? "Error al quitar el teléfono");
+}
+
 // Search active customers by name, phone or email (token-AND).
 export async function buscarClientes(q: string): Promise<Customer[]> {
   const { userId } = await auth();
@@ -124,7 +169,7 @@ export async function buscarClientes(q: string): Promise<Customer[]> {
   const { data } = await insforge.database
     .from("customers")
     .select(
-      "id, nombre, telefono, email, descuento_pct, tipo, notas, is_active, is_system, created_at",
+      "id, nombre, telefono, email, descuento_pct, tipo, notas, is_active, is_system, created_at, customer_phones(id, telefono, etiqueta)",
     )
     .eq("is_active", true)
     .order("nombre", { ascending: true })
@@ -134,7 +179,8 @@ export async function buscarClientes(q: string): Promise<Customer[]> {
   if (!query) return rows;
   const tokens = query.split(/\s+/).filter(Boolean);
   return rows.filter((c) => {
-    const hay = `${c.nombre} ${c.telefono ?? ""} ${c.email ?? ""}`.toLowerCase();
+    const extras = (c.customer_phones ?? []).map((p) => p.telefono).join(" ");
+    const hay = `${c.nombre} ${c.telefono ?? ""} ${extras} ${c.email ?? ""}`.toLowerCase();
     return tokens.every((t) => hay.includes(t));
   });
 }
