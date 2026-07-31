@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { responderMensaje } from "@/modules/agent/inventory-agent";
+import { detectarCliente } from "@/modules/agent/cliente";
 import { cargarHistorial, guardarMensaje } from "@/modules/agent/memoria";
 import { transcribirAudio } from "@/modules/agent/transcribir";
 import { estadoConversacion, marcarAsesor } from "@/modules/agent/handoff";
@@ -114,10 +115,14 @@ export async function POST(req: Request) {
   }
 
   try {
-    const historial = await cargarHistorial(numero, 10);
+    const [historial, cliente] = await Promise.all([
+      cargarHistorial(numero, 10),
+      detectarCliente(numero), // best-effort: null if unregistered
+    ]);
     const { texto: respuesta, escalar } = await responderMensaje(
       [...historial, { role: "user", content: texto }],
       numero,
+      cliente,
     );
     await guardarMensaje(numero, "user", texto);
     await guardarMensaje(numero, "assistant", respuesta);

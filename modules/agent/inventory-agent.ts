@@ -7,6 +7,7 @@ import { getNegocioInfo } from "@/modules/config/lib";
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { notifyCotizacionSinAsignar } from "@/lib/push";
 import type { Turno } from "./memoria";
+import type { ClienteDetectado } from "./cliente";
 
 // The agent creates a real quote (unassigned, canal='whatsapp') on the
 // customer's behalf and returns the public authorize link. Items are resolved
@@ -146,11 +147,25 @@ export type RespuestaAgente = {
 export async function responderMensaje(
   messages: Turno[],
   telefono: string,
+  cliente: ClienteDetectado | null = null,
 ): Promise<RespuestaAgente> {
   const info = await getNegocioInfo();
-  const system = info
+  let system = info
     ? `${SYSTEM}\n\n=== Información del negocio ===\n${info}`
     : `${SYSTEM}\n\n(No hay información del negocio configurada; para envíos/pagos/ubicación di que un asesor lo confirma.)`;
+
+  // Registered customer: greet by name and quote THEIR price. The discounted
+  // price arrives precomputed in buscar_producto (precio_cliente_mxn) and the
+  // quote RPC applies the same discount server-side — the model never does the
+  // math itself.
+  if (cliente) {
+    const desc = cliente.descuento_pct > 0 ? ` Tiene ${cliente.descuento_pct}% de descuento de cliente.` : "";
+    system += `\n\n=== Cliente registrado ===
+Este número pertenece a ${cliente.nombre} (cliente ${cliente.tipo}).${desc}
+- Salúdalo por su nombre de forma natural la primera vez que le contestes en la conversación; después ya no lo repitas en cada mensaje.
+- Si los resultados de buscar_producto traen "precio_cliente_mxn", ESE es su precio y es el que le cotizas (puedes decir "con tu descuento de cliente queda en $X"). El precio de lista solo menciónalo si te lo pide.
+- Su cotización (crear_cotizacion) ya sale con su descuento aplicado automáticamente.`;
+  }
 
   // Set by the pasar_a_asesor tool if the agent decides it needs a human.
   let escalar: { motivo: string } | null = null;
@@ -198,6 +213,7 @@ export async function responderMensaje(
               nota: "Demasiadas coincidencias. NO listes productos: pregunta al cliente el modelo específico.",
             };
           }
+          const pct = cliente?.descuento_pct ?? 0;
           return rows.map((r) => ({
             sku: r.sku, // for crear_cotizacion — no se lo dices al cliente
             nombre: r.nombre,
@@ -207,6 +223,11 @@ export async function responderMensaje(
             talla: r.talla,
             calidad: calidadDe(r.nombre),
             precio_mxn: r.precio_mxn,
+            // Registered-customer price, precomputed (same rounding as the
+            // quote RPC) so the model never does money math.
+            ...(pct > 0 && r.precio_mxn > 0
+              ? { precio_cliente_mxn: Math.round(r.precio_mxn * 100 * (100 - pct) / 100) / 100 }
+              : {}),
             disponible: r.stock > 0,
           }));
         },
