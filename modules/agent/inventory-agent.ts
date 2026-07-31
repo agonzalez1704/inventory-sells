@@ -234,8 +234,10 @@ Este número no está en el registro de clientes.
         execute: async ({ consulta }) => {
           const rows = await buscarProducto(consulta);
           // Too broad (brand/category, not a specific model): don't dump a list —
-          // tell the agent to ask the customer for the exact model.
-          if (rows.length > 6) {
+          // tell the agent to ask the customer for the exact model. A CONCRETE
+          // model easily has ~10 rows (12/12 Pro/Mini/Pro Max × qualities), so the
+          // cutoff must sit above that or the agent starves and loops asking.
+          if (rows.length > 12) {
             return {
               demasiados: true,
               total: rows.length,
