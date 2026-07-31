@@ -8,6 +8,7 @@ import { insforgeAdmin } from "@/lib/insforge/admin";
 import { notifyCotizacionSinAsignar } from "@/lib/push";
 import type { Turno } from "./memoria";
 import type { ClienteDetectado } from "./cliente";
+import { cargarPedido, guardarPedido, limpiarPedido, type PedidoItem } from "./pedido";
 
 // The agent creates a real quote (unassigned, canal='whatsapp') on the
 // customer's behalf and returns the public authorize link. Items are resolved
@@ -124,10 +125,12 @@ Reglas de conversación:
 Datos del negocio (envíos, pagos, transferencia, Uber, ubicación, horario):
 - Responde SOLO con la "Información del negocio" de abajo. Si la pregunta no está cubierta ahí, di que un asesor lo confirma; no inventes.
 
-Cuando el cliente quiere COMPRAR / PEDIR / APARTAR (crear_cotizacion):
-- Cuando el cliente confirma qué producto(s) quiere llevar (ya le diste precio disponible), usa crear_cotizacion con los SKU exactos (los del campo "sku" de buscar_producto) y las cantidades. NO uses pasar_a_asesor para esto.
-- Si pide varias cosas, júntalas en un solo crear_cotizacion (varios items).
-- Solo mete productos con precio disponible. Si eligió una versión con precio por confirmar (0), esa NO va en la cotización: para esa usa pasar_a_asesor.
+Cuando el cliente quiere COMPRAR / PEDIR / APARTAR (pedido en curso → cotización):
+- NO crees la cotización en cuanto confirme UN producto. El flujo es: confirma un producto → agregar_al_pedido (SKU exacto de buscar_producto + cantidad) → confirma corto lo que lleva y pregunta si sería algo más ("¿Sería algo más?" / "¿Le cotizo alguna otra cosa?") → sigue atendiendo lo que pida.
+- Cada producto nuevo que confirme: agregar_al_pedido igual. Cambia de cantidad: agregar_al_pedido con la cantidad TOTAL nueva. Quitar algo / ya no quiere: quitar_del_pedido. Pregunta qué lleva: ver_pedido.
+- SOLO cuando el cliente confirme que ya es todo ("es todo", "nada más", "así está bien", "sí, eso sería"), usa crear_cotizacion (sin parámetros: toma el pedido en curso completo). NO uses pasar_a_asesor para esto.
+- Si dice "es todo" y el último producto confirmado aún no está en el pedido, agrégalo primero (agregar_al_pedido) y luego crear_cotizacion.
+- Solo se agregan productos con precio disponible. Si eligió una versión con precio por confirmar (0), esa NO va al pedido: para esa usa pasar_a_asesor.
 - Después de crearla, dale al cliente su folio y el enlace para autorizarla, y dile que al autorizarla un vendedor lo contacta para el envío/pago. Ej: "¡Listo! Tu cotización COT-000123 por $980. Ábrela y autorízala aquí: <enlace>. En cuanto la autorices, un vendedor te contacta para el envío."
 - EL ENLACE va como URL sola y pelona (ej: https://ejemplo.com/cotizacion#abc), NUNCA en formato markdown [texto](url) ni entre paréntesis: WhatsApp no lo renderiza y se ve como basura. Solo pega la URL.
 - Los SKU son para la herramienta; NUNCA se los dictes al cliente en el chat.
@@ -232,26 +235,108 @@ Este número pertenece a ${cliente.nombre} (cliente ${cliente.tipo}).${desc}
           }));
         },
       }),
-      crear_cotizacion: tool({
+      agregar_al_pedido: tool({
         description:
-          "Crea una cotización formal cuando el cliente CONFIRMA qué producto(s) quiere pedir/comprar (con cantidades) y ya tienen precio disponible. Devuelve un folio y un enlace para que el cliente la autorice él mismo. Usa los SKU exactos que te dio buscar_producto. NO la uses para productos con precio por confirmar (0).",
+          "Agrega producto(s) al pedido en curso del cliente cuando CONFIRMA que lo(s) quiere. Usa el SKU exacto de buscar_producto y la cantidad TOTAL que quiere de ese producto (si ya estaba en el pedido, se reemplaza la cantidad). NO crea la cotización. Solo productos con precio disponible.",
         inputSchema: z.object({
           items: z
             .array(
               z.object({
-                sku: z.string().describe("SKU exacto del producto (de buscar_producto)"),
-                qty: z.number().int().positive().describe("cantidad"),
+                sku: z.string().describe("SKU exacto (de buscar_producto)"),
+                qty: z.number().int().positive().describe("cantidad TOTAL de ese producto"),
               }),
             )
             .min(1),
         }),
         execute: async ({ items }) => {
-          const res = await crearCotizacionAgente(items, telefono);
+          const pedido = await cargarPedido(telefono);
+          const skus = items.map((i) => i.sku);
+          const { data } = await insforgeAdmin.database
+            .from("products")
+            .select("sku, name, price_cents, is_active")
+            .in("sku", skus);
+          const porSku = new Map(
+            ((data ?? []) as { sku: string; name: string; price_cents: number; is_active: boolean }[])
+              .filter((p) => p.is_active)
+              .map((p) => [p.sku, p]),
+          );
+          const pct = cliente?.descuento_pct ?? 0;
+          const rechazados: string[] = [];
+          for (const it of items) {
+            const p = porSku.get(it.sku);
+            if (!p || p.price_cents <= 0) {
+              rechazados.push(it.sku);
+              continue;
+            }
+            const cents = pct > 0 ? Math.round((p.price_cents * (100 - pct)) / 100) : p.price_cents;
+            const item: PedidoItem = { sku: p.sku, nombre: p.name, qty: it.qty, unit_mxn: cents / 100 };
+            const idx = pedido.findIndex((x) => x.sku === p.sku);
+            if (idx >= 0) pedido[idx] = item;
+            else pedido.push(item);
+          }
+          await guardarPedido(telefono, pedido);
+          return {
+            pedido: pedido.map((i) => ({ nombre: i.nombre, qty: i.qty, unit_mxn: i.unit_mxn })),
+            total_mxn: pedido.reduce((s, i) => s + i.unit_mxn * i.qty, 0),
+            ...(rechazados.length
+              ? { nota_rechazados: "Estos no se agregaron (sin precio disponible): " + rechazados.join(", ") }
+              : {}),
+            nota: "Confirma corto lo que lleva y pregunta si sería algo más. NO crees la cotización hasta que el cliente diga que es todo.",
+          };
+        },
+      }),
+      ver_pedido: tool({
+        description: "Consulta el pedido en curso del cliente (lo que lleva hasta ahora).",
+        inputSchema: z.object({}),
+        execute: async () => {
+          const pedido = await cargarPedido(telefono);
+          return {
+            pedido: pedido.map((i) => ({ nombre: i.nombre, qty: i.qty, unit_mxn: i.unit_mxn })),
+            total_mxn: pedido.reduce((s, i) => s + i.unit_mxn * i.qty, 0),
+          };
+        },
+      }),
+      quitar_del_pedido: tool({
+        description:
+          "Quita un producto del pedido en curso (por SKU), o vacía el pedido completo si el cliente ya no quiere nada.",
+        inputSchema: z.object({
+          sku: z.string().optional().describe("SKU a quitar (omitir si vacías todo)"),
+          todo: z.boolean().optional().describe("true = vaciar el pedido completo"),
+        }),
+        execute: async ({ sku, todo }) => {
+          if (todo) {
+            await limpiarPedido(telefono);
+            return { pedido: [], total_mxn: 0 };
+          }
+          const pedido = (await cargarPedido(telefono)).filter((i) => i.sku !== sku);
+          await guardarPedido(telefono, pedido);
+          return {
+            pedido: pedido.map((i) => ({ nombre: i.nombre, qty: i.qty, unit_mxn: i.unit_mxn })),
+            total_mxn: pedido.reduce((s, i) => s + i.unit_mxn * i.qty, 0),
+          };
+        },
+      }),
+      crear_cotizacion: tool({
+        description:
+          "Crea la cotización formal con TODO el pedido en curso. Úsala SOLO cuando el cliente confirme que ya es todo (\"es todo\", \"nada más\", \"así está bien\"). Devuelve folio y enlace para que el cliente la autorice.",
+        inputSchema: z.object({}),
+        execute: async () => {
+          const pedido = await cargarPedido(telefono);
+          if (pedido.length === 0)
+            return {
+              ok: false,
+              nota: "El pedido está vacío. Agrega primero lo que el cliente confirmó (agregar_al_pedido).",
+            };
+          const res = await crearCotizacionAgente(
+            pedido.map((i) => ({ sku: i.sku, qty: i.qty })),
+            telefono,
+          );
           if ("error" in res)
             return {
               ok: false,
               nota: "No se pudo crear la cotización. Dile al cliente que un asesor lo atenderá en seguida.",
             };
+          await limpiarPedido(telefono);
           return {
             ok: true,
             folio: res.folio,
