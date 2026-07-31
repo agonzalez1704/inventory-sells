@@ -41,8 +41,9 @@ const MODEL =
   process.env.OPENAI_CHAT_MODEL ??
   "gpt-4o";
 
-// Screen quality read from the product name so the agent can group results by
-// quality (Original / OLED / Incell / AAA). Not the frame (C/M = con marco).
+// Screen quality read from the product name AND its SKU — some rows carry the
+// quality only in the SKU (name "iPhone 12/12 pro JK", sku "iphone-12-incell").
+// Not the frame (C/M = con marco).
 function calidadDe(nombre: string): string | null {
   const n = nombre.toUpperCase();
   if (/\bORIGINAL\b|\bORG\b|\bOEM\b/.test(n)) return "Original";
@@ -95,6 +96,8 @@ Reglas de productos:
 - Si aún no lo encuentras, usa buscar_compatibilidad: muchas pantallas sirven para VARIOS modelos. Si hay una pantalla compatible disponible, ofrécela y explica la compatibilidad (ej: "La pantalla del Oppo A79 es la misma que la del Realme 11 5G, y esa sí la tenemos disponible").
 - NUNCA digas cantidades ni números de stock. Solo "Disponible" o "Agotado" (campo "disponible").
 - Da el precio en pesos de las versiones que SÍ tengan precio. Nunca inventes un precio.
+- EL MODELO EXACTO IMPORTA: "12", "12 Mini", "12 Pro" y "12 Pro Max" son productos DISTINTOS con precios distintos. PROHIBIDO dar el precio de una variante como si fuera otra (el error clásico: decir que la del 12 cuesta lo que la del 12 Mini). Cada precio que des va amarrado al nombre del producto tal como viene en "nombre": di "la del 12 Mini incell está en $540", no "la del iPhone 12 está en $540".
+- Si la versión EXACTA que pidió está agotada (disponible: false), DILO claro ("la incell del 12 por ahora está agotada") y ofrece las variantes que SÍ hay con su nombre completo y su precio. NUNCA sustituyas en silencio el precio de otra variante.
 - Si una versión tiene precio 0 (no cargado): di que también la tenemos, pero que ESE precio te lo confirma un asesor. NO escales por esto solo.
 - MEZCLA (muy común): entre las coincidencias, unas traen precio y otras 0. Da primero el/los precios que SÍ tienes y menciona que la otra versión (p. ej. con marco, u otro modelo cercano) también la hay con el precio por confirmar; luego pregunta cuál quiere. Ej: "La Honor X7 sin marco la tenemos en $190. También la hay con marco, pero ese precio te lo confirma un asesor. ¿Cuál te interesa?".
 - Si el cliente elige/pide la versión cuyo precio está en 0 (por confirmar), ENTONCES sí usa pasar_a_asesor. Antes no.
@@ -252,7 +255,7 @@ Este número no está en el registro de clientes.
             marca: r.marca,
             color: r.color,
             talla: r.talla,
-            calidad: calidadDe(r.nombre),
+            calidad: calidadDe(`${r.nombre} ${r.sku}`),
             precio_mxn: r.precio_mxn,
             // Registered-customer price, precomputed (same rounding as the
             // quote RPC) so the model never does money math.
@@ -422,7 +425,7 @@ Este número no está en el registro de clientes.
               encontrados.push({
                 nombre: r.nombre,
                 marca: r.marca,
-                calidad: calidadDe(r.nombre),
+                calidad: calidadDe(`${r.nombre} ${r.sku}`),
                 precio_mxn: r.precio_mxn,
                 disponible: r.stock > 0,
               });
