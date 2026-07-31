@@ -348,6 +348,14 @@ Este número no está en el registro de clientes.
             else pedido.items.push(item);
           }
           const sync = await sincronizarCotizacion(telefono, pedido);
+          // The nota must match reality: only ask for the link when we ACTUALLY
+          // have a url — otherwise the model invents a placeholder.
+          const nota =
+            "error" in sync
+              ? "NO menciones ningún enlace en esta respuesta. Confirma lo agregado y pregunta si sería algo más."
+              : esNueva
+                ? "Cotización creada. Al FINAL de tu respuesta pega el valor de \"url\" tal cual, pelón, SIN corchetes ni [texto](url), diciendo que ahí puede ver su cotización. Luego pregunta si sería algo más."
+                : "Cotización actualizada (mismo enlace de antes; no lo repitas salvo que lo pida). Confirma corto y pregunta si sería algo más.";
           return {
             pedido: pedido.items.map((i) => ({ nombre: i.nombre, qty: i.qty, unit_mxn: i.unit_mxn })),
             total_mxn: pedido.items.reduce((s, i) => s + i.unit_mxn * i.qty, 0),
@@ -355,9 +363,7 @@ Este número no está en el registro de clientes.
             ...(rechazados.length
               ? { nota_rechazados: "Estos NO se agregaron (agotados o sin precio): " + rechazados.join(", ") + ". Dile al cliente cuál no se pudo y ofrece la alternativa disponible." }
               : {}),
-            nota: esNueva
-              ? "Cotización creada. Al FINAL de tu respuesta incluye el enlace tal cual, pelón, SIN corchetes ni [texto](url) diciendo que ahí puede ver su cotización. Luego pregunta si sería algo más."
-              : "Cotización actualizada (mismo enlace de antes; no lo repitas salvo que lo pida). Confirma corto y pregunta si sería algo más.",
+            nota,
           };
         },
       }),
@@ -515,9 +521,18 @@ Este número no está en el registro de clientes.
     },
   });
 
+  // WhatsApp renders no markdown: deterministically unwrap [texto](url) into
+  // the bare URL (or drop dead placeholders like [enlace](#)) so a formatting
+  // slip by the model never reaches the customer.
+  const sinMarkdown = text
+    .trim()
+    .replace(/\[([^\]]*)\]\(([^)]*)\)/g, (_m, t: string, u: string) =>
+      /^https?:\/\//.test(u) ? u : t,
+    );
+
   return {
     texto:
-      text.trim() ||
+      sinMarkdown ||
       "Perdón, no pude encontrar esa información. ¿Me das el modelo o SKU exacto?",
     escalar,
   };
