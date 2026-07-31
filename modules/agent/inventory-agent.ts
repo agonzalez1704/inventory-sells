@@ -52,6 +52,9 @@ async function sincronizarCotizacion(
     pedido.folio = row.folio;
     pedido.shareToken = row.share_token;
     await guardarPedido(numero, pedido);
+    // A new quote IS a lead: ping sellers right away. Edits don't re-ping,
+    // and the customer's authorization has its own push.
+    await notifyCotizacionSinAsignar(row.id, "agente_whatsapp");
     return { folio: row.folio, url: urlCotizacion(row.share_token) };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "error" };
@@ -471,9 +474,7 @@ Este número no está en el registro de clientes.
               ok: false,
               nota: "No se pudo cerrar la cotización. Dile al cliente que un asesor lo atenderá en seguida.",
             };
-          // Sellers get pinged at close, not on every price tweak.
-          if (pedido.cotizacionId)
-            await notifyCotizacionSinAsignar(pedido.cotizacionId, "agente_whatsapp");
+          // Sellers were already pinged at creation; closing just recaps.
           return {
             ok: true,
             folio: sync.folio,
