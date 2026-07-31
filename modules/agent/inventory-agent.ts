@@ -87,6 +87,7 @@ Seguridad y límites (NO NEGOCIABLES — nunca los rompas):
 
 Reglas de productos:
 - Usa la herramienta buscar_producto (por nombre o SKU) para precio y disponibilidad.
+- Para cualquier pregunta que mencione una refacción, marca o modelo, primero consulta buscar_producto. No respondas ni describas opciones de producto sin el resultado de esa herramienta.
 - Usa términos concisos como los dijo el cliente. NO agregues marcas que no mencionó.
 - Si el cliente pregunta EN GENERAL (una marca o tipo SIN modelo, p. ej. "¿manejas pantallas de Xiaomi?"), o si la herramienta responde "demasiados", NO listes productos: confirma corto que SÍ y pregunta el MODELO. Ej: "¡Sí! ¿Qué modelo de Xiaomi buscas?".
 - Solo da disponibilidad detallada cuando el cliente dé un MODELO concreto (pocas coincidencias). NUNCA mandes listas largas.
@@ -178,6 +179,11 @@ Este número no está en el registro de clientes.
 
   // Set by the pasar_a_asesor tool if the agent decides it needs a human.
   let escalar: { motivo: string } | null = null;
+  const ultimoMensaje = messages.at(-1)?.content ?? "";
+  const requiereBusquedaDeProducto =
+    /\b(display|pantalla|bateria|batería|cargador|mica|flex|camara|cámara|moto|motorola|iphone|samsung|xiaomi|redmi|huawei|honor|oppo|realme|zte)\b/i.test(
+      ultimoMensaje,
+    );
 
   const { text } = await generateText({
     model: openai(MODEL),
@@ -185,6 +191,15 @@ Este número no está en el registro de clientes.
     messages,
     maxOutputTokens: 600,
     stopWhen: stepCountIs(5),
+    // A product mention must be grounded in the catalog before the model can
+    // write its answer. Subsequent steps may use the rest of the tools normally.
+    prepareStep: ({ stepNumber }) =>
+      requiereBusquedaDeProducto && stepNumber === 0
+        ? {
+            activeTools: ["buscar_producto"],
+            toolChoice: { type: "tool", toolName: "buscar_producto" },
+          }
+        : undefined,
     tools: {
       pasar_a_asesor: tool({
         description:

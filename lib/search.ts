@@ -25,6 +25,7 @@ export function normalize(s: string): string {
 // where they're genuinely the same family (Xiaomi/Redmi/Poco, Huawei/Honor).
 const ALIAS_GROUPS: string[][] = [
   ["motorola", "moto"],
+  ["pantalla", "pantallas", "display"],
   ["xiaomi", "redmi", "poco", "mi"],
   ["samsung", "sam", "galaxy"],
   ["iphone", "iph", "apple"],
@@ -37,6 +38,15 @@ for (const group of ALIAS_GROUPS) {
     ALIASES.set(term, group.filter((t) => t !== term));
   }
 }
+
+// Conversational filler should not make a catalog lookup fail. Product nouns
+// stay meaningful: "display", "pantalla" and "batería" are aliases above.
+const QUERY_STOPWORDS = new Set([
+  "a", "al", "buenas", "con", "de", "del", "el", "es", "hay", "hola", "la",
+  "las", "lo", "los", "maneja", "manejas", "me", "para", "por", "que", "quiero",
+  "tardes", "tendras", "tendrás", "tiene", "tienen", "tienes", "un", "una", "venden",
+  "vendes",
+]);
 
 export function expand(token: string): string[] {
   return [token, ...(ALIASES.get(token) ?? [])];
@@ -103,7 +113,9 @@ function tokenScore(token: string, idx: Index): number {
 export function scoreProduct(p: Searchable, query: string): number {
   const q = normalize(query);
   if (!q) return 0;
-  const tokens = q.split(" ").filter(Boolean);
+  const tokens = q
+    .split(" ")
+    .filter((token) => token.length >= 2 && !QUERY_STOPWORDS.has(token));
   if (!tokens.length) return 0;
 
   const idx = buildIndex(p);
