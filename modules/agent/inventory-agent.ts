@@ -112,7 +112,7 @@ Abreviaturas en los nombres de productos:
 Calidades de pantalla (distinto del marco):
 - Manejamos estas calidades: Original (ORG), OLED, Incell, AAA (genérica/económica) y JK (marca genérica). Cada resultado trae su calidad en el campo "calidad".
 - Entiende al cliente: "original/orig/oem"→Original; "oled/amoled"→OLED; "incell"→Incell; "aaa/genérica/económica/barata"→AAA; "jk"→JK.
-- Si pidió una calidad que NO existe o no está disponible para su modelo, DILO y ofrece la(s) calidad(es) que SÍ hay, con su nombre y precio. Ej: "No tengo iPhone 12 incell, pero tengo JK en $330." NUNCA presentes una calidad como si fuera la que pidió.
+- Si pidió una calidad que NO existe o no está disponible para su modelo: PROHIBIDO responder solo "no está disponible". En la MISMA respuesta ofrece la(s) calidad(es) de ese modelo que SÍ están disponibles, con su nombre y precio. Ej: "No tengo iPhone 12 incell, pero tengo JK en $330." Decir que no hay sin ofrecer lo que sí hay = respuesta INCOMPLETA. NUNCA presentes una calidad como si fuera la que pidió.
 - Si el cliente pide una pantalla SIN decir calidad y hay VARIAS calidades disponibles para ese modelo: NO des precios todavía. Pregunta en qué calidad la busca, nombrando SOLO las calidades que SÍ tienes de ese modelo. Ej: "¿La buscas en original, OLED o incell?".
 - EXCEPCIÓN: si el cliente pregunta cuáles calidades manejas / "¿cuáles tienes?" / "¿qué opciones hay?" / "¿en cuánto las tienes?" / "precio de todas" / "precios de cada una" (o parecido), ENTONCES sí lista las calidades disponibles de ese modelo con su precio. Ej: "Para iPhone 13 la tengo en original a $X, OLED a $Y e incell a $Z.". Pedir el precio de "todas" o "cada una" ES elegir: quiere la lista completa con precios, NO le vuelvas a preguntar la calidad.
 - NUNCA preguntes la calidad dos veces seguidas. Si ya la preguntaste y el cliente contesta pidiendo precios (aunque no nombre una calidad), busca el producto y dale la lista completa de calidades con precio.
@@ -201,6 +201,8 @@ Este número no está en el registro de clientes.
     system,
     messages,
     maxOutputTokens: 600,
+    // Sales bot must follow catalog rules consistently, not creatively.
+    temperature: 0.2,
     stopWhen: stepCountIs(5),
     // A product mention must be grounded in the catalog before the model can
     // write its answer. Subsequent steps may use the rest of the tools normally.
@@ -251,7 +253,7 @@ Este número no está en el registro de clientes.
             };
           }
           const pct = cliente?.descuento_pct ?? 0;
-          return rows.map((r) => ({
+          const items = rows.map((r) => ({
             sku: r.sku, // for crear_cotizacion — no se lo dices al cliente
             nombre: r.nombre,
             categoria: r.categoria,
@@ -267,6 +269,17 @@ Este número no está en el registro de clientes.
               : {}),
             disponible: r.stock > 0,
           }));
+          // Reminder next to the data: an out-of-stock ask must come back with
+          // the in-stock alternatives, never a bare "no disponible".
+          const hayAgotados = items.some((i) => !i.disponible);
+          const hayDisponibles = items.some((i) => i.disponible);
+          if (hayAgotados && hayDisponibles) {
+            return {
+              items,
+              nota: "Hay resultados agotados y otros disponibles. Si lo que pidió el cliente está agotado, dilo Y en la misma respuesta ofrécele las opciones disponibles con su nombre y precio.",
+            };
+          }
+          return items;
         },
       }),
       agregar_al_pedido: tool({
