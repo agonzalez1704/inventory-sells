@@ -122,7 +122,7 @@ Reglas de productos:
 - NUNCA digas cantidades ni números de stock. Solo "Disponible" o "Agotado" (campo "disponible").
 - Da el precio en pesos de las versiones que SÍ tengan precio. Nunca inventes un precio.
 - EL MODELO EXACTO IMPORTA: "12", "12 Mini", "12 Pro" y "12 Pro Max" son productos DISTINTOS con precios distintos. PROHIBIDO dar el precio de una variante como si fuera otra (el error clásico: decir que la del 12 cuesta lo que la del 12 Mini). Cada precio que des va amarrado al nombre del producto tal como viene en "nombre": di "la del 12 Mini incell está en $540", no "la del iPhone 12 está en $540".
-- Si la versión EXACTA que pidió está agotada (disponible: false), DILO claro ("la incell del 12 por ahora está agotada") y ofrece las variantes que SÍ hay con su nombre completo y su precio. NUNCA sustituyas en silencio el precio de otra variante.
+- Si la versión EXACTA que pidió está agotada (disponible: false), DILO con la frase "la tengo agotada" ("la incell del 12 la tengo agotada") y ofrece las variantes que SÍ hay con su nombre completo y su precio. NUNCA sustituyas en silencio el precio de otra variante.
 - Si una versión tiene precio 0 (no cargado): di que también la tenemos, pero que ESE precio te lo confirma un asesor. NO escales por esto solo.
 - MEZCLA (muy común): entre las coincidencias, unas traen precio y otras 0. Da primero el/los precios que SÍ tienes y menciona que la otra versión (p. ej. con marco, u otro modelo cercano) también la hay con el precio por confirmar; luego pregunta cuál quiere. Ej: "La Honor X7 sin marco la tenemos en $190. También la hay con marco, pero ese precio te lo confirma un asesor. ¿Cuál te interesa?".
 - Si el cliente elige/pide la versión cuyo precio está en 0 (por confirmar), ENTONCES sí usa pasar_a_asesor. Antes no.
@@ -145,7 +145,7 @@ Formato de respuesta (suena humano, no robot):
 - NUNCA uses tablas ni el carácter "|". WhatsApp no las renderiza y se ven como basura. Habla en frases naturales, no en columnas.
 - Di disponibilidad y precio en una frase. Ej: "La tenemos en calidad original en $230." El "la tenemos" YA implica que está disponible; NO agregues "Disponible" ni una columna de disponibilidad.
 - Cuando SÍ toque listar calidades (porque el cliente las pidió), una línea corta por cada una. Ej: "original a $230, OLED a $260 e incell a $180.".
-- Si está agotada, dilo simple: "Esa por ahora no la tengo."
+- Si está agotada, dilo simple con la frase "la tengo agotada": "Esa la tengo agotada por ahora."
 - Negritas de WhatsApp con UN solo asterisco (*así*), nunca dobles (**así**). Emojis con moderación, máximo uno o dos.
 
 Reglas de conversación:
@@ -325,10 +325,10 @@ Este número no está en el registro de clientes.
           const skus = items.map((i) => i.sku);
           const { data } = await insforgeAdmin.database
             .from("products")
-            .select("sku, name, price_cents, is_active")
+            .select("sku, name, price_cents, quantity, is_active")
             .in("sku", skus);
           const porSku = new Map(
-            ((data ?? []) as { sku: string; name: string; price_cents: number; is_active: boolean }[])
+            ((data ?? []) as { sku: string; name: string; price_cents: number; quantity: number; is_active: boolean }[])
               .filter((p) => p.is_active)
               .map((p) => [p.sku, p]),
           );
@@ -336,7 +336,8 @@ Este número no está en el registro de clientes.
           const rechazados: string[] = [];
           for (const it of items) {
             const p = porSku.get(it.sku);
-            if (!p || p.price_cents <= 0) {
+            // No price OR no stock → doesn't enter the quote.
+            if (!p || p.price_cents <= 0 || p.quantity <= 0) {
               rechazados.push(it.sku);
               continue;
             }
@@ -352,7 +353,7 @@ Este número no está en el registro de clientes.
             total_mxn: pedido.items.reduce((s, i) => s + i.unit_mxn * i.qty, 0),
             ...("error" in sync ? {} : { folio: sync.folio, url: sync.url }),
             ...(rechazados.length
-              ? { nota_rechazados: "Estos no se agregaron (sin precio disponible): " + rechazados.join(", ") }
+              ? { nota_rechazados: "Estos NO se agregaron (agotados o sin precio): " + rechazados.join(", ") + ". Dile al cliente cuál no se pudo y ofrece la alternativa disponible." }
               : {}),
             nota: esNueva
               ? "Cotización creada. Al FINAL de tu respuesta incluye el enlace tal cual, pelón, SIN corchetes ni [texto](url) diciendo que ahí puede ver su cotización. Luego pregunta si sería algo más."
