@@ -108,7 +108,8 @@ Calidades de pantalla (distinto del marco):
 - Manejamos cuatro calidades: Original (ORG), OLED, Incell y AAA (genérica/económica). Cada resultado trae su calidad en el campo "calidad".
 - Entiende al cliente: "original/orig/oem"→Original; "oled/amoled"→OLED; "incell"→Incell; "aaa/genérica/económica/barata"→AAA.
 - Si el cliente pide una pantalla SIN decir calidad y hay VARIAS calidades disponibles para ese modelo: NO des precios todavía. Pregunta en qué calidad la busca, nombrando SOLO las calidades que SÍ tienes de ese modelo. Ej: "¿La buscas en original, OLED o incell?".
-- EXCEPCIÓN: si el cliente pregunta cuáles calidades manejas / "¿cuáles tienes?" / "¿qué opciones hay?" (o parecido), ENTONCES sí lista las calidades disponibles de ese modelo con su precio. Ej: "Para iPhone 13 la tengo en original a $X, OLED a $Y e incell a $Z.".
+- EXCEPCIÓN: si el cliente pregunta cuáles calidades manejas / "¿cuáles tienes?" / "¿qué opciones hay?" / "¿en cuánto las tienes?" / "precio de todas" / "precios de cada una" (o parecido), ENTONCES sí lista las calidades disponibles de ese modelo con su precio. Ej: "Para iPhone 13 la tengo en original a $X, OLED a $Y e incell a $Z.". Pedir el precio de "todas" o "cada una" ES elegir: quiere la lista completa con precios, NO le vuelvas a preguntar la calidad.
+- NUNCA preguntes la calidad dos veces seguidas. Si ya la preguntaste y el cliente contesta pidiendo precios (aunque no nombre una calidad), busca el producto y dale la lista completa de calidades con precio.
 - Si el cliente ya dijo la calidad, o si solo hay UNA calidad para ese modelo, da directo precio + disponibilidad de esa; no preguntes.
 
 Formato de respuesta (suena humano, no robot):
@@ -180,8 +181,12 @@ Este número no está en el registro de clientes.
   // Set by the pasar_a_asesor tool if the agent decides it needs a human.
   let escalar: { motivo: string } | null = null;
   const ultimoMensaje = messages.at(-1)?.content ?? "";
+  // Product mention OR a price/availability ask ("¿en cuánto?", "precio de
+  // todas") — the latter refers to a product from earlier turns whose tool
+  // results are NOT in the text-only history, so the model must re-search
+  // before it can answer with real prices.
   const requiereBusquedaDeProducto =
-    /\b(display|pantalla|bateria|batería|cargador|mica|flex|camara|cámara|moto|motorola|iphone|samsung|xiaomi|redmi|huawei|honor|oppo|realme|zte)\b/i.test(
+    /\b(display|pantalla|bateria|batería|cargador|mica|flex|camara|cámara|moto|motorola|iphone|samsung|xiaomi|redmi|huawei|honor|oppo|realme|zte|precios?|cu[aá]nto|cuestan?|valen?|vale)\b/i.test(
       ultimoMensaje,
     );
 
