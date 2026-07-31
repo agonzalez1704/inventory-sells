@@ -41,8 +41,9 @@ const MODEL =
   process.env.OPENAI_CHAT_MODEL ??
   "gpt-4o";
 
-// Screen quality read from the product name AND its SKU — some rows carry the
-// quality only in the SKU (name "iPhone 12/12 pro JK", sku "iphone-12-incell").
+// Screen quality read from the product name; the SKU is only a FALLBACK when
+// the name carries none — the name wins because SKUs can lie (name "iPhone
+// 12/12 pro JK" with sku "iphone-12-incell" IS a JK, not an incell).
 // Not the frame (C/M = con marco).
 function calidadDe(nombre: string): string | null {
   const n = nombre.toUpperCase();
@@ -50,6 +51,7 @@ function calidadDe(nombre: string): string | null {
   if (/\bOLED\b/.test(n)) return "OLED";
   if (/\bINCELL\b/.test(n)) return "Incell";
   if (/\bAAA\b/.test(n)) return "AAA";
+  if (/\bJK\b/.test(n)) return "JK";
   return null;
 }
 
@@ -108,8 +110,9 @@ Abreviaturas en los nombres de productos:
 - Al mostrar un producto con "C/M" dilo como "con marco" (y "S/M" como "sin marco").
 
 Calidades de pantalla (distinto del marco):
-- Manejamos cuatro calidades: Original (ORG), OLED, Incell y AAA (genérica/económica). Cada resultado trae su calidad en el campo "calidad".
-- Entiende al cliente: "original/orig/oem"→Original; "oled/amoled"→OLED; "incell"→Incell; "aaa/genérica/económica/barata"→AAA.
+- Manejamos estas calidades: Original (ORG), OLED, Incell, AAA (genérica/económica) y JK (marca genérica). Cada resultado trae su calidad en el campo "calidad".
+- Entiende al cliente: "original/orig/oem"→Original; "oled/amoled"→OLED; "incell"→Incell; "aaa/genérica/económica/barata"→AAA; "jk"→JK.
+- Si pidió una calidad que NO existe o no está disponible para su modelo, DILO y ofrece la(s) calidad(es) que SÍ hay, con su nombre y precio. Ej: "No tengo iPhone 12 incell, pero tengo JK en $330." NUNCA presentes una calidad como si fuera la que pidió.
 - Si el cliente pide una pantalla SIN decir calidad y hay VARIAS calidades disponibles para ese modelo: NO des precios todavía. Pregunta en qué calidad la busca, nombrando SOLO las calidades que SÍ tienes de ese modelo. Ej: "¿La buscas en original, OLED o incell?".
 - EXCEPCIÓN: si el cliente pregunta cuáles calidades manejas / "¿cuáles tienes?" / "¿qué opciones hay?" / "¿en cuánto las tienes?" / "precio de todas" / "precios de cada una" (o parecido), ENTONCES sí lista las calidades disponibles de ese modelo con su precio. Ej: "Para iPhone 13 la tengo en original a $X, OLED a $Y e incell a $Z.". Pedir el precio de "todas" o "cada una" ES elegir: quiere la lista completa con precios, NO le vuelvas a preguntar la calidad.
 - NUNCA preguntes la calidad dos veces seguidas. Si ya la preguntaste y el cliente contesta pidiendo precios (aunque no nombre una calidad), busca el producto y dale la lista completa de calidades con precio.
@@ -255,7 +258,7 @@ Este número no está en el registro de clientes.
             marca: r.marca,
             color: r.color,
             talla: r.talla,
-            calidad: calidadDe(`${r.nombre} ${r.sku}`),
+            calidad: calidadDe(r.nombre) ?? calidadDe(r.sku),
             precio_mxn: r.precio_mxn,
             // Registered-customer price, precomputed (same rounding as the
             // quote RPC) so the model never does money math.
@@ -425,7 +428,7 @@ Este número no está en el registro de clientes.
               encontrados.push({
                 nombre: r.nombre,
                 marca: r.marca,
-                calidad: calidadDe(`${r.nombre} ${r.sku}`),
+                calidad: calidadDe(r.nombre) ?? calidadDe(r.sku),
                 precio_mxn: r.precio_mxn,
                 disponible: r.stock > 0,
               });
