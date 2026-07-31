@@ -8,28 +8,51 @@ import { insforgeAdmin } from "@/lib/insforge/admin";
 import { notifyCotizacionSinAsignar } from "@/lib/push";
 import type { Turno } from "./memoria";
 import { detectarCliente, type ClienteDetectado } from "./cliente";
-import { cargarPedido, guardarPedido, limpiarPedido, type PedidoItem } from "./pedido";
+import { cargarPedido, guardarPedido, type Pedido, type PedidoItem } from "./pedido";
 
-// The agent creates a real quote (unassigned, canal='whatsapp') on the
-// customer's behalf and returns the public authorize link. Items are resolved
-// by SKU in the RPC; broadcast to sellers so one of them claims it.
-async function crearCotizacionAgente(
-  items: { sku: string; qty: number }[],
-  telefono: string,
-): Promise<{ folio: string; url: string; total_cents: number } | { error: string }> {
+const urlCotizacion = (token: string) =>
+  `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/cotizacion#${token}`;
+
+// The quote is a LIVING order: created silently the first time the agent has
+// concrete items (link shared in that same reply), then edited in place —
+// same folio, same link. Sellers are only notified when the customer closes.
+// Mutates `pedido` with the quote identity and persists it.
+async function sincronizarCotizacion(
+  numero: string,
+  pedido: Pedido,
+): Promise<{ folio: string; url: string } | { error: string }> {
+  const items = pedido.items.map((i) => ({ sku: i.sku, qty: i.qty }));
   try {
+    if (pedido.cotizacionId) {
+      const { error } = await insforgeAdmin.database.rpc("actualizar_cotizacion_whatsapp", {
+        p_id: pedido.cotizacionId,
+        p_items: items,
+      });
+      if (!error) {
+        await guardarPedido(numero, pedido);
+        return { folio: pedido.folio!, url: urlCotizacion(pedido.shareToken!) };
+      }
+      // Not editable anymore (expired/converted/cancelled): fall through and
+      // start a fresh quote for this conversation.
+    }
+    if (items.length === 0) {
+      await guardarPedido(numero, pedido);
+      return { error: "sin productos" };
+    }
     const { data, error } = await insforgeAdmin.database.rpc("crear_cotizacion_whatsapp", {
-      p_items: items.map((i) => ({ sku: i.sku, qty: i.qty })),
-      p_telefono: telefono,
+      p_items: items,
+      p_telefono: numero,
     });
     if (error) return { error: error.message ?? "no se pudo crear" };
     const row = (Array.isArray(data) ? data[0] : data) as
       | { id: string; folio: string; share_token: string; total_cents: number }
       | undefined;
     if (!row?.id) return { error: "no se pudo crear" };
-    await notifyCotizacionSinAsignar(row.id, "agente_whatsapp");
-    const base = process.env.NEXT_PUBLIC_APP_URL ?? "";
-    return { folio: row.folio, url: `${base}/cotizacion#${row.share_token}`, total_cents: row.total_cents };
+    pedido.cotizacionId = row.id;
+    pedido.folio = row.folio;
+    pedido.shareToken = row.share_token;
+    await guardarPedido(numero, pedido);
+    return { folio: row.folio, url: urlCotizacion(row.share_token) };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "error" };
   }
@@ -133,14 +156,15 @@ Reglas de conversación:
 Datos del negocio (envíos, pagos, transferencia, Uber, ubicación, horario):
 - Responde SOLO con la "Información del negocio" de abajo. Si la pregunta no está cubierta ahí, di que un asesor lo confirma; no inventes.
 
-Cuando el cliente quiere COMPRAR / PEDIR / APARTAR (pedido en curso → cotización):
-- NO crees la cotización en cuanto confirme UN producto. El flujo es: confirma un producto → agregar_al_pedido (SKU exacto de buscar_producto + cantidad) → confirma corto lo que lleva y pregunta si sería algo más ("¿Sería algo más?" / "¿Le cotizo alguna otra cosa?") → sigue atendiendo lo que pida.
-- Cada producto nuevo que confirme: agregar_al_pedido igual. Cambia de cantidad: agregar_al_pedido con la cantidad TOTAL nueva. Quitar algo / ya no quiere: quitar_del_pedido. Pregunta qué lleva: ver_pedido.
-- SOLO cuando el cliente confirme que ya es todo ("es todo", "nada más", "así está bien", "sí, eso sería"), usa crear_cotizacion (sin parámetros: toma el pedido en curso completo). NO uses pasar_a_asesor para esto.
-- Si dice "es todo" y el último producto confirmado aún no está en el pedido, agrégalo primero (agregar_al_pedido) y luego crear_cotizacion.
+Cotización VIVA (el pedido del cliente ES una cotización real desde el primer precio):
+- En cuanto des precio de producto(s) CONCRETOS disponibles (uno por modelo, sin ambigüedad de calidad), en ese MISMO turno usa agregar_al_pedido con esos SKU (qty 1 salvo que diga otra cosa). La primera vez esto crea su cotización: incluye el enlace AL FINAL de esa misma respuesta ("Aquí puedes ver tu cotización: <enlace>") y pregunta si sería algo más.
+- NO agregues cuando lo que diste fue una LISTA de opciones/calidades y le preguntaste cuál quiere: espera su elección y entonces agrega la elegida.
+- La cotización se edita en todo momento con el MISMO enlace: más productos → agregar_al_pedido; cambia cantidad → agregar_al_pedido con la cantidad TOTAL nueva; ya no quiere algo → quitar_del_pedido; pregunta qué lleva o pide el enlace → ver_pedido.
+- El enlace se comparte cuando se crea, cuando lo pida, y al cierre. NO lo repitas en cada mensaje.
+- Cuando el cliente confirme que ya es todo ("es todo", "nada más", "así está bien", "sí, eso sería"), usa crear_cotizacion (sin parámetros): cierra el pedido y avisa al equipo. NO uses pasar_a_asesor para esto.
 - Solo se agregan productos con precio disponible. Si eligió una versión con precio por confirmar (0), esa NO va al pedido: para esa usa pasar_a_asesor.
-- Después de crearla, dale al cliente su folio y el enlace para autorizarla, y dile que al autorizarla un vendedor lo contacta para el envío/pago. Ej: "¡Listo! Tu cotización COT-000123 por $980. Ábrela y autorízala aquí: <enlace>. En cuanto la autorices, un vendedor te contacta para el envío."
-- EL ENLACE va como URL sola y pelona (ej: https://ejemplo.com/cotizacion#abc), NUNCA en formato markdown [texto](url) ni entre paréntesis: WhatsApp no lo renderiza y se ve como basura. Solo pega la URL.
+- Al cerrar, dale su folio y el enlace para autorizarla, y dile que al autorizarla un vendedor lo contacta para el envío/pago. Ej: "¡Listo! Tu cotización COT-000123 por $980. Ábrela y autorízala aquí: <enlace>. En cuanto la autorices, un vendedor te contacta para el envío."
+- EL ENLACE: SOLO comparte el enlace EXACTO que te dio la herramienta en su campo "url". NUNCA inventes, completes o recuerdes un enlace — si no tienes el url en el resultado de una herramienta de este turno, usa ver_pedido para obtenerlo. Va como URL sola y pelona, NUNCA en formato markdown [texto](url) ni entre paréntesis: WhatsApp no lo renderiza y se ve como basura.
 - Los SKU son para la herramienta; NUNCA se los dictes al cliente en el chat.
 
 Cuándo pasar a un asesor (ÚSALA POCO — tu trabajo es contestar/cotizar, no derivar):
@@ -284,7 +308,7 @@ Este número no está en el registro de clientes.
       }),
       agregar_al_pedido: tool({
         description:
-          "Agrega producto(s) al pedido en curso del cliente cuando CONFIRMA que lo(s) quiere. Usa el SKU exacto de buscar_producto y la cantidad TOTAL que quiere de ese producto (si ya estaba en el pedido, se reemplaza la cantidad). NO crea la cotización. Solo productos con precio disponible.",
+          "Agrega producto(s) a la cotización viva del cliente (la crea si aún no existe y devuelve su enlace). Úsala en cuanto le des precio de producto(s) CONCRETOS disponibles, y también cuando confirme cantidades. SKU exacto de buscar_producto; qty = cantidad TOTAL (reemplaza si ya estaba). Solo productos con precio disponible.",
         inputSchema: z.object({
           items: z
             .array(
@@ -297,6 +321,7 @@ Este número no está en el registro de clientes.
         }),
         execute: async ({ items }) => {
           const pedido = await cargarPedido(telefono);
+          const esNueva = !pedido.cotizacionId;
           const skus = items.map((i) => i.sku);
           const { data } = await insforgeAdmin.database
             .from("products")
@@ -317,49 +342,71 @@ Este número no está en el registro de clientes.
             }
             const cents = pct > 0 ? Math.round((p.price_cents * (100 - pct)) / 100) : p.price_cents;
             const item: PedidoItem = { sku: p.sku, nombre: p.name, qty: it.qty, unit_mxn: cents / 100 };
-            const idx = pedido.findIndex((x) => x.sku === p.sku);
-            if (idx >= 0) pedido[idx] = item;
-            else pedido.push(item);
+            const idx = pedido.items.findIndex((x) => x.sku === p.sku);
+            if (idx >= 0) pedido.items[idx] = item;
+            else pedido.items.push(item);
           }
-          await guardarPedido(telefono, pedido);
+          const sync = await sincronizarCotizacion(telefono, pedido);
           return {
-            pedido: pedido.map((i) => ({ nombre: i.nombre, qty: i.qty, unit_mxn: i.unit_mxn })),
-            total_mxn: pedido.reduce((s, i) => s + i.unit_mxn * i.qty, 0),
+            pedido: pedido.items.map((i) => ({ nombre: i.nombre, qty: i.qty, unit_mxn: i.unit_mxn })),
+            total_mxn: pedido.items.reduce((s, i) => s + i.unit_mxn * i.qty, 0),
+            ...("error" in sync ? {} : { folio: sync.folio, url: sync.url }),
             ...(rechazados.length
               ? { nota_rechazados: "Estos no se agregaron (sin precio disponible): " + rechazados.join(", ") }
               : {}),
-            nota: "Confirma corto lo que lleva y pregunta si sería algo más. NO crees la cotización hasta que el cliente diga que es todo.",
+            nota: esNueva
+              ? "Cotización creada. Al FINAL de tu respuesta incluye el enlace tal cual, pelón, SIN corchetes ni [texto](url) diciendo que ahí puede ver su cotización. Luego pregunta si sería algo más."
+              : "Cotización actualizada (mismo enlace de antes; no lo repitas salvo que lo pida). Confirma corto y pregunta si sería algo más.",
           };
         },
       }),
       ver_pedido: tool({
-        description: "Consulta el pedido en curso del cliente (lo que lleva hasta ahora).",
+        description: "Consulta la cotización viva del cliente (lo que lleva hasta ahora y su enlace).",
         inputSchema: z.object({}),
         execute: async () => {
           const pedido = await cargarPedido(telefono);
           return {
-            pedido: pedido.map((i) => ({ nombre: i.nombre, qty: i.qty, unit_mxn: i.unit_mxn })),
-            total_mxn: pedido.reduce((s, i) => s + i.unit_mxn * i.qty, 0),
+            pedido: pedido.items.map((i) => ({ nombre: i.nombre, qty: i.qty, unit_mxn: i.unit_mxn })),
+            total_mxn: pedido.items.reduce((s, i) => s + i.unit_mxn * i.qty, 0),
+            ...(pedido.folio && pedido.shareToken
+              ? { folio: pedido.folio, url: urlCotizacion(pedido.shareToken) }
+              : {}),
           };
         },
       }),
       quitar_del_pedido: tool({
         description:
-          "Quita un producto del pedido en curso (por SKU), o vacía el pedido completo si el cliente ya no quiere nada.",
+          "Quita un producto de la cotización viva, o la vacía completa si ya no quiere nada. Pasa el SKU exacto O parte del nombre/modelo (ej: \"iphone 12\"). El enlace sigue siendo el mismo.",
         inputSchema: z.object({
-          sku: z.string().optional().describe("SKU a quitar (omitir si vacías todo)"),
+          producto: z.string().optional().describe("SKU o parte del nombre del producto a quitar (omitir si vacías todo)"),
           todo: z.boolean().optional().describe("true = vaciar el pedido completo"),
         }),
-        execute: async ({ sku, todo }) => {
+        execute: async ({ producto, todo }) => {
+          const pedido = await cargarPedido(telefono);
           if (todo) {
-            await limpiarPedido(telefono);
-            return { pedido: [], total_mxn: 0 };
+            pedido.items = [];
+          } else if (producto) {
+            // The model often lacks the draft's exact SKUs (text-only history),
+            // so match by SKU or name, loosely: every word must appear.
+            const palabras = producto.toLowerCase().split(/\s+/).filter(Boolean);
+            const matches = pedido.items.filter((i) => {
+              const hay = `${i.sku} ${i.nombre}`.toLowerCase();
+              return palabras.every((p) => hay.includes(p));
+            });
+            if (matches.length === 0)
+              return {
+                ok: false,
+                pedido: pedido.items.map((i) => ({ sku: i.sku, nombre: i.nombre, qty: i.qty })),
+                nota: "No encontré ese producto en el pedido. Estos son los que lleva — vuelve a llamar quitar_del_pedido con el nombre correcto.",
+              };
+            const fuera = new Set(matches.map((m) => m.sku));
+            pedido.items = pedido.items.filter((i) => !fuera.has(i.sku));
           }
-          const pedido = (await cargarPedido(telefono)).filter((i) => i.sku !== sku);
-          await guardarPedido(telefono, pedido);
+          const sync = await sincronizarCotizacion(telefono, pedido);
           return {
-            pedido: pedido.map((i) => ({ nombre: i.nombre, qty: i.qty, unit_mxn: i.unit_mxn })),
-            total_mxn: pedido.reduce((s, i) => s + i.unit_mxn * i.qty, 0),
+            pedido: pedido.items.map((i) => ({ nombre: i.nombre, qty: i.qty, unit_mxn: i.unit_mxn })),
+            total_mxn: pedido.items.reduce((s, i) => s + i.unit_mxn * i.qty, 0),
+            ...("error" in sync ? {} : { folio: sync.folio, url: sync.url }),
           };
         },
       }),
@@ -373,47 +420,59 @@ Este número no está en el registro de clientes.
           // Race-safe: re-check, then insert; a unique collision = already there.
           const existente = await detectarCliente(telefono);
           if (existente) return { ok: true, ya_registrado: true, nombre: existente.nombre };
-          const { error } = await insforgeAdmin.database.from("customers").insert([
-            {
-              nombre: nombre.trim().slice(0, 80),
-              telefono: telefono.replace(/\D/g, "").slice(-10), // registry stores 10-digit local
-              tipo: "publico",
-              descuento_pct: 0,
-              created_by: "agente_whatsapp",
-            },
-          ]);
+          const { data: nuevo, error } = await insforgeAdmin.database
+            .from("customers")
+            .insert([
+              {
+                nombre: nombre.trim().slice(0, 80),
+                telefono: telefono.replace(/\D/g, "").slice(-10), // registry stores 10-digit local
+                tipo: "publico",
+                descuento_pct: 0,
+                created_by: "agente_whatsapp",
+              },
+            ])
+            .select("id")
+            .single();
           if (error && !/duplicate|unique|already registered/i.test(error.message ?? ""))
             return { ok: false, nota: "No se pudo registrar; continúa con la cotización normal." };
+          // The live quote may pre-date the registration — link it to them.
+          const pedido = await cargarPedido(telefono);
+          const nuevoId = (nuevo as { id: string } | null)?.id;
+          if (nuevoId && pedido.cotizacionId) {
+            await insforgeAdmin.database
+              .from("cotizaciones")
+              .update({ customer_id: nuevoId })
+              .eq("id", pedido.cotizacionId);
+          }
           return { ok: true, nombre: nombre.trim() };
         },
       }),
       crear_cotizacion: tool({
         description:
-          "Crea la cotización formal con TODO el pedido en curso. Úsala SOLO cuando el cliente confirme que ya es todo (\"es todo\", \"nada más\", \"así está bien\"). Devuelve folio y enlace para que el cliente la autorice.",
+          "CIERRA el pedido cuando el cliente confirme que ya es todo (\"es todo\", \"nada más\", \"así está bien\"): avisa al equipo de ventas y devuelve el folio y el mismo enlace para que el cliente la autorice. La cotización ya existe desde antes — esto NO crea una nueva.",
         inputSchema: z.object({}),
         execute: async () => {
           const pedido = await cargarPedido(telefono);
-          if (pedido.length === 0)
+          if (pedido.items.length === 0)
             return {
               ok: false,
               nota: "El pedido está vacío. Agrega primero lo que el cliente confirmó (agregar_al_pedido).",
             };
-          const res = await crearCotizacionAgente(
-            pedido.map((i) => ({ sku: i.sku, qty: i.qty })),
-            telefono,
-          );
-          if ("error" in res)
+          const sync = await sincronizarCotizacion(telefono, pedido);
+          if ("error" in sync)
             return {
               ok: false,
-              nota: "No se pudo crear la cotización. Dile al cliente que un asesor lo atenderá en seguida.",
+              nota: "No se pudo cerrar la cotización. Dile al cliente que un asesor lo atenderá en seguida.",
             };
-          await limpiarPedido(telefono);
+          // Sellers get pinged at close, not on every price tweak.
+          if (pedido.cotizacionId)
+            await notifyCotizacionSinAsignar(pedido.cotizacionId, "agente_whatsapp");
           return {
             ok: true,
-            folio: res.folio,
-            url: res.url,
-            total_mxn: res.total_cents / 100,
-            nota: "Dale al cliente su folio y el enlace para autorizar (tal cual). Dile que al autorizarla un vendedor lo contacta para el envío/pago.",
+            folio: sync.folio,
+            url: sync.url,
+            total_mxn: pedido.items.reduce((s, i) => s + i.unit_mxn * i.qty, 0),
+            nota: "Dale al cliente su folio y el enlace para autorizar TAL CUAL, pelón: sin markdown, sin [ ] ni ( ). Dile que al autorizarla un vendedor lo contacta para el envío/pago.",
           };
         },
       }),
