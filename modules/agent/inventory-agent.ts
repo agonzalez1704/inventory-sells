@@ -7,7 +7,7 @@ import { getNegocioInfo } from "@/modules/config/lib";
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { notifyCotizacionSinAsignar } from "@/lib/push";
 import type { Turno } from "./memoria";
-import type { ClienteDetectado } from "./cliente";
+import { detectarCliente, type ClienteDetectado } from "./cliente";
 import { cargarPedido, guardarPedido, limpiarPedido, type PedidoItem } from "./pedido";
 
 // The agent creates a real quote (unassigned, canal='whatsapp') on the
@@ -168,6 +168,12 @@ Este número pertenece a ${cliente.nombre} (cliente ${cliente.tipo}).${desc}
 - Salúdalo por su nombre de forma natural la primera vez que le contestes en la conversación; después ya no lo repitas en cada mensaje.
 - Si los resultados de buscar_producto traen "precio_cliente_mxn", ESE es su precio y es el que le cotizas (puedes decir "con tu descuento de cliente queda en $X"). El precio de lista solo menciónalo si te lo pide.
 - Su cotización (crear_cotizacion) ya sale con su descuento aplicado automáticamente.`;
+  } else {
+    system += `\n\n=== Cliente NO registrado ===
+Este número no está en el registro de clientes.
+- Cuando confirme que su pedido es todo, ANTES de crear_cotizacion pregúntale "¿A nombre de quién va el pedido?"; con su respuesta usa registrar_cliente y LUEGO crear_cotizacion en el mismo turno.
+- Si pide que lo registres ("regístrame", "guarda mi número"), pide su nombre y usa registrar_cliente.
+- Solo el nombre: NO pidas correo, dirección ni más datos.`;
   }
 
   // Set by the pasar_a_asesor tool if the agent decides it needs a human.
@@ -314,6 +320,30 @@ Este número pertenece a ${cliente.nombre} (cliente ${cliente.tipo}).${desc}
             pedido: pedido.map((i) => ({ nombre: i.nombre, qty: i.qty, unit_mxn: i.unit_mxn })),
             total_mxn: pedido.reduce((s, i) => s + i.unit_mxn * i.qty, 0),
           };
+        },
+      }),
+      registrar_cliente: tool({
+        description:
+          "Registra este número como cliente nuevo con el nombre que dio. Úsala antes de crear la cotización de un número NO registrado, o si el cliente pide que lo registres. Solo el nombre — tipo y descuento los asigna un vendedor después.",
+        inputSchema: z.object({
+          nombre: z.string().min(2).describe("nombre del cliente o su negocio, tal como lo dijo"),
+        }),
+        execute: async ({ nombre }) => {
+          // Race-safe: re-check, then insert; a unique collision = already there.
+          const existente = await detectarCliente(telefono);
+          if (existente) return { ok: true, ya_registrado: true, nombre: existente.nombre };
+          const { error } = await insforgeAdmin.database.from("customers").insert([
+            {
+              nombre: nombre.trim().slice(0, 80),
+              telefono: telefono.replace(/\D/g, "").slice(-10), // registry stores 10-digit local
+              tipo: "publico",
+              descuento_pct: 0,
+              created_by: "agente_whatsapp",
+            },
+          ]);
+          if (error && !/duplicate|unique|already registered/i.test(error.message ?? ""))
+            return { ok: false, nota: "No se pudo registrar; continúa con la cotización normal." };
+          return { ok: true, nombre: nombre.trim() };
         },
       }),
       crear_cotizacion: tool({
