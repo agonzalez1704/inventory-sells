@@ -18,6 +18,7 @@ import {
   ScanBarcode,
   ShieldCheck,
   FileText,
+  Truck,
   Menu,
   X,
 } from "lucide-react";
@@ -51,6 +52,7 @@ const GRUPOS: {
     label: "Catálogo",
     links: [
       { href: "/inventario", label: "Inventario", icon: Boxes, permiso: "inventario_ver" },
+      { href: "/proveedores", label: "Proveedores", icon: Truck, permiso: "inventario_ver" },
       { href: "/clientes", label: "Clientes", icon: Users, permiso: "pos_vender" },
     ],
   },

@@ -15,6 +15,8 @@ import {
   adjustStock,
   type EditableProduct,
 } from "./actions";
+import { listarProveedores, type Proveedor } from "@/modules/proveedores/actions";
+import { entregaTexto } from "@/modules/proveedores/ProveedoresView";
 
 type Form = {
   name: string;
@@ -26,6 +28,7 @@ type Form = {
   price: string;
   is_active: boolean;
   etiqueta: string;
+  proveedor_id: string;
 };
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -58,6 +61,7 @@ export function ProductEditModal({
   const [reason, setReason] = useState<"adjustment" | "return">("adjustment");
   const [note, setNote] = useState("");
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [saving, startSave] = useTransition();
   const [adjusting, startAdjust] = useTransition();
 
@@ -78,6 +82,7 @@ export function ProductEditModal({
           price: String(fromCents(p.price_cents)),
           is_active: p.is_active,
           etiqueta: p.etiqueta ?? "",
+          proveedor_id: p.proveedor_id ?? "",
         });
       })
       .catch((e) => !cancelled && setLoadError(e.message));
@@ -85,6 +90,10 @@ export function ProductEditModal({
       cancelled = true;
     };
   }, [productId]);
+
+  useEffect(() => {
+    listarProveedores().then(setProveedores).catch(() => setProveedores([]));
+  }, []);
 
   function set<K extends keyof Form>(key: K, value: Form[K]) {
     setForm((f) => (f ? { ...f, [key]: value } : f));
@@ -104,6 +113,7 @@ export function ProductEditModal({
           price: parseFloat(form.price) || 0,
           is_active: form.is_active,
           etiqueta: form.etiqueta || null,
+          proveedor_id: form.proveedor_id || null,
         });
         toast.success("Producto actualizado");
         router.refresh();
@@ -205,6 +215,24 @@ export function ProductEditModal({
             <span className="mt-1 block text-xs text-muted-foreground">
               Se vende normal, pero su efectivo se reporta aparte en el corte de
               caja bajo esta etiqueta.
+            </span>
+          </Field>
+
+          <Field label="Proveedor (opcional)">
+            <Select
+              value={form.proveedor_id}
+              onChange={(e) => set("proveedor_id", e.target.value)}
+            >
+              <option value="">Nuestro stock (entrega inmediata)</option>
+              {proveedores.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.nombre} — {entregaTexto(p.lead_time_dias)}
+                </option>
+              ))}
+            </Select>
+            <span className="mt-1 block text-xs text-muted-foreground">
+              De quién se surte esta pieza. Su tiempo de entrega es lo que espera
+              el cliente cuando no la tenemos aquí.
             </span>
           </Field>
 
