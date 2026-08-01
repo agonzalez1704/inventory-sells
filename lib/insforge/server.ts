@@ -1,6 +1,7 @@
 import "server-only";
 import { auth } from "@clerk/nextjs/server";
 import { createClient } from "@insforge/sdk";
+import { noStoreFetch } from "./fetch";
 
 // User-scoped InsForge client for Server Components / Server Actions.
 // Authenticated with the caller's Clerk JWT (template "insforge"), so RLS and
@@ -13,6 +14,7 @@ export async function createInsForgeServerClient() {
   const client = createClient({
     baseUrl: process.env.NEXT_PUBLIC_INSFORGE_URL!,
     anonKey: process.env.NEXT_PUBLIC_INSFORGE_ANON_KEY!,
+    fetch: noStoreFetch, // never read the database from Next's Data Cache
   });
 
   if (token) client.setAccessToken(token);
