@@ -123,7 +123,9 @@ Cotización VIVA (el pedido del cliente ES una cotización real desde el primer 
 - En cuanto des precio de producto(s) CONCRETOS disponibles (uno por modelo, sin ambigüedad de calidad), en ese MISMO turno usa agregar_al_pedido con esos SKU (qty 1 salvo que diga otra cosa). La primera vez esto crea su cotización: incluye el enlace AL FINAL de esa misma respuesta ("Aquí puedes ver tu cotización: <enlace>") y pregunta si sería algo más.
 - NO agregues cuando lo que diste fue una LISTA de opciones/calidades y le preguntaste cuál quiere: espera su elección y entonces agrega la elegida.
 - La cotización se edita en todo momento con el MISMO enlace: más productos → agregar_al_pedido; cambia cantidad → agregar_al_pedido con la cantidad TOTAL nueva; ya no quiere algo → quitar_del_pedido; pregunta qué lleva o pide el enlace → ver_pedido.
-- El enlace se comparte cuando se crea, cuando lo pida, y al cierre. NO lo repitas en cada mensaje.
+- El enlace se comparte la PRIMERA vez que lo agregas algo en esta conversación, cuando lo pida, y al cierre. Después no lo repitas en cada mensaje. Regla simple: el cliente debe haber visto su enlace al menos una vez en esta conversación.
+- La cotización puede venir de un rato antes con productos ya dentro. Si al agregar algo el pedido trae MÁS productos de los que acabas de agregar, dile la lista completa de lo que lleva (no solo el total), para que no se confunda con el monto.
+- Si el cliente se despide ("gracias", "ok", "sale") y su cotización tiene productos, antes de despedirte recuérdale su folio y su enlace para autorizarla. Nunca dejes que se vaya sin saber dónde está su cotización.
 - Cuando el cliente confirme que ya es todo ("es todo", "nada más", "así está bien", "sí, eso sería"), usa crear_cotizacion (sin parámetros): cierra el pedido y avisa al equipo. NO uses pasar_a_asesor para esto.
 - Solo se agregan productos con precio disponible. Si eligió una versión con precio por confirmar (0), esa NO va al pedido: para esa usa pasar_a_asesor.
 - Al cerrar, dale su folio y el enlace para autorizarla, y dile que al autorizarla un vendedor lo contacta para el envío/pago. Ej: "¡Listo! Tu cotización COT-000123 por $980. Ábrela y autorízala aquí: <enlace>. En cuanto la autorices, un vendedor te contacta para el envío."
@@ -182,6 +184,14 @@ Este número no está en el registro de clientes.
     /\b(display|pantalla|bateria|batería|cargador|mica|flex|camara|cámara|moto|motorola|iphone|samsung|xiaomi|redmi|huawei|honor|oppo|realme|zte|precios?|cu[aá]nto|cuestan?|valen?|vale)\b/i.test(
       ultimoMensaje,
     );
+  // A goodbye triggers no tool on its own, so the model answers from the
+  // text-only history — where the folio and link don't exist. A customer who
+  // says "gracias" would walk away never knowing where their quote lives.
+  const seDespide =
+    !requiereBusquedaDeProducto &&
+    /^\s*(muchas\s+)?(gracias|grax|ok|okay|sale|listo|va|perfecto|excelente|de acuerdo|hasta luego|nos vemos|bye|adi[oó]s)\b/i.test(
+      ultimoMensaje,
+    );
 
   const { text } = await generateText({
     model: openai(MODEL),
@@ -193,13 +203,22 @@ Este número no está en el registro de clientes.
     stopWhen: stepCountIs(7),
     // A product mention must be grounded in the catalog before the model can
     // write its answer. Subsequent steps may use the rest of the tools normally.
-    prepareStep: ({ stepNumber }) =>
-      requiereBusquedaDeProducto && stepNumber === 0
-        ? {
-            activeTools: ["buscar_producto"],
-            toolChoice: { type: "tool", toolName: "buscar_producto" },
-          }
-        : undefined,
+    prepareStep: ({ stepNumber }) => {
+      if (stepNumber !== 0) return undefined;
+      if (requiereBusquedaDeProducto)
+        return {
+          activeTools: ["buscar_producto"],
+          toolChoice: { type: "tool", toolName: "buscar_producto" },
+        };
+      // On a goodbye, look up the quote first so the farewell can carry the
+      // folio and link instead of a bare "¡De nada!".
+      if (seDespide)
+        return {
+          activeTools: ["ver_pedido"],
+          toolChoice: { type: "tool", toolName: "ver_pedido" },
+        };
+      return undefined;
+    },
     tools: {
       pasar_a_asesor: tool({
         description:
@@ -352,12 +371,15 @@ Este número no está en el registro de clientes.
 
           // The nota must match reality: only ask for the link when we ACTUALLY
           // have a url — otherwise the model invents a placeholder.
+          // The link rule keys on whether the CUSTOMER has seen it in THIS
+          // conversation — not on whether the quote is new. A quote can carry
+          // over from an earlier chat (6h window), and telling the model "you
+          // already sent it" when it never did is how a customer ends up with
+          // a quote and no link.
           const nota =
             "error" in sync
               ? "NO menciones ningún enlace en esta respuesta. Confirma lo agregado y pregunta si sería algo más."
-              : sync.creada
-                ? "Cotización creada. Al FINAL de tu respuesta pega el valor de \"url\" tal cual, pelón, SIN corchetes ni [texto](url), diciendo que ahí puede ver su cotización. Luego pregunta si sería algo más."
-                : "Cotización actualizada (mismo enlace de antes; no lo repitas salvo que lo pida). Confirma corto y pregunta si sería algo más.";
+              : "Revisa TU historial de esta conversación: si NO le has enviado todavía el enlace de la cotización, pega el valor de \"url\" al FINAL de tu respuesta, tal cual, pelón, SIN corchetes ni [texto](url) — el cliente necesita verlo al menos una vez. Si ya se lo mandaste antes en esta misma conversación, no lo repitas. Luego pregunta si sería algo más.";
           if (!("error" in sync) && sync.creada && pedido.cotizacionId) {
             // A new quote IS a lead: ping sellers once, at creation.
             await notifyCotizacionSinAsignar(pedido.cotizacionId, "agente_whatsapp");
@@ -382,12 +404,16 @@ Este número no está en el registro de clientes.
         inputSchema: z.object({}),
         execute: async () => {
           const pedido = await cargarPedido(telefono);
+          const tiene = pedido.items.length > 0 && !!pedido.shareToken;
           return {
             pedido: pedido.items.map((i) => ({ nombre: i.nombre, qty: i.qty, unit_mxn: i.unit_mxn })),
             total_mxn: pedido.items.reduce((s, i) => s + i.unit_mxn * i.qty, 0),
             ...(pedido.folio && pedido.shareToken
               ? { folio: pedido.folio, url: urlCotizacion(pedido.shareToken) }
               : {}),
+            nota: tiene
+              ? "Si el cliente se está despidiendo, despídete recordándole su folio y pegando el \"url\" tal cual, pelón. No lo dejes ir sin saber dónde está su cotización."
+              : "No tiene cotización activa: si se despide, solo despídete normal.",
           };
         },
       }),
