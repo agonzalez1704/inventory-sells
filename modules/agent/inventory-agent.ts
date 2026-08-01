@@ -11,7 +11,7 @@ import { detectarCliente, type ClienteDetectado } from "./cliente";
 import { cargarPedido, guardarPedido, type Pedido, type PedidoItem } from "./pedido";
 
 const urlCotizacion = (token: string) =>
-  `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/cotizacion#${token}`;
+  `${(process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/+$/, "")}/cotizacion#${token}`;
 
 // The quote is a LIVING order: created silently the first time the agent has
 // concrete items (link shared in that same reply), then edited in place —
@@ -134,6 +134,7 @@ Abreviaturas en los nombres de productos:
 - "C/M" = con marco · "S/M" = sin marco.
 - Si el cliente pide "con marco" o "sin marco", corresponde a C/M o S/M; búscalo y filtra por eso.
 - Al mostrar un producto con "C/M" dilo como "con marco" (y "S/M" como "sin marco").
+- Si de un modelo existe la versión "C/M" y otra SIN marcar (sin C/M ni S/M en el nombre), la no marcada es la de SIN marco. El precio que ya citaste también te dice cuál es cuál.
 
 Calidades de pantalla (distinto del marco):
 - Manejamos estas calidades: Original (ORG), OLED, Incell, AAA (genérica/económica) y JK (marca genérica). Cada resultado trae su calidad en el campo "calidad".
@@ -230,7 +231,7 @@ Este número no está en el registro de clientes.
     maxOutputTokens: 600,
     // Sales bot must follow catalog rules consistently, not creatively.
     temperature: 0.2,
-    stopWhen: stepCountIs(5),
+    stopWhen: stepCountIs(7),
     // A product mention must be grounded in the catalog before the model can
     // write its answer. Subsequent steps may use the rest of the tools normally.
     prepareStep: ({ stepNumber }) =>
@@ -336,12 +337,53 @@ Este número no está en el registro de clientes.
               .map((p) => [p.sku, p]),
           );
           const pct = cliente?.descuento_pct ?? 0;
-          const rechazados: string[] = [];
+          // Rejections carry their REASON: a guessed sku ("no existe") must
+          // never be reported to the customer as "agotado".
+          const rechazados: { sku: string; motivo: string; candidatos?: { sku: string; nombre: string }[] }[] = [];
           for (const it of items) {
-            const p = porSku.get(it.sku);
-            // No price OR no stock → doesn't enter the quote.
-            if (!p || p.price_cents <= 0 || p.quantity <= 0) {
-              rechazados.push(it.sku);
+            let p = porSku.get(it.sku);
+            if (!p) {
+              // The model often guesses SKUs in later turns (tool results
+              // don't survive the text-only history). Recover by searching —
+              // progressively dropping trailing words ("moto e32 sin marco" →
+              // "moto e32") until something live matches. A single match is
+              // unambiguous; several become candidates for the model to pick.
+              const palabras = it.sku.replace(/[-_]/g, " ").trim().split(/\s+/);
+              let vivos: Awaited<ReturnType<typeof buscarProducto>> = [];
+              for (let n = palabras.length; n >= 1; n--) {
+                const rows = await buscarProducto(palabras.slice(0, n).join(" "));
+                vivos = rows.filter((r) => r.stock > 0 && r.precio_mxn > 0);
+                if (vivos.length > 0) break;
+              }
+              if (vivos.length === 1) {
+                p = {
+                  sku: vivos[0].sku,
+                  name: vivos[0].nombre,
+                  price_cents: Math.round(vivos[0].precio_mxn * 100),
+                  quantity: vivos[0].stock,
+                  is_active: true,
+                };
+              } else {
+                rechazados.push({
+                  sku: it.sku,
+                  motivo: "ese SKU no existe — NO está agotado; usa el sku EXACTO de buscar_producto",
+                  ...(vivos.length
+                    ? {
+                        candidatos: vivos
+                          .slice(0, 4)
+                          .map((v) => ({ sku: v.sku, nombre: v.nombre, precio_mxn: v.precio_mxn })),
+                      }
+                    : {}),
+                });
+                continue;
+              }
+            }
+            if (p.price_cents <= 0) {
+              rechazados.push({ sku: it.sku, motivo: "sin precio cargado (lo confirma un asesor)" });
+              continue;
+            }
+            if (p.quantity <= 0) {
+              rechazados.push({ sku: it.sku, motivo: "agotado" });
               continue;
             }
             const cents = pct > 0 ? Math.round((p.price_cents * (100 - pct)) / 100) : p.price_cents;
@@ -364,7 +406,11 @@ Este número no está en el registro de clientes.
             total_mxn: pedido.items.reduce((s, i) => s + i.unit_mxn * i.qty, 0),
             ...("error" in sync ? {} : { folio: sync.folio, url: sync.url }),
             ...(rechazados.length
-              ? { nota_rechazados: "Estos NO se agregaron (agotados o sin precio): " + rechazados.join(", ") + ". Dile al cliente cuál no se pudo y ofrece la alternativa disponible." }
+              ? {
+                  rechazados,
+                  nota_rechazados:
+                    "Revisa el MOTIVO de cada rechazado. Si trae 'candidatos': ELIGE el correcto según lo que pidió el cliente y llama agregar_al_pedido OTRA VEZ EN ESTE MISMO TURNO con ese sku — no anuncies el problema ni pidas permiso para reintentar. Si el motivo es 'no existe' sin candidatos, usa buscar_producto y reintenta igual. NUNCA menciones SKUs ni errores técnicos al cliente, y NUNCA digas 'agotado' por un SKU mal escrito — solo el motivo 'agotado' se dice como 'la tengo agotada'.",
+                }
               : {}),
             nota,
           };
