@@ -1,11 +1,12 @@
 import "server-only";
 import { insforgeAdmin } from "@/lib/insforge/admin";
 
-// Per-number LIVE order for the WhatsApp agent: items accumulate across
-// messages and are mirrored into a real cotización (created on the first
-// concrete quote, edited in place afterwards — same folio, same share link).
-// Persisted because tool results (the exact SKUs) don't survive in the
-// text-only chat history.
+// The conversation's live quote. There is no separate draft: the cotización IS
+// the order, so what the customer sees at the link and what the agent believes
+// they carry can never drift apart. Creating/editing goes through the SQL
+// functions, which hold an advisory lock per phone — the model calls the add
+// tool once per product in PARALLEL, and doing this in app code created one
+// quote per call instead of one per conversation.
 export type PedidoItem = { sku: string; nombre: string; qty: number; unit_mxn: number };
 
 export type Pedido = {
@@ -16,42 +17,88 @@ export type Pedido = {
 };
 
 const VACIO: Pedido = { items: [], cotizacionId: null, folio: null, shareToken: null };
-const VENTANA_MS = 6 * 3_600_000; // same session window as cargarHistorial
 
+const urlBase = () => (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/+$/, "");
+export const urlCotizacion = (token: string) => `${urlBase()}/cotizacion#${token}`;
+
+type CotRow = {
+  id: string;
+  folio: string;
+  share_token: string;
+  cotizacion_items: { sku: string; nombre: string; qty: number; unit_price_cents: number }[] | null;
+};
+
+// Read-only view of the live quote (same 6h window the SQL uses).
 export async function cargarPedido(numero: string): Promise<Pedido> {
+  const desde = new Date(Date.now() - 6 * 3_600_000).toISOString();
   const { data } = await insforgeAdmin.database
-    .from("wa_pedidos")
-    .select("items, cotizacion_id, folio, share_token, updated_at")
-    .eq("numero", numero)
-    .maybeSingle();
-  const row = data as
-    | { items: PedidoItem[]; cotizacion_id: string | null; folio: string | null; share_token: string | null; updated_at: string }
-    | null;
+    .from("cotizaciones")
+    .select("id, folio, share_token, cotizacion_items(sku, nombre, qty, unit_price_cents)")
+    .eq("canal", "whatsapp")
+    .eq("estado", "pendiente")
+    .eq("notas", `WhatsApp: ${numero}`)
+    .gte("created_at", desde)
+    .order("created_at", { ascending: false })
+    .limit(1);
+  const row = (data as CotRow[] | null)?.[0];
   if (!row) return { ...VACIO };
-  if (Date.now() - +new Date(row.updated_at) > VENTANA_MS) return { ...VACIO }; // stale draft
   return {
-    items: Array.isArray(row.items) ? row.items : [],
-    cotizacionId: row.cotizacion_id,
+    items: (row.cotizacion_items ?? []).map((i) => ({
+      sku: i.sku,
+      nombre: i.nombre,
+      qty: i.qty,
+      unit_mxn: i.unit_price_cents / 100,
+    })),
+    cotizacionId: row.id,
     folio: row.folio,
     shareToken: row.share_token,
   };
 }
 
-export async function guardarPedido(numero: string, pedido: Pedido): Promise<void> {
-  // Overwrite-by-key without relying on PostgREST upsert semantics.
-  await insforgeAdmin.database.from("wa_pedidos").delete().eq("numero", numero);
-  await insforgeAdmin.database.from("wa_pedidos").insert([
-    {
-      numero,
-      items: pedido.items,
-      cotizacion_id: pedido.cotizacionId,
-      folio: pedido.folio,
-      share_token: pedido.shareToken,
-      updated_at: new Date().toISOString(),
-    },
-  ]);
+type SyncRow = { id: string; folio: string; share_token: string; total_cents: number; creada?: boolean };
+
+// Add items (qty = total wanted per SKU) to the live quote, creating it on
+// first use. Atomic and commutative: two parallel calls end with both products
+// in ONE quote regardless of order.
+export async function agregarACotizacion(
+  numero: string,
+  items: { sku: string; qty: number }[],
+): Promise<{ folio: string; url: string; totalMxn: number; creada: boolean } | { error: string }> {
+  try {
+    const { data, error } = await insforgeAdmin.database.rpc("agregar_a_cotizacion_whatsapp", {
+      p_telefono: numero,
+      p_items: items,
+    });
+    if (error) return { error: error.message ?? "no se pudo agregar" };
+    const row = (Array.isArray(data) ? data[0] : data) as SyncRow | undefined;
+    if (!row?.id) return { error: "no se pudo agregar" };
+    return {
+      folio: row.folio,
+      url: urlCotizacion(row.share_token),
+      totalMxn: row.total_cents / 100,
+      creada: !!row.creada,
+    };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "error" };
+  }
 }
 
-export async function limpiarPedido(numero: string): Promise<void> {
-  await insforgeAdmin.database.from("wa_pedidos").delete().eq("numero", numero);
+export async function quitarDeCotizacion(
+  numero: string,
+  sku: string | null,
+  todo: boolean,
+): Promise<{ folio: string; url: string; totalMxn: number } | { error: string }> {
+  try {
+    const { data, error } = await insforgeAdmin.database.rpc("quitar_de_cotizacion_whatsapp", {
+      p_telefono: numero,
+      p_sku: sku,
+      p_todo: todo,
+    });
+    if (error) return { error: error.message ?? "no se pudo quitar" };
+    const row = (Array.isArray(data) ? data[0] : data) as SyncRow | undefined;
+    if (!row?.id) return { error: "sin cotización activa" };
+    return { folio: row.folio, url: urlCotizacion(row.share_token), totalMxn: row.total_cents / 100 };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "error" };
+  }
 }

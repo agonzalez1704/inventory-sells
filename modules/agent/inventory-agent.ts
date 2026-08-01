@@ -8,58 +8,17 @@ import { insforgeAdmin } from "@/lib/insforge/admin";
 import { notifyCotizacionSinAsignar } from "@/lib/push";
 import type { Turno } from "./memoria";
 import { detectarCliente, type ClienteDetectado } from "./cliente";
-import { cargarPedido, guardarPedido, type Pedido, type PedidoItem } from "./pedido";
+import {
+  cargarPedido,
+  agregarACotizacion,
+  quitarDeCotizacion,
+  urlCotizacion,
+} from "./pedido";
 
-const urlCotizacion = (token: string) =>
-  `${(process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/+$/, "")}/cotizacion#${token}`;
-
-// The quote is a LIVING order: created silently the first time the agent has
-// concrete items (link shared in that same reply), then edited in place —
-// same folio, same link. Sellers are only notified when the customer closes.
-// Mutates `pedido` with the quote identity and persists it.
-async function sincronizarCotizacion(
-  numero: string,
-  pedido: Pedido,
-): Promise<{ folio: string; url: string } | { error: string }> {
-  const items = pedido.items.map((i) => ({ sku: i.sku, qty: i.qty }));
-  try {
-    if (pedido.cotizacionId) {
-      const { error } = await insforgeAdmin.database.rpc("actualizar_cotizacion_whatsapp", {
-        p_id: pedido.cotizacionId,
-        p_items: items,
-      });
-      if (!error) {
-        await guardarPedido(numero, pedido);
-        return { folio: pedido.folio!, url: urlCotizacion(pedido.shareToken!) };
-      }
-      // Not editable anymore (expired/converted/cancelled): fall through and
-      // start a fresh quote for this conversation.
-    }
-    if (items.length === 0) {
-      await guardarPedido(numero, pedido);
-      return { error: "sin productos" };
-    }
-    const { data, error } = await insforgeAdmin.database.rpc("crear_cotizacion_whatsapp", {
-      p_items: items,
-      p_telefono: numero,
-    });
-    if (error) return { error: error.message ?? "no se pudo crear" };
-    const row = (Array.isArray(data) ? data[0] : data) as
-      | { id: string; folio: string; share_token: string; total_cents: number }
-      | undefined;
-    if (!row?.id) return { error: "no se pudo crear" };
-    pedido.cotizacionId = row.id;
-    pedido.folio = row.folio;
-    pedido.shareToken = row.share_token;
-    await guardarPedido(numero, pedido);
-    // A new quote IS a lead: ping sellers right away. Edits don't re-ping,
-    // and the customer's authorization has its own push.
-    await notifyCotizacionSinAsignar(row.id, "agente_whatsapp");
-    return { folio: row.folio, url: urlCotizacion(row.share_token) };
-  } catch (e) {
-    return { error: e instanceof Error ? e.message : "error" };
-  }
-}
+// Quote creation/editing lives in SQL (agregar_a_cotizacion_whatsapp), which
+// holds an advisory lock per phone. The model calls the add tool once per
+// product IN PARALLEL, so deciding create-vs-edit here — read, then write —
+// raced with itself and produced one quote per call.
 
 const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 const MODEL =
@@ -326,8 +285,6 @@ Este número no está en el registro de clientes.
             .min(1),
         }),
         execute: async ({ items }) => {
-          const pedido = await cargarPedido(telefono);
-          const esNueva = !pedido.cotizacionId;
           const { data } = await insforgeAdmin.database
             .from("products")
             .select("sku, name, price_cents, quantity, is_active")
@@ -337,10 +294,10 @@ Este número no está en el registro de clientes.
               .filter((p) => p.is_active)
               .map((p) => [p.sku, p]),
           );
-          const pct = cliente?.descuento_pct ?? 0;
           // Rejections carry their REASON: a product we simply couldn't
           // identify must never be reported to the customer as "agotado".
           const rechazados: { producto: string; motivo: string }[] = [];
+          const aAgregar: { sku: string; qty: number }[] = [];
           for (const it of items) {
             let p = porSku.get(it.producto);
             if (!p) {
@@ -383,21 +340,28 @@ Este número no está en el registro de clientes.
               rechazados.push({ producto: p.name, motivo: "agotado" });
               continue;
             }
-            const cents = pct > 0 ? Math.round((p.price_cents * (100 - pct)) / 100) : p.price_cents;
-            const item: PedidoItem = { sku: p.sku, nombre: p.name, qty: it.qty, unit_mxn: cents / 100 };
-            const idx = pedido.items.findIndex((x) => x.sku === p.sku);
-            if (idx >= 0) pedido.items[idx] = item;
-            else pedido.items.push(item);
+            aAgregar.push({ sku: p.sku, qty: it.qty });
           }
-          const sync = await sincronizarCotizacion(telefono, pedido);
+
+          // One atomic call: SQL finds-or-creates the quote under a per-phone
+          // lock and merges these SKUs, so parallel calls can't fork it.
+          const sync = aAgregar.length
+            ? await agregarACotizacion(telefono, aAgregar)
+            : { error: "nada que agregar" as const };
+          const pedido = await cargarPedido(telefono);
+
           // The nota must match reality: only ask for the link when we ACTUALLY
           // have a url — otherwise the model invents a placeholder.
           const nota =
             "error" in sync
               ? "NO menciones ningún enlace en esta respuesta. Confirma lo agregado y pregunta si sería algo más."
-              : esNueva
+              : sync.creada
                 ? "Cotización creada. Al FINAL de tu respuesta pega el valor de \"url\" tal cual, pelón, SIN corchetes ni [texto](url), diciendo que ahí puede ver su cotización. Luego pregunta si sería algo más."
                 : "Cotización actualizada (mismo enlace de antes; no lo repitas salvo que lo pida). Confirma corto y pregunta si sería algo más.";
+          if (!("error" in sync) && sync.creada && pedido.cotizacionId) {
+            // A new quote IS a lead: ping sellers once, at creation.
+            await notifyCotizacionSinAsignar(pedido.cotizacionId, "agente_whatsapp");
+          }
           return {
             pedido: pedido.items.map((i) => ({ nombre: i.nombre, qty: i.qty, unit_mxn: i.unit_mxn })),
             total_mxn: pedido.items.reduce((s, i) => s + i.unit_mxn * i.qty, 0),
@@ -435,27 +399,29 @@ Este número no está en el registro de clientes.
           todo: z.boolean().optional().describe("true = vaciar el pedido completo"),
         }),
         execute: async ({ producto, todo }) => {
-          const pedido = await cargarPedido(telefono);
-          if (todo) {
-            pedido.items = [];
-          } else if (producto) {
-            // The model often lacks the draft's exact SKUs (text-only history),
-            // so match by SKU or name, loosely: every word must appear.
+          const antes = await cargarPedido(telefono);
+          let skus: string[] = [];
+          if (!todo && producto) {
+            // The model rarely has exact SKUs in a later turn (text-only
+            // history), so match by SKU or name: every word must appear.
             const palabras = producto.toLowerCase().split(/\s+/).filter(Boolean);
-            const matches = pedido.items.filter((i) => {
-              const hay = `${i.sku} ${i.nombre}`.toLowerCase();
-              return palabras.every((p) => hay.includes(p));
-            });
-            if (matches.length === 0)
+            skus = antes.items
+              .filter((i) => palabras.every((p) => `${i.sku} ${i.nombre}`.toLowerCase().includes(p)))
+              .map((i) => i.sku);
+            if (skus.length === 0)
               return {
                 ok: false,
-                pedido: pedido.items.map((i) => ({ sku: i.sku, nombre: i.nombre, qty: i.qty })),
-                nota: "No encontré ese producto en el pedido. Estos son los que lleva — vuelve a llamar quitar_del_pedido con el nombre correcto.",
+                pedido: antes.items.map((i) => ({ nombre: i.nombre, qty: i.qty })),
+                nota: "No encontré ese producto en la cotización. Estos son los que lleva — vuelve a llamar quitar_del_pedido con el nombre correcto.",
               };
-            const fuera = new Set(matches.map((m) => m.sku));
-            pedido.items = pedido.items.filter((i) => !fuera.has(i.sku));
           }
-          const sync = await sincronizarCotizacion(telefono, pedido);
+          let sync: Awaited<ReturnType<typeof quitarDeCotizacion>> = { error: "sin cambios" };
+          if (todo) {
+            sync = await quitarDeCotizacion(telefono, null, true);
+          } else {
+            for (const sku of skus) sync = await quitarDeCotizacion(telefono, sku, false);
+          }
+          const pedido = await cargarPedido(telefono);
           return {
             pedido: pedido.items.map((i) => ({ nombre: i.nombre, qty: i.qty, unit_mxn: i.unit_mxn })),
             total_mxn: pedido.items.reduce((s, i) => s + i.unit_mxn * i.qty, 0),
@@ -511,17 +477,12 @@ Este número no está en el registro de clientes.
               ok: false,
               nota: "El pedido está vacío. Agrega primero lo que el cliente confirmó (agregar_al_pedido).",
             };
-          const sync = await sincronizarCotizacion(telefono, pedido);
-          if ("error" in sync)
-            return {
-              ok: false,
-              nota: "No se pudo cerrar la cotización. Dile al cliente que un asesor lo atenderá en seguida.",
-            };
-          // Sellers were already pinged at creation; closing just recaps.
+          // The quote already exists and is up to date — closing just recaps it.
+          // Sellers were pinged when it was created.
           return {
             ok: true,
-            folio: sync.folio,
-            url: sync.url,
+            folio: pedido.folio,
+            url: pedido.shareToken ? urlCotizacion(pedido.shareToken) : undefined,
             total_mxn: pedido.items.reduce((s, i) => s + i.unit_mxn * i.qty, 0),
             nota: "Dale al cliente su folio y el enlace para autorizar TAL CUAL, pelón: sin markdown, sin [ ] ni ( ). Dile que al autorizarla un vendedor lo contacta para el envío/pago.",
           };

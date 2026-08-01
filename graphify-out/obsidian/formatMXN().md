@@ -1,0 +1,86 @@
+---
+source_file: "lib/money.ts"
+type: "code"
+community: "formatMXN()"
+location: "L16"
+tags:
+  - graphify/code
+  - graphify/EXTRACTED
+  - community/formatMXN
+---
+
+# formatMXN()
+
+## Connections
+- [[AbonarFiadoModal()]] - `calls` [EXTRACTED]
+- [[AbonarModal()]] - `calls` [EXTRACTED]
+- [[AdelantoRow()]] - `calls` [EXTRACTED]
+- [[AdelantosView()]] - `calls` [EXTRACTED]
+- [[AdelantosView.tsx]] - `imports` [EXTRACTED]
+- [[CajaView()]] - `calls` [EXTRACTED]
+- [[CajaView.tsx]] - `imports` [EXTRACTED]
+- [[CartBody()]] - `calls` [EXTRACTED]
+- [[CartDrawer.tsx]] - `imports` [EXTRACTED]
+- [[CheckoutView()]] - `calls` [EXTRACTED]
+- [[CheckoutView.tsx]] - `imports` [EXTRACTED]
+- [[CotizacionBuilder()]] - `calls` [EXTRACTED]
+- [[CotizacionBuilder.tsx]] - `imports` [EXTRACTED]
+- [[CotizacionDetalle()]] - `calls` [EXTRACTED]
+- [[CotizacionDetalle.tsx]] - `imports` [EXTRACTED]
+- [[CotizacionPublica()]] - `calls` [EXTRACTED]
+- [[CotizacionPublica.tsx]] - `imports` [EXTRACTED]
+- [[CotizacionesView()]] - `calls` [EXTRACTED]
+- [[CotizacionesView.tsx]] - `imports` [EXTRACTED]
+- [[EditModal()]] - `calls` [EXTRACTED]
+- [[IngresosModal()]] - `calls` [EXTRACTED]
+- [[InventarioModal()]] - `calls` [EXTRACTED]
+- [[InventoryPdf()]] - `calls` [EXTRACTED]
+- [[InventoryPdf.tsx]] - `imports` [EXTRACTED]
+- [[InventoryView()]] - `calls` [EXTRACTED]
+- [[InventoryView.tsx]] - `imports` [EXTRACTED]
+- [[ItemSwapModal()]] - `calls` [EXTRACTED]
+- [[ItemSwapModal.tsx]] - `imports` [EXTRACTED]
+- [[LoanRow()]] - `calls` [EXTRACTED]
+- [[LoansView()]] - `calls` [EXTRACTED]
+- [[LoansView.tsx]] - `imports` [EXTRACTED]
+- [[MovRow()]] - `calls` [EXTRACTED]
+- [[OrdenPage()]] - `calls` [EXTRACTED]
+- [[PaymentContent()]] - `calls` [EXTRACTED]
+- [[PaymentSheet.tsx]] - `imports` [EXTRACTED]
+- [[PedidoRow()]] - `calls` [EXTRACTED]
+- [[PedidosView.tsx]] - `imports` [EXTRACTED]
+- [[ProductCard()]] - `calls` [EXTRACTED]
+- [[ProductCard()_1]] - `calls` [EXTRACTED]
+- [[ProductRow()]] - `calls` [EXTRACTED]
+- [[ProductoDetalle()]] - `calls` [EXTRACTED]
+- [[ProductoDetalle.tsx]] - `imports` [EXTRACTED]
+- [[RecentSales()]] - `calls` [EXTRACTED]
+- [[RecentSales.tsx]] - `imports` [EXTRACTED]
+- [[ReportesPage()]] - `calls` [EXTRACTED]
+- [[ReturnModal()]] - `calls` [EXTRACTED]
+- [[ReturnModal.tsx]] - `imports` [EXTRACTED]
+- [[SalesScreen()]] - `calls` [EXTRACTED]
+- [[SalesScreen.tsx]] - `imports` [EXTRACTED]
+- [[TiendaView.tsx]] - `imports` [EXTRACTED]
+- [[VentasFiltros()]] - `calls` [EXTRACTED]
+- [[VentasFiltros.tsx]] - `imports` [EXTRACTED]
+- [[buildCorteHTML()]] - `calls` [EXTRACTED]
+- [[buildEscPos()]] - `calls` [EXTRACTED]
+- [[buildEscPosCorte()]] - `calls` [EXTRACTED]
+- [[buildTicketHTML()]] - `calls` [EXTRACTED]
+- [[corte.ts]] - `imports` [EXTRACTED]
+- [[escpos-usb.ts]] - `imports` [EXTRACTED]
+- [[money.ts]] - `contains` [EXTRACTED]
+- [[notifyAbono()]] - `calls` [EXTRACTED]
+- [[notifyAsignacion()]] - `calls` [EXTRACTED]
+- [[notifyCancelacion()]] - `calls` [EXTRACTED]
+- [[notifyCotizacionAutorizada()]] - `calls` [EXTRACTED]
+- [[notifyCotizacionSinAsignar()]] - `calls` [EXTRACTED]
+- [[notifyCotizacionTomada()]] - `calls` [EXTRACTED]
+- [[notifyNuevaVenta()]] - `calls` [EXTRACTED]
+- [[page.tsx_13]] - `imports` [EXTRACTED]
+- [[page.tsx_21]] - `imports` [EXTRACTED]
+- [[push.ts]] - `imports` [EXTRACTED]
+- [[ticket.ts]] - `imports` [EXTRACTED]
+
+#graphify/code #graphify/EXTRACTED #community/formatMXN

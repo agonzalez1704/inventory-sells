@@ -1,0 +1,208 @@
+{
+  "main": {
+    "id": "3b54c5b56696cc57",
+    "type": "split",
+    "children": [
+      {
+        "id": "e10481307bc67f56",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "6476fcdb6b36efa3",
+            "type": "leaf",
+            "state": {
+              "type": "graph",
+              "state": {},
+              "icon": "lucide-git-fork",
+              "title": "Graph view"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "c54098c6199901b1",
+    "type": "split",
+    "children": [
+      {
+        "id": "da5b225789956f66",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "b14b37f366138092",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          },
+          {
+            "id": "9d989d65145d77f2",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Search"
+            }
+          },
+          {
+            "id": "f85e05207945dedc",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "2e3ef5dec643e054",
+    "type": "split",
+    "children": [
+      {
+        "id": "3e49669094fa2782",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "33561fb231bb20f6",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks"
+            }
+          },
+          {
+            "id": "9db400ca82ce2c71",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links"
+            }
+          },
+          {
+            "id": "fd976d8f998d9b86",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "2e683d3fc0a5c88d",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "All properties"
+            }
+          },
+          {
+            "id": "c88ae8281495fdb7",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Outline"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false,
+      "bases:Create new base": false
+    }
+  },
+  "active": "6476fcdb6b36efa3",
+  "lastOpenFiles": [
+    "_COMMUNITY_sw.js.md",
+    "_COMMUNITY_SPEI payment logo.md",
+    "_COMMUNITY_OXXO payment logo.md",
+    "_COMMUNITY_Aplazo payment logo.md",
+    "_COMMUNITY_ZTE brand logo.md",
+    "_COMMUNITY_Xiaomi brand logo.md",
+    "_COMMUNITY_realme brand logo.md",
+    "_COMMUNITY_OPPO brand logo.md",
+    "_COMMUNITY_Motorola brand logo.md",
+    "_COMMUNITY_Huawei brand logo.md",
+    "_COMMUNITY_20260728153810_inventario-gestionar-permiso.sql.md",
+    "_COMMUNITY_20260716170728_orden-web-no-filtrar-stock.sql.md",
+    "_COMMUNITY_20260701182518_edit-sale-items.sql.md",
+    "_COMMUNITY_20260624191817_edit-loan-items.sql.md",
+    "_COMMUNITY_VOUCHER_HORAS.md",
+    "_COMMUNITY_Conversational WhatsApp quotations.md",
+    "_COMMUNITY_Fiable logo mark.md",
+    "_COMMUNITY_tailwind.config.ts.md",
+    "_COMMUNITY_proxy.ts.md",
+    "_COMMUNITY_postcss.config.mjs.md",
+    "_COMMUNITY_next.config.ts.md",
+    "_COMMUNITY_20260731222623_cotizacion-wa-no-mostrador.sql.md",
+    "_COMMUNITY_20260730220927_wa-pedido-en-curso.sql.md",
+    "_COMMUNITY_20260730190501_cotizacion-whatsapp-cliente.sql.md",
+    "_COMMUNITY_20260728193234_crear-cotizacion-whatsapp.sql.md",
+    "_COMMUNITY_20260728170000_cotizacion-share-token.sql.md"
+  ]
+}
