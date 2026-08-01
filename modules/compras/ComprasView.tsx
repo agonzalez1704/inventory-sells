@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
-import type { Compra, CompraEstado } from "./actions";
+import type { Compra, CompraEstado, CuentaPorPagar } from "./actions";
 
 const TONO: Record<CompraEstado, "neutral" | "accent" | "warning"> = {
   borrador: "warning",
@@ -30,7 +30,13 @@ export function capturado(c: Compra): number {
   return (c.compra_items ?? []).reduce((s, i) => s + Number(i.line_total_cents ?? 0), 0);
 }
 
-export function ComprasView({ compras }: { compras: Compra[] }) {
+export function ComprasView({
+  compras,
+  porPagar,
+}: {
+  compras: Compra[];
+  porPagar: CuentaPorPagar[];
+}) {
   const [query, setQuery] = useState("");
 
   const filtradas = useMemo(() => {
@@ -61,6 +67,35 @@ export function ComprasView({ compras }: { compras: Compra[] }) {
           </Button>
         </Link>
       </div>
+
+      {porPagar.length > 0 && (
+        <Card className="p-4">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm font-medium">Por pagar a proveedores</p>
+            <p className="font-semibold tabular-nums">
+              {formatMXN(porPagar.reduce((s, p) => s + p.saldo_cents, 0))}
+            </p>
+          </div>
+          <ul className="mt-3 space-y-1.5">
+            {porPagar.map((p) => (
+              <li key={p.proveedor_id} className="flex items-center justify-between gap-2 text-sm">
+                <span className="min-w-0 truncate">
+                  {p.nombre}
+                  <span className="ml-2 text-xs text-muted-foreground">
+                    {p.facturas} {p.facturas === 1 ? "factura" : "facturas"}
+                  </span>
+                  {p.vencidas > 0 && (
+                    <Badge tone="warning" className="ml-2">
+                      {p.vencidas} vencida{p.vencidas === 1 ? "" : "s"}
+                    </Badge>
+                  )}
+                </span>
+                <span className="shrink-0 tabular-nums">{formatMXN(p.saldo_cents)}</span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
 
       <div className="relative">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />

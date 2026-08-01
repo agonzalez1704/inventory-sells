@@ -201,3 +201,199 @@ export async function cancelarCompra(id: string): Promise<void> {
     throw new Error(error.message ?? "No se pudo cancelar la compra");
   }
 }
+
+// ---- Parte 2: notas de crédito, pagos y saldo ----
+
+export type NotaTipo = "no_llego" | "devolucion" | "descuento";
+export type MetodoPago = "transferencia" | "cheque" | "efectivo";
+
+export type NotaCredito = {
+  id: string;
+  tipo: NotaTipo;
+  monto_cents: number;
+  motivo: string | null;
+  fecha: string;
+  compra_nota_items?: {
+    id: string;
+    qty: number;
+    costo_unitario_cents: number;
+    line_total_cents: number;
+    products?: { sku: string; name: string } | null;
+  }[];
+};
+
+export type Pago = {
+  id: string;
+  monto_cents: number;
+  metodo: MetodoPago;
+  fecha: string;
+  referencia: string | null;
+  notas: string | null;
+};
+
+export type Saldo = {
+  base_cents: number;
+  notas_cents: number;
+  pagado_cents: number;
+  saldo_cents: number;
+};
+
+export async function getSaldo(compraId: string): Promise<Saldo> {
+  await assertPermiso("inventario_gestionar");
+  const { data } = await insforgeAdmin.database
+    .from("compras_saldo")
+    .select("base_cents, notas_cents, pagado_cents, saldo_cents")
+    .eq("compra_id", compraId)
+    .maybeSingle();
+  const s = data as Saldo | null;
+  return {
+    base_cents: Number(s?.base_cents ?? 0),
+    notas_cents: Number(s?.notas_cents ?? 0),
+    pagado_cents: Number(s?.pagado_cents ?? 0),
+    saldo_cents: Number(s?.saldo_cents ?? 0),
+  };
+}
+
+export async function listarNotas(compraId: string): Promise<NotaCredito[]> {
+  await assertPermiso("inventario_gestionar");
+  const { data } = await insforgeAdmin.database
+    .from("compra_notas_credito")
+    .select(
+      "id, tipo, monto_cents, motivo, fecha, " +
+        "compra_nota_items(id, qty, costo_unitario_cents, line_total_cents, products(sku, name))",
+    )
+    .eq("compra_id", compraId)
+    .order("fecha", { ascending: false });
+  return (data ?? []) as unknown as NotaCredito[];
+}
+
+export async function listarPagos(compraId: string): Promise<Pago[]> {
+  await assertPermiso("inventario_gestionar");
+  const { data } = await insforgeAdmin.database
+    .from("compra_pagos")
+    .select("id, monto_cents, metodo, fecha, referencia, notas")
+    .eq("compra_id", compraId)
+    .order("fecha", { ascending: false });
+  return (data ?? []) as unknown as Pago[];
+}
+
+// A note that names products also returns that stock — the RPC does both in one
+// transaction, on the user-scoped client so the ledger records who did it.
+export async function registrarNota(input: {
+  compraId: string;
+  tipo: NotaTipo;
+  motivo: string | null;
+  items: { product_id: string; qty: number; costo_unitario_cents: number }[];
+  montoPesos: number | null;
+}): Promise<void> {
+  await assertPermiso("inventario_gestionar");
+  const conItems = input.items.length > 0;
+  if (!conItems && !(input.montoPesos && input.montoPesos > 0))
+    throw new Error("Indica el importe de la nota");
+
+  const insforge = await createInsForgeServerClient();
+  const { error } = await insforge.database.rpc("crear_nota_credito", {
+    p_compra_id: input.compraId,
+    p_tipo: input.tipo,
+    p_motivo: input.motivo,
+    p_items: conItems ? input.items : null,
+    p_monto_cents: conItems ? null : Math.max(0, toCents(input.montoPesos || 0)),
+  });
+  if (error) {
+    if (/quantity_check|violates/i.test(error.message ?? ""))
+      throw new Error(
+        "No se puede: esa mercancía ya salió del inventario. Ajusta el stock antes de registrar la nota.",
+      );
+    throw new Error(error.message ?? "No se pudo registrar la nota de crédito");
+  }
+}
+
+export async function registrarPago(input: {
+  compraId: string;
+  montoPesos: number;
+  metodo: MetodoPago;
+  fecha: string;
+  referencia: string | null;
+  notas: string | null;
+}): Promise<void> {
+  const userId = await assertPermiso("inventario_gestionar");
+  const cents = Math.max(0, toCents(input.montoPesos || 0));
+  if (cents <= 0) throw new Error("El pago debe ser mayor a cero");
+
+  const { error } = await insforgeAdmin.database.from("compra_pagos").insert([
+    {
+      compra_id: input.compraId,
+      monto_cents: cents,
+      metodo: input.metodo,
+      fecha: input.fecha,
+      referencia: input.referencia?.trim() || null,
+      notas: input.notas?.trim() || null,
+      created_by: userId,
+    },
+  ]);
+  if (error) throw new Error(error.message ?? "No se pudo registrar el pago");
+}
+
+export async function borrarPago(id: string): Promise<void> {
+  await assertPermiso("inventario_gestionar");
+  const { error } = await insforgeAdmin.database.from("compra_pagos").delete().eq("id", id);
+  if (error) throw new Error(error.message ?? "No se pudo borrar el pago");
+}
+
+// What we owe each supplier: only received purchases with something left.
+export type CuentaPorPagar = {
+  proveedor_id: string;
+  nombre: string;
+  saldo_cents: number;
+  facturas: number;
+  vencidas: number;
+};
+
+export async function cuentasPorPagar(): Promise<CuentaPorPagar[]> {
+  await assertPermiso("inventario_gestionar");
+  const [{ data: saldos }, { data: compras }, { data: provs }] = await Promise.all([
+    insforgeAdmin.database
+      .from("compras_saldo")
+      .select("compra_id, proveedor_id, estado, saldo_cents"),
+    insforgeAdmin.database.from("compras").select("id, vence_el, condicion"),
+    insforgeAdmin.database.from("proveedores").select("id, nombre"),
+  ]);
+
+  const nombre = new Map(
+    ((provs ?? []) as { id: string; nombre: string }[]).map((p) => [p.id, p.nombre]),
+  );
+  const vence = new Map(
+    ((compras ?? []) as { id: string; vence_el: string; condicion: string }[]).map((c) => [
+      c.id,
+      c,
+    ]),
+  );
+  const hoy = new Date().toISOString().slice(0, 10);
+
+  const out = new Map<string, CuentaPorPagar>();
+  for (const s of (saldos ?? []) as {
+    compra_id: string;
+    proveedor_id: string;
+    estado: string;
+    saldo_cents: number;
+  }[]) {
+    const saldo = Number(s.saldo_cents ?? 0);
+    if (s.estado !== "recibida" || saldo <= 0) continue;
+    const cur =
+      out.get(s.proveedor_id) ??
+      {
+        proveedor_id: s.proveedor_id,
+        nombre: nombre.get(s.proveedor_id) ?? "—",
+        saldo_cents: 0,
+        facturas: 0,
+        vencidas: 0,
+      };
+    cur.saldo_cents += saldo;
+    cur.facturas += 1;
+    const c = vence.get(s.compra_id);
+    if (c && c.condicion === "credito" && c.vence_el && c.vence_el.slice(0, 10) < hoy)
+      cur.vencidas += 1;
+    out.set(s.proveedor_id, cur);
+  }
+  return [...out.values()].sort((a, b) => b.saldo_cents - a.saldo_cents);
+}

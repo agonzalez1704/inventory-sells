@@ -3,8 +3,9 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { requirePagePermiso } from "@/lib/auth/profile";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
-import { getCompra } from "@/modules/compras/actions";
+import { getCompra, getSaldo, listarNotas, listarPagos } from "@/modules/compras/actions";
 import { CompraDetalle } from "@/modules/compras/CompraDetalle";
+import { CompraFinanzas } from "@/modules/compras/CompraFinanzas";
 import type { SalesProduct } from "@/modules/sales/SalesScreen";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +29,13 @@ export default async function CompraPage({ params }: { params: Promise<{ id: str
     productos = (data ?? []) as SalesProduct[];
   }
 
+  // Money only matters once the goods are in: a draft has nothing to owe yet.
+  const [saldo, notas, pagos] = await Promise.all([
+    getSaldo(id),
+    listarNotas(id),
+    listarPagos(id),
+  ]);
+
   return (
     <section className="space-y-5">
       <div>
@@ -40,6 +48,9 @@ export default async function CompraPage({ params }: { params: Promise<{ id: str
         </Link>
       </div>
       <CompraDetalle compra={compra} productos={productos} />
+      {compra.estado !== "cancelada" && (
+        <CompraFinanzas compra={compra} saldo={saldo} notas={notas} pagos={pagos} />
+      )}
     </section>
   );
 }
