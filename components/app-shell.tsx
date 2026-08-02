@@ -20,6 +20,7 @@ import {
   FileText,
   Truck,
   ShoppingBag,
+  ShieldAlert,
   Menu,
   X,
 } from "lucide-react";
@@ -55,6 +56,7 @@ const GRUPOS: {
       { href: "/inventario", label: "Inventario", icon: Boxes, permiso: "inventario_ver" },
       { href: "/proveedores", label: "Proveedores", icon: Truck, permiso: "inventario_ver" },
       { href: "/compras", label: "Compras", icon: ShoppingBag, permiso: "inventario_gestionar" },
+      { href: "/garantias", label: "Garantías", icon: ShieldAlert, permiso: "inventario_gestionar" },
       { href: "/clientes", label: "Clientes", icon: Users, permiso: "pos_vender" },
     ],
   },
