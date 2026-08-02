@@ -3,6 +3,7 @@ import { redirect, notFound } from "next/navigation";
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { getPermisos, getAsignables } from "@/lib/auth/profile";
 import { CotizacionDetalle, type CotDetalle, type CotItem } from "@/modules/cotizaciones/CotizacionDetalle";
+import { planSurtido, type ProductoSurtido } from "@/lib/surtido";
 
 export const dynamic = "force-dynamic";
 
@@ -60,6 +61,27 @@ export default async function CotizacionPage({ params }: { params: Promise<{ id:
     puedeReasignar ? getAsignables() : Promise.resolve([]),
   ]);
 
+  // Delivery plan (R7): what we hold vs what each supplier still owes us. Only
+  // the SKUs on this quote are looked up.
+  const skus = ((itemData ?? []) as CotItem[]).map((i) => i.sku).filter(Boolean) as string[];
+  const { data: prodData } = skus.length
+    ? await insforgeAdmin.database
+        .from("products")
+        .select("sku, quantity, proveedores(nombre, lead_time_dias)")
+        .in("sku", skus)
+    : { data: [] };
+  const catalogo = new Map<string, ProductoSurtido>(
+    ((prodData ?? []) as unknown as {
+      sku: string;
+      quantity: number;
+      proveedores: { nombre: string; lead_time_dias: number } | null;
+    }[]).map((p) => [
+      p.sku,
+      { sku: p.sku, quantity: Number(p.quantity ?? 0), proveedor: p.proveedores ?? null },
+    ]),
+  );
+  const plan = planSurtido((itemData ?? []) as CotItem[], catalogo);
+
   // All profiles resolve the current assignee's name (even if their role no
   // longer grants cotizar); the reassign dropdown only lists real sellers.
   const vendName = new Map(
@@ -89,6 +111,7 @@ export default async function CotizacionPage({ params }: { params: Promise<{ id:
     <CotizacionDetalle
       cot={cot}
       items={(itemData ?? []) as CotItem[]}
+      plan={plan}
       perms={{
         editar: perms.has("cotizar"),
         autorizar: perms.has("autorizar"),

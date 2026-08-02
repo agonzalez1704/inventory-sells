@@ -21,6 +21,7 @@ import {
   Truck,
   ShoppingBag,
   ShieldAlert,
+  ClipboardList,
   Menu,
   X,
 } from "lucide-react";
@@ -45,6 +46,7 @@ const GRUPOS: {
       { href: "/ventas", label: "Ventas", icon: ShoppingCart, permiso: "pos_vender" },
       { href: "/cotizaciones", label: "Cotizaciones", icon: FileText, permiso: "cotizar" },
       { href: "/pedidos", label: "Pedidos", icon: Package, permiso: "surtir" },
+      { href: "/surtido", label: "Por surtir", icon: ClipboardList, permiso: "inventario_gestionar" },
       { href: "/fiados", label: "Notas de crédito", icon: HandCoins, permiso: "pos_vender" },
       { href: "/adelantos", label: "Adelantos", icon: Wallet, permiso: "pos_vender" },
       { href: "/asesor", label: "Asesor", icon: Headset, permiso: "pos_vender" },

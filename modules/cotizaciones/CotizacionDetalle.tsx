@@ -9,6 +9,8 @@ import { formatMXN } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { PlanEntrega } from "@/modules/surtido/PlanEntrega";
+import type { PlanSurtido } from "@/lib/surtido";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
@@ -79,9 +81,11 @@ export function CotizacionDetalle({
   items,
   perms,
   vendedores,
+  plan,
 }: {
   cot: CotDetalle;
   items: CotItem[];
+  plan?: PlanSurtido;
   perms: {
     editar: boolean;
     autorizar: boolean;
@@ -267,6 +271,9 @@ export function CotizacionDetalle({
           </table>
         </div>
       </Card>
+
+      {/* Delivery plan: what ships today vs what each supplier still owes */}
+      {plan && <PlanEntrega plan={plan} />}
 
       {/* Reassign */}
       {perms.reasignar && !terminal && vendedores.length > 0 && (
