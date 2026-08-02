@@ -31,16 +31,16 @@ Features a construir/considerar **antes de arrancar el fork** de la refaccionari
 
 | ID | Feature | Dif. | Prio. | Notas / dependencias |
 |----|---------|------|-------|----------------------|
-| **R1** | **Cárdex SKU por producto** — fecha de venta + bitácora de compra por unidad. | L | P2 | Historial por SKU/unidad. Apoya en el ledger `inventory_movements` (ya existe); falta granularidad por unidad + origen de compra. Liga a R5. |
-| **R2** | **Detección del cliente por WhatsApp.** | S–M | P1 | Machear número entrante con cliente. El agente ya opera por número; clientes ya tienen teléfono. Mejora con R4. |
-| **R3** | **Dar de alta números de cliente por medio del Agente.** | M | P2 | Tool del agente para registrar cliente/teléfono. Depende de clientes + agente (existen). |
-| **R4** | **Múltiples teléfonos por cliente.** | M | P1 | Cambio de esquema (tabla `customer_phones`) + UI. Habilita R2/R3. |
+| **R1** | **Cárdex SKU por producto** — fecha de venta + bitácora de compra por unidad. | L | P2 | ✅ **Hecho** (2026-08-02): `/inventario/[id]` lee el ledger como historia — entrada de compra (con folio, proveedor y costo pagado), venta, devolución, ajuste — con saldo corrido calculado hacia atrás desde el stock actual. Costos gated por `costos_ver`. | Historial por SKU/unidad. Apoya en el ledger `inventory_movements` (ya existe); falta granularidad por unidad + origen de compra. Liga a R5. |
+| **R2** | ✅ **Hecho**. **Detección del cliente por WhatsApp.** | S–M | P1 | Machear número entrante con cliente. El agente ya opera por número; clientes ya tienen teléfono. Mejora con R4. |
+| **R3** | ✅ **Hecho**. **Dar de alta números de cliente por medio del Agente.** | M | P2 | Tool del agente para registrar cliente/teléfono. Depende de clientes + agente (existen). |
+| **R4** | ✅ **Hecho**. **Múltiples teléfonos por cliente.** | M | P1 | Cambio de esquema (tabla `customer_phones`) + UI. Habilita R2/R3. |
 | **R5** | **Proveedores.** *(Cuidado: logística de inventarios ↔ proveedores.)* | L | P1 | ✅ **Fase 1 hecha** (2026-08-01): tabla `proveedores` + `lead_time_dias`, `products.proveedor_id`, `/proveedores`, selector en el editor de producto. El proveedor cuelga del PRODUCTO (un almacén tiene varios proveedores; misma pieza de otro proveedor = otro SKU) → **E5 resuelto de paso**. Falta Fase 2 = compras/facturas (R6). |
-| **R6** | **Compras a proveedor: facturas y cuentas por pagar.** Captura de la factura completa, contado vs crédito (días), forma de pago (transferencia/cheque/efectivo), fecha de ingreso, flag de pronto pago con su descuento, y notas de crédito/devoluciones que descuentan del documento. Total a pagar = documento − devoluciones. | L | P2 | Ampliado el 2026-08-01 con la nota de voz del negocio: no es solo "a quién le debemos". La factura se captura COMPLETA para cuadrar contra el papel; lo que no llegó se baja con nota de crédito y actúa como descuento de esa nota. Pronto pago solo se MARCA (no se calcula). Depende de R5. Base de R1 (cárdex). |
-| **R9** | **Garantías y devoluciones a proveedor.** Piezas que le regresamos a un proveedor por garantía, acumuladas como **adeudo del proveedor hacia nosotros** hasta que nos lo rebajen. Llevan monto en pesos. | M | P2 | Requerimiento NUEVO (nota de voz 2026-08-01), no estaba en el backlog original. Clave que lo abarata: *"no necesitamos saber de qué nota viene"* — solo saldo acumulado por proveedor, sin trazabilidad al documento de compra. Depende de R5. |
+| **R6** | ✅ **Hecho** (2026-08-01). **Compras a proveedor: facturas y cuentas por pagar.** Captura de la factura completa, contado vs crédito (días), forma de pago (transferencia/cheque/efectivo), fecha de ingreso, flag de pronto pago con su descuento, y notas de crédito/devoluciones que descuentan del documento. Total a pagar = documento − devoluciones. | L | P2 | Ampliado el 2026-08-01 con la nota de voz del negocio: no es solo "a quién le debemos". La factura se captura COMPLETA para cuadrar contra el papel; lo que no llegó se baja con nota de crédito y actúa como descuento de esa nota. Pronto pago solo se MARCA (no se calcula). Depende de R5. Base de R1 (cárdex). |
+| **R9** | ✅ **Hecho** (2026-08-02). **Garantías y devoluciones a proveedor.** Piezas que le regresamos a un proveedor por garantía, acumuladas como **adeudo del proveedor hacia nosotros** hasta que nos lo rebajen. Llevan monto en pesos. | M | P2 | Requerimiento NUEVO (nota de voz 2026-08-01), no estaba en el backlog original. Clave que lo abarata: *"no necesitamos saber de qué nota viene"* — solo saldo acumulado por proveedor, sin trazabilidad al documento de compra. Depende de R5. |
 | **R10** | **Costeo por capas (utilidad real por venta).** El mismo SKU comprado a distintos costos forma capas; al vender, el sistema consume una capa y el costo de esa venta sale de ahí, no del costo único del catálogo. | L | P3 | Surgido el 2026-08-01: *"si me quedan 2 piezas a un costo menor mi utilidad es más alta y debo dar prioridad a sacar esas"*. Es una decisión CONTABLE, no física (las piezas son indistinguibles), así que es automática y no da trabajo al vendedor. **R6 deja las capas listas gratis** (`compra_items` ya guarda costo por entrada); esto solo agrega el consumo al vender. Cambia el cálculo de utilidad en reportes y corte, que hoy usa `products.cost_cents`. Método de consumo (FIFO vs menor-costo-primero) **pendiente de decidir**. |
-| **R7** | **Surtir notas por proveedor** — cuando una nota tiene productos de **diferentes almacenes** con **diferentes tiempos de entrega**. | L | P2 | Fulfillment dividido por proveedor/almacén + lead time. Depende de R5 + E5. |
-| **R8** | **Cotizaciones por WhatsApp conversacionales.** No crear la cotización de inmediato; dar seguimiento ("¿Sería algo más?", "¿Le cotizo otra cosa?") y crearla **hasta que el cliente confirme** que es todo. | M | P0 | Extiende el flujo WA de cotización (`crear-cotizacion-whatsapp` ya existe) a multi-turno acumulando ítems hasta confirmación. |
+| **R7** | **Surtir notas por proveedor** — cuando una nota tiene productos de **diferentes almacenes** con **diferentes tiempos de entrega**. | L | P2 | ✅ **Hecho** (2026-08-02): plan de entrega en la cotización (qué va hoy, qué espera a quién, cuándo está completo) + `/surtido` con lo que hay que pedir por proveedor, sumando demanda entre cotizaciones. | Fulfillment dividido por proveedor/almacén + lead time. Depende de R5 + E5. |
+| **R8** | ✅ **Hecho**. **Cotizaciones por WhatsApp conversacionales.** No crear la cotización de inmediato; dar seguimiento ("¿Sería algo más?", "¿Le cotizo otra cosa?") y crearla **hasta que el cliente confirme** que es todo. | M | P0 | Extiende el flujo WA de cotización (`crear-cotizacion-whatsapp` ya existe) a multi-turno acumulando ítems hasta confirmación. |
 
 ---
 
@@ -59,7 +59,7 @@ Los features no son independientes; conviene atacar por cimientos:
 Los Re-utilizables se construyen y estabilizan en la base (Fiable); el fork de
 refaccionaria arranca después sobre esa base ya probada.
 
-### Fase A — Compartidos (en Fiable, antes del fork)
+### Fase A — Compartidos (en Fiable, antes del fork) — ✅ COMPLETA (2026-08-02)
 
 Orden por cimiento × dificultad:
 
@@ -157,3 +157,27 @@ se aplicó.
 - **El costo del catálogo NO se actualiza solo** con la compra: queda manual.
   De ahí salió R10 — el costo real de cada venta debe venir de su capa, no del
   costo único del producto.
+
+
+---
+
+## Fase A cerrada — 2026-08-02
+
+Los 8 compartidos están en producción. Lo que quedó construido, en orden de
+cimiento:
+
+1. **R4** teléfonos múltiples → **R2** detección por WhatsApp → **R3** alta por
+   el agente. La identidad del cliente ya no depende de que alguien la teclee.
+2. **R8** cotización conversacional: el pedido se acumula y la cotización vive
+   y se edita durante toda la charla, con un enlace permanente.
+3. **R5** proveedores (con `lead_time_dias`, que resolvió **E5** de paso) →
+   **R6** compras, facturas y cuentas por pagar → **R9** garantías → **R7**
+   surtido por proveedor.
+4. **R1** cárdex: el ledger se lee como la historia de una pieza.
+
+Queda **R10** (costeo por capas) agendado en P3 — `compra_items` ya guarda el
+costo de cada entrada, así que las capas están puestas; falta consumirlas al
+vender. Método (FIFO vs menor-costo-primero) sin decidir, y conviene revisarlo
+con el contador.
+
+**Siguiente: Fase B — el fork de la refaccionaria** (E1, E2, E3, E4, E6, E7).

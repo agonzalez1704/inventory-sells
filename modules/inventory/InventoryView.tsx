@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   Boxes,
   PackageSearch,
@@ -12,6 +13,7 @@ import {
   ChevronsUpDown,
   Plus,
   Camera,
+  History,
 } from "lucide-react";
 import type { Inventory, Product } from "@/lib/types";
 import { formatMXN } from "@/lib/money";
@@ -419,6 +421,9 @@ export function InventoryView({
                 <SortableTh label="Categoría" k="category" sort={sort} onSort={toggleSort} className="hidden sm:table-cell" />
                 <SortableTh label="Precio" k="price" sort={sort} onSort={toggleSort} align="right" className="hidden text-right sm:table-cell" />
                 <SortableTh label="Stock" k="quantity" sort={sort} onSort={toggleSort} align="right" className="text-right" />
+                <th className="w-10 px-2 py-2 font-medium">
+                  <span className="sr-only">Historial</span>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -511,6 +516,17 @@ export function InventoryView({
                   </td>
                   <td className="px-4 py-2.5 text-right">
                     <StockCell qty={p.quantity} />
+                  </td>
+                  <td className="px-2 py-2.5 text-right">
+                    <Link
+                      href={`/inventario/${p.id}`}
+                      onClick={(e) => e.stopPropagation()}
+                      aria-label={`Historial de ${p.name}`}
+                      title="Ver historial (cárdex)"
+                      className="inline-flex cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    >
+                      <History className="h-4 w-4" />
+                    </Link>
                   </td>
                 </tr>
               ))}
