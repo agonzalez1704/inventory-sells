@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import { useQueryState, parseAsString } from "nuqs";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -219,7 +220,12 @@ export function SalesScreen({
     () => customers.find((c) => c.is_system) ?? customers[0],
     [customers],
   );
-  const [query, setQuery] = useState("");
+  // The search box lives in the URL so a refresh — including the one a new
+  // deploy forces mid-sale — doesn't wipe what the seller was looking for.
+  const [query, setQuery] = useQueryState(
+    "q",
+    parseAsString.withDefault("").withOptions({ history: "replace" }),
+  );
   const [categoria, setCategoria] = useState<string | null>(null);
   const [cart, setCart] = useState<Record<string, number>>({});
   const [mode, setMode] = useState<"venta" | "prestamo">("venta");

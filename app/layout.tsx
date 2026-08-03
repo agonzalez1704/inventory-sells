@@ -3,6 +3,7 @@ import { Inter, JetBrains_Mono } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { auth } from "@clerk/nextjs/server";
 import { Toaster } from "sonner";
+import { NuqsAdapter } from "nuqs/adapters/next/app";
 import { AppShell } from "@/components/app-shell";
 import { getPermisos } from "@/lib/auth/profile";
 import "./globals.css";
@@ -51,14 +52,18 @@ export default async function RootLayout({
               "(function(){try{var p=location.pathname;if(p.indexOf('/tienda')===0||p==='/cotizacion')return;var t=localStorage.getItem('theme');var d=t?t==='dark':matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.classList.toggle('dark',d);}catch(e){}})();",
           }}
         />
-        <ClerkProvider>
-          <AppShell permisos={permisos}>{children}</AppShell>
-          <Toaster
-            position="top-right"
-            richColors
-            toastOptions={{ className: "font-sans" }}
-          />
-        </ClerkProvider>
+        {/* Search and filters live in the URL (nuqs), so a refresh — or the
+            reload a new deploy forces — doesn't wipe what the seller typed. */}
+        <NuqsAdapter>
+          <ClerkProvider>
+            <AppShell permisos={permisos}>{children}</AppShell>
+            <Toaster
+              position="top-right"
+              richColors
+              toastOptions={{ className: "font-sans" }}
+            />
+          </ClerkProvider>
+        </NuqsAdapter>
       </body>
     </html>
   );

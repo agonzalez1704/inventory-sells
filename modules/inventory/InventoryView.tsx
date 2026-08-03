@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useQueryState, parseAsString, parseAsStringLiteral } from "nuqs";
 import {
   Boxes,
   PackageSearch,
@@ -110,7 +111,8 @@ function ExportMenu({ verCostos }: { verCostos: boolean }) {
   );
 }
 
-type SortKey = "sku" | "name" | "category" | "price" | "quantity";
+const SORT_KEYS = ["sku", "name", "category", "price", "quantity"] as const;
+type SortKey = (typeof SORT_KEYS)[number];
 type Sort = { key: SortKey; dir: "asc" | "desc" };
 
 // Alphabetical for text (locale + natural number order so "X7" < "X10"),
@@ -205,17 +207,42 @@ export function InventoryView({
   verCostos: boolean;
   puedePrecios: boolean;
 }) {
-  const [query, setQuery] = useState("");
-  const [sort, setSort] = useState<Sort | null>(null);
-  const [selectedInv, setSelectedInv] = useState<string>("all");
+  // Search, sort and warehouse live in the URL: a refresh (or the reload a new
+  // deploy forces) keeps the screen exactly where the user left it, and the
+  // address can be shared or bookmarked. `history: replace` keeps typing from
+  // filling the back button.
+  const [query, setQuery] = useQueryState(
+    "q",
+    parseAsString.withDefault("").withOptions({ history: "replace" }),
+  );
+  const [sortKey, setSortKey] = useQueryState(
+    "sort",
+    parseAsStringLiteral(SORT_KEYS).withOptions({ history: "replace" }),
+  );
+  const [sortDir, setSortDir] = useQueryState(
+    "dir",
+    parseAsStringLiteral(["asc", "desc"] as const)
+      .withDefault("asc")
+      .withOptions({ history: "replace" }),
+  );
+  const [selectedInv, setSelectedInv] = useQueryState(
+    "inv",
+    parseAsString.withDefault("all").withOptions({ history: "replace" }),
+  );
+
+  const sort: Sort | null = sortKey ? { key: sortKey, dir: sortDir } : null;
 
   // Cycle: none → asc → desc → none for the clicked column.
   function toggleSort(key: SortKey) {
-    setSort((cur) => {
-      if (cur?.key !== key) return { key, dir: "asc" };
-      if (cur.dir === "asc") return { key, dir: "desc" };
-      return null;
-    });
+    if (sortKey !== key) {
+      setSortKey(key);
+      setSortDir("asc");
+    } else if (sortDir === "asc") {
+      setSortDir("desc");
+    } else {
+      setSortKey(null);
+      setSortDir(null);
+    }
   }
   const [importOpen, setImportOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
