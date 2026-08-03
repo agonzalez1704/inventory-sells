@@ -53,7 +53,9 @@ const PAYMENT: [PaymentMethod, string][] = [
   ["transferencia", "Transferencia"],
   ["otro", "Otro"],
 ];
-const LABEL = Object.fromEntries(PAYMENT) as Record<string, string>;
+// "mixto" is display-only: it labels a split sale but is never an option
+// you pick, so it stays out of PAYMENT.
+const LABEL = { ...Object.fromEntries(PAYMENT), mixto: "Mixto" } as Record<string, string>;
 
 function EditModal({
   sale,
@@ -65,8 +67,12 @@ function EditModal({
   onClose: () => void;
 }) {
   const router = useRouter();
+  // A split sale has no single method to refund with, so the operator picks
+  // one; anything else keeps the sale's own method as the default.
   const [payment, setPayment] = useState<PaymentMethod>(
-    sale.payment_method ?? "efectivo",
+    sale.payment_method && sale.payment_method !== "mixto"
+      ? sale.payment_method
+      : "efectivo",
   );
   const [customer, setCustomer] = useState(sale.customer_name ?? "");
   const [swapOpen, setSwapOpen] = useState(false);

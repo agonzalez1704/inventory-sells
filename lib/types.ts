@@ -1,5 +1,8 @@
 export type Role = "admin" | "seller";
+// What a payment can be made with. "mixto" is not a method you pick — it marks
+// a sale settled with several methods, whose amounts live in sale_pagos.
 export type PaymentMethod = "efectivo" | "tarjeta" | "transferencia" | "otro";
+export type PaymentMethodStored = PaymentMethod | "mixto";
 
 export interface Profile {
   id: string;
@@ -38,7 +41,7 @@ export type SaleStatus = "pending" | "completed" | "void";
 export interface Sale {
   id: string;
   total_cents: number;
-  payment_method: PaymentMethod | null;
+  payment_method: PaymentMethodStored | null;
   status: SaleStatus;
   customer_name: string | null;
   note: string | null;

@@ -8,6 +8,7 @@ import {
   Wallet,
   Delete,
   Check,
+  Split as SplitIcon,
 } from "lucide-react";
 import { formatMXN } from "@/lib/money";
 import { cn } from "@/lib/utils";
@@ -39,7 +40,7 @@ export function PaymentSheet({
   onClose: () => void;
   total: number; // cents
   pending: boolean;
-  onConfirm: (metodo: PaymentMethod) => void;
+  onConfirm: (metodo: PaymentMethod, pagos?: { metodo: PaymentMethod; monto_cents: number }[]) => void;
 }) {
   // Modal is the drawer on phones now — no local switch needed.
   return (
@@ -58,10 +59,22 @@ function PaymentContent({
   total: number;
   pending: boolean;
   onCancel: () => void;
-  onConfirm: (metodo: PaymentMethod) => void;
+  onConfirm: (metodo: PaymentMethod, pagos?: { metodo: PaymentMethod; monto_cents: number }[]) => void;
 }) {
   const [metodo, setMetodo] = useState<PaymentMethod>("efectivo");
   const [recibido, setRecibido] = useState(""); // pesos, as typed
+  // Split payment: an amount per method, as typed. Off by default — the common
+  // sale is one method and shouldn't pay for this.
+  const [dividir, setDividir] = useState(false);
+  const [montos, setMontos] = useState<Record<string, string>>({});
+
+  const pagos = METODOS.map((m) => ({
+    metodo: m.value,
+    monto_cents: Math.round((Number((montos[m.value] ?? "").replace(",", ".")) || 0) * 100),
+  })).filter((p) => p.monto_cents > 0);
+  const asignado = pagos.reduce((s, p) => s + p.monto_cents, 0);
+  const restante = total - asignado;
+  const splitCuadra = dividir && restante === 0 && pagos.length > 0;
 
   // Reset the typed amount when switching away from cash.
   useEffect(() => {
@@ -74,7 +87,8 @@ function PaymentContent({
   const cambio = hayRecibido ? recibidoCents - total : 0;
   const insuficiente = hayRecibido && recibidoCents < total;
   // Cash: allow "exact" (empty) or received ≥ total. Non-cash: always ok.
-  const puedeCobrar = !esEfectivo || !hayRecibido || recibidoCents >= total;
+  const puedeCobrarSimple = !esEfectivo || !hayRecibido || recibidoCents >= total;
+  const puedeCobrar = dividir ? splitCuadra : puedeCobrarSimple;
 
   const sugerencias = useMemo(() => {
     const opts = new Set<number>([
@@ -108,6 +122,61 @@ function PaymentContent({
         </span>
       </div>
 
+      {/* Split toggle — a mixed payment is the exception, so it stays out of
+          the way until asked for. */}
+      <button
+        onClick={() => setDividir((d) => !d)}
+        className={cn(
+          "flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border py-2 text-sm font-medium transition-colors",
+          dividir
+            ? "border-accent bg-accent-soft text-accent"
+            : "border-dashed border-border text-muted-foreground hover:border-ring/40 hover:text-foreground",
+        )}
+      >
+        <SplitIcon className="h-4 w-4" />
+        {dividir ? "Cobrar con un solo método" : "Dividir el pago"}
+      </button>
+
+      {dividir ? (
+        <div className="space-y-3">
+          <div className="space-y-2">
+            {METODOS.map((m) => (
+              <label key={m.value} className="flex items-center gap-3">
+                <span className="flex w-32 shrink-0 items-center gap-2 text-sm">
+                  <m.icon className="h-4 w-4 text-muted-foreground" />
+                  {m.label}
+                </span>
+                <input
+                  value={montos[m.value] ?? ""}
+                  onChange={(e) =>
+                    setMontos((cur) => ({ ...cur, [m.value]: e.target.value }))
+                  }
+                  inputMode="decimal"
+                  placeholder="0.00"
+                  className="h-10 w-full rounded-lg border border-border bg-background px-3 text-right font-mono tabular-nums outline-none focus:border-ring/40"
+                />
+              </label>
+            ))}
+          </div>
+
+          <div className="space-y-1 text-sm">
+            <Row label="Asignado" value={formatMXN(asignado)} />
+            <Row
+              label={restante > 0 ? "Falta" : restante < 0 ? "Sobra" : "Cuadra"}
+              value={restante === 0 ? formatMXN(total) : formatMXN(Math.abs(restante))}
+              strong
+              tone={restante === 0 ? "accent" : "danger"}
+            />
+          </div>
+
+          {restante !== 0 && (
+            <p className="text-xs text-muted-foreground">
+              Los montos deben sumar exactamente el total para poder cobrar.
+            </p>
+          )}
+        </div>
+      ) : (
+      <>
       {/* Method tiles */}
       <div className="grid grid-cols-4 gap-2">
         {METODOS.map((m) => {
@@ -186,6 +255,9 @@ function PaymentContent({
         </>
       )}
 
+      </>
+      )}
+
       {/* Actions */}
       <div className="flex gap-2 border-t border-border pt-4">
         <Button variant="ghost" className="flex-1" onClick={onCancel} disabled={pending}>
@@ -194,7 +266,7 @@ function PaymentContent({
         <Button
           variant="accent"
           className="flex-1"
-          onClick={() => onConfirm(metodo)}
+          onClick={() => (dividir ? onConfirm("mixto" as PaymentMethod, pagos) : onConfirm(metodo))}
           loading={pending}
           disabled={!puedeCobrar}
         >

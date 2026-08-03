@@ -9,7 +9,7 @@ import {
   type Devolucion,
   type IngresoLinea,
 } from "@/modules/caja/CajaView";
-import type { PaymentMethod } from "@/lib/types";
+import type { PaymentMethodStored, PaymentMethod } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +20,7 @@ const cero = () =>
 type VentaRow = {
   id?: string;
   total_cents: number;
-  payment_method: PaymentMethod | null;
+  payment_method: PaymentMethodStored | null;
   created_at?: string;
   settled_at?: string;
   sale_items: {
@@ -185,7 +185,12 @@ export default async function CajaPage({
   // Adelanto abonos are a subset of income, tracked per method too so the corte
   // can show them separately (they're already folded into ingresosPorMetodo).
   const adelantosPorMetodo = cero();
-  for (const v of directasV) addIngreso(v.payment_method ?? "otro", v.total_cents);
+  // A 'mixto' sale was settled with more than one method, so its money is in
+  // sale_pagos (summed just below). Counting its total here too would double it.
+  for (const v of directasV) {
+    if (v.payment_method === "mixto") continue;
+    addIngreso(v.payment_method ?? "otro", v.total_cents);
+  }
   for (const p of salePagos) addIngreso(p.metodo, p.monto_cents);
   for (const p of adelantoPagos)
     if (p.tipo === "abono") {

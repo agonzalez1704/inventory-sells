@@ -65,8 +65,12 @@ export function ReturnModal({
   onClose: () => void;
 }) {
   const router = useRouter();
+  // A split sale has no single method to refund with, so the operator picks
+  // one; anything else keeps the sale's own method as the default.
   const [metodo, setMetodo] = useState<PaymentMethod>(
-    sale.payment_method ?? "efectivo",
+    sale.payment_method && sale.payment_method !== "mixto"
+      ? sale.payment_method
+      : "efectivo",
   );
   const [motivo, setMotivo] = useState("");
   const [qty, setQty] = useState<Record<string, number>>({});

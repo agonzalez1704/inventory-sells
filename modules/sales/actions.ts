@@ -65,10 +65,16 @@ export async function buscarVentas(q: string): Promise<SaleWithItems[]> {
 
 // Register a sale atomically via the register_sale() RPC: it locks each product
 // row, rejects oversell, and writes sale + items + stock movements in one tx.
+export type PagoSplit = { metodo: PaymentMethod; monto_cents: number };
+
 export async function registerSale(
   items: CartLine[],
   paymentMethod: PaymentMethod,
   customerId: string | null,
+  // Split payment (part transfer, part cash…). The RPC requires these to add
+  // up to the sale total and marks the sale 'mixto'; one entry is treated as a
+  // plain single-method sale.
+  pagos?: PagoSplit[],
 ): Promise<{ saleId: string }> {
   const { userId } = await auth();
   if (!userId) throw new Error("No autenticado");
@@ -81,6 +87,7 @@ export async function registerSale(
     p_items: items.map((i) => ({ product_id: i.product_id, qty: i.qty })),
     p_payment_method: paymentMethod,
     p_customer_id: customerId,
+    p_pagos: pagos && pagos.length > 1 ? pagos : null,
   });
 
   if (error) throw new Error(error.message ?? "Error al registrar la venta");

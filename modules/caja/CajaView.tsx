@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { formatMXN } from "@/lib/money";
 import { cn } from "@/lib/utils";
-import type { PaymentMethod } from "@/lib/types";
+import type { PaymentMethod, PaymentMethodStored } from "@/lib/types";
 import { imprimirCorteNavegador, type CorteData } from "@/lib/corte";
 import { imprimirCorteUSB, webUsbDisponible } from "@/lib/escpos-usb";
 import { Card } from "@/components/ui/card";
@@ -39,7 +39,9 @@ const METODOS: [PaymentMethod, string][] = [
   ["transferencia", "Transferencia"],
   ["otro", "Otro"],
 ];
-const LABEL = Object.fromEntries(METODOS) as Record<string, string>;
+// "mixto" is display-only: it labels a split sale but is never an option
+// you pick, so it stays out of METODOS.
+const LABEL = { ...Object.fromEntries(METODOS), mixto: "Mixto" } as Record<string, string>;
 
 export type Gasto = {
   id: string;
@@ -64,7 +66,7 @@ export type IngresoLinea = {
   tipo: "venta" | "abono" | "adelanto" | "extra";
   concepto: string;
   monto_cents: number;
-  metodo: PaymentMethod | null;
+  metodo: PaymentMethodStored | null;
   fecha: string;
 };
 

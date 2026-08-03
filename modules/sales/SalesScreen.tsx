@@ -26,7 +26,7 @@ import { imprimirTicketNavegador, type TicketData } from "@/lib/ticket";
 import { CustomerPicker, type PickerCustomer } from "@/modules/customers/CustomerPicker";
 import { CompatPanel } from "@/modules/compat/CompatPanel";
 import { PaymentSheet } from "./PaymentSheet";
-import { registerSale, registerLoan } from "./actions";
+import { registerSale, registerLoan, type PagoSplit } from "./actions";
 
 export type SalesProduct = Pick<
   Product,
@@ -290,7 +290,7 @@ export function SalesScreen({
   const canSubmit =
     lines.length > 0 && !(mode === "prestamo" && note.trim() === "");
 
-  function submit(metodo?: PaymentMethod) {
+  function submit(metodo?: PaymentMethod, pagos?: PagoSplit[]) {
     if (!canSubmit) return;
     const items = lines.map((l) => ({ product_id: l.product.id, qty: l.qty }));
     // Snapshot ticket data now — the cart is cleared before the user taps
@@ -315,7 +315,7 @@ export function SalesScreen({
       try {
         const { saleId } = esFiado
           ? await registerLoan(items, note)
-          : await registerSale(items, pm, customer.id);
+          : await registerSale(items, pm, customer.id, pagos);
         const ticket: TicketData = {
           folio: saleId,
           fecha: new Date().toISOString(),
@@ -563,7 +563,7 @@ export function SalesScreen({
         onClose={() => setPaymentOpen(false)}
         total={total}
         pending={pending}
-        onConfirm={(metodo) => submit(metodo)}
+        onConfirm={(metodo, pagos) => submit(metodo, pagos)}
       />
     </>
   );
