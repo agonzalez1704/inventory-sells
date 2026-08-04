@@ -40,6 +40,9 @@ type DevolRow = {
   devolucion_items: {
     qty: number;
     unit_price_cents: number;
+    // What these specific pieces cost, resolved FIFO at sale time. NULL on
+    // sales made before cost layers existed.
+    costo_total_cents?: number | null;
     products: { cost_cents: number } | null;
   }[];
 };
@@ -79,7 +82,7 @@ export default async function CajaPage({
     insforge.database
       .from("sales")
       .select(
-        "id, total_cents, payment_method, created_at, sale_items(qty, unit_price_cents, products(etiqueta, cost_cents, name, sku, inventory_id))",
+        "id, total_cents, payment_method, created_at, sale_items(qty, unit_price_cents, costo_total_cents, products(etiqueta, cost_cents, name, sku, inventory_id))",
       )
       .eq("status", "completed")
       .is("settled_at", null)
@@ -117,7 +120,7 @@ export default async function CajaPage({
     insforge.database
       .from("sale_pagos")
       .select(
-        "monto_cents, metodo, created_at, sales(customer_name, total_cents, sale_items(qty, unit_price_cents, products(etiqueta, cost_cents, name, sku, inventory_id)))",
+        "monto_cents, metodo, created_at, sales(customer_name, total_cents, sale_items(qty, unit_price_cents, costo_total_cents, products(etiqueta, cost_cents, name, sku, inventory_id)))",
       )
       .gte("created_at", startISO)
       .lt("created_at", endISO),
@@ -244,11 +247,20 @@ export default async function CajaPage({
   // --- Net profit (admin): cash basis — direct sales in full, credit notes
   // prorated by each day's abonos — less returns ---
   let gananciaVentas = 0;
+  // Cost comes from the layers the sale actually consumed (FIFO). Sales made
+  // before layers existed have none, so they fall back to the catalog cost —
+  // which is what the whole corte used to do.
+  const costoLinea = (it: {
+    qty: number;
+    costo_total_cents?: number | null;
+    products: { cost_cents: number } | null;
+  }) => it.costo_total_cents ?? (it.products?.cost_cents ?? 0) * it.qty;
+
   const margen = (rows: VentaRow[], factor = 1) => {
     for (const v of rows)
       for (const it of v.sale_items ?? [])
         gananciaVentas += Math.round(
-          (it.unit_price_cents - (it.products?.cost_cents ?? 0)) * it.qty * factor,
+          (it.unit_price_cents * it.qty - costoLinea(it)) * factor,
         );
   };
   margen(directasV);
