@@ -1,5 +1,6 @@
 import { ShieldX } from "lucide-react";
 import { SignOutButton } from "@clerk/nextjs";
+import { MARCA } from "@/lib/marca";
 
 export default function SinAccesoPage() {
   return (
@@ -11,7 +12,7 @@ export default function SinAccesoPage() {
         Acceso restringido
       </h1>
       <p className="mt-2 text-sm text-muted-foreground">
-        Esta cuenta no está autorizada para usar Fiable. Si crees que es un
+        Esta cuenta no está autorizada para usar {MARCA.nombre}. Si crees que es un
         error, contacta al administrador.
       </p>
       <SignOutButton redirectUrl="/">

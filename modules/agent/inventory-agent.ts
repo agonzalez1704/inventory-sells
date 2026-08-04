@@ -5,6 +5,7 @@ import { z } from "zod";
 import { buscarProducto } from "@/modules/analytics/queries";
 import { getNegocioInfo } from "@/modules/config/lib";
 import { insforgeAdmin } from "@/lib/insforge/admin";
+import { MARCA } from "@/lib/marca";
 import { notifyCotizacionSinAsignar } from "@/lib/push";
 import type { Turno } from "./memoria";
 import { detectarCliente, type ClienteDetectado } from "./cliente";
@@ -63,7 +64,7 @@ async function modelosCompatibles(modelo: string): Promise<string[]> {
   }
 }
 
-const SYSTEM = `Eres el asistente de WhatsApp de una tienda de celulares y accesorios (Fiable).
+const SYSTEM = `Eres el asistente de WhatsApp de ${MARCA.nombre}.
 Atiendes a clientes que preguntan por PRECIO y DISPONIBILIDAD de productos, y por datos del negocio (envíos, pagos, ubicación, etc.).
 
 Seguridad y límites (NO NEGOCIABLES — nunca los rompas):

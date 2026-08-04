@@ -14,6 +14,7 @@ import {
   reporteVentas,
 } from "@/modules/analytics/queries";
 import { mxHoy } from "@/lib/caja-range";
+import { MARCA } from "@/lib/marca";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -34,7 +35,7 @@ const handler = createMcpHandler(
   (server) => {
     server.tool(
       "salud",
-      "Verifica que el conector de Fiable responde (ping rápido, sin datos). Úsalo para confirmar la conexión antes de un reporte.",
+      `Verifica que el conector de ${MARCA.nombre} responde (ping rápido, sin datos). Úsalo para confirmar la conexión antes de un reporte.`,
       {},
       async () => json({ ok: true, servicio: "fiable-mcp", fecha: mxHoy() }),
     );

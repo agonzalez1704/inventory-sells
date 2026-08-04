@@ -4,6 +4,7 @@ import { auth } from "@clerk/nextjs/server";
 import { getProfile } from "@/lib/auth/profile";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
 import { pushToUsers, DEFAULT_PREFS, type NotifKind } from "@/lib/push";
+import { MARCA } from "@/lib/marca";
 
 export type WebPushSub = {
   endpoint: string;
@@ -59,7 +60,7 @@ export async function sendTestPush(): Promise<void> {
   if (!userId) throw new Error("No autenticado");
 
   await pushToUsers([userId], {
-    title: "Prueba · Fiable",
+    title: `Prueba · ${MARCA.nombre}`,
     body: "Si ves esto, las notificaciones funcionan ✓",
     url: "/ventas",
   });

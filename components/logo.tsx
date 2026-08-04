@@ -1,7 +1,9 @@
+import { MARCA } from "@/lib/marca";
+
 // Fiable wordmark. The "f" keeps its brand gradient; the rest inherits
 // currentColor so it adapts to the surrounding text color. viewBox is cropped
 // to the glyph bounds so it sizes cleanly via height (w-auto).
-export function Logo({ className }: { className?: string }) {
+function LogoFiable({ className }: { className?: string }) {
   return (
     <svg
       className={className}
@@ -45,5 +47,43 @@ export function Logo({ className }: { className?: string }) {
         d="M574.91,419.53c-2.06,13.53-14.44,22.62-31.52,22.62c-21.27,0-34.03-13.6-34.03-35.71c0-22.04,12.89-36.35,33.32-36.35c20.11,0,32.81,13.6,32.81,34.61v5.74h-47.63v1.16c0,9.86,6.25,16.63,15.86,16.63c6.9,0,12.18-3.42,13.92-8.7H574.91z M528.06,398.9h29.33c-0.39-8.83-6.12-14.89-14.5-14.89C534.63,384.01,528.7,390.27,528.06,398.9z"
       />
     </svg>
+  );
+}
+
+// Ruli wordmark. PLACEHOLDER: typographic stand-in matching the storefront sign
+// (bold, tight, red accent) until the real artwork is supplied as SVG paths —
+// same shape as LogoFiable, where one glyph carries the brand colour and the
+// rest inherits currentColor so it works on light and dark chrome.
+function LogoRuli({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 300 100"
+      xmlns="http://www.w3.org/2000/svg"
+      role="img"
+      aria-label="Refaccionaria Ruli"
+    >
+      <text
+        x="0"
+        y="72"
+        fontFamily="var(--font-sans), system-ui, sans-serif"
+        fontSize="76"
+        fontWeight="800"
+        letterSpacing="2"
+      >
+        <tspan fill="hsl(var(--brand))">R</tspan>
+        <tspan fill="currentColor">ULI</tspan>
+      </text>
+      {/* the sign's gear/wrench dot, reduced to a mark */}
+      <circle cx="238" cy="60" r="13" fill="none" stroke="hsl(var(--brand))" strokeWidth="7" />
+    </svg>
+  );
+}
+
+export function Logo({ className }: { className?: string }) {
+  return MARCA.id === "ruli" ? (
+    <LogoRuli className={className} />
+  ) : (
+    <LogoFiable className={className} />
   );
 }

@@ -1,5 +1,6 @@
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { formatMXN } from "@/lib/money";
+import { MARCA } from "@/lib/marca";
 
 export type PdfVariant = "internal" | "public";
 
@@ -90,7 +91,7 @@ export function InventoryPdf({
   return (
     <Document
       title={isInternal ? "Inventario" : "Lista de precios"}
-      author="Fiable"
+      author={MARCA.nombre}
     >
       <Page size="A4" style={styles.page}>
         <View style={styles.header}>
@@ -199,7 +200,7 @@ export function InventoryPdf({
         <Text
           style={styles.footer}
           render={({ pageNumber, totalPages }) =>
-            `Fiable · Página ${pageNumber} de ${totalPages}`
+            `${MARCA.nombre} · Página ${pageNumber} de ${totalPages}`
           }
           fixed
         />

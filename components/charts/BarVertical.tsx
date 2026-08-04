@@ -3,7 +3,7 @@ import { scaleBand, scaleLinear } from "d3-scale";
 import { max } from "d3-array";
 
 // Vertical bar chart in the Rosen Charts style (div bars + D3 scales),
-// branded with the Fiable gold→amber gradient. RSC-friendly.
+// branded with the deploy's --brand gradient. RSC-friendly.
 export type BarDatum = { key: string; value: number };
 
 export function BarVertical({

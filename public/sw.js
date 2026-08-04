@@ -4,9 +4,11 @@ self.addEventListener("push", (event) => {
   try {
     data = event.data ? event.data.json() : {};
   } catch (_e) {
-    data = { title: "Fiable", body: event.data ? event.data.text() : "" };
+    data = { title: "Notificación", body: event.data ? event.data.text() : "" };
   }
-  const title = data.title || "Fiable";
+  // Static file: cannot read env, so no brand name here. Every push we send
+  // carries its own title; this is only the last-resort fallback.
+  const title = data.title || "Notificación";
   const options = {
     body: data.body || "",
     icon: data.icon || "/icon.svg",

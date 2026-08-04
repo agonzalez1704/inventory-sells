@@ -4,6 +4,7 @@ import { ClerkProvider } from "@clerk/nextjs";
 import { auth } from "@clerk/nextjs/server";
 import { Toaster } from "sonner";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
+import { MARCA, brandCssVars } from "@/lib/marca";
 import { AppShell } from "@/components/app-shell";
 import { getPermisos } from "@/lib/auth/profile";
 import "./globals.css";
@@ -16,10 +17,10 @@ const mono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Fiable",
-  description: "Inventario, ventas y notas de crédito",
+  title: MARCA.nombre,
+  description: MARCA.descripcion,
   manifest: "/manifest.webmanifest",
-  appleWebApp: { capable: true, title: "Fiable", statusBarStyle: "default" },
+  appleWebApp: { capable: true, title: MARCA.corto, statusBarStyle: "default" },
   icons: { icon: "/icon.svg", apple: "/icon.svg" },
 };
 
@@ -43,6 +44,8 @@ export default async function RootLayout({
   return (
     <html lang="es-MX" className={`${sans.variable} ${mono.variable}`} suppressHydrationWarning>
       <body className="min-h-screen font-sans antialiased">
+        {/* Brand palette for this deploy; overrides the defaults in globals.css. */}
+        <style dangerouslySetInnerHTML={{ __html: brandCssVars() }} />
         {/* Set the theme class before paint — no flash of the wrong theme.
             Stored choice wins, else the OS preference. Customer-facing pages
             (storefront + shareable quote) stay light and on-brand. */}

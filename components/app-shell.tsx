@@ -30,6 +30,7 @@ import type { Permiso } from "@/lib/permissions";
 import { Logo } from "@/components/logo";
 import { AsesorNavBadge } from "@/components/asesor-nav-badge";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { MARCA } from "@/lib/marca";
 
 // Nav grouped into sections — a flat list of 12 got unwieldy in a top bar, and a
 // sidebar has the vertical room to label the groups. Each link names the permiso
@@ -154,7 +155,7 @@ export function AppShell({
           <aside className="fixed inset-y-0 left-0 z-30 hidden w-56 flex-col border-r border-border bg-background lg:flex">
             <div className="brand-gradient h-[2px] w-full" />
             <div className="flex h-[52px] shrink-0 items-center border-b border-border px-4">
-              <Link href="/" aria-label="Fiable — inicio">
+              <Link href="/" aria-label={`${MARCA.nombre} — inicio`}>
                 <Logo className="h-6 w-auto text-foreground" />
               </Link>
             </div>
@@ -175,7 +176,7 @@ export function AppShell({
             >
               <Menu className="h-5 w-5" />
             </button>
-            <Link href="/" className="flex items-center" aria-label="Fiable — inicio">
+            <Link href="/" className="flex items-center" aria-label={`${MARCA.nombre} — inicio`}>
               <Logo className="h-6 w-auto text-foreground" />
             </Link>
             <div className="ml-auto flex items-center gap-1">
@@ -215,7 +216,7 @@ export function AppShell({
           <header className="sticky top-0 z-30 border-b border-border bg-background/80 backdrop-blur">
             <div className="brand-gradient h-[2px] w-full" />
             <div className="mx-auto flex h-14 max-w-6xl items-center gap-2 px-3 sm:px-6">
-              <Link href="/" className="flex shrink-0 items-center" aria-label="Fiable — inicio">
+              <Link href="/" className="flex shrink-0 items-center" aria-label={`${MARCA.nombre} — inicio`}>
                 <Logo className="h-6 w-auto text-foreground" />
               </Link>
               <div className="ml-auto flex items-center gap-2">

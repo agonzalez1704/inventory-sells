@@ -1,15 +1,16 @@
 import type { MetadataRoute } from "next";
+import { MARCA } from "@/lib/marca";
 
 // PWA manifest — required for installable app + iOS home-screen push.
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Fiable",
-    short_name: "Fiable",
-    description: "Inventario, ventas y notas de crédito",
+    name: MARCA.nombre,
+    short_name: MARCA.corto,
+    description: MARCA.descripcion,
     start_url: "/pos",
     display: "standalone",
     background_color: "#ffffff",
-    theme_color: "#0f172a",
+    theme_color: MARCA.themeColor,
     icons: [
       { src: "/icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any" },
     ],
