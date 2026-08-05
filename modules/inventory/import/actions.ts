@@ -57,7 +57,19 @@ function attrsToObject(
   return Object.keys(out).length > 0 ? out : undefined;
 }
 
-export type CommitResult = { inserted: number; updated: number };
+// What the `quantity` column in a file means. See the commit_import migration.
+//   alta      goods arrived — add to what we have (a delivery, a photo, a PO)
+//   espejo    the file IS the stock — set ours to match (their ERP owns it)
+//   catalogo  ignore quantity, update only names/prices/costs (we own stock)
+export type ModoImport = "alta" | "espejo" | "catalogo";
+
+export type CommitResult = {
+  inserted: number;
+  updated: number;
+  movidos: number; // productos cuya existencia cambió
+  bajas: number; // de esos, cuántos bajaron — la señal de alarma en espejo
+  sin_precio: number; // entran visibles pero no vendibles
+};
 
 function slugify(s: string): string {
   return s
@@ -101,6 +113,7 @@ export async function commitImport(
   source: ImportSource,
   filename: string | null,
   inventoryId: string,
+  modo: ModoImport = "alta",
 ): Promise<CommitResult> {
   await requireAdmin();
   if (!inventoryId) throw new Error("Selecciona un inventario destino");
@@ -114,13 +127,86 @@ export async function commitImport(
     p_source: source,
     p_filename: filename,
     p_inventory_id: inventoryId,
+    p_modo: modo,
   });
 
   if (error) throw new Error(error.message ?? "Error al importar");
+  const d = (data ?? {}) as Partial<CommitResult>;
   return {
-    inserted: Number((data as { inserted?: number })?.inserted ?? 0),
-    updated: Number((data as { updated?: number })?.updated ?? 0),
+    inserted: Number(d.inserted ?? 0),
+    updated: Number(d.updated ?? 0),
+    movidos: Number(d.movidos ?? 0),
+    bajas: Number(d.bajas ?? 0),
+    sin_precio: Number(d.sin_precio ?? 0),
   };
+}
+
+/**
+ * What an import WOULD do, without writing anything.
+ *
+ * `espejo` is the only mode that can destroy data — it overwrites stock, so
+ * running it after the ERP cutover erases every sale the POS recorded since the
+ * file was exported. Those losses look exactly like ordinary stock corrections
+ * in the result counters, which is why they have to be visible BEFORE the write,
+ * itemised, not as a number to skim past.
+ */
+export type Preview = {
+  nuevos: number;
+  existentes: number;
+  sinPrecio: number;
+  suben: number;
+  bajan: number;
+  igual: number;
+  bajasTop: { sku: string; name: string; de: number; a: number }[];
+};
+
+export async function previewImport(
+  rows: ExtractedRow[],
+  inventoryId: string,
+  modo: ModoImport,
+): Promise<Preview> {
+  await requireAdmin();
+  if (!inventoryId) throw new Error("Selecciona un inventario destino");
+  const payload = buildPayload(rows);
+
+  const insforge = await createInsForgeServerClient();
+  const { data } = await insforge.database
+    .from("products")
+    .select("sku, name, quantity")
+    .eq("inventory_id", inventoryId);
+  const actual = new Map(
+    ((data ?? []) as { sku: string; name: string; quantity: number }[]).map((p) => [
+      p.sku,
+      p,
+    ]),
+  );
+
+  const out: Preview = {
+    nuevos: 0,
+    existentes: 0,
+    sinPrecio: 0,
+    suben: 0,
+    bajan: 0,
+    igual: 0,
+    bajasTop: [],
+  };
+  for (const r of payload) {
+    const prev = actual.get(r.sku);
+    if (!prev) out.nuevos++;
+    else out.existentes++;
+    if (!r.price_cents) out.sinPrecio++;
+
+    if (modo === "catalogo") continue;
+    const desde = prev?.quantity ?? 0;
+    const hasta = modo === "espejo" ? r.quantity : desde + r.quantity;
+    if (hasta > desde) out.suben++;
+    else if (hasta < desde) {
+      out.bajan++;
+      out.bajasTop.push({ sku: r.sku, name: prev?.name ?? r.name ?? r.sku, de: desde, a: hasta });
+    } else out.igual++;
+  }
+  out.bajasTop.sort((a, b) => b.de - b.a - (a.de - a.a)).splice(20);
+  return out;
 }
 
 export type CreatedInventory = {

@@ -17,7 +17,14 @@ import { Input, Select } from "@/components/ui/input";
 import type { Inventory } from "@/lib/types";
 import type { ExtractedRow, ImportSource } from "./schema";
 import { parseSpreadsheet } from "./parse-spreadsheet";
-import { extractFromUpload, commitImport, createInventoryWithImport } from "./actions";
+import {
+  extractFromUpload,
+  commitImport,
+  createInventoryWithImport,
+  previewImport,
+  type ModoImport,
+  type Preview,
+} from "./actions";
 import { createInventory } from "../inventories";
 
 type Format = "image" | "spreadsheet" | "pdf";
@@ -61,6 +68,8 @@ export function ImportPanel({
   const [margin, setMargin] = useState("");
   const [pending, startTransition] = useTransition();
   const [dragging, setDragging] = useState(false);
+  const [modo, setModo] = useState<ModoImport>("alta");
+  const [preview, setPreview] = useState<Preview | null>(null);
 
   const fmt = FORMATS.find((f) => f.key === format)!;
 
@@ -156,15 +165,29 @@ export function ImportPanel({
       toast.error("Selecciona un inventario destino");
       return;
     }
+    // "Espejo" overwrites stock, so it can wipe sales the POS already recorded.
+    // Show what would be lost and make them confirm it, once, before writing.
+    if (!newMode && modo === "espejo" && !preview) {
+      startTransition(async () => {
+        try {
+          setPreview(await previewImport(rows, inventoryId, modo));
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : "Error al revisar");
+        }
+      });
+      return;
+    }
     startTransition(async () => {
       try {
         if (newMode) {
           const r = await createInventoryWithImport(name, rows, source, filename);
           toast.success(`"${r.name}" creado · ${r.inserted} productos`);
         } else {
-          const res = await commitImport(rows, source, filename, inventoryId);
+          const res = await commitImport(rows, source, filename, inventoryId, modo);
           toast.success(
-            `Importado: ${res.inserted} nuevos, ${res.updated} actualizados`,
+            `Importado: ${res.inserted} nuevos, ${res.updated} actualizados` +
+              (res.bajas ? ` · ${res.bajas} bajaron de existencia` : "") +
+              (res.sin_precio ? ` · ${res.sin_precio} sin precio` : ""),
           );
         }
         setStatus("done");
@@ -246,6 +269,65 @@ export function ImportPanel({
             </Select>
           </label>
         )
+      )}
+
+      {/* What the quantity column means. Getting this wrong is how stock gets
+          silently doubled (re-importing a full export as if it were a delivery)
+          or how sales get erased (mirroring after the ERP cutover). */}
+      {!newMode && (
+        <label className="mb-3 block">
+          <span className="mb-1 block text-xs font-medium text-muted-foreground">
+            Qué significan las existencias del archivo
+          </span>
+          <Select
+            value={modo}
+            onChange={(e) => {
+              setModo(e.target.value as ModoImport);
+              setPreview(null);
+            }}
+          >
+            <option value="alta">Llegó mercancía — sumar a lo que hay</option>
+            <option value="espejo">
+              El archivo es el inventario — reemplazar existencias
+            </option>
+            <option value="catalogo">
+              Solo catálogo — no tocar existencias (precios, nombres, costos)
+            </option>
+          </Select>
+          {modo === "espejo" && (
+            <span className="mt-1 block text-xs text-amber-700 dark:text-amber-300">
+              Reemplaza las existencias con las del archivo. Si el POS ya vendió
+              algo que el archivo no refleja, esa venta se pierde del conteo.
+            </span>
+          )}
+        </label>
+      )}
+
+      {preview && (
+        <div className="mb-3 rounded-lg border border-amber-600/25 bg-amber-50 dark:bg-amber-950/30 p-3">
+          <p className="text-sm font-medium">Revisa antes de reemplazar</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {preview.nuevos} nuevos · {preview.existentes} existentes ·{" "}
+            {preview.suben} suben · <strong>{preview.bajan} bajan</strong> ·{" "}
+            {preview.igual} sin cambio
+            {preview.sinPrecio > 0 && ` · ${preview.sinPrecio} sin precio`}
+          </p>
+          {preview.bajasTop.length > 0 && (
+            <ul className="mt-2 max-h-32 space-y-0.5 overflow-y-auto text-xs">
+              {preview.bajasTop.map((b) => (
+                <li key={b.sku} className="flex justify-between gap-2">
+                  <span className="min-w-0 truncate">{b.name}</span>
+                  <span className="shrink-0 tabular-nums text-muted-foreground">
+                    {b.de} → {b.a}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="mt-2 text-xs text-muted-foreground">
+            Vuelve a presionar Importar para aplicarlo.
+          </p>
+        </div>
       )}
 
       {/* Format segmented control */}

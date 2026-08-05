@@ -112,9 +112,15 @@ function ProductCard({
         </p>
       )}
       <div className="mt-1 flex items-center justify-between gap-1">
-        <span className="font-mono text-sm font-semibold tabular-nums text-accent">
-          {formatMXN(p.price_cents)}
-        </span>
+        {p.price_cents ? (
+          <span className="font-mono text-sm font-semibold tabular-nums text-accent">
+            {formatMXN(p.price_cents)}
+          </span>
+        ) : (
+          <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700 ring-1 ring-inset ring-amber-600/20 dark:bg-amber-950/40 dark:text-amber-300">
+            Sin precio
+          </span>
+        )}
         <span className="shrink-0 text-[11px] text-muted-foreground">
           {soldOut ? "—" : `${p.quantity} disp.`}
         </span>
@@ -156,7 +162,13 @@ function ProductRow({
         </p>
       </div>
       <span className="shrink-0 font-mono text-sm font-semibold tabular-nums">
-        {formatMXN(p.price_cents)}
+        {p.price_cents ? (
+          formatMXN(p.price_cents)
+        ) : (
+          <span className="font-sans text-xs font-medium text-amber-700 dark:text-amber-300">
+            Sin precio
+          </span>
+        )}
       </span>
       <span
         className={cn(
@@ -263,6 +275,13 @@ export function SalesScreen({
   const count = lines.reduce((s, l) => s + l.qty, 0);
 
   function add(p: SalesProduct) {
+    // Imported catalogs carry products their ERP never priced. They have to be
+    // visible — staff need to see the part exists — but the database rejects a
+    // sale line at zero, so stop it here with an answer instead of an error.
+    if (!p.price_cents) {
+      toast.error(`${p.name} no tiene precio. Asígnalo en Inventario.`);
+      return;
+    }
     setCart((c) => {
       const cur = c[p.id] ?? 0;
       if (cur >= p.quantity) return c;
