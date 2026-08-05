@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useState } from "react";
 import { Sparkles, Loader2, Info, AlertTriangle } from "lucide-react";
-import { searchProducts, type Searchable } from "@/lib/search";
+import type { Searchable } from "@/lib/search";
 import { Button } from "@/components/ui/button";
 import { compatiblesStaff } from "./actions";
 import { useCompat } from "./useCompat";
@@ -10,30 +10,51 @@ import { useCompat } from "./useCompat";
 // Shown in Inventario / Ventas when a search returns nothing. The AI lookup is
 // MANUAL: firing it per keystroke would cost a model call for every partial
 // query. The user asks for it; answers are cached (session + DB).
+//
+// `buscar` looks each suggested model up on the server rather than filtering a
+// client-side array. Once the catalog stopped being shipped whole, a local
+// search here would only ever see the current page and report "we stock none of
+// these" — a catalog fact staff quote customers on, and wrong. Pass a stable
+// reference (useCallback); it is a dependency of the lookup effect.
 export function CompatPanel<T extends Searchable & { id: string }>({
   query,
-  products,
+  buscar,
   renderItem,
 }: {
   query: string;
-  products: T[];
+  buscar: (modelo: string) => Promise<T[]>;
   renderItem: (p: T) => React.ReactNode;
 }) {
   const { query: q, data, loading, fallo, run } = useCompat(query, compatiblesStaff);
+  const [hits, setHits] = useState<T[]>([]);
 
-  const hits = useMemo(() => {
-    if (!data?.modelos.length) return [];
-    const seen = new Set<string>();
-    const out: T[] = [];
-    for (const modelo of data.modelos) {
-      for (const p of searchProducts(products, modelo, { limit: 4 })) {
-        if (seen.has(p.id)) continue;
-        seen.add(p.id);
-        out.push(p);
-      }
+  useEffect(() => {
+    if (!data?.modelos.length) {
+      setHits([]);
+      return;
     }
-    return out;
-  }, [data, products]);
+    let cancelado = false;
+    (async () => {
+      // All models at once — sequentially this would be one round trip per
+      // suggestion while the seller waits.
+      const porModelo = await Promise.all(data.modelos.map((m) => buscar(m)));
+      const seen = new Set<string>();
+      const out: T[] = [];
+      for (const lista of porModelo) {
+        for (const p of lista) {
+          if (seen.has(p.id)) continue;
+          seen.add(p.id);
+          out.push(p);
+        }
+      }
+      if (!cancelado) setHits(out);
+    })().catch(() => {
+      if (!cancelado) setHits([]);
+    });
+    return () => {
+      cancelado = true;
+    };
+  }, [data, buscar]);
 
   if (!q.trim()) return null;
 

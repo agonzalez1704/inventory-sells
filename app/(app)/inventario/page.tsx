@@ -5,6 +5,7 @@ import {
   InventoryView,
   type InventoryRow,
 } from "@/modules/inventory/InventoryView";
+import { estadisticasInventario } from "@/modules/inventory/buscar";
 
 export default async function InventarioPage() {
   const userId = await requirePagePermiso("inventario_ver");
@@ -15,17 +16,24 @@ export default async function InventarioPage() {
   const puedePrecios = admin || perms.has("precios_gestionar");
 
   const insforge = await createInsForgeServerClient();
-  const [{ data: productData, error }, { data: invData }] = await Promise.all([
+  // First page + aggregates. The full catalog used to arrive here and be
+  // filtered in the browser; at 21k products that is ~3 MB per page load.
+  const [{ data: productData, error, count }, { data: invData }, statsIniciales] =
+    await Promise.all([
     insforge.database
       .from("products")
       .select(
         "id, inventory_id, sku, name, category, brand, size, price_cents, quantity, etiqueta, image_url",
+        { count: "exact" },
       )
-      .order("created_at", { ascending: false }),
+      .eq("is_active", true)
+      .order("name", { ascending: true })
+      .range(0, 49),
     insforge.database
       .from("inventories")
       .select("id, name")
       .order("name", { ascending: true }),
+    estadisticasInventario(),
   ]);
 
   const products = (productData ?? []) as InventoryRow[];
@@ -40,6 +48,8 @@ export default async function InventarioPage() {
       )}
       <InventoryView
         products={products}
+        totalInicial={Number(count ?? products.length)}
+        statsIniciales={statsIniciales}
         inventories={inventories}
         puedeGestionar={puedeGestionar}
         verCostos={verCostos}

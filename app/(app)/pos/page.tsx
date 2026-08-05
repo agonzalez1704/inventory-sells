@@ -1,6 +1,7 @@
 import { createInsForgeServerClient } from "@/lib/insforge/server";
 import { requirePagePermiso } from "@/lib/auth/profile";
 import { SalesScreen, type SalesProduct } from "@/modules/sales/SalesScreen";
+import { listarCategorias } from "@/modules/inventory/buscar";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +11,10 @@ export default async function PosPage() {
   await requirePagePermiso("pos_vender");
   const insforge = await createInsForgeServerClient();
 
-  const [{ data: productData }, { data: invData }, { data: customerData }] =
+  // The first screenful, not the catalog. Shipping every active product was
+  // fine at 614 and is ~3 MB per page load at 21k — before the till can ring
+  // anything up. Searching happens in the database from here on.
+  const [{ data: productData }, { data: invData }, { data: customerData }, categoriasData] =
     await Promise.all([
       insforge.database
         .from("products")
@@ -18,7 +22,9 @@ export default async function PosPage() {
           "id, inventory_id, sku, name, brand, size, category, price_cents, quantity, image_url",
         )
         .eq("is_active", true)
-        .order("name", { ascending: true }),
+        .order("quantity", { ascending: false })
+        .order("name", { ascending: true })
+        .limit(30),
       insforge.database.from("inventories").select("id, name"),
       insforge.database
         .from("customers")
@@ -26,6 +32,7 @@ export default async function PosPage() {
         .eq("is_active", true)
         .order("is_system", { ascending: false })
         .order("nombre", { ascending: true }),
+      listarCategorias(),
     ]);
 
   const invName = new Map(
@@ -42,6 +49,8 @@ export default async function PosPage() {
     is_system: boolean;
   }[];
 
+  const categorias = categoriasData.map((c) => c.categoria);
+
   return (
     <section className="space-y-6">
       <div>
@@ -51,7 +60,7 @@ export default async function PosPage() {
         </p>
       </div>
 
-      <SalesScreen products={products} customers={customers} />
+      <SalesScreen products={products} categorias={categorias} customers={customers} />
     </section>
   );
 }

@@ -52,6 +52,21 @@ export function expand(token: string): string[] {
   return [token, ...(ALIASES.get(token) ?? [])];
 }
 
+/**
+ * The tokens a query actually searches on: normalized, filler dropped, and
+ * single characters ignored.
+ *
+ * Exported so the SQL pre-filter (buscar_productos_candidatos) can narrow the
+ * catalog with the SAME tokens this file scores by. If the two ever disagreed,
+ * the database would withhold rows the scorer would have matched, and the miss
+ * would be invisible — a product that simply never appears.
+ */
+export function tokensDeConsulta(query: string): string[] {
+  return normalize(query)
+    .split(" ")
+    .filter((token) => token.length >= 2 && !QUERY_STOPWORDS.has(token));
+}
+
 type Index = {
   tokens: Set<string>;
   compact: string;
@@ -113,9 +128,7 @@ function tokenScore(token: string, idx: Index): number {
 export function scoreProduct(p: Searchable, query: string): number {
   const q = normalize(query);
   if (!q) return 0;
-  const tokens = q
-    .split(" ")
-    .filter((token) => token.length >= 2 && !QUERY_STOPWORDS.has(token));
+  const tokens = tokensDeConsulta(query);
   if (!tokens.length) return 0;
 
   const idx = buildIndex(p);

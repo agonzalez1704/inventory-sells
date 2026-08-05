@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { useQueryState, parseAsString } from "nuqs";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -14,7 +14,7 @@ import {
   Check,
 } from "lucide-react";
 import { formatMXN } from "@/lib/money";
-import { searchProducts } from "@/lib/search";
+import { buscarProductos } from "@/modules/inventory/buscar";
 import type { PaymentMethod, Product } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
@@ -222,9 +222,14 @@ function Stepper({
 
 export function SalesScreen({
   products,
+  categorias,
   customers,
 }: {
+  /** First page of the catalog, rendered before any search runs. */
   products: SalesProduct[];
+  /** Counted in SQL — deriving these needs the whole catalog, which is the
+   *  thing we stopped shipping. */
+  categorias: string[];
   customers: PickerCustomer[];
 }) {
   const router = useRouter();
@@ -246,27 +251,57 @@ export function SalesScreen({
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [pending, startTransition] = useTransition();
 
-  const byId = useMemo(
-    () => Object.fromEntries(products.map((p) => [p.id, p])),
-    [products],
+  const [results, setResults] = useState<SalesProduct[]>(products);
+  const [buscando, setBuscando] = useState(false);
+
+  // Every product the register has ever shown this session. The cart holds ids,
+  // and results are now a page of the catalog rather than all of it — without
+  // this, changing the search would drop items out of the open sale.
+  const [conocidos, setConocidos] = useState<Record<string, SalesProduct>>(() =>
+    Object.fromEntries(products.map((p) => [p.id, p])),
   );
-
-  const categorias = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const p of products) if (p.category) m.set(p.category, (m.get(p.category) ?? 0) + 1);
-    return [...m.entries()].sort((a, b) => b[1] - a[1]).map(([c]) => c);
-  }, [products]);
-
-  // Category filter → brand-alias search → in-stock first, capped.
-  const results = useMemo(() => {
-    const scoped = categoria
-      ? products.filter((p) => p.category === categoria)
-      : products;
-    return searchProducts(scoped, query, {
-      limit: GRID_LIMIT,
-      tieBreak: (a, b) => Number(b.quantity > 0) - Number(a.quantity > 0),
+  const recordar = useCallback((ps: SalesProduct[]) => {
+    setConocidos((prev) => {
+      const next = { ...prev };
+      for (const p of ps) next[p.id] = p;
+      return next;
     });
-  }, [products, categoria, query]);
+  }, []);
+  const byId = conocidos;
+
+  // Search runs in the database now: at 21k products the catalog is too big to
+  // ship to the browser, let alone re-filter on every keystroke. Debounced so
+  // typing costs one query, not one per character.
+  useEffect(() => {
+    let cancelado = false;
+    setBuscando(true);
+    const t = setTimeout(async () => {
+      try {
+        const rows = (await buscarProductos({
+          query,
+          categoria,
+          limit: GRID_LIMIT,
+        })) as SalesProduct[];
+        if (cancelado) return;
+        setResults(rows);
+        recordar(rows);
+      } catch {
+        if (!cancelado) setResults([]);
+      } finally {
+        if (!cancelado) setBuscando(false);
+      }
+    }, 180);
+    return () => {
+      cancelado = true;
+      clearTimeout(t);
+    };
+  }, [query, categoria, recordar]);
+
+  const buscarCompat = useCallback(async (modelo: string) => {
+    const rows = (await buscarProductos({ query: modelo, limit: 4 })) as SalesProduct[];
+    recordar(rows);
+    return rows;
+  }, [recordar]);
 
   const lines = Object.entries(cart)
     .map(([id, qty]) => ({ product: byId[id], qty }))
@@ -410,7 +445,7 @@ export function SalesScreen({
               {query.trim() && (
                 <CompatPanel
                   query={query}
-                  products={products}
+                  buscar={buscarCompat}
                   renderItem={(p) => (
                     <ProductRow key={p.id} p={p} inCart={cart[p.id] ?? 0} onAdd={() => add(p)} />
                   )}

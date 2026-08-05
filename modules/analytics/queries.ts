@@ -1,7 +1,7 @@
 import "server-only";
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { rangoUTC } from "@/lib/caja-range";
-import { searchProducts } from "@/lib/search";
+import { searchProducts, tokensDeConsulta, expand } from "@/lib/search";
 
 // Analytics over InsForge for the MCP server. The bearer token already gates
 // access (owner = full access), so these run with the admin client and include
@@ -272,11 +272,28 @@ export async function estadoInventario() {
 }
 
 export async function buscarProducto(q: string) {
+  // The WhatsApp agent calls this several times per message — the forced
+  // product lookup, then again per word while resolving a name to a SKU, then
+  // once per compatible model. Loading the whole products table each time was
+  // fine at 614 rows and would not survive 21k inside a 60-second webhook.
+  //
+  // Same two stages as the register: the database narrows by trigram, then the
+  // scoring below ranks what comes back, unchanged.
+  const tokens = tokensDeConsulta(q);
   const [names, { data }] = await Promise.all([
     inventoryNames(),
-    DB.from("products").select(
-      "inventory_id, sku, name, category, brand, size, color, cost_cents, price_cents, quantity, is_active",
-    ),
+    tokens.length
+      ? DB.rpc("buscar_productos_candidatos", {
+          p_tokens: tokens.map(expand),
+          p_inventory_id: null,
+          p_categoria: null,
+          p_limit: 1000,
+        })
+      : DB.from("products")
+          .select(
+            "inventory_id, sku, name, category, brand, size, color, cost_cents, price_cents, quantity, is_active",
+          )
+          .limit(1000),
   ]);
   const ps = (data ?? []) as ProductRow[];
   return searchProducts(ps, q, {

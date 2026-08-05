@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useQueryState, parseAsString, parseAsStringLiteral } from "nuqs";
 import {
@@ -18,7 +18,11 @@ import {
 } from "lucide-react";
 import type { Inventory, Product } from "@/lib/types";
 import { formatMXN } from "@/lib/money";
-import { searchProducts } from "@/lib/search";
+import {
+  paginaInventario,
+  estadisticasInventario,
+  type EstadisticasInv,
+} from "./buscar";
 import { CompatPanel } from "@/modules/compat/CompatPanel";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -196,12 +200,17 @@ function InvTab({
 
 export function InventoryView({
   products,
+  totalInicial,
+  statsIniciales,
   inventories,
   puedeGestionar,
   verCostos,
   puedePrecios,
 }: {
+  /** First page, rendered before any query runs. */
   products: InventoryRow[];
+  totalInicial: number;
+  statsIniciales: EstadisticasInv;
   inventories: Inventory[];
   puedeGestionar: boolean;
   verCostos: boolean;
@@ -255,52 +264,71 @@ export function InventoryView({
     [inventories],
   );
 
-  const scoped = useMemo(
-    () =>
-      selectedInv === "all"
-        ? products
-        : products.filter((p) => p.inventory_id === selectedInv),
-    [products, selectedInv],
-  );
-
-  const stats = useMemo(() => {
-    const units = scoped.reduce((s, p) => s + p.quantity, 0);
-    const value = scoped.reduce((s, p) => s + p.price_cents * p.quantity, 0);
-    const low = scoped.filter((p) => p.quantity > 0 && p.quantity <= 5).length;
-    const out = scoped.filter((p) => p.quantity === 0).length;
-    return { units, value, low, out };
-  }, [scoped]);
-
-  // Brand-alias aware search: "moto g42" / "redmi note 7" find the shorthand
-  // catalog names. See lib/search.ts.
-  const filtered = useMemo(
-    () => searchProducts(scoped, query),
-    [query, scoped],
-  );
-
-  const sorted = useMemo(() => {
-    if (!sort) return filtered;
-    const arr = [...filtered];
-    arr.sort((a, b) => {
-      const c = compareRows(a, b, sort.key);
-      return sort.dir === "asc" ? c : -c;
-    });
-    return arr;
-  }, [filtered, sort]);
-
-  // Client-side pagination — the whole catalog already arrives (610 rows today),
-  // so slicing here keeps the DOM light without a round trip. Reset to page 1
-  // when the result set changes underneath; pageSafe clamps the render if a
-  // filter shrinks it before the effect runs.
+  // Search, sort and paging all happen in the database now. The catalog used to
+  // arrive whole and be filtered here, which is fine at 614 products and is
+  // ~3 MB per page load at 21k.
   const PER_PAGE = 50;
   const [page, setPage] = useState(1);
-  useEffect(() => setPage(1), [query, selectedInv, sort]);
-  const totalPages = Math.max(1, Math.ceil(sorted.length / PER_PAGE));
-  const pageSafe = Math.min(page, totalPages);
-  const paged = useMemo(
-    () => sorted.slice((pageSafe - 1) * PER_PAGE, pageSafe * PER_PAGE),
-    [sorted, pageSafe],
+  const [paged, setPaged] = useState<InventoryRow[]>(products);
+  const [total, setTotal] = useState(totalInicial);
+  const [stats, setStats] = useState(statsIniciales);
+  const [cargando, setCargando] = useState(false);
+
+  useEffect(() => setPage(1), [query, selectedInv, sortKey, sortDir]);
+
+  useEffect(() => {
+    let cancelado = false;
+    setCargando(true);
+    const t = setTimeout(async () => {
+      try {
+        const r = await paginaInventario({
+          query,
+          inventoryId: selectedInv === "all" ? null : selectedInv,
+          orden: sortKey ? { key: sortKey, dir: sortDir } : null,
+          page,
+          perPage: PER_PAGE,
+        });
+        if (cancelado) return;
+        setPaged(r.rows as InventoryRow[]);
+        setTotal(r.total);
+      } catch {
+        if (!cancelado) setPaged([]);
+      } finally {
+        if (!cancelado) setCargando(false);
+      }
+    }, 180);
+    return () => {
+      cancelado = true;
+      clearTimeout(t);
+    };
+  }, [query, selectedInv, sortKey, sortDir, page]);
+
+  // Header totals follow the warehouse filter, not the search: they describe
+  // the stock, not the current result set.
+  useEffect(() => {
+    let cancelado = false;
+    estadisticasInventario(selectedInv === "all" ? null : selectedInv)
+      .then((s) => !cancelado && setStats(s))
+      .catch(() => {});
+    return () => {
+      cancelado = true;
+    };
+  }, [selectedInv]);
+
+  const buscarCompat = useCallback(
+    async (modelo: string) =>
+      (
+        await paginaInventario({
+          query: modelo,
+          inventoryId: selectedInv === "all" ? null : selectedInv,
+          perPage: 4,
+        })
+      ).rows as InventoryRow[],
+    [selectedInv],
   );
+
+  const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
+  const pageSafe = Math.min(page, totalPages);
 
   return (
     <section className="space-y-6">
@@ -308,12 +336,12 @@ export function InventoryView({
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Inventario</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {scoped.length} productos · {stats.units} unidades
+            {stats.productos} productos · {stats.piezas} unidades
             {puedeGestionar && " · toca un producto para editar"}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {scoped.length > 0 && <ExportMenu verCostos={verCostos} />}
+          {stats.productos > 0 && <ExportMenu verCostos={verCostos} />}
           {puedeGestionar && inventories.length > 0 && (
             <Button variant="secondary" onClick={() => setManualOpen(true)}>
               <Plus className="h-4 w-4" />
@@ -355,10 +383,10 @@ export function InventoryView({
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Kpi label="Productos" value={String(scoped.length)} />
-        <Kpi label="Unidades" value={String(stats.units)} />
-        <Kpi label="Valor (venta)" value={formatMXN(stats.value)} />
-        <Kpi label="Bajo / agotado" value={`${stats.low} / ${stats.out}`} />
+        <Kpi label="Productos" value={String(stats.productos)} />
+        <Kpi label="Unidades" value={String(stats.piezas)} />
+        <Kpi label="Valor (venta)" value={formatMXN(stats.valor_cents)} />
+        <Kpi label="Bajo / agotado" value={`${stats.bajos} / ${stats.agotados}`} />
       </div>
 
       <Card>
@@ -374,7 +402,7 @@ export function InventoryView({
           </div>
         </div>
 
-        {scoped.length === 0 ? (
+        {stats.productos === 0 ? (
           <div className="p-6">
             <EmptyState
               icon={Boxes}
@@ -395,7 +423,7 @@ export function InventoryView({
               className="border-0"
             />
           </div>
-        ) : filtered.length === 0 ? (
+        ) : paged.length === 0 ? (
           <div className="p-6">
             <EmptyState
               icon={PackageSearch}
@@ -406,7 +434,7 @@ export function InventoryView({
             {query.trim() && (
               <CompatPanel
                 query={query}
-                products={scoped}
+                buscar={buscarCompat}
                 renderItem={(p) => (
                   <div
                     key={p.id}
@@ -562,10 +590,10 @@ export function InventoryView({
         )}
       </Card>
 
-      {sorted.length > PER_PAGE && (
+      {total > PER_PAGE && (
         <div className="flex items-center justify-between gap-3 text-sm">
           <span className="text-muted-foreground tabular-nums">
-            {(pageSafe - 1) * PER_PAGE + 1}–{Math.min(pageSafe * PER_PAGE, sorted.length)} de {sorted.length}
+            {(pageSafe - 1) * PER_PAGE + 1}–{Math.min(pageSafe * PER_PAGE, total)} de {total}
           </span>
           <div className="flex gap-2">
             <Button
