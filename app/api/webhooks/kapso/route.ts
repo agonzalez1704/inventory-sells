@@ -4,6 +4,7 @@ import { detectarCliente } from "@/modules/agent/cliente";
 import { cargarHistorial, guardarMensaje } from "@/modules/agent/memoria";
 import { transcribirAudio } from "@/modules/agent/transcribir";
 import { estadoConversacion, marcarAsesor } from "@/modules/agent/handoff";
+import { resolverRemitente, etiqueta } from "@/modules/agent/identidad";
 import { getAsesores } from "@/modules/config/lib";
 import { enviarTexto, descargarMedia } from "@/lib/kapso";
 
@@ -33,7 +34,13 @@ type KapsoEvent = {
       media_data?: { content_type?: string };
     };
   };
-  conversation?: { phone_number?: string };
+  contact?: { id?: string | null } | null;
+  conversation?: {
+    phone_number?: string | null;
+    business_scoped_user_id?: string | null;
+    parent_business_scoped_user_id?: string | null;
+    username?: string | null;
+  } | null;
 };
 
 // Pull the text out of one inbound event. Voice notes: Kapso may already attach
@@ -93,50 +100,59 @@ export async function POST(req: Request) {
       "",
   );
 
-  const numero =
-    eventos.find((ev) => ev.conversation?.phone_number)?.conversation
-      ?.phone_number ?? "";
-
   // Extract every event's text in parallel (audio downloads/transcription can
   // be slow), then merge into one turn.
   const partes = await Promise.all(eventos.map((ev) => textoDeEvento(ev)));
   const texto = partes.filter(Boolean).join("\n").trim();
 
-  if (!phoneNumberId || !numero || !texto) {
+  if (!phoneNumberId || !texto) {
     return new Response(null, { status: 200 });
   }
+
+  // Identity, not phone number. A customer who adopted a @username sends no
+  // phone number at all, and this used to drop their message on the floor —
+  // silently, and Meta never replays it.
+  const remitente = await resolverRemitente(eventos);
+  if (!remitente) {
+    console.error("Kapso webhook: mensaje sin identificador de remitente");
+    return new Response(null, { status: 200 });
+  }
+  const { clave, telefono, bsuid } = remitente;
 
   // A human already took over this conversation: pause the bot. Record the
   // customer's message (so history is intact when it returns to the bot), but
   // don't auto-reply over the asesor.
-  if ((await estadoConversacion(numero)) === "asesor") {
-    await guardarMensaje(numero, "user", texto);
+  if ((await estadoConversacion(clave)) === "asesor") {
+    await guardarMensaje(clave, "user", texto);
     return new Response(null, { status: 200 });
   }
 
   try {
     const [historial, cliente] = await Promise.all([
-      cargarHistorial(numero, 10),
-      detectarCliente(numero), // best-effort: null if unregistered
+      cargarHistorial(clave, 10),
+      detectarCliente(telefono), // best-effort: null if unregistered
     ]);
     const { texto: respuesta, escalar } = await responderMensaje(
       [...historial, { role: "user", content: texto }],
-      numero,
+      clave,
       cliente,
     );
-    await guardarMensaje(numero, "user", texto);
-    await guardarMensaje(numero, "assistant", respuesta);
-    await enviarTexto(phoneNumberId, numero, respuesta);
+    await guardarMensaje(clave, "user", texto);
+    await guardarMensaje(clave, "assistant", respuesta);
+    // Send both identifiers: Meta prefers the phone number, which keeps it
+    // flowing back to us through the 30-day rule, and falls back to the BSUID
+    // for customers whose number we no longer receive.
+    await enviarTexto(phoneNumberId, telefono, respuesta, bsuid);
 
     // Agent asked for a human: pause the bot + ping the asesores (best-effort,
     // WhatsApp only delivers inside the 24h window).
     if (escalar) {
-      await marcarAsesor(numero, escalar.motivo, texto);
+      await marcarAsesor(clave, escalar.motivo, texto);
       const asesores = await getAsesores();
       if (asesores.length) {
         const aviso =
           `🔔 *Un cliente necesita asesor*\n` +
-          `Cliente: ${numero}\n` +
+          `Cliente: ${etiqueta(remitente)}\n` +
           `Motivo: ${escalar.motivo}\n` +
           `Último mensaje: "${texto}"\n\n` +
           `Respóndele directo. El bot quedó en pausa con ese cliente; ` +
