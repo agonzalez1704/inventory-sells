@@ -21,9 +21,12 @@ export default async function NuevaCotizacionPage() {
   const [{ data: productData }, { data: customerData }, vendedores] = await Promise.all([
     insforge.database
       .from("products")
+      // First page only; the builder searches the database from here.
       .select("id, sku, name, brand, size, category, price_cents, quantity, image_url")
       .eq("is_active", true)
-      .order("name", { ascending: true }),
+      .order("quantity", { ascending: false })
+      .order("name", { ascending: true })
+      .limit(24),
     insforge.database
       .from("customers")
       .select("id, nombre, telefono, is_system")

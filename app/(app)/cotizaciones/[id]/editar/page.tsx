@@ -36,9 +36,12 @@ export default async function EditarCotizacionPage({ params }: { params: Promise
   const [{ data: productData }, { data: customerData }, { data: itemData }] = await Promise.all([
     insforge.database
       .from("products")
+      // First page only; the builder searches the database from here.
       .select("id, sku, name, brand, size, category, price_cents, quantity, image_url")
       .eq("is_active", true)
-      .order("name", { ascending: true }),
+      .order("quantity", { ascending: false })
+      .order("name", { ascending: true })
+      .limit(24),
     insforge.database
       .from("customers")
       .select("id, nombre, telefono, is_system")
@@ -51,6 +54,19 @@ export default async function EditarCotizacionPage({ params }: { params: Promise
   const items = ((itemData ?? []) as { product_id: string | null; qty: number }[])
     .filter((i): i is { product_id: string; qty: number } => !!i.product_id)
     .map((i) => ({ product_id: i.product_id, qty: i.qty }));
+
+  // Fetch this quote's own products by id. The catalog above is only the first
+  // page now, so a line whose product falls outside it would have nothing to
+  // resolve against and would disappear from the editor — and saving would then
+  // drop it from the quote. Included regardless of is_active: a discontinued
+  // product still has to show in a quote that already contains it.
+  const idsEnCotizacion = [...new Set(items.map((i) => i.product_id))];
+  const { data: itemProductData } = idsEnCotizacion.length
+    ? await insforge.database
+        .from("products")
+        .select("id, sku, name, brand, size, category, price_cents, quantity, image_url")
+        .in("id", idsEnCotizacion)
+    : { data: [] };
 
   return (
     <section className="space-y-5">
@@ -65,6 +81,7 @@ export default async function EditarCotizacionPage({ params }: { params: Promise
       </div>
       <CotizacionBuilder
         products={(productData ?? []) as SalesProduct[]}
+        productosDeLaCotizacion={(itemProductData ?? []) as SalesProduct[]}
         customers={(customerData ?? []) as PickerCustomer[]}
         initial={{ id, items, customerId: c.customer_id, notas: c.notas ?? "" }}
       />

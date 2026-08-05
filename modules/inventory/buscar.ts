@@ -1,8 +1,27 @@
 "use server";
 
 import { createInsForgeServerClient } from "@/lib/insforge/server";
-import { assertPermiso } from "@/lib/auth/profile";
+import { assertPermiso, permisosDe } from "@/lib/auth/profile";
+import type { Permiso } from "@/lib/permissions";
 import { searchProducts, tokensDeConsulta, expand } from "@/lib/search";
+
+// Reading the catalog isn't one feature's privilege: the register, the quote
+// builder, the purchase form and the inventory table all legitimately look
+// products up. Gating on a single permiso would lock out a seller who may quote
+// but not ring up sales.
+const VER_CATALOGO: Permiso[] = [
+  "pos_vender",
+  "cotizar",
+  "inventario_ver",
+  "inventario_gestionar",
+];
+
+async function assertVerCatalogo(): Promise<void> {
+  const perms = await permisosDe();
+  if (!perms.has("admin_total") && !VER_CATALOGO.some((p) => perms.has(p))) {
+    throw new Error("Sin permiso");
+  }
+}
 
 // Columns the register and the inventory table need. Deliberately not `*`:
 // at 21k products the difference between this and the full row is what the
@@ -47,7 +66,7 @@ const CANDIDATOS = 1000;
  * the JS on the first change to either.
  */
 export async function buscarProductos(f: Filtro): Promise<ProductoBuscado[]> {
-  await assertPermiso("pos_vender");
+  await assertVerCatalogo();
   const insforge = await createInsForgeServerClient();
   const limite = Math.min(Math.max(f.limit ?? 60, 1), 200);
   const tokens = tokensDeConsulta(f.query ?? "");
@@ -183,7 +202,7 @@ export type CategoriaConteo = { categoria: string; productos: number };
 export async function listarCategorias(
   inventoryId?: string | null,
 ): Promise<CategoriaConteo[]> {
-  await assertPermiso("pos_vender");
+  await assertVerCatalogo();
   const insforge = await createInsForgeServerClient();
   const { data } = await insforge.database.rpc("categorias_de_inventario", {
     p_inventory_id: inventoryId || null,

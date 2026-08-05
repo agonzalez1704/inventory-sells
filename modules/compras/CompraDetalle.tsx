@@ -1,11 +1,11 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Search, Trash2, PackageCheck, AlertTriangle, CheckCircle2, Ban, Clock } from "lucide-react";
 import { formatMXN, fromCents } from "@/lib/money";
-import { searchProducts } from "@/lib/search";
+import { buscarProductos } from "@/modules/inventory/buscar";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,13 +16,7 @@ import { ponerItem, quitarItem, recibirCompra, cancelarCompra, type Compra } fro
 const fecha = (iso: string) =>
   new Date(iso).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
 
-export function CompraDetalle({
-  compra,
-  productos,
-}: {
-  compra: Compra;
-  productos: SalesProduct[];
-}) {
+export function CompraDetalle({ compra }: { compra: Compra }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [query, setQuery] = useState("");
@@ -38,10 +32,29 @@ export function CompraDetalle({
   const cuadra = papel === 0 || diferencia === 0;
   const editable = compra.estado === "borrador";
 
-  const resultados = useMemo(
-    () => (query.trim() ? searchProducts(productos, query, { limit: 8 }) : []),
-    [productos, query],
-  );
+  // Search runs in the database. The whole catalog used to be loaded just to
+  // filter it here, which is 21k products at the refaccionaria; the lines
+  // already captured come embedded in compra_items and never needed it.
+  const [resultados, setResultados] = useState<SalesProduct[]>([]);
+  useEffect(() => {
+    if (!query.trim()) {
+      setResultados([]);
+      return;
+    }
+    let cancelado = false;
+    const t = setTimeout(async () => {
+      try {
+        const rows = (await buscarProductos({ query, limit: 8 })) as SalesProduct[];
+        if (!cancelado) setResultados(rows);
+      } catch {
+        if (!cancelado) setResultados([]);
+      }
+    }, 180);
+    return () => {
+      cancelado = true;
+      clearTimeout(t);
+    };
+  }, [query]);
 
   function agregar() {
     if (!elegido) return toast.error("Elige un producto");

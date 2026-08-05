@@ -1,11 +1,11 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Search, Plus, Minus, Package, Trash2, FileText } from "lucide-react";
 import { formatMXN } from "@/lib/money";
-import { searchProducts } from "@/lib/search";
+import { buscarProductos } from "@/modules/inventory/buscar";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -37,12 +37,23 @@ function Thumb({ src, alt }: { src?: string | null; alt: string }) {
 
 export function CotizacionBuilder({
   products,
+  productosDeLaCotizacion = [],
   customers,
   initial,
   vendedores = [],
   puedeAsignar = false,
 }: {
+  /** First page of the catalog, shown before any search. */
   products: SalesProduct[];
+  /**
+   * The products this quote already contains, when editing.
+   *
+   * The catalog is no longer shipped whole, so a line whose product happens to
+   * fall outside the first page would have no entry to resolve against and the
+   * item would vanish from the editor — silently, and saving would then drop it
+   * from the quote.
+   */
+  productosDeLaCotizacion?: SalesProduct[];
   customers: PickerCustomer[];
   initial?: CotizacionInicial;
   vendedores?: { id: string; nombre: string }[];
@@ -50,7 +61,20 @@ export function CotizacionBuilder({
 }) {
   const router = useRouter();
   const mostrador = useMemo(() => customers.find((c) => c.is_system) ?? customers[0], [customers]);
-  const byId = useMemo(() => Object.fromEntries(products.map((p) => [p.id, p])), [products]);
+
+  // Every product this builder has seen: the first page, whatever the quote
+  // already had, and anything a later search brings back.
+  const [conocidos, setConocidos] = useState<Record<string, SalesProduct>>(() =>
+    Object.fromEntries([...products, ...productosDeLaCotizacion].map((p) => [p.id, p])),
+  );
+  const recordar = useCallback((ps: SalesProduct[]) => {
+    setConocidos((prev) => {
+      const next = { ...prev };
+      for (const p of ps) next[p.id] = p;
+      return next;
+    });
+  }, []);
+  const byId = conocidos;
 
   const [query, setQuery] = useState("");
   const [cart, setCart] = useState<Record<string, number>>(
@@ -69,7 +93,27 @@ export function CotizacionBuilder({
 
   // Quote lines are not stock-bound (no reserve until conversion) — allow any qty
   // the seller types, catalog stock is only a hint shown on the card.
-  const results = useMemo(() => searchProducts(products, query, { limit: GRID_LIMIT }), [products, query]);
+  //
+  // Searching happens in the database: the catalog is 21k products at the
+  // refaccionaria, too big to hand the browser and re-filter per keystroke.
+  const [results, setResults] = useState<SalesProduct[]>(products);
+  useEffect(() => {
+    let cancelado = false;
+    const t = setTimeout(async () => {
+      try {
+        const rows = (await buscarProductos({ query, limit: GRID_LIMIT })) as SalesProduct[];
+        if (cancelado) return;
+        setResults(rows);
+        recordar(rows);
+      } catch {
+        if (!cancelado) setResults([]);
+      }
+    }, 180);
+    return () => {
+      cancelado = true;
+      clearTimeout(t);
+    };
+  }, [query, recordar]);
 
   const lines = Object.entries(cart)
     .map(([id, qty]) => ({ product: byId[id], qty }))
