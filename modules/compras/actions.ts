@@ -344,7 +344,10 @@ export async function borrarPago(id: string): Promise<void> {
 export type CuentaPorPagar = {
   proveedor_id: string;
   nombre: string;
+  /** Net: positive = we owe, negative = they owe us. */
   saldo_cents: number;
+  /** Of the above, how much is credit in our favour. */
+  favor_cents: number;
   facturas: number;
   vencidas: number;
 };
@@ -378,17 +381,23 @@ export async function cuentasPorPagar(): Promise<CuentaPorPagar[]> {
     saldo_cents: number;
   }[]) {
     const saldo = Number(s.saldo_cents ?? 0);
-    if (s.estado !== "recibida" || saldo <= 0) continue;
+    if (s.estado !== "recibida" || saldo === 0) continue;
+    // A negative balance is money the supplier owes US — an invoice paid in full
+    // for goods that never arrived, once the shortfall is a credit note. It used
+    // to be dropped here along with the settled ones, so a credit you were owed
+    // simply never appeared anywhere and went unclaimed on the next order.
     const cur =
       out.get(s.proveedor_id) ??
       {
         proveedor_id: s.proveedor_id,
         nombre: nombre.get(s.proveedor_id) ?? "—",
         saldo_cents: 0,
+        favor_cents: 0,
         facturas: 0,
         vencidas: 0,
       };
     cur.saldo_cents += saldo;
+    if (saldo < 0) cur.favor_cents += -saldo;
     cur.facturas += 1;
     const c = vence.get(s.compra_id);
     if (c && c.condicion === "credito" && c.vence_el && c.vence_el.slice(0, 10) < hoy)

@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Search, Trash2, PackageCheck, AlertTriangle, CheckCircle2, Ban, Clock } from "lucide-react";
+import { Search, Trash2, PackageCheck, AlertTriangle, CheckCircle2, Ban, Clock, FileDown } from "lucide-react";
 import { formatMXN, fromCents } from "@/lib/money";
 import { buscarProductos } from "@/modules/inventory/buscar";
 import { Card } from "@/components/ui/card";
@@ -11,7 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import type { SalesProduct } from "@/modules/sales/SalesScreen";
-import { ponerItem, quitarItem, recibirCompra, cancelarCompra, type Compra } from "./actions";
+import { ponerItem, quitarItem, recibirCompra, cancelarCompra, registrarNota, type Compra } from "./actions";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { CargarFactura } from "./CargarFactura";
 
 const fecha = (iso: string) =>
@@ -87,9 +88,19 @@ export function CompraDetalle({ compra }: { compra: Compra }) {
     });
   }
 
+  const [confirmarRecibo, setConfirmarRecibo] = useState(false);
+  const [confirmarCancelar, setConfirmarCancelar] = useState<string | null>(null);
+
   function recibir() {
-    if (!cuadra && !confirm("Lo capturado no cuadra con el total de la factura. ¿Recibir de todos modos?"))
-      return;
+    // A mismatch is a decision, not a warning to click past: the goods that
+    // didn't arrive have to become a credit note or the supplier keeps being
+    // owed for them.
+    if (!cuadra) return setConfirmarRecibo(true);
+    hacerRecibo();
+  }
+
+  function hacerRecibo() {
+    setConfirmarRecibo(false);
     start(async () => {
       try {
         const r = await recibirCompra(compra.id);
@@ -101,12 +112,45 @@ export function CompraDetalle({ compra }: { compra: Compra }) {
     });
   }
 
+  /**
+   * Turn the shortfall into a "no llegó" credit note, then receive.
+   *
+   * This is what makes both outcomes work: on credit you now owe only what
+   * arrived, and if the invoice was already paid in full the balance goes
+   * negative — which is the credit you hold with that supplier.
+   */
+  function notaYRecibir() {
+    setConfirmarRecibo(false);
+    start(async () => {
+      try {
+        await registrarNota({
+          compraId: compra.id,
+          tipo: "no_llego",
+          motivo: `No llegó: diferencia contra la factura ${compra.folio_factura ?? ""}`.trim(),
+          items: [],
+          montoPesos: Math.abs(diferencia) / 100,
+        });
+        const r = await recibirCompra(compra.id);
+        toast.success(
+          `Recibido: ${r.piezas} piezas · nota por ${formatMXN(Math.abs(diferencia))} registrada`,
+        );
+        router.refresh();
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Error al recibir");
+      }
+    });
+  }
+
   function cancelar() {
-    const msg =
+    setConfirmarCancelar(
       compra.estado === "recibida"
-        ? "Esto devolverá al inventario lo que entró con esta factura. ¿Cancelar?"
-        : "¿Cancelar esta compra?";
-    if (!confirm(msg)) return;
+        ? "Esto devolverá al inventario todo lo que entró con esta factura."
+        : "La compra quedará cancelada y no se podrá recibir.",
+    );
+  }
+
+  function hacerCancelacion() {
+    setConfirmarCancelar(null);
     start(async () => {
       try {
         await cancelarCompra(compra.id);
@@ -207,9 +251,22 @@ export function CompraDetalle({ compra }: { compra: Compra }) {
           <p className="mt-2 flex items-start gap-1.5 text-xs text-amber-600 dark:text-amber-400">
             <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             {diferencia > 0
-              ? "Falta capturar producto para llegar al total de la factura."
+              ? "Falta capturar producto, o parte de la mercancía no llegó."
               : "Lo capturado excede el total de la factura."}
           </p>
+        )}
+        {!cuadra && (
+          <a
+            href={`/api/compras/${compra.id}/contra-recibo`}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-3 inline-flex"
+          >
+            <Button variant="secondary" size="sm">
+              <FileDown className="h-4 w-4" />
+              Contra recibo (PDF)
+            </Button>
+          </a>
         )}
         {cuadra && papel > 0 && (
           <p className="mt-2 flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400">
@@ -323,6 +380,63 @@ export function CompraDetalle({ compra }: { compra: Compra }) {
           </ul>
         )}
       </Card>
+
+      <ConfirmDialog
+        open={confirmarRecibo}
+        onClose={() => setConfirmarRecibo(false)}
+        onConfirm={hacerRecibo}
+        title="Lo capturado no cuadra con la factura"
+        confirmLabel="Recibir sin nota"
+        loading={pending}
+        extra={
+          diferencia > 0 ? (
+            <Button variant="accent" onClick={notaYRecibir} disabled={pending}>
+              Registrar nota y recibir
+            </Button>
+          ) : undefined
+        }
+        description={
+          diferencia > 0
+            ? "Llegó menos de lo que dice la factura. Si no lo registras como nota de crédito, el proveedor te va a seguir cobrando esa diferencia."
+            : "Lo capturado excede el total de la factura. Revisa las cantidades antes de recibir."
+        }
+      >
+        <div className="space-y-1.5 rounded-lg border border-border p-3 text-sm">
+          <div className="flex justify-between gap-2">
+            <span className="text-muted-foreground">Dice la factura</span>
+            <span className="tabular-nums">{formatMXN(papel)}</span>
+          </div>
+          <div className="flex justify-between gap-2">
+            <span className="text-muted-foreground">Capturado ({piezas} piezas)</span>
+            <span className="tabular-nums">{formatMXN(capturado)}</span>
+          </div>
+          <div className="flex justify-between gap-2 border-t border-border pt-1.5 font-medium">
+            <span>Diferencia</span>
+            <span className="tabular-nums text-amber-600 dark:text-amber-400">
+              {formatMXN(Math.abs(diferencia))}
+            </span>
+          </div>
+        </div>
+        {diferencia > 0 && (
+          <p className="text-xs text-muted-foreground">
+            Con la nota: a crédito quedas debiendo sólo {formatMXN(capturado)}. Si ya
+            pagaste la factura completa, la diferencia te queda como saldo a favor con
+            este proveedor.
+          </p>
+        )}
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={confirmarCancelar !== null}
+        onClose={() => setConfirmarCancelar(null)}
+        onConfirm={hacerCancelacion}
+        title="Cancelar la compra"
+        description={confirmarCancelar}
+        confirmLabel="Sí, cancelar"
+        cancelLabel="No"
+        tone="danger"
+        loading={pending}
+      />
     </div>
   );
 }

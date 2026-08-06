@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Plus, Search, FileText, Clock, AlertTriangle } from "lucide-react";
 import { formatMXN } from "@/lib/money";
+import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -89,8 +90,22 @@ export function ComprasView({
                       {p.vencidas} vencida{p.vencidas === 1 ? "" : "s"}
                     </Badge>
                   )}
+                  {p.favor_cents > 0 && (
+                    <Badge tone="success" className="ml-2">
+                      {formatMXN(p.favor_cents)} a favor
+                    </Badge>
+                  )}
                 </span>
-                <span className="shrink-0 tabular-nums">{formatMXN(p.saldo_cents)}</span>
+                <span
+                  className={cn(
+                    "shrink-0 tabular-nums",
+                    p.saldo_cents < 0 && "text-emerald-600 dark:text-emerald-400",
+                  )}
+                >
+                  {p.saldo_cents < 0
+                    ? `${formatMXN(-p.saldo_cents)} a favor`
+                    : formatMXN(p.saldo_cents)}
+                </span>
               </li>
             ))}
           </ul>
