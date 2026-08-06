@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { getPermisos, requirePagePermiso } from "@/lib/auth/profile";
-import { getCardex } from "@/modules/cardex/actions";
+import { getCardex, proveedoresDelProducto } from "@/modules/cardex/actions";
 import { CardexView } from "@/modules/cardex/CardexView";
 
 export const dynamic = "force-dynamic";
@@ -16,6 +16,12 @@ export default async function CardexPage({ params }: { params: Promise<{ id: str
 
   const { producto, movimientos, resumen } = await getCardex(id);
   if (!producto) notFound();
+
+  // Who actually supplies this, derived from purchases — only for eyes that may
+  // see costs, since it is a price list by supplier.
+  const surtido = verCostos
+    ? await proveedoresDelProducto(id)
+    : { proveedores: [], sinOrigen: 0 };
 
   return (
     <section className="space-y-5">
@@ -32,6 +38,7 @@ export default async function CardexPage({ params }: { params: Promise<{ id: str
         producto={producto}
         movimientos={movimientos}
         resumen={resumen}
+        surtido={surtido}
         verCostos={verCostos}
       />
     </section>

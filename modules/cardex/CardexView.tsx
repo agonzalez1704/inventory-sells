@@ -13,7 +13,12 @@ import { formatMXN } from "@/lib/money";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
-import type { CardexProducto, CardexResumen, MovimientoCardex } from "./actions";
+import type {
+  CardexProducto,
+  CardexResumen,
+  MovimientoCardex,
+  ProveedorDelProducto,
+} from "./actions";
 
 const fechaHora = (iso: string) =>
   new Date(iso).toLocaleString("es-MX", {
@@ -28,11 +33,13 @@ export function CardexView({
   producto,
   movimientos,
   resumen,
+  surtido,
   verCostos,
 }: {
   producto: CardexProducto;
   movimientos: MovimientoCardex[];
   resumen: CardexResumen;
+  surtido: { proveedores: ProveedorDelProducto[]; sinOrigen: number };
   verCostos: boolean;
 }) {
   return (
@@ -88,6 +95,55 @@ export function CardexView({
           </p>
         </Card>
       </div>
+
+      {verCostos && (surtido.proveedores.length > 0 || surtido.sinOrigen > 0) && (
+        <Card className="overflow-hidden">
+          <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+            <Truck className="h-4 w-4" />
+            <p className="text-sm font-medium">Quién lo surte</p>
+            <span className="ml-auto text-xs text-muted-foreground">
+              del más barato al más caro
+            </span>
+          </div>
+          <ul className="divide-y divide-border">
+            {surtido.proveedores.map((pr) => (
+              <li key={pr.proveedor_id} className="flex flex-wrap items-center gap-3 px-4 py-3">
+                <div className="min-w-0 flex-1">
+                  <p className="flex flex-wrap items-center gap-2 font-medium">
+                    {pr.nombre}
+                    {pr.piezas_en_stock > 0 && (
+                      <Badge tone="accent">{pr.piezas_en_stock} en stock</Badge>
+                    )}
+                  </p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {pr.veces} compra{pr.veces === 1 ? "" : "s"} · {pr.piezas_compradas} pzas ·
+                    última {pr.ultima_compra}
+                    {pr.lead_time_dias > 0 && ` · entrega ~${pr.lead_time_dias} d`}
+                    {pr.telefono && ` · ${pr.telefono}`}
+                  </p>
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="font-mono font-semibold tabular-nums">
+                    {formatMXN(pr.costo_ultimo_cents)}
+                  </p>
+                  {pr.costo_min_cents !== pr.costo_ultimo_cents && (
+                    <p className="text-xs text-muted-foreground">
+                      mínimo {formatMXN(pr.costo_min_cents)}
+                    </p>
+                  )}
+                </div>
+              </li>
+            ))}
+            {surtido.sinOrigen > 0 && (
+              <li className="px-4 py-2.5 text-xs text-muted-foreground">
+                {surtido.sinOrigen} pieza{surtido.sinOrigen === 1 ? "" : "s"} sin proveedor
+                identificado — entraron por carga inicial o ajuste, antes de que se
+                registraran compras.
+              </li>
+            )}
+          </ul>
+        </Card>
+      )}
 
       <Card className="overflow-hidden">
         <div className="flex items-center gap-2 border-b border-border px-4 py-3">
