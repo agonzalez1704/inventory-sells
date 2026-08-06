@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { useConfirm } from "@/components/ui/use-confirm";
 import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -120,6 +121,7 @@ export function AdelantosView({
 }
 
 function AdelantoRow({ a }: { a: Adelanto }) {
+  const [confirmar, dialogoConfirm] = useConfirm();
   const router = useRouter();
   const [abonar, setAbonar] = useState(false);
   const [pending, start] = useTransition();
@@ -128,8 +130,15 @@ function AdelantoRow({ a }: { a: Adelanto }) {
   const pct = Math.min(100, Math.round((a.pagado_cents / a.precio_cents) * 100));
   const pagado = resta === 0;
 
-  function entregar() {
-    if (!confirm("¿Entregar el producto? Debe estar pagado por completo.")) return;
+  async function entregar() {
+    if (
+      !(await confirmar({
+        title: "¿Entregar el producto?",
+        description: "Debe estar pagado por completo.",
+        confirmLabel: "Entregar",
+      }))
+    )
+      return;
     start(async () => {
       try {
         await entregarAdelanto(a.id);
@@ -140,8 +149,16 @@ function AdelantoRow({ a }: { a: Adelanto }) {
       }
     });
   }
-  function cancelar() {
-    if (!confirm("¿Cancelar el adelanto? Se devuelven los abonos y (si aplica) el stock.")) return;
+  async function cancelar() {
+    if (
+      !(await confirmar({
+        title: "¿Cancelar el adelanto?",
+        description: "Se devuelven los abonos y, si aplica, el stock.",
+        confirmLabel: "Sí, cancelar",
+        tone: "danger",
+      }))
+    )
+      return;
     start(async () => {
       try {
         await cancelarAdelanto(a.id);
@@ -155,6 +172,7 @@ function AdelantoRow({ a }: { a: Adelanto }) {
 
   return (
     <Card className="p-4">
+      {dialogoConfirm}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">

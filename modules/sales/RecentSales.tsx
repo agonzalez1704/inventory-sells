@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { useConfirm } from "@/components/ui/use-confirm";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PrintTicketButtons } from "@/components/ticket/PrintTicketButtons";
 import { ItemSwapModal, type SwapProduct } from "@/modules/sales/ItemSwapModal";
@@ -65,6 +66,7 @@ function EditModal({
   onClose: () => void;
 }) {
   const router = useRouter();
+  const [confirmar, dialogoConfirm] = useConfirm();
   // A split sale has no single method to refund with, so the operator picks
   // one; anything else keeps the sale's own method as the default.
   const [payment, setPayment] = useState<PaymentMethod>(
@@ -89,11 +91,13 @@ function EditModal({
     });
   }
 
-  function aFiado() {
+  async function aFiado() {
     if (
-      !confirm(
-        "¿Convertir esta venta en nota de crédito? Pasará a pendientes de pago (el stock no cambia).",
-      )
+      !(await confirmar({
+        title: "¿Convertir esta venta en nota de crédito?",
+        description: "Pasará a pendientes de pago. El stock no cambia.",
+        confirmLabel: "Convertir",
+      }))
     )
       return;
     start(async () => {
@@ -108,11 +112,15 @@ function EditModal({
     });
   }
 
-  function anular() {
+  async function anular() {
     if (
-      !confirm(
-        "¿Anular esta venta? Regresa el stock y quita su dinero del corte. Úsalo para ventas duplicadas o registradas por error.",
-      )
+      !(await confirmar({
+        title: "¿Anular esta venta?",
+        description:
+          "Regresa el stock y quita su dinero del corte. Es para ventas duplicadas o registradas por error.",
+        confirmLabel: "Anular",
+        tone: "danger",
+      }))
     )
       return;
     start(async () => {
@@ -129,6 +137,7 @@ function EditModal({
 
   return (
     <Modal open onClose={onClose} title="Corregir venta" className="max-w-md">
+      {dialogoConfirm}
       <div className="space-y-3">
         <p className="font-mono text-lg font-semibold tabular-nums">
           {formatMXN(sale.total_cents)}

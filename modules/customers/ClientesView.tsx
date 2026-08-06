@@ -17,6 +17,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { useConfirm } from "@/components/ui/use-confirm";
 import { Input, Select } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { Badge } from "@/components/ui/badge";
@@ -122,10 +123,17 @@ export function ClientesView({ initial }: { initial: Customer[] }) {
 function ClienteRow({ c, onEdit }: { c: Customer; onEdit: () => void }) {
   const router = useRouter();
   const [pending, start] = useTransition();
+  const [confirmar, dialogoConfirm] = useConfirm();
   const descuento = pct(c.descuento_pct);
 
-  function archivar() {
-    if (!confirm(`¿Archivar a ${c.nombre}? Se ocultará de la lista (su historial se conserva).`))
+  async function archivar() {
+    if (
+      !(await confirmar({
+        title: `¿Archivar a ${c.nombre}?`,
+        description: "Se ocultará de la lista. Su historial se conserva.",
+        confirmLabel: "Archivar",
+      }))
+    )
       return;
     start(async () => {
       try {
@@ -140,6 +148,7 @@ function ClienteRow({ c, onEdit }: { c: Customer; onEdit: () => void }) {
 
   return (
     <Card className="p-4">
+      {dialogoConfirm}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">

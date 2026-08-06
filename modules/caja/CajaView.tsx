@@ -22,6 +22,7 @@ import { imprimirCorteNavegador, type CorteData } from "@/lib/corte";
 import { imprimirCorteUSB, webUsbDisponible } from "@/lib/escpos-usb";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { useConfirm } from "@/components/ui/use-confirm";
 import { Input, Select } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
@@ -866,10 +867,18 @@ function MovRow({
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
+  const [confirmar, dialogoConfirm] = useConfirm();
   const esIngreso = tipo === "ingreso";
 
-  function borrar() {
-    if (!confirm(`¿Eliminar este ${tipo}?`)) return;
+  async function borrar() {
+    if (
+      !(await confirmar({
+        title: `¿Eliminar este ${tipo}?`,
+        confirmLabel: "Eliminar",
+        tone: "danger",
+      }))
+    )
+      return;
     start(async () => {
       try {
         await (esIngreso ? eliminarIngreso(m.id) : eliminarGasto(m.id));
@@ -883,6 +892,7 @@ function MovRow({
 
   return (
     <li className="flex items-center gap-3 px-4 py-2.5">
+      {dialogoConfirm}
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium">{m.concepto}</p>
         <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">

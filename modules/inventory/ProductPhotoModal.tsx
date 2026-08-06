@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Camera, ImageUp, Trash2, Loader2 } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
+import { useConfirm } from "@/components/ui/use-confirm";
 import { resizeImage } from "@/lib/image";
 import { subirImagenProducto, quitarImagenProducto } from "./actions";
 
@@ -26,6 +27,7 @@ export function ProductPhotoModal({
   const [preview, setPreview] = useState<string | null>(imagenActual);
   const [busy, setBusy] = useState(false);
   const [pending, start] = useTransition();
+  const [confirmar, dialogoConfirm] = useConfirm();
   const fileRef = useRef<HTMLInputElement>(null);
   const camRef = useRef<HTMLInputElement>(null);
 
@@ -54,8 +56,9 @@ export function ProductPhotoModal({
     }
   }
 
-  function quitar() {
-    if (!confirm("¿Quitar la foto de este producto?")) return;
+  async function quitar() {
+    if (!(await confirmar({ title: "¿Quitar la foto?", confirmLabel: "Quitar", tone: "danger" })))
+      return;
     start(async () => {
       const res = await quitarImagenProducto(productId);
       if (!res.ok) {
@@ -72,6 +75,7 @@ export function ProductPhotoModal({
 
   return (
     <Modal open onClose={onClose} title="Foto del producto" className="max-w-sm">
+      {dialogoConfirm}
       <div className="space-y-3">
         <p className="truncate text-sm text-muted-foreground">{nombre}</p>
 

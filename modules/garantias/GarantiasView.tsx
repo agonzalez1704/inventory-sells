@@ -7,6 +7,7 @@ import { Plus, Search, ShieldAlert, Check, X, RotateCcw, Trash2 } from "lucide-r
 import { formatMXN } from "@/lib/money";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { useConfirm } from "@/components/ui/use-confirm";
 import { Input, Select } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { Badge } from "@/components/ui/badge";
@@ -147,6 +148,7 @@ export function GarantiasView({
 }
 
 function GarantiaRow({ g }: { g: Garantia }) {
+  const [confirmar, dialogoConfirm] = useConfirm();
   const router = useRouter();
   const [pending, start] = useTransition();
   const [resolviendo, setResolviendo] = useState<"aplicada" | "rechazada" | null>(null);
@@ -165,6 +167,7 @@ function GarantiaRow({ g }: { g: Garantia }) {
 
   return (
     <Card className={`p-4 ${g.estado === "pendiente" ? "" : "opacity-70"}`}>
+      {dialogoConfirm}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -213,8 +216,9 @@ function GarantiaRow({ g }: { g: Garantia }) {
             </button>
           )}
           <button
-            onClick={() => {
-              if (confirm("¿Borrar esta garantía?")) run(() => borrarGarantia(g.id), "Borrada");
+            onClick={async () => {
+              if (await confirmar({ title: "¿Borrar esta garantía?", confirmLabel: "Borrar", tone: "danger" }))
+                run(() => borrarGarantia(g.id), "Borrada");
             }}
             disabled={pending}
             aria-label="Borrar garantía"

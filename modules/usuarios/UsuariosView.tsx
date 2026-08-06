@@ -7,6 +7,7 @@ import { ShieldCheck, Plus, Pencil, Trash2, Lock, Mail, UserPlus, ChevronDown } 
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { useConfirm } from "@/components/ui/use-confirm";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
@@ -52,12 +53,21 @@ export function UsuariosView({
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
+  const [confirmar, dialogoConfirm] = useConfirm();
   const [editando, setEditando] = useState<RolRow | null>(null);
   const [creando, setCreando] = useState(false);
   const [invitando, setInvitando] = useState(false);
 
-  function revocar(email: string) {
-    if (!confirm(`¿Revocar la invitación de ${email}? Perderá el acceso.`)) return;
+  async function revocar(email: string) {
+    if (
+      !(await confirmar({
+        title: "¿Revocar la invitación?",
+        description: `${email} perderá el acceso.`,
+        confirmLabel: "Revocar",
+        tone: "danger",
+      }))
+    )
+      return;
     start(async () => {
       const r = await revocarInvitacion(email);
       if (!r.ok) {
@@ -81,8 +91,15 @@ export function UsuariosView({
     });
   }
 
-  function borrar(rol: RolRow) {
-    if (!confirm(`¿Eliminar el rol "${rol.name}"?`)) return;
+  async function borrar(rol: RolRow) {
+    if (
+      !(await confirmar({
+        title: `¿Eliminar el rol "${rol.name}"?`,
+        confirmLabel: "Eliminar",
+        tone: "danger",
+      }))
+    )
+      return;
     start(async () => {
       const r = await eliminarRol(rol.id);
       if (!r.ok) {
@@ -96,6 +113,7 @@ export function UsuariosView({
 
   return (
     <section className="space-y-8">
+      {dialogoConfirm}
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Usuarios y roles</h1>
         <p className="mt-1 text-sm text-muted-foreground">

@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Plus, Search, Truck, Phone, User, Pencil, Archive, Clock, Package } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { useConfirm } from "@/components/ui/use-confirm";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { Badge } from "@/components/ui/badge";
@@ -146,12 +147,13 @@ function ProveedorRow({
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
+  const [confirmar, dialogoConfirm] = useConfirm();
 
-  function archivar() {
+  async function archivar() {
     const msg = p.is_active
       ? `¿Archivar a ${p.nombre}? Sus productos conservan la referencia.`
       : `¿Reactivar a ${p.nombre}?`;
-    if (!confirm(msg)) return;
+    if (!(await confirmar({ title: msg, confirmLabel: "Continuar" }))) return;
     start(async () => {
       try {
         await archivarProveedor(p.id, !p.is_active);
@@ -165,6 +167,7 @@ function ProveedorRow({
 
   return (
     <Card className={`p-4 ${p.is_active ? "" : "opacity-60"}`}>
+      {dialogoConfirm}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">

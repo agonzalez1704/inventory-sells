@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { useConfirm } from "@/components/ui/use-confirm";
 import { Modal } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ItemSwapModal, type SwapProduct } from "@/modules/sales/ItemSwapModal";
@@ -161,6 +162,7 @@ function LoanRow({
   const [abonar, setAbonar] = useState(false);
   const [cliente, setCliente] = useState<PickerCustomer | null>(loan.cliente);
   const [pending, startTransition] = useTransition();
+  const [confirmar, dialogoConfirm] = useConfirm();
 
   function asignar(c: PickerCustomer) {
     const prev = cliente;
@@ -197,8 +199,16 @@ function LoanRow({
     });
   }
 
-  function cancel() {
-    if (!confirm("¿Cancelar nota de crédito y devolver el producto al stock?")) return;
+  async function cancel() {
+    if (
+      !(await confirmar({
+        title: "¿Cancelar la nota de crédito?",
+        description: "El producto vuelve al inventario y se borra la deuda.",
+        confirmLabel: "Sí, cancelar",
+        tone: "danger",
+      }))
+    )
+      return;
     startTransition(async () => {
       try {
         await cancelLoan(loan.id);
@@ -215,6 +225,7 @@ function LoanRow({
       id={`fiado-${loan.id}`}
       className={cn("p-4 transition-shadow", resaltar && "ring-2 ring-amber-400")}
     >
+      {dialogoConfirm}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="flex items-center gap-1.5 font-medium">

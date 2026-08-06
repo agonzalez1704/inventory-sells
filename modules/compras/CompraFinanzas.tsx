@@ -7,6 +7,7 @@ import { Plus, Trash2, ReceiptText, Banknote } from "lucide-react";
 import { formatMXN, fromCents } from "@/lib/money";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { useConfirm } from "@/components/ui/use-confirm";
 import { Input, Select } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { Badge } from "@/components/ui/badge";
@@ -180,10 +181,12 @@ export function CompraFinanzas({
 }
 
 function PagoRow({ pago }: { pago: Pago }) {
+  const [confirmar, dialogoConfirm] = useConfirm();
   const router = useRouter();
   const [pending, start] = useTransition();
   return (
     <li className="flex items-center gap-3 px-4 py-3">
+      {dialogoConfirm}
       <div className="min-w-0 flex-1">
         <p className="text-sm">
           {METODO_LABEL[pago.metodo]}
@@ -195,8 +198,9 @@ function PagoRow({ pago }: { pago: Pago }) {
       </div>
       <p className="shrink-0 tabular-nums">{formatMXN(pago.monto_cents)}</p>
       <button
-        onClick={() => {
-          if (!confirm("¿Borrar este pago?")) return;
+        onClick={async () => {
+          if (!(await confirmar({ title: "¿Borrar este pago?", confirmLabel: "Borrar", tone: "danger" })))
+            return;
           start(async () => {
             try {
               await borrarPago(pago.id);
