@@ -12,9 +12,12 @@
 .DS_Store
 *.log
 
-# env
+# env — every variant except the checked-in template. The old rules were `.env`
+# and `.env*.local`, which let a file like `.env.prod` (real Clerk secret key)
+# sit untracked-but-not-ignored, one `git add -A` from being published.
 .env
-.env*.local
+.env.*
+!.env.example
 
 # typescript
 *.tsbuildinfo

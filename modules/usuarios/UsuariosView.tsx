@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ShieldCheck, Plus, Pencil, Trash2, Lock, Mail, UserPlus } from "lucide-react";
+import { ShieldCheck, Plus, Pencil, Trash2, Lock, Mail, UserPlus, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -358,34 +358,68 @@ function RolEditor({ rol, onClose }: { rol: RolRow | null; onClose: () => void }
           </label>
         </div>
 
+        {/*
+          Sixteen permissions across four groups, each with a description, made a
+          dialog taller than the screen — so the footer sat below the fold and
+          you couldn't save without scrolling to find it. The list scrolls on its
+          own now and the buttons stay put.
+
+          <details> rather than state: it collapses, remembers, and is keyboard
+          accessible without a line of JavaScript. Open by default — a collapsed
+          group hides which permissions are ticked, which is the thing you opened
+          this dialog to see. The n/m counter means a group you close yourself
+          still tells you it has some.
+        */}
         <div className="space-y-3">
           <p className="text-xs font-medium text-muted-foreground">Permisos</p>
-          {CATALOGO_PERMISOS.map((g) => (
-            <div key={g.grupo} className="rounded-xl border border-border p-3">
-              <p className="mb-2 text-xs font-semibold">{g.grupo}</p>
-              <div className="grid gap-2">
-                {g.permisos.map((p) => (
-                  <label key={p.key} className="flex cursor-pointer items-start gap-2.5">
-                    <input
-                      type="checkbox"
-                      checked={sel.has(p.key)}
-                      onChange={() => toggle(p.key)}
-                      className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-accent"
-                    />
-                    <span className="min-w-0">
-                      <span className={cn("block text-sm font-medium", p.key === "admin_total" && "text-accent")}>
-                        {p.label}
-                      </span>
-                      <span className="block text-xs text-muted-foreground">{p.desc}</span>
+          <div className="max-h-[48vh] space-y-3 overflow-y-auto pr-1">
+            {CATALOGO_PERMISOS.map((g) => {
+              const activos = g.permisos.filter((p) => sel.has(p.key)).length;
+              return (
+                <details key={g.grupo} open className="group rounded-xl border border-border p-3">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-xs font-semibold [&::-webkit-details-marker]:hidden">
+                    <span className="flex items-center gap-1.5">
+                      <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform group-[[open]]:rotate-180" />
+                      {g.grupo}
                     </span>
-                  </label>
-                ))}
-              </div>
-            </div>
-          ))}
+                    <span
+                      className={cn(
+                        "shrink-0 rounded-full px-1.5 py-0.5 text-[11px] font-medium tabular-nums",
+                        activos > 0
+                          ? "bg-accent-soft text-accent"
+                          : "text-muted-foreground",
+                      )}
+                    >
+                      {activos}/{g.permisos.length}
+                    </span>
+                  </summary>
+                  <div className="mt-2 grid gap-2">
+                    {g.permisos.map((p) => (
+                      <label key={p.key} className="flex cursor-pointer items-start gap-2.5">
+                        <input
+                          type="checkbox"
+                          checked={sel.has(p.key)}
+                          onChange={() => toggle(p.key)}
+                          className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-accent"
+                        />
+                        <span className="min-w-0">
+                          <span className={cn("block text-sm font-medium", p.key === "admin_total" && "text-accent")}>
+                            {p.label}
+                          </span>
+                          <span className="block text-xs text-muted-foreground">{p.desc}</span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </details>
+              );
+            })}
+          </div>
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-border pt-3">
+        {/* sticky bottom-0: the dialog's own scroll can move past this, and on a
+            phone the sheet scrolls too. Pinned, Guardar is always one tap away. */}
+        <div className="sticky bottom-0 -mx-5 flex justify-end gap-2 border-t border-border bg-background px-5 pb-1 pt-3">
           <Button variant="ghost" onClick={onClose} disabled={pending}>Cancelar</Button>
           <Button onClick={guardar} loading={pending} disabled={name.trim().length < 2}>
             {rol ? "Guardar" : "Crear rol"}
