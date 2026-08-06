@@ -1,0 +1,15 @@
+-- Editing any product failed: "permission denied for table products".
+--
+-- products.proveedor_id was added with the suppliers feature, but UPDATE on
+-- products is granted column by column and this one was never included. The edit
+-- form always sends proveedor_id — it is one of the fields it edits — so every
+-- save was refused, whatever the user had actually changed. It surfaced as a
+-- report about updating a cost.
+--
+-- Proven by A/B against the live table as `authenticated`: the same UPDATE is
+-- denied with proveedor_id in the SET list and passes without it.
+--
+-- image_url / image_key stay out of this on purpose: those go through the
+-- set_product_image RPC precisely so they can't be written directly. quantity
+-- stays out too — stock only moves through the ledger.
+GRANT UPDATE (proveedor_id) ON public.products TO authenticated;
