@@ -24,7 +24,10 @@ export function Drawer({
         <Vaul.Overlay className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm" />
         <Vaul.Content
           className={cn(
-            "fixed inset-x-0 bottom-0 z-50 flex max-h-[94vh] flex-col rounded-t-2xl border-t border-border bg-background outline-none",
+            // dvh, not vh: on iOS `vh` measures the viewport as if the browser
+            // chrome weren't there, so a 94vh sheet is taller than the screen
+            // actually is and its top starts off-screen.
+            "fixed inset-x-0 bottom-0 z-50 flex max-h-[90dvh] flex-col rounded-t-2xl border-t border-border bg-background outline-none",
             className,
           )}
         >
@@ -32,11 +35,18 @@ export function Drawer({
             aria-hidden
             className="mx-auto mt-2.5 h-1.5 w-10 shrink-0 rounded-full bg-muted"
           />
-          <Vaul.Title className="px-5 pb-2 pt-3 text-sm font-semibold">
+          <Vaul.Title className="shrink-0 px-5 pb-2 pt-3 text-sm font-semibold">
             {title}
           </Vaul.Title>
+          {/*
+            min-h-0 is what makes the sheet size to its content. A flex child
+            defaults to min-height:auto, so this scroller refuses to shrink below
+            its content and pushes the sheet to its full max height — leaving a
+            blank expanse under a short form, and putting the buttons off-screen
+            once vaul scrolls the focused input into view when the keyboard opens.
+          */}
           <div
-            className="overflow-y-auto px-5 pb-6"
+            className="min-h-0 flex-1 overflow-y-auto px-5 pb-6"
             style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}
           >
             {children}
