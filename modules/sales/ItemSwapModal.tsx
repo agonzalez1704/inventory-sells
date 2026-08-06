@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Search, Plus, Minus, Package } from "lucide-react";
+import { buscarProductos, productosPorId } from "@/modules/inventory/buscar";
 import { formatMXN } from "@/lib/money";
 import type { Product } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -64,7 +65,6 @@ export function ItemSwapModal({
   description,
   submitLabel = "Guardar cambios",
   currentItems,
-  products,
   onSubmit,
   successMsg,
 }: {
@@ -74,7 +74,6 @@ export function ItemSwapModal({
   description: string;
   submitLabel?: string;
   currentItems: SwapItem[];
-  products: SwapProduct[];
   onSubmit: (items: { product_id: string; qty: number }[]) => Promise<void>;
   successMsg: (totalCents: number) => string;
 }) {
@@ -82,10 +81,21 @@ export function ItemSwapModal({
   const [query, setQuery] = useState("");
   const [pending, startTransition] = useTransition();
 
-  const byId = useMemo(
-    () => Object.fromEntries(products.map((p) => [p.id, p])),
-    [products],
-  );
+  // The catalog is no longer handed to this modal — it fetches what it needs.
+  // `conocidos` holds the products of the lines already on the sale plus
+  // anything a search brings back; without the former, an item whose product
+  // isn't in the search results would drop out of the list and be written back
+  // missing.
+  const [conocidos, setConocidos] = useState<Record<string, SwapProduct>>({});
+  const [results, setResults] = useState<SwapProduct[]>([]);
+  const recordar = useCallback((ps: SwapProduct[]) => {
+    setConocidos((prev) => {
+      const next = { ...prev };
+      for (const p of ps) next[p.id] = p;
+      return next;
+    });
+  }, []);
+  const byId = conocidos;
 
   const initialQ = useMemo(() => {
     const m: Record<string, number> = {};
@@ -97,19 +107,41 @@ export function ItemSwapModal({
 
   const [cart, setCart] = useState<Record<string, number>>(initialQ);
 
+  // Resolve the sale's own lines first, before anything can be edited.
+  useEffect(() => {
+    if (!open) return;
+    const ids = Object.keys(initialQ);
+    if (!ids.length) return;
+    let cancelado = false;
+    productosPorId(ids)
+      .then((ps) => !cancelado && recordar(ps as SwapProduct[]))
+      .catch(() => {});
+    return () => {
+      cancelado = true;
+    };
+  }, [open, initialQ, recordar]);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelado = false;
+    const t = setTimeout(async () => {
+      try {
+        const rows = (await buscarProductos({ query, limit: 10 })) as SwapProduct[];
+        if (cancelado) return;
+        setResults(rows);
+        recordar(rows);
+      } catch {
+        if (!cancelado) setResults([]);
+      }
+    }, 180);
+    return () => {
+      cancelado = true;
+      clearTimeout(t);
+    };
+  }, [open, query, recordar]);
+
   const maxFor = (id: string) =>
     (byId[id]?.quantity ?? 0) + (initialQ[id] ?? 0);
-
-  const results = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const base = q
-      ? products.filter(
-          (p) =>
-            p.sku.toLowerCase().includes(q) || p.name.toLowerCase().includes(q),
-        )
-      : products;
-    return base.slice(0, 10);
-  }, [query, products]);
 
   const lines = Object.entries(cart)
     .map(([id, qty]) => ({ product: byId[id], qty }))

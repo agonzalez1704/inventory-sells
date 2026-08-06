@@ -2,7 +2,6 @@ import { createInsForgeServerClient } from "@/lib/insforge/server";
 import {
   AdelantosView,
   type Adelanto,
-  type AdelantoProducto,
 } from "@/modules/adelantos/AdelantosView";
 
 export const dynamic = "force-dynamic";
@@ -22,8 +21,7 @@ type Row = {
 
 export default async function AdelantosPage() {
   const insforge = await createInsForgeServerClient();
-  const [{ data, error }, { data: prodData }, { data: invData }] =
-    await Promise.all([
+  const [{ data, error }] = await Promise.all([
       insforge.database
         .from("adelantos")
         .select(
@@ -31,20 +29,7 @@ export default async function AdelantosPage() {
         )
         .eq("estado", "activo")
         .order("created_at", { ascending: true }),
-      insforge.database
-        .from("products")
-        .select("id, inventory_id, sku, name, size, price_cents, quantity")
-        .eq("is_active", true)
-        .order("name", { ascending: true }),
-      insforge.database.from("inventories").select("id, name"),
     ]);
-
-  const invName = new Map(
-    ((invData ?? []) as { id: string; name: string }[]).map((i) => [i.id, i.name]),
-  );
-  const products = (
-    (prodData ?? []) as (AdelantoProducto & { inventory_id: string })[]
-  ).map((p) => ({ ...p, inventory_name: invName.get(p.inventory_id) ?? null }));
 
   const adelantos: Adelanto[] = ((data ?? []) as unknown as Row[]).map((r) => {
     const pagado = (r.adelanto_pagos ?? []).reduce(
@@ -71,7 +56,7 @@ export default async function AdelantosPage() {
           {error.message}
         </p>
       )}
-      <AdelantosView adelantos={adelantos} products={products} />
+      <AdelantosView adelantos={adelantos} />
     </>
   );
 }

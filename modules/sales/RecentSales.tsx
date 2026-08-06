@@ -59,11 +59,9 @@ const LABEL = { ...Object.fromEntries(PAYMENT), mixto: "Mixto" } as Record<strin
 
 function EditModal({
   sale,
-  products,
   onClose,
 }: {
   sale: SaleWithItems;
-  products: SwapProduct[];
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -227,7 +225,6 @@ function EditModal({
         title="Cambiar productos de la venta"
         description="Cambia el modelo, agrega o quita productos. El stock se ajusta solo (lo que quites regresa, lo nuevo se descuenta) y el total se recalcula."
         currentItems={sale.sale_items}
-        products={products}
         onSubmit={(items) => cambiarVentaItems(sale.id, items)}
         successMsg={(t) => `Venta actualizada · ${formatMXN(t)}`}
       />
@@ -238,14 +235,12 @@ function EditModal({
 export function RecentSales({
   sales,
   isAdmin,
-  products,
   titulo = "Ventas recientes",
   subtitulo = "Toca una venta para ver sus productos.",
   abrirId,
 }: {
   sales: SaleWithItems[];
   isAdmin: boolean;
-  products: SwapProduct[];
   titulo?: string;
   subtitulo?: string;
   abrirId?: string | null;
@@ -530,7 +525,7 @@ export function RecentSales({
       )}
 
       {edit && (
-        <EditModal sale={edit} products={products} onClose={() => setEdit(null)} />
+        <EditModal sale={edit} onClose={() => setEdit(null)} />
       )}
       {returnSale && (
         <ReturnModal

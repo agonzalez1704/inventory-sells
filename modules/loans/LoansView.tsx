@@ -59,12 +59,10 @@ function ago(iso: string): string {
 
 export function LoansView({
   loans,
-  products,
   customers,
   abrirId,
 }: {
   loans: Loan[];
-  products: SwapProduct[];
   customers: PickerCustomer[];
   abrirId?: string | null;
 }) {
@@ -136,7 +134,6 @@ export function LoansView({
                 <LoanRow
                   key={l.id}
                   loan={l}
-                  products={products}
                   customers={customers}
                   resaltar={flash === l.id}
                 />
@@ -151,12 +148,10 @@ export function LoansView({
 
 function LoanRow({
   loan,
-  products,
   customers,
   resaltar = false,
 }: {
   loan: Loan;
-  products: SwapProduct[];
   customers: PickerCustomer[];
   resaltar?: boolean;
 }) {
@@ -304,7 +299,6 @@ function LoanRow({
         title="Editar productos de la nota"
         description="Agrega, quita o cambia productos de esta nota de crédito. El stock se ajusta solo: lo que quites regresa al inventario, lo nuevo se descuenta."
         currentItems={loan.sale_items}
-        products={products}
         onSubmit={(items) => cambiarFiado(loan.id, items)}
         successMsg={(t) => `Nota de crédito actualizada · ${formatMXN(t)}`}
       />

@@ -1,5 +1,5 @@
 import { createInsForgeServerClient } from "@/lib/insforge/server";
-import { LoansView, type Loan, type SwapProduct } from "@/modules/loans/LoansView";
+import { LoansView, type Loan } from "@/modules/loans/LoansView";
 import type { PickerCustomer } from "@/modules/customers/CustomerPicker";
 
 export default async function FiadosPage({
@@ -12,8 +12,6 @@ export default async function FiadosPage({
 
   const [
     { data, error },
-    { data: productData },
-    { data: invData },
     { data: profileData },
     { data: customerData },
   ] = await Promise.all([
@@ -24,12 +22,6 @@ export default async function FiadosPage({
       )
       .eq("status", "pending")
       .order("created_at", { ascending: true }),
-    insforge.database
-      .from("products")
-      .select("id, inventory_id, sku, name, size, price_cents, quantity")
-      .eq("is_active", true)
-      .order("name", { ascending: true }),
-    insforge.database.from("inventories").select("id, name"),
     insforge.database.from("profiles").select("id, full_name"),
     insforge.database
       .from("customers")
@@ -62,13 +54,6 @@ export default async function FiadosPage({
 
   const customers = (customerData ?? []) as PickerCustomer[];
 
-  const invName = new Map(
-    ((invData ?? []) as { id: string; name: string }[]).map((i) => [i.id, i.name]),
-  );
-  const products = (
-    (productData ?? []) as (SwapProduct & { inventory_id: string })[]
-  ).map((p) => ({ ...p, inventory_name: invName.get(p.inventory_id) ?? null }));
-
   return (
     <>
       {error && (
@@ -76,7 +61,7 @@ export default async function FiadosPage({
           {error.message}
         </p>
       )}
-      <LoansView loans={loans} products={products} customers={customers} abrirId={abrirId} />
+      <LoansView loans={loans} customers={customers} abrirId={abrirId} />
     </>
   );
 }

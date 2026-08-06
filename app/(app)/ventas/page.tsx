@@ -4,7 +4,6 @@ import { getProfile, requirePagePermiso } from "@/lib/auth/profile";
 import { mxHoy, rangoUTC } from "@/lib/caja-range";
 import { RecentSales, type SaleWithItems } from "@/modules/sales/RecentSales";
 import { VentasFiltros } from "@/modules/sales/VentasFiltros";
-import type { SalesProduct } from "@/modules/sales/SalesScreen";
 import type { PaymentMethod } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -55,28 +54,13 @@ export default async function VentasPage({
 
   const [
     { data: salesData },
-    { data: productData },
     { data: invData },
     { data: profileData },
   ] = await Promise.all([
     ventasQuery,
-    insforge.database
-      .from("products")
-      .select(
-        "id, inventory_id, sku, name, brand, size, category, price_cents, quantity, image_url",
-      )
-      .eq("is_active", true)
-      .order("name", { ascending: true }),
     insforge.database.from("inventories").select("id, name"),
     insforge.database.from("profiles").select("id, full_name"),
   ]);
-
-  const invName = new Map(
-    ((invData ?? []) as { id: string; name: string }[]).map((i) => [i.id, i.name]),
-  );
-  const products = (
-    (productData ?? []) as (SalesProduct & { inventory_id: string })[]
-  ).map((p) => ({ ...p, inventory_name: invName.get(p.inventory_id) ?? null }));
 
   const sellerName = new Map(
     ((profileData ?? []) as { id: string; full_name: string | null }[]).map((p) => [
@@ -170,7 +154,6 @@ export default async function VentasPage({
       <RecentSales
         sales={lista}
         isAdmin={isAdmin}
-        products={products}
         abrirId={abrirId}
         titulo="Ventas del periodo"
         subtitulo="Toca una venta para ver sus productos. La búsqueda abarca todas las ventas."

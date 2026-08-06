@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -13,6 +13,7 @@ import {
   X,
 } from "lucide-react";
 import { formatMXN } from "@/lib/money";
+import { buscarProductos } from "@/modules/inventory/buscar";
 import type { PaymentMethod, Product } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
@@ -55,10 +56,8 @@ const METODOS: [PaymentMethod, string][] = [
 
 export function AdelantosView({
   adelantos,
-  products,
 }: {
   adelantos: Adelanto[];
-  products: AdelantoProducto[];
 }) {
   const [crear, setCrear] = useState(false);
   const porCobrar = adelantos.reduce(
@@ -114,7 +113,7 @@ export function AdelantosView({
       )}
 
       {crear && (
-        <CrearModal products={products} onClose={() => setCrear(false)} />
+        <CrearModal onClose={() => setCrear(false)} />
       )}
     </section>
   );
@@ -295,10 +294,8 @@ function AbonarModal({
 }
 
 function CrearModal({
-  products,
   onClose,
 }: {
-  products: AdelantoProducto[];
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -313,19 +310,33 @@ function CrearModal({
   const [metodo, setMetodo] = useState<PaymentMethod>("efectivo");
   const [pending, start] = useTransition();
 
-  const results = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const base = products.filter((p) =>
-      tipo === "apartado" ? p.quantity > 0 : true,
-    );
-    const list = q
-      ? base.filter(
-          (p) =>
-            p.sku.toLowerCase().includes(q) || p.name.toLowerCase().includes(q),
-        )
-      : base;
-    return list.slice(0, 8);
-  }, [query, products, tipo]);
+  // Searched in the database — the whole catalog used to be loaded just to
+  // filter it here. An "apartado" reserves a physical piece, so it only offers
+  // what's actually in stock; a "pedido" is ordered in and may have none.
+  const [encontrados, setEncontrados] = useState<AdelantoProducto[]>([]);
+  useEffect(() => {
+    let cancelado = false;
+    const t = setTimeout(async () => {
+      try {
+        const rows = (await buscarProductos({ query, limit: 24 })) as AdelantoProducto[];
+        if (!cancelado) setEncontrados(rows);
+      } catch {
+        if (!cancelado) setEncontrados([]);
+      }
+    }, 180);
+    return () => {
+      cancelado = true;
+      clearTimeout(t);
+    };
+  }, [query]);
+
+  const results = useMemo(
+    () =>
+      encontrados
+        .filter((p) => (tipo === "apartado" ? p.quantity > 0 : true))
+        .slice(0, 8),
+    [encontrados, tipo],
+  );
 
   function pick(p: AdelantoProducto) {
     setProd(p);

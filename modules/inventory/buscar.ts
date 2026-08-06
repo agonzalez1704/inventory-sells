@@ -104,6 +104,26 @@ export async function buscarProductos(f: Filtro): Promise<ProductoBuscado[]> {
   });
 }
 
+/**
+ * Specific products by id, for a screen that already references them.
+ *
+ * A sale, quote or purchase holds product ids. Now that no screen receives the
+ * whole catalog, those ids have nothing to resolve against unless the product
+ * happens to sit in the current page — and an unresolved line doesn't render as
+ * an error, it just isn't there, which then writes the record back without it.
+ *
+ * No is_active filter on purpose: a discontinued product still has to appear in
+ * a document that already contains it.
+ */
+export async function productosPorId(ids: string[]): Promise<ProductoBuscado[]> {
+  await assertVerCatalogo();
+  const limpios = [...new Set(ids.filter(Boolean))];
+  if (limpios.length === 0) return [];
+  const insforge = await createInsForgeServerClient();
+  const { data } = await insforge.database.from("products").select(COLS).in("id", limpios);
+  return (data ?? []) as ProductoBuscado[];
+}
+
 export type OrdenInventario = { key: string; dir: "asc" | "desc" } | null;
 
 export type PaginaInventario = { rows: ProductoBuscado[]; total: number };
