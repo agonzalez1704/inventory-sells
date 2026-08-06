@@ -48,10 +48,14 @@ export async function listarProveedores(incluirInactivos = false): Promise<Prove
 }
 
 export async function crearProveedor(input: ProveedorInput): Promise<{ id: string }> {
-  await assertPermiso("inventario_gestionar");
+  const userId = await assertPermiso("inventario_gestionar");
+  // created_by is NOT NULL and defaults to requesting_user_id(), which reads the
+  // JWT — and insforgeAdmin carries none, so the default resolved to NULL and
+  // every insert died on the not-null constraint. The user id has to come from
+  // the caller, the way every other admin-client insert in this app does it.
   const { data, error } = await insforgeAdmin.database
     .from("proveedores")
-    .insert([clean(input)])
+    .insert([{ ...clean(input), created_by: userId }])
     .select("id")
     .single();
   if (error || !data) {
