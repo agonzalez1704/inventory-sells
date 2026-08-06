@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import type { SalesProduct } from "@/modules/sales/SalesScreen";
 import { ponerItem, quitarItem, recibirCompra, cancelarCompra, type Compra } from "./actions";
+import { CargarFactura } from "./CargarFactura";
 
 const fecha = (iso: string) =>
   new Date(iso).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
@@ -217,6 +218,10 @@ export function CompraDetalle({ compra }: { compra: Compra }) {
           </p>
         )}
       </Card>
+
+      {/* Captura desde archivo — antes del alta manual, porque es el camino
+          rápido y el manual queda como el de una línea suelta. */}
+      {editable && <CargarFactura compraId={compra.id} />}
 
       {/* Alta de productos (solo borrador) */}
       {editable && (

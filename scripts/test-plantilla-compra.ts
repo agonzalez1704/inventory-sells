@@ -11,6 +11,7 @@ import { existsSync, readFileSync } from "node:fs";
 import * as XLSX from "xlsx";
 import {
   ENCABEZADOS,
+  PLANTILLA_HOJA,
   esPlantilla,
   leerPlantilla,
 } from "../lib/plantilla-compra.ts";
@@ -119,6 +120,37 @@ check("'Stock actual' nunca se confunde con la cantidad a entrar", () => {
   ];
   const f = leerPlantilla(conAmbas).filas[0];
   assert.equal(f.cantidad, 8, `tomó ${f.cantidad} — si es 999 leyó la existencia actual`);
+});
+
+// Round trip through the real XLSX serializer: what the download route writes
+// must be what the parser reads. A template that can't read its own output is
+// worse than no template — the user follows instructions and it still fails.
+check("ida y vuelta: lo generado se vuelve a leer", () => {
+  const hojaGen = XLSX.utils.aoa_to_sheet([
+    ENCABEZADOS,
+    ["A2655", "BAT IPH 13", 8, 169, "PB-13", 10],
+    ["iphone-11-jk", "iPhone 11 JK", 5, 245, "", ""],
+  ]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, hojaGen, PLANTILLA_HOJA);
+  // Second sheet, as the route emits — the parser must still find the data one.
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["Instrucciones"]]), "Instrucciones");
+
+  const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+  const leido = XLSX.read(buf, { type: "buffer" });
+  assert.equal(leido.SheetNames[0], PLANTILLA_HOJA, "la hoja de datos debe ir primero");
+
+  const grid = XLSX.utils.sheet_to_json<unknown[]>(leido.Sheets[PLANTILLA_HOJA], {
+    header: 1, defval: "",
+  });
+  assert.equal(esPlantilla(grid), true, "no reconoció su propia salida");
+  const { filas } = leerPlantilla(grid);
+  assert.equal(filas.length, 2);
+  assert.equal(filas[0].cantidad, 8);
+  assert.equal(filas[0].costo, 169);       // número, no texto
+  assert.equal(filas[0].skuProveedor, "PB-13");
+  assert.equal(filas[0].pedido, 10);
+  assert.equal(filas[1].pedido, null, "celda vacía debe quedar en null, no 0");
 });
 
 // The real file, when it's on this machine: the one the shop actually uploads.
