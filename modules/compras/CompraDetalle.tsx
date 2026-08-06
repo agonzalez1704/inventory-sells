@@ -121,22 +121,38 @@ export function CompraDetalle({ compra }: { compra: Compra }) {
    */
   function notaYRecibir() {
     setConfirmarRecibo(false);
+    const falta = Math.abs(diferencia);
     start(async () => {
+      // Receive FIRST. crear_nota_credito refuses anything that isn't already
+      // received — "solo una compra recibida admite notas de crédito" — and the
+      // order is right on its own terms: receiving moves the stock that actually
+      // arrived, and the note then records that the invoice charged for more.
+      let recibida = false;
       try {
+        const r = await recibirCompra(compra.id);
+        recibida = true;
         await registrarNota({
           compraId: compra.id,
           tipo: "no_llego",
           motivo: `No llegó: diferencia contra la factura ${compra.folio_factura ?? ""}`.trim(),
           items: [],
-          montoPesos: Math.abs(diferencia) / 100,
+          montoPesos: falta / 100,
         });
-        const r = await recibirCompra(compra.id);
         toast.success(
-          `Recibido: ${r.piezas} piezas · nota por ${formatMXN(Math.abs(diferencia))} registrada`,
+          `Recibido: ${r.piezas} piezas · nota por ${formatMXN(falta)} registrada`,
         );
         router.refresh();
       } catch (e) {
-        toast.error(e instanceof Error ? e.message : "Error al recibir");
+        const msg = e instanceof Error ? e.message : "Error al recibir";
+        // Two steps, and the second can fail on its own. Say which state the
+        // purchase is actually in, or the user re-runs it and double-receives.
+        toast.error(
+          recibida
+            ? `La mercancía SÍ entró, pero la nota de crédito falló: ${msg}. ` +
+                `Regístrala a mano en Finanzas por ${formatMXN(falta)}.`
+            : msg,
+        );
+        if (recibida) router.refresh();
       }
     });
   }
