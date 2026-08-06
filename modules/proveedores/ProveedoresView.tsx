@@ -7,6 +7,7 @@ import { Plus, Search, Truck, Phone, User, Pencil, Archive, Clock, Package } fro
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/use-confirm";
+import { unwrap } from "@/lib/errors";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { Badge } from "@/components/ui/badge";
@@ -156,7 +157,7 @@ function ProveedorRow({
     if (!(await confirmar({ title: msg, confirmLabel: "Continuar" }))) return;
     start(async () => {
       try {
-        await archivarProveedor(p.id, !p.is_active);
+        unwrap(await archivarProveedor(p.id, !p.is_active));
         toast.success(p.is_active ? "Proveedor archivado" : "Proveedor reactivado");
         router.refresh();
       } catch (e) {
@@ -255,8 +256,8 @@ function ProveedorModal({
     };
     start(async () => {
       try {
-        if (esEdit) await editarProveedor(proveedor!.id, payload);
-        else await crearProveedor(payload);
+        if (esEdit) unwrap(await editarProveedor(proveedor!.id, payload));
+        else unwrap(await crearProveedor(payload));
         toast.success(esEdit ? "Proveedor actualizado" : "Proveedor registrado");
         onClose();
         router.refresh();

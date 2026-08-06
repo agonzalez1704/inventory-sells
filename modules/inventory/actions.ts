@@ -150,7 +150,8 @@ export async function getProductForEdit(id: string): Promise<EditableProduct> {
 export async function updateProduct(
   id: string,
   patch: ProductPatch,
-): Promise<void> {
+): Promise<ActionResult<null>> {
+  return attempt("updateProduct", async () => {
   await assertPermiso("inventario_gestionar");
   const perms = await permisosDe();
   const admin = perms.has("admin_total");
@@ -191,6 +192,8 @@ export async function updateProduct(
     })
     .eq("id", id);
   if (error) throw new Error(error.message ?? "Error al guardar");
+  return null;
+  });
 }
 
 // Manual stock correction (recount / damage / return) → adjust_stock RPC.
@@ -200,7 +203,8 @@ export async function adjustStock(
   delta: number,
   reason: "adjustment" | "return",
   note: string | null,
-): Promise<number> {
+): Promise<ActionResult<number>> {
+  return attempt("adjustStock", async () => {
   await assertPermiso("inventario_gestionar");
   if (!Number.isInteger(delta) || delta === 0)
     throw new Error("Ajuste inválido");
@@ -213,4 +217,5 @@ export async function adjustStock(
   });
   if (error) throw new Error(error.message ?? "Error al ajustar stock");
   return Number(data);
+  });
 }

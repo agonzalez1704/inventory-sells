@@ -213,7 +213,12 @@ export async function analizarFactura(
           skuPropio: f.sku,
           cantidad: f.cantidad,
           costo: f.costo,
-          pedido: f.pedido,
+          // No explicit "Pedido" column means the sheet you uploaded IS the
+          // requisition, so its quantity is what was ordered. Received starts
+          // equal and is then corrected to what actually turned up — which is
+          // what makes the shortfall visible on the counter-receipt. Leaving
+          // this null instead gave a PDF with an empty "Pedido" column.
+          pedido: f.pedido ?? f.cantidad,
         })),
       );
       return { modo: "plantilla", folio: null, lineas, ignoradas };

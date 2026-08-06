@@ -2,6 +2,7 @@
 
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { assertPermiso } from "@/lib/auth/profile";
+import { attempt, type ActionResult } from "@/lib/errors";
 import { toCents } from "@/lib/money";
 
 export type GarantiaEstado = "pendiente" | "aplicada" | "rechazada";
@@ -62,7 +63,8 @@ export async function crearGarantia(input: {
   montoPesos: number;
   fecha: string;
   notas: string | null;
-}): Promise<void> {
+}): Promise<ActionResult<null>> {
+  return attempt("crearGarantia", async () => {
   const userId = await assertPermiso("inventario_gestionar");
   const descripcion = input.descripcion.trim();
   if (!descripcion) throw new Error("Describe la pieza que se regresa");
@@ -82,6 +84,8 @@ export async function crearGarantia(input: {
     },
   ]);
   if (error) throw new Error(error.message ?? "No se pudo registrar la garantía");
+  return null;
+  });
 }
 
 // Closing one: the supplier credited it, replaced the part, or refused it.
@@ -89,7 +93,8 @@ export async function resolverGarantia(
   id: string,
   estado: Exclude<GarantiaEstado, "pendiente">,
   resolucion: string | null,
-): Promise<void> {
+): Promise<ActionResult<null>> {
+  return attempt("resolverGarantia", async () => {
   await assertPermiso("inventario_gestionar");
   const { error } = await insforgeAdmin.database
     .from("garantias_proveedor")
@@ -100,22 +105,30 @@ export async function resolverGarantia(
     })
     .eq("id", id);
   if (error) throw new Error(error.message ?? "No se pudo actualizar");
+  return null;
+  });
 }
 
-export async function reabrirGarantia(id: string): Promise<void> {
+export async function reabrirGarantia(id: string): Promise<ActionResult<null>> {
+  return attempt("reabrirGarantia", async () => {
   await assertPermiso("inventario_gestionar");
   const { error } = await insforgeAdmin.database
     .from("garantias_proveedor")
     .update({ estado: "pendiente", resolucion: null, resuelta_at: null })
     .eq("id", id);
   if (error) throw new Error(error.message ?? "No se pudo reabrir");
+  return null;
+  });
 }
 
-export async function borrarGarantia(id: string): Promise<void> {
+export async function borrarGarantia(id: string): Promise<ActionResult<null>> {
+  return attempt("borrarGarantia", async () => {
   await assertPermiso("inventario_gestionar");
   const { error } = await insforgeAdmin.database
     .from("garantias_proveedor")
     .delete()
     .eq("id", id);
   if (error) throw new Error(error.message ?? "No se pudo borrar");
+  return null;
+  });
 }

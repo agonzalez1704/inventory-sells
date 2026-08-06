@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { unwrap } from "@/lib/errors";
 import { Loader2 } from "lucide-react";
 import { fromCents } from "@/lib/money";
 import { ETIQUETAS } from "@/lib/etiquetas";
@@ -103,7 +104,7 @@ export function ProductEditModal({
     if (!form) return;
     startSave(async () => {
       try {
-        await updateProduct(productId, {
+        unwrap(await updateProduct(productId, {
           name: form.name,
           category: form.category || null,
           brand: form.brand || null,
@@ -114,7 +115,7 @@ export function ProductEditModal({
           is_active: form.is_active,
           etiqueta: form.etiqueta || null,
           proveedor_id: form.proveedor_id || null,
-        });
+        }));
         toast.success("Producto actualizado");
         router.refresh();
         onClose();
@@ -132,7 +133,7 @@ export function ProductEditModal({
     }
     startAdjust(async () => {
       try {
-        const newQty = await adjustStock(productId, d, reason, note || null);
+        const newQty = unwrap(await adjustStock(productId, d, reason, note || null));
         setQty(newQty);
         setDelta("");
         setNote("");

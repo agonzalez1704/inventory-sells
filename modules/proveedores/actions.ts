@@ -2,6 +2,7 @@
 
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { assertPermiso } from "@/lib/auth/profile";
+import { attempt, type ActionResult } from "@/lib/errors";
 
 export type Proveedor = {
   id: string;
@@ -47,7 +48,10 @@ export async function listarProveedores(incluirInactivos = false): Promise<Prove
   return (data ?? []) as Proveedor[];
 }
 
-export async function crearProveedor(input: ProveedorInput): Promise<{ id: string }> {
+export async function crearProveedor(
+  input: ProveedorInput,
+): Promise<ActionResult<{ id: string }>> {
+  return attempt("crearProveedor", async () => {
   const userId = await assertPermiso("inventario_gestionar");
   // created_by is NOT NULL and defaults to requesting_user_id(), which reads the
   // JWT — and insforgeAdmin carries none, so the default resolved to NULL and
@@ -64,9 +68,14 @@ export async function crearProveedor(input: ProveedorInput): Promise<{ id: strin
     throw new Error(error?.message ?? "Error al crear el proveedor");
   }
   return { id: (data as { id: string }).id };
+  });
 }
 
-export async function editarProveedor(id: string, input: ProveedorInput): Promise<void> {
+export async function editarProveedor(
+  id: string,
+  input: ProveedorInput,
+): Promise<ActionResult<null>> {
+  return attempt("editarProveedor", async () => {
   await assertPermiso("inventario_gestionar");
   const { error } = await insforgeAdmin.database
     .from("proveedores")
@@ -77,16 +86,24 @@ export async function editarProveedor(id: string, input: ProveedorInput): Promis
       throw new Error("Ya existe un proveedor con ese nombre");
     throw new Error(error.message ?? "Error al guardar el proveedor");
   }
+  return null;
+  });
 }
 
 // Soft archive — products keep pointing at it, so history stays readable.
-export async function archivarProveedor(id: string, activo: boolean): Promise<void> {
+export async function archivarProveedor(
+  id: string,
+  activo: boolean,
+): Promise<ActionResult<null>> {
+  return attempt("archivarProveedor", async () => {
   await assertPermiso("inventario_gestionar");
   const { error } = await insforgeAdmin.database
     .from("proveedores")
     .update({ is_active: activo })
     .eq("id", id);
   if (error) throw new Error(error.message ?? "Error al archivar");
+  return null;
+  });
 }
 
 // How many products each supplier covers — an archived supplier that still

@@ -8,6 +8,7 @@ import { formatMXN } from "@/lib/money";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/use-confirm";
+import { unwrap, type ActionResult } from "@/lib/errors";
 import { Input, Select } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { Badge } from "@/components/ui/badge";
@@ -153,10 +154,13 @@ function GarantiaRow({ g }: { g: Garantia }) {
   const [pending, start] = useTransition();
   const [resolviendo, setResolviendo] = useState<"aplicada" | "rechazada" | null>(null);
 
-  function run(fn: () => Promise<void>, ok: string) {
+  // Unwrapping here rather than at each button: these actions now return
+  // { ok, error } instead of throwing, and a caller that ignores that would
+  // report success on a failure.
+  function run(fn: () => Promise<ActionResult<unknown>>, ok: string) {
     start(async () => {
       try {
-        await fn();
+        unwrap(await fn());
         toast.success(ok);
         router.refresh();
       } catch (e) {
@@ -317,7 +321,7 @@ function NuevaGarantia({
     if (!descripcion.trim()) return toast.error("Describe la pieza");
     start(async () => {
       try {
-        await crearGarantia({
+        unwrap(await crearGarantia({
           proveedor_id: proveedorId,
           product_id: null,
           descripcion,
@@ -325,7 +329,7 @@ function NuevaGarantia({
           montoPesos: parseFloat(monto.replace(",", ".")) || 0,
           fecha: fechaG,
           notas: notas || null,
-        });
+        }));
         toast.success("Garantía registrada");
         onClose();
         router.refresh();
