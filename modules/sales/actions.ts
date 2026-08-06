@@ -101,15 +101,21 @@ export async function registerSale(
 // free-text reminder (person/place) — no client record is created.
 export async function registerLoan(
   items: CartLine[],
+  customerId: string,
   note: string | null,
 ): Promise<{ saleId: string }> {
   const { userId } = await auth();
   if (!userId) throw new Error("No autenticado");
   if (items.length === 0) throw new Error("Carrito vacío");
+  // A credit note is a debt: it has to be owed by a registered customer, not by
+  // a name typed into a box. The RPC refuses it too — this is the early, clearer
+  // message, not the guard.
+  if (!customerId) throw new Error("Elige el cliente al que se le fía");
 
   const insforge = await createInsForgeServerClient();
   const { data, error } = await insforge.database.rpc("register_loan", {
     p_items: items.map((i) => ({ product_id: i.product_id, qty: i.qty })),
+    p_customer_id: customerId,
     p_note: note?.trim() || null,
   });
 

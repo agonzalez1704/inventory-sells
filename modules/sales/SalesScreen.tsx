@@ -341,8 +341,11 @@ export function SalesScreen({
     });
   }
 
-  const canSubmit =
-    lines.length > 0 && !(mode === "prestamo" && note.trim() === "");
+  // A credit note is a debt, so it needs a real customer — "Mostrador" is the
+  // walk-in placeholder, not a person. The note used to stand in for the
+  // customer and was therefore required; now it is just an optional reminder.
+  const clienteReal = !customer.is_system;
+  const canSubmit = lines.length > 0 && !(mode === "prestamo" && !clienteReal);
 
   function submit(metodo?: PaymentMethod, pagos?: PagoSplit[]) {
     if (!canSubmit) return;
@@ -358,17 +361,13 @@ export function SalesScreen({
       total: l.product.price_cents * l.qty,
     }));
     const ticketTotal = total;
-    const ticketCliente = esFiado
-      ? note.trim() || null
-      : customer.is_system
-        ? null
-        : customer.nombre;
+    const ticketCliente = customer.is_system ? null : customer.nombre;
     const ticketPago = esFiado ? null : pm;
 
     startTransition(async () => {
       try {
         const { saleId } = esFiado
-          ? await registerLoan(items, note)
+          ? await registerLoan(items, customer.id, note)
           : await registerSale(items, pm, customer.id, pagos);
         const ticket: TicketData = {
           folio: saleId,
@@ -541,14 +540,20 @@ export function SalesScreen({
                 </ul>
 
                 <div className="space-y-3 border-t border-border p-4">
-                  {mode === "venta" ? (
-                    <CustomerPicker customers={customers} value={customer} onChange={setCustomer} />
-                  ) : (
-                    <Input
-                      value={note}
-                      onChange={(e) => setNote(e.target.value)}
-                      placeholder="¿A quién? Ej: Ernesto · Local 87"
-                    />
+                  <CustomerPicker customers={customers} value={customer} onChange={setCustomer} />
+                  {mode === "prestamo" && (
+                    <>
+                      <Input
+                        value={note}
+                        onChange={(e) => setNote(e.target.value)}
+                        placeholder="Nota (opcional): plazo, referencia…"
+                      />
+                      {!clienteReal && (
+                        <p className="text-xs text-amber-700 dark:text-amber-300">
+                          Un crédito necesita cliente registrado. Elige o crea uno arriba.
+                        </p>
+                      )}
+                    </>
                   )}
 
                   <div className="space-y-1.5 border-t border-dashed border-border pt-3">
