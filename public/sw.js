@@ -11,8 +11,8 @@ self.addEventListener("push", (event) => {
   const title = data.title || "Notificación";
   const options = {
     body: data.body || "",
-    icon: data.icon || "/icon.svg",
-    badge: "/icon.svg",
+    icon: data.icon || "/icono-fiable.svg",
+    badge: data.icon || "/icono-fiable.svg",
     tag: data.tag,
     renotify: true,
     data: { url: data.url || "/ventas" },

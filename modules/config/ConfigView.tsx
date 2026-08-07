@@ -6,6 +6,8 @@ import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
+import type { ValorBase } from "@/lib/marca";
 import { updateNegocioInfo } from "./negocio";
 
 const PLACEHOLDER = `Ejemplo:
@@ -18,23 +20,26 @@ const PLACEHOLDER = `Ejemplo:
 export function ConfigView({
   info,
   asesores,
+  valorBase,
   isAdmin,
 }: {
   info: string;
   asesores: string;
+  valorBase: ValorBase;
   isAdmin: boolean;
 }) {
   const router = useRouter();
   const [text, setText] = useState(info);
   const [nums, setNums] = useState(asesores);
+  const [base, setBase] = useState<ValorBase>(valorBase);
   const [pending, start] = useTransition();
 
-  const dirty = text !== info || nums !== asesores;
+  const dirty = text !== info || nums !== asesores || base !== valorBase;
 
   function save() {
     start(async () => {
       try {
-        await updateNegocioInfo(text, nums);
+        await updateNegocioInfo(text, nums, base);
         toast.success("Guardado");
         router.refresh();
       } catch (e) {
@@ -87,18 +92,66 @@ export function ConfigView({
           </span>
         </label>
 
-        {isAdmin ? (
-          <div className="mt-4 flex justify-end">
-            <Button onClick={save} loading={pending} disabled={!dirty}>
-              Guardar
-            </Button>
-          </div>
-        ) : (
-          <p className="mt-2 text-xs text-muted-foreground">
-            Solo administradores pueden editar.
-          </p>
-        )}
       </Card>
+
+      <Card className="p-4">
+        <h2 className="text-sm font-semibold">Inventario</h2>
+        <fieldset className="mt-3" disabled={!isAdmin || pending}>
+          <legend className="mb-1.5 text-sm font-medium">
+            Valor del inventario
+          </legend>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {(
+              [
+                ["costo", "A costo", "Lo que costó surtir lo que hay en piso."],
+                ["venta", "A venta", "Lo que vale en el mostrador, al precio de lista."],
+              ] as const
+            ).map(([valor, titulo, detalle]) => (
+              <label
+                key={valor}
+                className={cn(
+                  "flex cursor-pointer gap-2.5 rounded-lg border p-3 transition-colors",
+                  base === valor
+                    ? "border-ring bg-muted"
+                    : "border-border hover:border-ring/40",
+                  (!isAdmin || pending) && "cursor-not-allowed opacity-70",
+                )}
+              >
+                <input
+                  type="radio"
+                  name="valor-base"
+                  value={valor}
+                  checked={base === valor}
+                  onChange={() => setBase(valor)}
+                  className="mt-0.5 h-4 w-4 accent-[hsl(var(--brand))]"
+                />
+                <span>
+                  <span className="block text-sm font-medium">{titulo}</span>
+                  <span className="block text-xs text-muted-foreground">{detalle}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+          <span className="mt-2 block text-xs text-muted-foreground">
+            Cambia el recuadro <span className="font-medium">Valor</span> en
+            Inventario y el total del reporte en PDF. A costo solo lo ven quienes
+            tienen permiso de ver costos; a los demás se les sigue mostrando a
+            venta, y la etiqueta lo dice.
+          </span>
+        </fieldset>
+      </Card>
+
+      {isAdmin ? (
+        <div className="flex justify-end">
+          <Button onClick={save} loading={pending} disabled={!dirty}>
+            Guardar
+          </Button>
+        </div>
+      ) : (
+        <p className="text-xs text-muted-foreground">
+          Solo administradores pueden editar.
+        </p>
+      )}
     </section>
   );
 }

@@ -393,7 +393,10 @@ export function InventoryView({
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Kpi label="Productos" value={String(stats.productos)} />
         <Kpi label="Unidades" value={String(stats.piezas)} />
-        <Kpi label="Valor (venta)" value={formatMXN(stats.valor_cents)} />
+        <Kpi
+          label={`Valor (${stats.valor_base})`}
+          value={formatMXN(stats.valor_cents)}
+        />
         <Kpi label="Bajo / agotado" value={`${stats.bajos} / ${stats.agotados}`} />
       </div>
 

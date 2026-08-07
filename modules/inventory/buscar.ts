@@ -4,6 +4,8 @@ import { createInsForgeServerClient } from "@/lib/insforge/server";
 import { assertPermiso, permisosDe } from "@/lib/auth/profile";
 import type { Permiso } from "@/lib/permissions";
 import { searchProducts, tokensDeConsulta, expand } from "@/lib/search";
+import { getValorBase } from "@/modules/config/lib";
+import type { ValorBase } from "@/lib/marca";
 
 // Reading the catalog isn't one feature's privilege: the register, the quote
 // builder, the purchase form and the inventory table all legitimately look
@@ -193,6 +195,8 @@ export type EstadisticasInv = {
   productos: number;
   piezas: number;
   valor_cents: number;
+  /** Which valuation valor_cents actually holds, so the label can say so. */
+  valor_base: ValorBase;
   bajos: number;
   agotados: number;
 };
@@ -203,14 +207,32 @@ export async function estadisticasInventario(
 ): Promise<EstadisticasInv> {
   await assertPermiso("inventario_ver");
   const insforge = await createInsForgeServerClient();
-  const { data } = await insforge.database.rpc("estadisticas_inventario", {
-    p_inventory_id: inventoryId || null,
-  });
-  const r = (Array.isArray(data) ? data[0] : data) as Partial<EstadisticasInv> | undefined;
+  const [{ data }, base, permisos] = await Promise.all([
+    insforge.database.rpc("estadisticas_inventario", {
+      p_inventory_id: inventoryId || null,
+    }),
+    getValorBase(),
+    permisosDe(),
+  ]);
+  const r = (Array.isArray(data) ? data[0] : data) as
+    | Record<string, unknown>
+    | undefined;
+  // Valuing the whole stock at cost states the margin out loud, so it answers
+  // to the same permission the cost column does. Falling back to the sale
+  // price rather than hiding the number keeps the card populated for sellers —
+  // and the label travels with the value, so nobody misreads which one it is.
+  const efectiva: ValorBase =
+    base === "costo" &&
+    !(permisos.has("admin_total") || permisos.has("costos_ver"))
+      ? "venta"
+      : base;
   return {
     productos: Number(r?.productos ?? 0),
     piezas: Number(r?.piezas ?? 0),
-    valor_cents: Number(r?.valor_cents ?? 0),
+    valor_cents: Number(
+      (efectiva === "costo" ? r?.valor_costo_cents : r?.valor_venta_cents) ?? 0,
+    ),
+    valor_base: efectiva,
     bajos: Number(r?.bajos ?? 0),
     agotados: Number(r?.agotados ?? 0),
   };

@@ -1,4 +1,5 @@
 import "server-only";
+import { MARCA } from "@/lib/marca";
 import webpush from "web-push";
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { getAsignables } from "@/lib/auth/profile";
@@ -20,6 +21,10 @@ export type PushPayload = {
   body: string;
   url?: string;
   tag?: string;
+  /** Brand icon. sw.js is a static file and can't read MARCA, so the icon has
+   *  to travel with the payload — otherwise every notification wears the other
+   *  brand's logo. */
+  icon?: string;
 };
 
 // Which events can notify, and the default when a user has no saved prefs.
@@ -49,7 +54,7 @@ export async function pushToUsers(
   }[];
   if (!rows.length) return;
 
-  const msg = JSON.stringify(payload);
+  const msg = JSON.stringify({ icon: MARCA.icono, ...payload });
   await Promise.all(
     rows.map(async (s) => {
       try {

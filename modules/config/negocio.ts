@@ -3,10 +3,12 @@
 import { auth } from "@clerk/nextjs/server";
 import { getProfile } from "@/lib/auth/profile";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
+import type { ValorBase } from "@/lib/marca";
 
 export async function updateNegocioInfo(
   info: string,
   asesores: string,
+  valorBase: ValorBase,
 ): Promise<void> {
   const { userId } = await auth();
   if (!userId) throw new Error("No autenticado");
@@ -16,7 +18,7 @@ export async function updateNegocioInfo(
   const insforge = await createInsForgeServerClient();
   const { error } = await insforge.database
     .from("config_negocio")
-    .update({ info, asesores })
+    .update({ info, asesores, valor_base: valorBase })
     .eq("id", 1);
   if (error) throw new Error(error.message ?? "Error al guardar");
 }

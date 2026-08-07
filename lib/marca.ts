@@ -10,6 +10,8 @@
 
 export type MarcaId = "fiable" | "ruli";
 
+export type ValorBase = "venta" | "costo";
+
 export type Marca = {
   id: MarcaId;
   /** Full name, for titles and customer-facing text. */
@@ -21,6 +23,12 @@ export type Marca = {
   brand: { base: string; strong: string; soft: string; foreground: string };
   /** PWA theme colour (hex) — the OS chrome around the installed app. */
   themeColor: string;
+  /** Favicon / app icon. A static file per brand: the browser fetches it on its
+   *  own, so it cannot use the CSS variables the in-app logo relies on. */
+  icono: string;
+  /** How the inventory header values stock when nobody has chosen in Configuración:
+   *  Ruli reads it as what the stock cost, Fiable as what it is worth to sell. */
+  valorBase: ValorBase;
 };
 
 const MARCAS: Record<MarcaId, Marca> = {
@@ -37,6 +45,8 @@ const MARCAS: Record<MarcaId, Marca> = {
       foreground: "30 65% 24%",
     },
     themeColor: "#0f172a",
+    icono: "/icono-fiable.svg",
+    valorBase: "venta",
   },
   ruli: {
     id: "ruli",
@@ -52,6 +62,8 @@ const MARCAS: Record<MarcaId, Marca> = {
       foreground: "357 70% 25%",
     },
     themeColor: "#1f2937",
+    icono: "/icono-ruli.svg",
+    valorBase: "costo",
   },
 };
 

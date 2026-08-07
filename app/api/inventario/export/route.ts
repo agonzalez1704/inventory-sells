@@ -4,6 +4,7 @@ import { auth, currentUser } from "@clerk/nextjs/server";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
 import { getProfile } from "@/lib/auth/profile";
 import { emailTieneAcceso } from "@/lib/auth/allowlist";
+import { getValorBase } from "@/modules/config/lib";
 import {
   InventoryPdf,
   type PdfRow,
@@ -43,13 +44,14 @@ export async function GET(request: Request) {
   if (error) return new Response(error.message, { status: 500 });
 
   const rows = (data ?? []) as PdfRow[];
+  const valorBase = await getValorBase();
   const generatedAt = new Date().toLocaleString("es-MX", {
     dateStyle: "long",
     timeStyle: "short",
   });
 
   const buffer = await renderToBuffer(
-    createElement(InventoryPdf, { rows, generatedAt, variant }) as Parameters<
+    createElement(InventoryPdf, { rows, generatedAt, variant, valorBase }) as Parameters<
       typeof renderToBuffer
     >[0],
   );

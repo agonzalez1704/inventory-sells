@@ -1,6 +1,6 @@
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { formatMXN } from "@/lib/money";
-import { MARCA } from "@/lib/marca";
+import { MARCA, type ValorBase } from "@/lib/marca";
 
 export type PdfVariant = "internal" | "public";
 
@@ -79,14 +79,23 @@ export function InventoryPdf({
   rows,
   generatedAt,
   variant,
+  valorBase = "venta",
 }: {
   rows: PdfRow[];
   generatedAt: string;
   variant: PdfVariant;
+  valorBase?: ValorBase;
 }) {
   const isInternal = variant === "internal";
   const units = rows.reduce((s, r) => s + r.quantity, 0);
-  const value = rows.reduce((s, r) => s + r.price_cents * r.quantity, 0);
+  // Follows the same Configuración setting as the inventory header, so the
+  // printed total and the one on screen can't disagree. Only the internal
+  // report shows it, and that one is admin-only.
+  const alCosto = valorBase === "costo";
+  const value = rows.reduce(
+    (s, r) => s + (alCosto ? r.cost_cents : r.price_cents) * r.quantity,
+    0,
+  );
 
   return (
     <Document
@@ -108,7 +117,7 @@ export function InventoryPdf({
                 Unidades: <Text style={styles.kpiVal}>{units}</Text>
               </Text>
               <Text style={styles.kpi}>
-                Valor (venta): <Text style={styles.kpiVal}>{formatMXN(value)}</Text>
+                Valor ({valorBase}): <Text style={styles.kpiVal}>{formatMXN(value)}</Text>
               </Text>
             </View>
           )}

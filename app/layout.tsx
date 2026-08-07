@@ -21,7 +21,7 @@ export const metadata: Metadata = {
   description: MARCA.descripcion,
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, title: MARCA.corto, statusBarStyle: "default" },
-  icons: { icon: "/icon.svg", apple: "/icon.svg" },
+  icons: { icon: MARCA.icono, apple: MARCA.icono },
 };
 
 export const viewport: Viewport = {

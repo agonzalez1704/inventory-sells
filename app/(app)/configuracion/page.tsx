@@ -1,6 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { getProfile } from "@/lib/auth/profile";
-import { getNegocioInfo, getAsesoresRaw } from "@/modules/config/lib";
+import { getNegocioInfo, getAsesoresRaw, getValorBase } from "@/modules/config/lib";
 import { ConfigView } from "@/modules/config/ConfigView";
 import { Card } from "@/components/ui/card";
 import { PushToggle } from "@/components/push-toggle";
@@ -12,15 +12,21 @@ export default async function ConfiguracionPage() {
   const { userId } = await auth();
   const profile = userId ? await getProfile(userId) : null;
   const isAdmin = profile?.role === "admin";
-  const [info, asesores, notifPrefs] = await Promise.all([
+  const [info, asesores, valorBase, notifPrefs] = await Promise.all([
     getNegocioInfo(),
     getAsesoresRaw(),
+    getValorBase(),
     isAdmin ? getNotifPrefs() : null,
   ]);
 
   return (
     <div className="space-y-6">
-      <ConfigView info={info} asesores={asesores} isAdmin={isAdmin} />
+      <ConfigView
+        info={info}
+        asesores={asesores}
+        valorBase={valorBase}
+        isAdmin={isAdmin}
+      />
 
       {isAdmin && (
         <Card className="p-4">
