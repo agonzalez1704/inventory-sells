@@ -194,7 +194,8 @@ export async function paginaInventario(opts: {
 export type EstadisticasInv = {
   productos: number;
   piezas: number;
-  valor_cents: number;
+  /** null when the reader may not see what the stock is worth. */
+  valor_cents: number | null;
   /** Which valuation valor_cents actually holds, so the label can say so. */
   valor_base: ValorBase;
   bajos: number;
@@ -217,21 +218,27 @@ export async function estadisticasInventario(
   const r = (Array.isArray(data) ? data[0] : data) as
     | Record<string, unknown>
     | undefined;
-  // Valuing the whole stock at cost states the margin out loud, so it answers
-  // to the same permission the cost column does. Falling back to the sale
-  // price rather than hiding the number keeps the card populated for sellers —
-  // and the label travels with the value, so nobody misreads which one it is.
+  const admin = permisos.has("admin_total");
+  // What the whole floor is worth is a finance number, so it answers to the
+  // same permiso that already closes /caja and /reportes. Withheld here rather
+  // than hidden in the component: a card the browser never receives can't be
+  // read off the network tab.
+  const verValor = admin || permisos.has("corte_ver");
+  // Valuing that stock at COST additionally states the margin out loud, which
+  // is what costos_ver guards. Falling back to the sale price rather than
+  // blanking keeps the card useful, and the label travels with the value, so
+  // nobody misreads which of the two they are looking at.
   const efectiva: ValorBase =
-    base === "costo" &&
-    !(permisos.has("admin_total") || permisos.has("costos_ver"))
-      ? "venta"
-      : base;
+    base === "costo" && !(admin || permisos.has("costos_ver")) ? "venta" : base;
   return {
     productos: Number(r?.productos ?? 0),
     piezas: Number(r?.piezas ?? 0),
-    valor_cents: Number(
-      (efectiva === "costo" ? r?.valor_costo_cents : r?.valor_venta_cents) ?? 0,
-    ),
+    valor_cents: verValor
+      ? Number(
+          (efectiva === "costo" ? r?.valor_costo_cents : r?.valor_venta_cents) ??
+            0,
+        )
+      : null,
     valor_base: efectiva,
     bajos: Number(r?.bajos ?? 0),
     agotados: Number(r?.agotados ?? 0),

@@ -390,13 +390,22 @@ export function InventoryView({
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      {/* Three cards without the value one, so the row still fills its width
+          instead of leaving a hole where the money used to be. */}
+      <div
+        className={cn(
+          "grid grid-cols-2 gap-3",
+          stats.valor_cents === null ? "sm:grid-cols-3" : "sm:grid-cols-4",
+        )}
+      >
         <Kpi label="Productos" value={String(stats.productos)} />
         <Kpi label="Unidades" value={String(stats.piezas)} />
-        <Kpi
-          label={`Valor (${stats.valor_base})`}
-          value={formatMXN(stats.valor_cents)}
-        />
+        {stats.valor_cents !== null && (
+          <Kpi
+            label={`Valor (${stats.valor_base})`}
+            value={formatMXN(stats.valor_cents)}
+          />
+        )}
         <Kpi label="Bajo / agotado" value={`${stats.bajos} / ${stats.agotados}`} />
       </div>
 
