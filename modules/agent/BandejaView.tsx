@@ -117,8 +117,11 @@ export function BandejaView({ inicial }: { inicial: ConversacionBandeja[] }) {
               <button
                 onClick={() => setSel(c.clave)}
                 className={cn(
-                  "w-full cursor-pointer px-4 py-3 text-left transition-colors hover:bg-muted/50",
-                  sel === c.clave && "bg-muted",
+                  "relative w-full cursor-pointer py-3 pl-4 pr-4 text-left transition-colors duration-150 hover:bg-muted/60",
+                  // A left rail marks the selection: a background alone reads as
+                  // hover, and on a long list you lose your place.
+                  sel === c.clave &&
+                    "bg-muted before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:bg-accent",
                 )}
               >
                 <div className="flex items-center gap-2">
@@ -130,9 +133,10 @@ export function BandejaView({ inicial }: { inicial: ConversacionBandeja[] }) {
                     {fecha(c.ultimo_at)}
                   </span>
                 </div>
-                <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                  {c.ultimo_rol !== "user" && "· "}
-                  {c.ultimo_texto}
+                <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+                  {c.ultimo_rol === "assistant" && <Bot className="h-3 w-3 shrink-0 text-accent" />}
+                  {c.ultimo_rol === "asesor" && <Hand className="h-3 w-3 shrink-0" />}
+                  <span className="truncate">{c.ultimo_texto}</span>
                 </p>
               </button>
             </li>
@@ -149,13 +153,19 @@ export function BandejaView({ inicial }: { inicial: ConversacionBandeja[] }) {
                 <p className="truncate text-sm font-medium">
                   {actual.cliente_nombre ?? actual.telefono ?? actual.clave}
                 </p>
-                <p className="text-xs text-muted-foreground">
+                <p className="mt-0.5 flex items-center gap-1.5 text-xs">
+                  <span
+                    className={cn(
+                      "h-1.5 w-1.5 shrink-0 rounded-full",
+                      actual.estado === "asesor" ? "bg-amber-500" : "bg-accent",
+                    )}
+                  />
                   {actual.estado === "asesor" ? (
-                    <span className="text-amber-700 dark:text-amber-300">
-                      El bot está en pausa · {actual.motivo ?? "tomada por un asesor"}
+                    <span className="text-amber-700 dark:text-amber-400">
+                      Bot en pausa · {actual.motivo ?? "tomada por un asesor"}
                     </span>
                   ) : (
-                    "El bot está contestando"
+                    <span className="text-muted-foreground">El bot está contestando</span>
                   )}
                 </p>
               </div>
@@ -178,7 +188,7 @@ export function BandejaView({ inicial }: { inicial: ConversacionBandeja[] }) {
               </Button>
             </div>
 
-            <div className="flex-1 space-y-2 overflow-y-auto p-4">
+            <div className="flex-1 space-y-2.5 overflow-y-auto bg-page p-4">
               {hilo.map((m) => (
                 <Burbuja key={m.id} m={m} />
               ))}
@@ -216,32 +226,58 @@ export function BandejaView({ inicial }: { inicial: ConversacionBandeja[] }) {
   );
 }
 
+// Three voices, three FILLS — not three pale tints.
+//
+// The first version used bg-muted (96% lightness), accent-soft (96%) and
+// brand-soft (95%) on a 100% white card: the same near-white three times over,
+// separated only by hue. Who said what is the entire reason this screen exists,
+// so the difference has to survive a glance on a shop phone in daylight.
+//
+// The thread sits on a tinted canvas so the customer's white bubble reads as an
+// object on it, and the two outgoing voices carry saturated fills.
+const VOZ = {
+  user: {
+    etiqueta: "Cliente",
+    Icono: User,
+    burbuja: "bg-background border border-border text-foreground rounded-bl-md",
+    meta: "text-muted-foreground",
+  },
+  assistant: {
+    etiqueta: "Agente",
+    Icono: Bot,
+    // emerald-700, not the --accent token (emerald-600). White on 600 measures
+    // 3.77:1, under the 4.5:1 floor for body text; 700 gives 5.48:1. The token
+    // stays as it is — it is a system colour for money and availability, and
+    // narrowing it to satisfy this one surface would be the wrong trade.
+    // Dark mode inverts: a light fill with near-black text, 7.75:1.
+    burbuja:
+      "bg-emerald-700 text-white dark:bg-emerald-400 dark:text-emerald-950 rounded-br-md",
+    meta: "text-white/75 dark:text-emerald-950/70",
+  },
+  asesor: {
+    etiqueta: "Asesor",
+    Icono: Hand,
+    burbuja: "bg-primary text-primary-foreground rounded-br-md",
+    meta: "text-primary-foreground/75",
+  },
+} as const;
+
 function Burbuja({ m }: { m: MensajeBandeja }) {
   const delCliente = m.rol === "user";
+  const v = VOZ[m.rol] ?? VOZ.assistant;
+  const { Icono } = v;
   return (
     <div className={cn("flex", delCliente ? "justify-start" : "justify-end")}>
       <div
         className={cn(
-          "max-w-[80%] rounded-2xl px-3 py-2 text-sm",
-          delCliente
-            ? "bg-muted"
-            : m.rol === "asesor"
-              ? "bg-brand-soft text-brand-foreground"
-              : "bg-accent-soft text-accent",
+          "max-w-[78%] rounded-2xl px-3.5 py-2 text-sm shadow-sm",
+          v.burbuja,
         )}
       >
-        <p className="whitespace-pre-wrap break-words">{m.contenido}</p>
-        <p className="mt-1 flex items-center gap-1 text-[10px] opacity-70">
-          {/* Who wrote it is the point of reading these back: a prompt can only
-              be fixed against what the agent actually said. */}
-          {delCliente ? (
-            <User className="h-3 w-3" />
-          ) : m.rol === "asesor" ? (
-            <Hand className="h-3 w-3" />
-          ) : (
-            <Bot className="h-3 w-3" />
-          )}
-          {delCliente ? "Cliente" : m.rol === "asesor" ? "Asesor" : "Agente"} · {hora(m.created_at)}
+        <p className="whitespace-pre-wrap break-words leading-relaxed">{m.contenido}</p>
+        <p className={cn("mt-1 flex items-center gap-1 text-[10px]", v.meta)}>
+          <Icono className="h-3 w-3" />
+          {v.etiqueta} · {hora(m.created_at)}
         </p>
       </div>
     </div>

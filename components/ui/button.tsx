@@ -43,7 +43,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         // pass it (and the spinner) in the native-button case.
         {...(asChild ? {} : { disabled: disabled || loading })}
         className={cn(
-          "inline-flex cursor-pointer items-center justify-center whitespace-nowrap font-medium transition-colors duration-150 disabled:pointer-events-none disabled:opacity-50",
+          "inline-flex cursor-pointer items-center justify-center whitespace-nowrap font-medium transition-[colors,transform] duration-150 active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50 disabled:active:scale-100",
           variants[variant],
           sizes[size],
           className,
