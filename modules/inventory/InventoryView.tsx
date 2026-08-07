@@ -301,7 +301,15 @@ export function InventoryView({
       cancelado = true;
       clearTimeout(t);
     };
-  }, [query, selectedInv, sortKey, sortDir, page]);
+    // `products` is in the deps on purpose, and it is what makes router.refresh()
+    // work again. This list stopped rendering from that prop when search moved to
+    // the server — it fetches its own page now — so after an import, an edit or a
+    // stock adjustment the screen sat unchanged and looked like nothing had
+    // happened. Seven call sites do router.refresh() expecting this list to
+    // follow; that re-runs the server component and hands down a NEW array, which
+    // is the signal to re-read. Threading a counter through each modal instead
+    // would mean remembering it for every modal added later.
+  }, [query, selectedInv, sortKey, sortDir, page, products]);
 
   // Header totals follow the warehouse filter, not the search: they describe
   // the stock, not the current result set.
@@ -313,7 +321,7 @@ export function InventoryView({
     return () => {
       cancelado = true;
     };
-  }, [selectedInv]);
+  }, [selectedInv, statsIniciales]);
 
   const buscarCompat = useCallback(
     async (modelo: string) =>

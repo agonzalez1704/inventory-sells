@@ -295,7 +295,11 @@ export function SalesScreen({
       cancelado = true;
       clearTimeout(t);
     };
-  }, [query, categoria, recordar]);
+    // Same reason as the inventory list: this grid feeds itself from the server
+    // now, so the router.refresh() after a sale never reached it and the card
+    // kept showing the stock the shelf had before the sale. A refresh re-runs the
+    // server component and hands down a new `products` array — that is the cue.
+  }, [query, categoria, recordar, products]);
 
   const buscarCompat = useCallback(async (modelo: string) => {
     const rows = (await buscarProductos({ query: modelo, limit: 4 })) as SalesProduct[];
