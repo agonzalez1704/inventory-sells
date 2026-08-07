@@ -38,6 +38,16 @@ const LOTE = 1000;
 // the row is real, it just isn't a product.
 const EXISTENCIA_INVEROSIMIL = 10_000;
 
+// Rows the review table will actually draw. Each one is eleven cells and three
+// inputs, so a 21k-row ERP export is a quarter of a million React elements and
+// the tab stops responding before anyone can press Confirmar.
+//
+// Capping rather than virtualising, because nobody proofreads twenty-one
+// thousand rows. The table is for spot-checking what the model pulled out of a
+// photo; at this size the useful review is the summary below it. Everything is
+// still imported — only the drawing is limited.
+const MUESTRA = 100;
+
 type Format = "image" | "spreadsheet" | "pdf";
 type Status = "idle" | "reading" | "review" | "done";
 
@@ -509,6 +519,17 @@ function ReviewStep({
   const num = (v: number | undefined) => (v == null ? "" : String(v));
   const toNum = (s: string) => (s.trim() === "" ? undefined : Number(s));
 
+  // slice keeps indices aligned with the real array, so editing and removing a
+  // visible row still points at the right one.
+  const visibles = rows.slice(0, MUESTRA);
+  const recortada = rows.length > MUESTRA;
+  const resumen = {
+    conPrecio: rows.filter((r) => r.price).length,
+    sinPrecio: rows.filter((r) => !r.price).length,
+    conStock: rows.filter((r) => r.quantity).length,
+    piezas: rows.reduce((a, r) => a + (r.quantity ?? 0), 0),
+  };
+
   return (
     <div className="mt-4">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg bg-muted/50 px-3 py-2.5 text-xs">
@@ -539,6 +560,22 @@ function ReviewStep({
         )}
       </div>
 
+      {recortada && (
+        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {[
+            ["Productos", rows.length.toLocaleString("es-MX")],
+            ["Con precio", resumen.conPrecio.toLocaleString("es-MX")],
+            ["Sin precio", resumen.sinPrecio.toLocaleString("es-MX")],
+            ["Piezas", resumen.piezas.toLocaleString("es-MX")],
+          ].map(([k, v]) => (
+            <div key={k} className="rounded-lg border border-border px-3 py-2">
+              <p className="text-[11px] text-muted-foreground">{k}</p>
+              <p className="font-mono text-sm font-semibold tabular-nums">{v}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="mt-3 max-h-[22rem] overflow-auto rounded-lg border border-border">
         <table className="w-full text-xs">
           <thead className="sticky top-0 bg-muted text-left text-muted-foreground">
@@ -553,7 +590,7 @@ function ReviewStep({
             </tr>
           </thead>
           <tbody>
-            {rows.map((r, i) => {
+            {visibles.map((r, i) => {
               const specs = (r.attributes ?? [])
                 .map((a) => `${a.key}: ${a.value}`)
                 .join(" · ");
@@ -594,9 +631,11 @@ function ReviewStep({
         <p className="text-xs text-muted-foreground">
           {/* A 21k catalog is a couple of dozen requests; without a count it
               looks frozen and someone reloads the tab mid-import. */}
-          {avance > 0
-            ? `Escribiendo ${avance.toLocaleString("es-MX")} de ${rows.length.toLocaleString("es-MX")}…`
-            : `${rows.length.toLocaleString("es-MX")} fila(s) · precios en pesos`}
+          {recortada && avance === 0
+            ? `Se importan las ${rows.length.toLocaleString("es-MX")} · abajo se muestran las primeras ${MUESTRA}`
+            : avance > 0
+              ? `Escribiendo ${avance.toLocaleString("es-MX")} de ${rows.length.toLocaleString("es-MX")}…`
+              : `${rows.length.toLocaleString("es-MX")} fila(s) · precios en pesos`}
         </p>
         <div className="flex gap-2">
           <Button variant="ghost" onClick={onCancel} disabled={busy}>
