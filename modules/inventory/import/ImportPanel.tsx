@@ -27,6 +27,17 @@ import {
 } from "./actions";
 import { createInventory } from "../inventories";
 
+// Rows per request. Small enough that one chunk can't time out, large enough
+// that a 21k catalog is a couple of dozen round trips rather than hundreds.
+const LOTE = 1000;
+
+// A stock figure above this is not a count, it is a service line an ERP keeps in
+// the same table — the refaccionaria's export carries "MANIOBA DE ENVIO" with
+// 100,104,561. Importing it creates a product with a hundred million units and a
+// ledger movement to match. Held back and named rather than dropped quietly:
+// the row is real, it just isn't a product.
+const EXISTENCIA_INVEROSIMIL = 10_000;
+
 type Format = "image" | "spreadsheet" | "pdf";
 type Status = "idle" | "reading" | "review" | "done";
 
@@ -69,12 +80,15 @@ export function ImportPanel({
   const [pending, startTransition] = useTransition();
   const [dragging, setDragging] = useState(false);
   const [modo, setModo] = useState<ModoImport>("alta");
+  const [avance, setAvance] = useState(0);
+  const [descartadas, setDescartadas] = useState<ExtractedRow[]>([]);
   const [preview, setPreview] = useState<Preview | null>(null);
 
   const fmt = FORMATS.find((f) => f.key === format)!;
 
   function reset() {
     setRows([]);
+    setDescartadas([]);
     setStatus("idle");
     setFilename(null);
     setCostModeState(false);
@@ -88,7 +102,9 @@ export function ImportPanel({
       if (format === "spreadsheet") {
         const parsed = await parseSpreadsheet(file);
         if (parsed.length === 0) throw new Error("No se encontraron filas con SKU.");
-        setRows(parsed);
+        const raras = parsed.filter((r) => (r.quantity ?? 0) > EXISTENCIA_INVEROSIMIL);
+        setDescartadas(raras);
+        setRows(parsed.filter((r) => (r.quantity ?? 0) <= EXISTENCIA_INVEROSIMIL));
         setSource(file.name.toLowerCase().endsWith(".csv") ? "csv" : "excel");
         setFilename(file.name);
         setStatus("review");
@@ -183,17 +199,35 @@ export function ImportPanel({
           const r = await createInventoryWithImport(name, rows, source, filename);
           toast.success(`"${r.name}" creado · ${r.inserted} productos`);
         } else {
-          const res = await commitImport(rows, source, filename, inventoryId, modo);
+          // Sent in chunks, not in one call. commit_import walks every row in a
+          // single plpgsql loop — a SELECT FOR UPDATE, an upsert and a movement
+          // apiece — and the refaccionaria's catalog is 21k rows. One request
+          // risks the function timing out, and because it is one transaction a
+          // timeout at row 18,000 rolls back all of it and the wait buys
+          // nothing. Each chunk commits on its own, so progress survives.
+          const total = rows.length;
+          let inserted = 0, updated = 0, bajas = 0, sinPrecio = 0;
+          for (let i = 0; i < total; i += LOTE) {
+            const trozo = rows.slice(i, i + LOTE);
+            const res = await commitImport(trozo, source, filename, inventoryId, modo);
+            inserted += res.inserted;
+            updated += res.updated;
+            bajas += res.bajas;
+            sinPrecio += res.sin_precio;
+            if (total > LOTE) setAvance(Math.min(i + LOTE, total));
+          }
           toast.success(
-            `Importado: ${res.inserted} nuevos, ${res.updated} actualizados` +
-              (res.bajas ? ` · ${res.bajas} bajaron de existencia` : "") +
-              (res.sin_precio ? ` · ${res.sin_precio} sin precio` : ""),
+            `Importado: ${inserted} nuevos, ${updated} actualizados` +
+              (bajas ? ` · ${bajas} bajaron de existencia` : "") +
+              (sinPrecio ? ` · ${sinPrecio} sin precio` : ""),
           );
         }
         setStatus("done");
         router.refresh();
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Error al importar");
+      } finally {
+        setAvance(0);
       }
     });
   }
@@ -301,6 +335,25 @@ export function ImportPanel({
             </span>
           )}
         </label>
+      )}
+
+      {descartadas.length > 0 && (
+        <div className="mb-3 rounded-lg border border-amber-600/25 bg-amber-50 p-3 text-xs text-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+          <p className="font-medium">
+            {descartadas.length} fila(s) apartadas por existencia inverosímil
+          </p>
+          <ul className="mt-1 space-y-0.5">
+            {descartadas.slice(0, 5).map((r) => (
+              <li key={r.sku}>
+                {r.sku} · {r.name} — {(r.quantity ?? 0).toLocaleString("es-MX")} piezas
+              </li>
+            ))}
+          </ul>
+          <p className="mt-1">
+            Suelen ser conceptos de servicio (fletes, maniobras) que el ERP guarda
+            junto a los productos. No se importan; si alguna es real, agrégala a mano.
+          </p>
+        </div>
       )}
 
       {preview && (
@@ -418,6 +471,7 @@ export function ImportPanel({
           onApplyMargin={applyMargin}
           onConfirm={confirm}
           onCancel={reset}
+          avance={avance}
         />
       )}
     </div>
@@ -425,6 +479,7 @@ export function ImportPanel({
 }
 
 function ReviewStep({
+  avance,
   rows,
   costMode,
   margin,
@@ -448,6 +503,8 @@ function ReviewStep({
   onApplyMargin: () => void;
   onConfirm: () => void;
   onCancel: () => void;
+  /** Rows written so far. 0 when not chunking, so nothing is shown. */
+  avance: number;
 }) {
   const num = (v: number | undefined) => (v == null ? "" : String(v));
   const toNum = (s: string) => (s.trim() === "" ? undefined : Number(s));
@@ -535,7 +592,11 @@ function ReviewStep({
 
       <div className="mt-4 flex items-center justify-between">
         <p className="text-xs text-muted-foreground">
-          {rows.length} fila(s) · precios en pesos
+          {/* A 21k catalog is a couple of dozen requests; without a count it
+              looks frozen and someone reloads the tab mid-import. */}
+          {avance > 0
+            ? `Escribiendo ${avance.toLocaleString("es-MX")} de ${rows.length.toLocaleString("es-MX")}…`
+            : `${rows.length.toLocaleString("es-MX")} fila(s) · precios en pesos`}
         </p>
         <div className="flex gap-2">
           <Button variant="ghost" onClick={onCancel} disabled={busy}>
