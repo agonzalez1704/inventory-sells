@@ -1,26 +1,25 @@
-import { createInsForgeServerClient } from "@/lib/insforge/server";
-import { AsesorView, type Conversacion } from "@/modules/agent/AsesorView";
+import { requirePagePermiso } from "@/lib/auth/profile";
+import { listarConversaciones } from "@/modules/agent/bandeja-actions";
+import { BandejaView } from "@/modules/agent/BandejaView";
 
 export const dynamic = "force-dynamic";
 
 export default async function AsesorPage() {
-  const insforge = await createInsForgeServerClient();
-  const { data, error } = await insforge.database
-    .from("conversaciones")
-    .select("numero, motivo, ultimo_texto, handoff_at")
-    .eq("estado", "asesor")
-    .order("handoff_at", { ascending: false });
-
-  const conversaciones = (data ?? []) as Conversacion[];
+  // This page had no guard at all: any signed-in session could read every
+  // customer's WhatsApp conversation. Sellers and admins, as agreed.
+  await requirePagePermiso("pos_vender");
+  const inicial = await listarConversaciones();
 
   return (
-    <>
-      {error && (
-        <p className="mb-4 rounded-lg bg-red-50 dark:bg-red-950/40 px-3 py-2 text-sm text-red-700 dark:text-red-300">
-          {error.message}
+    <section className="space-y-5">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">WhatsApp</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Conversaciones en vivo. Toma el control cuando haga falta; el bot se
+          detiene solo.
         </p>
-      )}
-      <AsesorView conversaciones={conversaciones} />
-    </>
+      </div>
+      <BandejaView inicial={inicial} />
+    </section>
   );
 }
