@@ -1,6 +1,8 @@
 import "server-only";
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { MARCA, type ValorBase } from "@/lib/marca";
+import { cache } from "react";
+import { normalizarTienda, type TiendaInfo } from "@/lib/tienda-info";
 
 // Business info blob injected into the WhatsApp agent. Read with the admin
 // client so it works from the webhook (no Clerk session there).
@@ -48,3 +50,18 @@ export async function getValorBase(): Promise<ValorBase> {
   const v = (data as { valor_base?: string | null } | null)?.valor_base;
   return v === "venta" || v === "costo" ? v : MARCA.valorBase;
 }
+
+/**
+ * The storefront's address, hours and terms.
+ *
+ * Cached per request: the storefront layout, the product page and the pickup
+ * pass all ask for it while rendering the same page.
+ */
+export const getTiendaInfo = cache(async (): Promise<TiendaInfo> => {
+  const { data } = await insforgeAdmin.database
+    .from("config_negocio")
+    .select("tienda")
+    .eq("id", 1)
+    .maybeSingle();
+  return normalizarTienda((data as { tienda?: unknown } | null)?.tienda);
+});

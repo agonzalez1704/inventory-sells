@@ -5,7 +5,7 @@ import { CheckCircle2, Clock, Store, ArrowLeftRight, XCircle, Landmark } from "l
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { getConektaOrder } from "@/lib/conekta";
 import { formatMXN } from "@/lib/money";
-import { TIENDA } from "@/lib/tienda-info";
+import { getTiendaInfo } from "@/modules/config/lib";
 import { VOUCHER_HORAS_UI } from "@/modules/tienda/pago-const";
 import { PasePickup } from "@/modules/tienda/PasePickup";
 import { MARCA } from "@/lib/marca";
@@ -48,6 +48,7 @@ export default async function OrdenPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const tienda = await getTiendaInfo();
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
 
   const { data } = await insforgeAdmin.database
@@ -115,7 +116,7 @@ export default async function OrdenPage({
             recoger ? (
               <>Gracias, {o.nombre.split(" ")[0]}. Tu pedido está listo para recoger. Ven tú o manda tu Uber/mensajero — solo dan el folio <strong>{o.folio}</strong> al llegar.</>
             ) : (
-              <>Gracias, {o.nombre.split(" ")[0]}. Preparamos tu envío y te contactamos por WhatsApp con tu guía. Entrega en {TIENDA.entregaDias} hábiles.</>
+              <>Gracias, {o.nombre.split(" ")[0]}. Preparamos tu envío y te contactamos por WhatsApp con tu guía.{tienda.entregaDias ? ` Entrega en ${tienda.entregaDias} hábiles.` : ""}</>
             )
           ) : cancelada ? (
             <>Este pedido se canceló y los productos volvieron al catálogo. Si fue un error, vuelve a intentarlo o escríbenos.</>

@@ -1,5 +1,5 @@
 import "server-only";
-import { TIENDA } from "@/lib/tienda-info";
+import { getTiendaInfo } from "@/modules/config/lib";
 
 // Skydropx Pro quoting. Verified empirically against the live API — their
 // developer docs (developers.skydropx.com) were down, and docs.skydropx.com
@@ -90,6 +90,16 @@ export async function cotizarEnvio(
 ): Promise<Tarifa[]> {
   if (!/^\d{5}$/.test(destino.cp)) throw new Error("Código postal inválido");
 
+  // No origin, no quote. Quoting from a default would price the parcel from
+  // the wrong city and charge the difference to a real customer — the failure
+  // this used to have when the origin lived in env and went missing.
+  const { origen } = await getTiendaInfo();
+  if (!origen) {
+    throw new Error(
+      "Falta el origen de envío de la tienda. Configúralo en Configuración → Tienda.",
+    );
+  }
+
   const t = await token();
   const headers = { Authorization: `Bearer ${t}`, "Content-Type": "application/json" };
 
@@ -100,10 +110,10 @@ export async function cotizarEnvio(
       quotation: {
         address_from: {
           country_code: "mx",
-          postal_code: TIENDA.origen.cp,
-          area_level1: TIENDA.origen.estado,
-          area_level2: TIENDA.origen.municipio,
-          area_level3: TIENDA.origen.colonia,
+          postal_code: origen.cp,
+          area_level1: origen.estado,
+          area_level2: origen.municipio,
+          area_level3: origen.colonia,
         },
         address_to: {
           country_code: "mx",

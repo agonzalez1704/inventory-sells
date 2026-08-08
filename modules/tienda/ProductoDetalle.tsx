@@ -9,7 +9,7 @@ import {
 import { formatMXN } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { calidadDe, marcoDe, CALIDAD_LABEL } from "@/lib/calidad";
-import { TIENDA } from "@/lib/tienda-info";
+import { getTiendaInfo } from "@/modules/config/lib";
 import { AddToCart } from "./AddToCart";
 import { MARCA } from "@/lib/marca";
 
@@ -46,7 +46,7 @@ function waHref(nombre: string, whatsapp: string | null) {
     : `https://wa.me/?text=${text}`;
 }
 
-export function ProductoDetalle({
+export async function ProductoDetalle({
   producto: p,
   relacionados,
   whatsapp,
@@ -55,6 +55,7 @@ export function ProductoDetalle({
   relacionados: RelacionadoProducto[];
   whatsapp: string | null;
 }) {
+  const tienda = await getTiendaInfo();
   const specs = [
     ["Marca", p.marca],
     ["Categoría", p.categoria],
@@ -157,22 +158,30 @@ export function ProductoDetalle({
           </div>
 
           <div className="mt-5 space-y-2 text-xs text-muted-foreground">
-            <p className="flex items-start gap-2">
-              <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-tienda-500" />
-              <span>
-                <strong className="text-foreground">
-                  {TIENDA.garantiaDias} días de garantía
-                </strong>{" "}
-                por defecto de fábrica, {TIENDA.garantiaCondicion}.
-              </span>
-            </p>
+            {tienda.garantiaDias != null && (
+              <p className="flex items-start gap-2">
+                <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-tienda-500" />
+                <span>
+                  <strong className="text-foreground">
+                    {tienda.garantiaDias} días de garantía
+                  </strong>{" "}
+                  por defecto de fábrica
+                  {tienda.garantiaCondicion ? `, ${tienda.garantiaCondicion}` : ""}.
+                </span>
+              </p>
+            )}
             <p className="flex items-start gap-2">
               <Truck className="mt-0.5 h-4 w-4 shrink-0 text-tienda-500" />
               <span>
-                Envíos a todo México · entrega en{" "}
-                <strong className="text-foreground">
-                  {TIENDA.entregaDias} hábiles
-                </strong>
+                Envíos a todo México
+                {tienda.entregaDias ? (
+                  <>
+                    {" "}· entrega en{" "}
+                    <strong className="text-foreground">
+                      {tienda.entregaDias} hábiles
+                    </strong>
+                  </>
+                ) : null}
                 . El costo de envío se calcula según tu destino. Precio sujeto a
                 disponibilidad.
               </span>

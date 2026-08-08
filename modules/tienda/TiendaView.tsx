@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { formatMXN } from "@/lib/money";
 import { cn } from "@/lib/utils";
-import { TIENDA } from "@/lib/tienda-info";
+import { useTiendaInfo } from "./TiendaInfoProvider";
 import { AddToCart } from "./AddToCart";
 import { CompatibleBox } from "./CompatibleBox";
 import { logoDeMarca } from "./marca-logo";
@@ -74,6 +74,7 @@ export function TiendaView({
 }) {
   const router = useRouter();
   const params = useSearchParams();
+  const tienda = useTiendaInfo();
   const [pending, start] = useTransition();
   const [texto, setTexto] = useState(q);
 
@@ -206,12 +207,19 @@ export function TiendaView({
               filtrando ? "hidden sm:flex" : "flex",
             )}
           >
-            <span className="inline-flex items-center gap-1.5">
-              <Clock className="h-4 w-4" /> Entrega en {TIENDA.entregaDias}
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <ShieldCheck className="h-4 w-4" /> {TIENDA.garantiaDias} días de garantía
-            </span>
+            {/* Each promise renders only if the shop has actually made it. An
+                unconfigured business must not advertise "Entrega en" and then
+                nothing at all. */}
+            {tienda.entregaDias && (
+              <span className="inline-flex items-center gap-1.5">
+                <Clock className="h-4 w-4" /> Entrega en {tienda.entregaDias}
+              </span>
+            )}
+            {tienda.garantiaDias != null && (
+              <span className="inline-flex items-center gap-1.5">
+                <ShieldCheck className="h-4 w-4" /> {tienda.garantiaDias} días de garantía
+              </span>
+            )}
             <span className="inline-flex items-center gap-1.5">
               <Truck className="h-4 w-4" /> Envíos a todo México
             </span>
@@ -363,17 +371,28 @@ export function TiendaView({
           exact terms matter more than the reassurance. */}
       <section className="mt-12 grid gap-3 sm:grid-cols-3">
         <InfoCard icon={Truck} title="Envío">
-          A todo México, entrega en{" "}
-          <strong className="text-foreground">{TIENDA.entregaDias} hábiles</strong>.
-          El costo se calcula según tu destino.
+          A todo México
+          {tienda.entregaDias ? (
+            <>
+              , entrega en{" "}
+              <strong className="text-foreground">{tienda.entregaDias} hábiles</strong>
+            </>
+          ) : null}
+          . El costo se calcula según tu destino.
         </InfoCard>
-        <InfoCard icon={ShieldCheck} title="Garantía">
-          <strong className="text-foreground">{TIENDA.garantiaDias} días</strong>{" "}
-          por defecto de fábrica, {TIENDA.garantiaCondicion}.
-        </InfoCard>
-        <InfoCard icon={MapPin} title="Recoge en tienda">
-          {TIENDA.direccion}. {TIENDA.horario}.
-        </InfoCard>
+        {tienda.garantiaDias != null && (
+          <InfoCard icon={ShieldCheck} title="Garantía">
+            <strong className="text-foreground">{tienda.garantiaDias} días</strong>{" "}
+            por defecto de fábrica
+            {tienda.garantiaCondicion ? `, ${tienda.garantiaCondicion}` : ""}.
+          </InfoCard>
+        )}
+        {tienda.direccion && (
+          <InfoCard icon={MapPin} title="Recoge en tienda">
+            {tienda.direccion}
+            {tienda.horario ? `. ${tienda.horario}` : ""}.
+          </InfoCard>
+        )}
       </section>
     </div>
   );

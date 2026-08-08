@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { MapPin, Navigation, Share2, Check, Clock } from "lucide-react";
-import { TIENDA } from "@/lib/tienda-info";
+import { mapsUrl } from "@/lib/tienda-info";
+import { useTiendaInfo } from "./TiendaInfoProvider";
 import { MARCA } from "@/lib/marca";
 
 // The pickup "pass" the customer forwards to whoever collects — usually an Uber
@@ -12,14 +13,21 @@ import { MARCA } from "@/lib/marca";
 export function PasePickup({ folio, pagada }: { folio: string; pagada: boolean }) {
   const [copiado, setCopiado] = useState(false);
 
+  const tienda = useTiendaInfo();
+  const comoLlegar = mapsUrl(tienda);
+
   async function compartir() {
     const url = typeof window !== "undefined" ? window.location.href : "";
+    // Lines the shop has not filled in are dropped rather than sent as
+    // "Horario: undefined" to a customer's phone.
     const texto = [
       `Recoge mi pedido ${folio} en ${MARCA.tienda.nombre}`,
-      TIENDA.direccion,
-      `Horario: ${TIENDA.horario}`,
-      `Cómo llegar: ${TIENDA.mapsUrl}`,
-    ].join("\n");
+      tienda.direccion,
+      tienda.horario && `Horario: ${tienda.horario}`,
+      comoLlegar && `Cómo llegar: ${comoLlegar}`,
+    ]
+      .filter(Boolean)
+      .join("\n");
     try {
       if (navigator.share) {
         await navigator.share({ title: `Pedido ${folio}`, text: texto, url });
@@ -56,18 +64,22 @@ export function PasePickup({ folio, pagada }: { folio: string; pagada: boolean }
           {folio}
         </p>
 
-        <div className="mt-4 flex items-start gap-2 text-sm text-foreground">
-          <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-tienda-600 dark:text-tienda-400" />
-          <span>{TIENDA.direccion}</span>
-        </div>
-        <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">
-          <Clock className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-          {TIENDA.horario}
-        </div>
+        {tienda.direccion && (
+          <div className="mt-4 flex items-start gap-2 text-sm text-foreground">
+            <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-tienda-600 dark:text-tienda-400" />
+            <span>{tienda.direccion}</span>
+          </div>
+        )}
+        {tienda.horario && (
+          <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">
+            <Clock className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            {tienda.horario}
+          </div>
+        )}
 
         <div className="mt-4 flex flex-wrap gap-2">
           <a
-            href={TIENDA.mapsUrl}
+            href={comoLlegar ?? "#"}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex h-10 items-center gap-2 rounded-xl bg-tienda-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-tienda-700"

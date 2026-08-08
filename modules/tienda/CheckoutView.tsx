@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { formatMXN } from "@/lib/money";
 import { cn } from "@/lib/utils";
-import { TIENDA } from "@/lib/tienda-info";
+import { useTiendaInfo } from "./TiendaInfoProvider";
 import { useRouter } from "next/navigation";
 import { tokenizarTarjeta, type DatosTarjeta } from "@/lib/conekta-client";
 import { useCart } from "./CartProvider";
@@ -39,6 +39,7 @@ const ESTADOS = [
 ];
 
 export function CheckoutView() {
+  const tienda = useTiendaInfo();
   const { items, setQty, ready, clear } = useCart();
   const [resumen, setResumen] = useState<Resumen | null>(null);
   const [cargando, setCargando] = useState(true);
@@ -254,7 +255,10 @@ export function CheckoutView() {
         {/* Form */}
         <div className="space-y-5 lg:col-span-3">
           <Card titulo="¿Cómo lo recibes?">
-            <div className="grid grid-cols-2 gap-2">
+            {/* Pickup is only offered when there is somewhere to pick up from.
+                Without an address the customer chooses it, pays, and then the
+                confirmation has no counter to send them to. */}
+            <div className={cn("grid gap-2", tienda.direccion ? "grid-cols-2" : "grid-cols-1")}>
               <EntregaTile
                 activo={!recoger}
                 onClick={() => setTipoEntrega("envio")}
@@ -262,13 +266,15 @@ export function CheckoutView() {
                 titulo="Envío a domicilio"
                 desc="Te lo mandamos por paquetería"
               />
-              <EntregaTile
-                activo={recoger}
-                onClick={() => setTipoEntrega("recoger")}
-                icon={StoreIcon}
-                titulo="Recoger / mando por mi cuenta"
-                desc="Sin costo de envío"
-              />
+              {tienda.direccion && (
+                <EntregaTile
+                  activo={recoger}
+                  onClick={() => setTipoEntrega("recoger")}
+                  icon={StoreIcon}
+                  titulo="Recoger / mando por mi cuenta"
+                  desc="Sin costo de envío"
+                />
+              )}
             </div>
           </Card>
 
@@ -285,8 +291,10 @@ export function CheckoutView() {
               <div className="flex items-start gap-3 rounded-xl bg-tienda-50/60 dark:bg-tienda-950/40 p-3">
                 <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-tienda-600 dark:text-tienda-400" />
                 <div className="text-sm text-foreground">
-                  <p className="font-medium text-foreground">{TIENDA.direccion}</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">{TIENDA.horario}</p>
+                  <p className="font-medium text-foreground">{tienda.direccion}</p>
+                  {tienda.horario && (
+                    <p className="mt-0.5 text-xs text-muted-foreground">{tienda.horario}</p>
+                  )}
                   <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
                     Prepara tu pedido en cuanto se confirme el pago. Puedes venir tú
                     o mandar un mensajero/Uber — solo dan tu folio al recoger.
@@ -464,11 +472,13 @@ export function CheckoutView() {
               </p>
             )}
 
-            <p className="mt-3 flex items-start gap-1.5 text-[11px] leading-relaxed text-muted-foreground">
-              <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-tienda-500" />
-              {TIENDA.garantiaDias} días de garantía por defecto de fábrica,{" "}
-              {TIENDA.garantiaCondicion}.
-            </p>
+            {tienda.garantiaDias != null && (
+              <p className="mt-3 flex items-start gap-1.5 text-[11px] leading-relaxed text-muted-foreground">
+                <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-tienda-500" />
+                {tienda.garantiaDias} días de garantía por defecto de fábrica
+                {tienda.garantiaCondicion ? `, ${tienda.garantiaCondicion}` : ""}.
+              </p>
+            )}
           </div>
         </div>
       </div>

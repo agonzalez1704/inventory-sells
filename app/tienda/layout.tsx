@@ -10,7 +10,8 @@ import {
   MessageCircle,
   MapPin,
 } from "lucide-react";
-import { TIENDA } from "@/lib/tienda-info";
+import { getTiendaInfo } from "@/modules/config/lib";
+import { TiendaInfoProvider } from "@/modules/tienda/TiendaInfoProvider";
 import { CartProvider } from "@/modules/tienda/CartProvider";
 import { CartButton } from "@/modules/tienda/CartDrawer";
 import { MARCA } from "@/lib/marca";
@@ -73,16 +74,21 @@ function prettyPhone(w: string | null): string | null {
   return `+52 ${local.slice(0, 2)} ${local.slice(2, 6)} ${local.slice(6)}`;
 }
 
-export default function TiendaLayout({
+export default async function TiendaLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   const whatsapp = process.env.STORE_WHATSAPP ?? null;
   const tel = prettyPhone(whatsapp);
+  // Read once here and provided to the whole storefront: the cards, the
+  // checkout and the pickup pass are client components and cannot read it
+  // themselves.
+  const tienda = await getTiendaInfo();
 
   return (
     <CartProvider>
+    <TiendaInfoProvider valor={tienda}>
     <div
       className={`${display.variable} flex min-h-screen flex-col bg-[#f5f8ff] text-foreground`}
     >
@@ -91,13 +97,20 @@ export default function TiendaLayout({
         <div className="mx-auto flex h-9 max-w-6xl items-center justify-between px-4 text-xs sm:px-6">
           <span className="inline-flex items-center gap-1.5">
             <ShieldCheck className="h-3.5 w-3.5" />
-            {TIENDA.garantiaDias} días de garantía · Entrega en {TIENDA.entregaDias}
+            {[
+              tienda.garantiaDias != null && `${tienda.garantiaDias} días de garantía`,
+              tienda.entregaDias && `Entrega en ${tienda.entregaDias}`,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
           </span>
           <div className="flex items-center gap-4">
-            <span className="hidden items-center gap-1.5 sm:inline-flex">
-              <Clock className="h-3.5 w-3.5" />
-              {TIENDA.horario}
-            </span>
+            {tienda.horario && (
+              <span className="hidden items-center gap-1.5 sm:inline-flex">
+                <Clock className="h-3.5 w-3.5" />
+                {tienda.horario}
+              </span>
+            )}
             {tel && (
               <a
                 href={waHref(whatsapp)}
@@ -120,7 +133,7 @@ export default function TiendaLayout({
           <div className="flex items-center gap-4">
             <span className="hidden items-center gap-1.5 text-xs font-medium text-muted-foreground lg:inline-flex">
               <MapPin className="h-3.5 w-3.5 text-tienda-500" />
-              {TIENDA.ciudad} · Envíos a todo México
+              {tienda.ciudad ? `${tienda.ciudad} · ` : ""}Envíos a todo México
             </span>
             <a
               href={waHref(whatsapp)}
@@ -171,14 +184,18 @@ export default function TiendaLayout({
                   {tel}
                 </li>
               )}
-              <li className="flex items-start gap-1.5">
-                <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-tienda-500" />
-                {TIENDA.direccion}
-              </li>
-              <li className="flex items-center gap-1.5">
-                <Clock className="h-3.5 w-3.5 text-tienda-500" />
-                {TIENDA.horario}
-              </li>
+              {tienda.direccion && (
+                <li className="flex items-start gap-1.5">
+                  <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-tienda-500" />
+                  {tienda.direccion}
+                </li>
+              )}
+              {tienda.horario && (
+                <li className="flex items-center gap-1.5">
+                  <Clock className="h-3.5 w-3.5 text-tienda-500" />
+                  {tienda.horario}
+                </li>
+              )}
             </ul>
           </div>
         </div>
@@ -189,6 +206,7 @@ export default function TiendaLayout({
         </div>
       </footer>
     </div>
+    </TiendaInfoProvider>
     </CartProvider>
   );
 }

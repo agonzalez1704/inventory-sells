@@ -1,6 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { getProfile } from "@/lib/auth/profile";
-import { getNegocioInfo, getAsesoresRaw, getValorBase } from "@/modules/config/lib";
+import { getNegocioInfo, getAsesoresRaw, getValorBase, getTiendaInfo } from "@/modules/config/lib";
 import { ConfigView } from "@/modules/config/ConfigView";
 import { Card } from "@/components/ui/card";
 import { PushToggle } from "@/components/push-toggle";
@@ -12,10 +12,11 @@ export default async function ConfiguracionPage() {
   const { userId } = await auth();
   const profile = userId ? await getProfile(userId) : null;
   const isAdmin = profile?.role === "admin";
-  const [info, asesores, valorBase, notifPrefs] = await Promise.all([
+  const [info, asesores, valorBase, tienda, notifPrefs] = await Promise.all([
     getNegocioInfo(),
     getAsesoresRaw(),
     getValorBase(),
+    getTiendaInfo(),
     isAdmin ? getNotifPrefs() : null,
   ]);
 
@@ -25,6 +26,7 @@ export default async function ConfiguracionPage() {
         info={info}
         asesores={asesores}
         valorBase={valorBase}
+        tienda={tienda}
         isAdmin={isAdmin}
       />
 
