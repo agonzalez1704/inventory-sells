@@ -28,6 +28,14 @@ const config: Config = {
           foreground: "hsl(var(--accent-foreground))",
           soft: "hsl(var(--accent-soft))",
         },
+        // The public storefront's accent. Its own scale because the shop is its
+        // own brand — see MARCA.tienda.acento.
+        tienda: Object.fromEntries(
+          [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950].map((n) => [
+            n,
+            `hsl(var(--tienda-${n}) / <alpha-value>)`,
+          ]),
+        ) as Record<string, string>,
         brand: {
           DEFAULT: "hsl(var(--brand))",
           strong: "hsl(var(--brand-strong))",

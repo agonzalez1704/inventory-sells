@@ -69,7 +69,7 @@ export function AddToCart({
       aria-label={`Agregar ${p.nombre} al carrito`}
       title={maxed ? "Máximo por pieza en línea" : "Agregar al carrito"}
       className={cn(
-        "flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-blue-600 font-semibold text-white shadow-sm shadow-blue-600/30 transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-muted disabled:shadow-none",
+        "flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-tienda-600 font-semibold text-white shadow-sm shadow-tienda-600/30 transition-colors hover:bg-tienda-700 disabled:cursor-not-allowed disabled:bg-muted disabled:shadow-none",
         size === "lg" ? "h-12 w-full text-sm" : "h-9 w-9",
         className,
       )}

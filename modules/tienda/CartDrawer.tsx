@@ -22,11 +22,11 @@ export function CartButton() {
       <Vaul.Trigger asChild>
         <button
           aria-label={`Carrito${count ? ` (${count})` : ""}`}
-          className="relative flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border border-blue-100 dark:border-blue-900 bg-background text-foreground transition-colors hover:border-blue-300 dark:border-blue-800 hover:text-blue-700 dark:text-blue-300"
+          className="relative flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border border-tienda-100 dark:border-tienda-900 bg-background text-foreground transition-colors hover:border-tienda-300 dark:border-tienda-800 hover:text-tienda-700 dark:text-tienda-300"
         >
           <ShoppingCart className="h-5 w-5" />
           {ready && count > 0 && (
-            <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-blue-600 px-1 text-[11px] font-semibold text-white">
+            <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-tienda-600 px-1 text-[11px] font-semibold text-white">
               {count}
             </span>
           )}
@@ -59,7 +59,7 @@ function CartBody({ mobile }: { mobile: boolean }) {
         <div aria-hidden className="mx-auto mt-2.5 h-1.5 w-10 shrink-0 rounded-full bg-muted" />
       )}
       <div className="flex items-center gap-2 border-b border-border px-5 py-4">
-        <ShoppingCart className="h-5 w-5 text-blue-700 dark:text-blue-300" />
+        <ShoppingCart className="h-5 w-5 text-tienda-700 dark:text-tienda-300" />
         <Vaul.Title className="text-sm font-semibold text-foreground">
           Tu carrito {count > 0 && `(${count})`}
         </Vaul.Title>
@@ -81,7 +81,7 @@ function CartBody({ mobile }: { mobile: boolean }) {
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={i.imagen} alt={i.nombre} className="h-full w-full object-contain" />
                   ) : (
-                    <span className="flex h-full w-full items-center justify-center text-blue-300">
+                    <span className="flex h-full w-full items-center justify-center text-tienda-300">
                       <Smartphone className="h-6 w-6" />
                     </span>
                   )}
@@ -110,7 +110,7 @@ function CartBody({ mobile }: { mobile: boolean }) {
                         <Plus className="h-3.5 w-3.5" />
                       </button>
                     </div>
-                    <span className="ml-auto text-sm font-semibold tabular-nums text-blue-800 dark:text-blue-300">
+                    <span className="ml-auto text-sm font-semibold tabular-nums text-tienda-800 dark:text-tienda-300">
                       {formatMXN(i.precio_cents * i.qty)}
                     </span>
                     <button
@@ -142,7 +142,7 @@ function CartBody({ mobile }: { mobile: boolean }) {
             <Link
               href="/tienda/checkout"
               onClick={() => setOpen(false)}
-              className="mt-3 flex h-12 w-full items-center justify-center rounded-xl bg-blue-600 text-sm font-semibold text-white shadow-sm shadow-blue-600/30 transition-colors hover:bg-blue-700"
+              className="mt-3 flex h-12 w-full items-center justify-center rounded-xl bg-tienda-600 text-sm font-semibold text-white shadow-sm shadow-tienda-600/30 transition-colors hover:bg-tienda-700"
             >
               Continuar al pago
             </Link>

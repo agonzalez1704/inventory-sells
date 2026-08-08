@@ -34,7 +34,21 @@ export type Marca = {
    *  Deliberately separate from `nombre`: that one is what the staff call this
    *  app, and a customer has never heard it. Fiable's shop is Lead Displays,
    *  and every customer-facing string has to reach for this one instead. */
-  tienda: { nombre: string; tagline: string; descripcion: string };
+  tienda: {
+    nombre: string;
+    tagline: string;
+    descripcion: string;
+    /** The storefront's accent ramp, 50→950, as raw HSL channels.
+     *
+     *  A full ramp rather than one hue: the shop uses the whole scale — tints
+     *  for panels, mid tones for links, dark ends for the footer — and a single
+     *  colour lightened by opacity looks washed out at the pale end.
+     *
+     *  Separate from `brand` for the same reason `tienda.nombre` is separate
+     *  from `nombre`: the shop is its own brand. Fiable's back office is amber
+     *  and Lead Displays is blue, and that is on purpose, not drift. */
+    acento: Record<50 | 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900 | 950, string>;
+  };
 };
 
 const MARCAS: Record<MarcaId, Marca> = {
@@ -58,6 +72,21 @@ const MARCAS: Record<MarcaId, Marca> = {
       tagline: "Pantallas y refacciones para celular",
       descripcion:
         "Catálogo de pantallas, baterías y refacciones para tu celular. Explora modelos y disponibilidad.",
+      // Tailwind's own blue, channel for channel: Lead Displays already ships
+      // in it and this move is meant to change nothing for them.
+      acento: {
+        50: "214 100% 97%",
+        100: "214 95% 93%",
+        200: "213 97% 87%",
+        300: "212 96% 78%",
+        400: "213 94% 68%",
+        500: "217 91% 60%",
+        600: "221 83% 53%",
+        700: "224 76% 48%",
+        800: "226 71% 40%",
+        900: "224 64% 33%",
+        950: "226 57% 21%",
+      },
     },
   },
   ruli: {
@@ -81,6 +110,22 @@ const MARCAS: Record<MarcaId, Marca> = {
       tagline: "Refacciones y autopartes",
       descripcion:
         "Catálogo de refacciones y autopartes. Consulta modelos, precios y disponibilidad.",
+      // The storefront sign's red. 600 is the brand base exactly, so the shop's
+      // primary and the app's brand are the same colour rather than two reds
+      // that almost match.
+      acento: {
+        50: "357 100% 97%",
+        100: "357 94% 94%",
+        200: "357 96% 89%",
+        300: "357 94% 82%",
+        400: "357 91% 71%",
+        500: "357 84% 60%",
+        600: "357 75% 48%",
+        700: "357 78% 41%",
+        800: "357 74% 34%",
+        900: "357 66% 30%",
+        950: "357 78% 15%",
+      },
     },
   },
 };
@@ -95,5 +140,11 @@ export const MARCA: Marca =
 /** The --brand* block for this brand, injected into the root layout. */
 export function brandCssVars(): string {
   const b = MARCA.brand;
-  return `:root{--brand:${b.base};--brand-strong:${b.strong};--brand-soft:${b.soft};--brand-foreground:${b.foreground};}`;
+  const acento = Object.entries(MARCA.tienda.acento)
+    .map(([paso, hsl]) => `--tienda-${paso}:${hsl};`)
+    .join("");
+  return (
+    `:root{--brand:${b.base};--brand-strong:${b.strong};` +
+    `--brand-soft:${b.soft};--brand-foreground:${b.foreground};${acento}}`
+  );
 }

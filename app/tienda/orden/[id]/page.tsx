@@ -142,15 +142,15 @@ export default async function OrdenPage({
           </div>
         )}
         {!pagada && !cancelada && clabe && (
-          <div className="mt-5 rounded-xl border border-blue-200 dark:border-blue-900 bg-blue-50/60 dark:bg-blue-950/40 p-4">
-            <p className="flex items-center gap-2 text-sm font-semibold text-blue-900 dark:text-blue-200">
+          <div className="mt-5 rounded-xl border border-tienda-200 dark:border-tienda-900 bg-tienda-50/60 dark:bg-tienda-950/40 p-4">
+            <p className="flex items-center gap-2 text-sm font-semibold text-tienda-900 dark:text-tienda-200">
               <ArrowLeftRight className="h-4 w-4" /> Transferencia SPEI
             </p>
-            <p className="mt-2 text-xs text-blue-800 dark:text-blue-300">CLABE {banco ? `· ${banco}` : ""}</p>
-            <p className="select-all font-mono text-xl font-bold tracking-wider text-blue-950 dark:text-blue-200">
+            <p className="mt-2 text-xs text-tienda-800 dark:text-tienda-300">CLABE {banco ? `· ${banco}` : ""}</p>
+            <p className="select-all font-mono text-xl font-bold tracking-wider text-tienda-950 dark:text-tienda-200">
               {clabe}
             </p>
-            <p className="mt-2 text-xs text-blue-800 dark:text-blue-300">
+            <p className="mt-2 text-xs text-tienda-800 dark:text-tienda-300">
               Monto exacto: <strong>{formatMXN(o.total_cents)}</strong> · vence en {VOUCHER_HORAS_UI} h
             </p>
           </div>
@@ -158,22 +158,22 @@ export default async function OrdenPage({
 
         {/* Direct bank transfer: our own account, confirmed by staff. */}
         {!pagada && !cancelada && esTransferencia && (
-          <div className="mt-5 rounded-xl border border-blue-200 dark:border-blue-900 bg-blue-50/60 dark:bg-blue-950/40 p-4">
-            <p className="flex items-center gap-2 text-sm font-semibold text-blue-900 dark:text-blue-200">
+          <div className="mt-5 rounded-xl border border-tienda-200 dark:border-tienda-900 bg-tienda-50/60 dark:bg-tienda-950/40 p-4">
+            <p className="flex items-center gap-2 text-sm font-semibold text-tienda-900 dark:text-tienda-200">
               <Landmark className="h-4 w-4" /> Transfiere a nuestra cuenta
             </p>
             {BANK.clabe ? (
-              <div className="mt-2 space-y-1.5 text-sm text-blue-950 dark:text-blue-200">
-                {BANK.banco && <p className="text-xs text-blue-800 dark:text-blue-300">{BANK.banco}</p>}
+              <div className="mt-2 space-y-1.5 text-sm text-tienda-950 dark:text-tienda-200">
+                {BANK.banco && <p className="text-xs text-tienda-800 dark:text-tienda-300">{BANK.banco}</p>}
                 <p className="select-all font-mono text-xl font-bold tracking-wider">{BANK.clabe}</p>
-                {BANK.titular && <p className="text-xs text-blue-800 dark:text-blue-300">A nombre de {BANK.titular}</p>}
+                {BANK.titular && <p className="text-xs text-tienda-800 dark:text-tienda-300">A nombre de {BANK.titular}</p>}
               </div>
             ) : (
-              <p className="mt-2 text-xs text-blue-800 dark:text-blue-300">
+              <p className="mt-2 text-xs text-tienda-800 dark:text-tienda-300">
                 Te enviamos los datos de la cuenta por WhatsApp.
               </p>
             )}
-            <p className="mt-3 text-xs leading-relaxed text-blue-800 dark:text-blue-300">
+            <p className="mt-3 text-xs leading-relaxed text-tienda-800 dark:text-tienda-300">
               Monto exacto: <strong>{formatMXN(o.total_cents)}</strong>. Manda tu
               comprobante por WhatsApp y apartamos tu pedido; lo preparamos en
               cuanto confirmemos el depósito. Referencia: <strong>{o.folio}</strong>.
@@ -207,7 +207,7 @@ export default async function OrdenPage({
           </div>
           <div className="flex items-baseline justify-between border-t border-border pt-1.5">
             <dt className="font-semibold text-foreground">Total</dt>
-            <dd className="text-lg font-semibold tabular-nums text-blue-800 dark:text-blue-300">
+            <dd className="text-lg font-semibold tabular-nums text-tienda-800 dark:text-tienda-300">
               {formatMXN(o.total_cents)}
             </dd>
           </div>
@@ -223,7 +223,7 @@ export default async function OrdenPage({
 
         <Link
           href="/tienda"
-          className="mt-5 inline-flex h-11 items-center rounded-xl border border-border px-4 text-sm font-medium text-foreground transition-colors hover:border-blue-300 dark:border-blue-800 hover:text-blue-700 dark:text-blue-300"
+          className="mt-5 inline-flex h-11 items-center rounded-xl border border-border px-4 text-sm font-medium text-foreground transition-colors hover:border-tienda-300 dark:border-tienda-800 hover:text-tienda-700 dark:text-tienda-300"
         >
           Volver al catálogo
         </Link>

@@ -107,22 +107,22 @@ export function CotizacionPublica() {
 
       <Estado cot={cot} />
 
-      <div className="overflow-hidden rounded-2xl border border-blue-100 dark:border-blue-900 bg-background shadow-sm">
+      <div className="overflow-hidden rounded-2xl border border-tienda-100 dark:border-tienda-900 bg-background shadow-sm">
         {cot.cliente && (
-          <div className="border-b border-blue-50 px-5 py-3 text-sm">
+          <div className="border-b border-tienda-50 px-5 py-3 text-sm">
             <span className="text-muted-foreground">Cliente: </span>
             <span className="font-medium">{cot.cliente}</span>
           </div>
         )}
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-blue-50 text-left text-xs text-muted-foreground">
+            <tr className="border-b border-tienda-50 text-left text-xs text-muted-foreground">
               <th className="px-5 py-2.5 font-medium">Producto</th>
               <th className="px-2 py-2.5 text-right font-medium">Cant.</th>
               <th className="px-5 py-2.5 text-right font-medium">Importe</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-blue-50">
+          <tbody className="divide-y divide-tienda-50">
             {items.map((it, i) => (
               <tr key={i}>
                 <td className="px-5 py-3">
@@ -137,7 +137,7 @@ export function CotizacionPublica() {
             ))}
           </tbody>
           <tfoot>
-            <tr className="border-t border-blue-100 dark:border-blue-900 bg-blue-50/40 dark:bg-blue-950/40">
+            <tr className="border-t border-tienda-100 dark:border-tienda-900 bg-tienda-50/40 dark:bg-tienda-950/40">
               <td colSpan={2} className="px-5 py-3 text-right font-medium">
                 Total
               </td>
@@ -150,7 +150,7 @@ export function CotizacionPublica() {
       </div>
 
       {cot.notas && (
-        <div className="rounded-2xl border border-blue-100 dark:border-blue-900 bg-background p-4 text-sm">
+        <div className="rounded-2xl border border-tienda-100 dark:border-tienda-900 bg-background p-4 text-sm">
           <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">Notas</p>
           <p>{cot.notas}</p>
         </div>

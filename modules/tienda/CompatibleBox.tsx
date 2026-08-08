@@ -32,14 +32,14 @@ export function CompatibleBox({
 
   if (!data && !loading && !fallo) {
     return (
-      <div className="mx-auto mt-8 max-w-lg rounded-2xl border border-dashed border-blue-200 dark:border-blue-900 bg-blue-50/40 dark:bg-blue-950/40 p-5 text-center">
+      <div className="mx-auto mt-8 max-w-lg rounded-2xl border border-dashed border-tienda-200 dark:border-tienda-900 bg-tienda-50/40 dark:bg-tienda-950/40 p-5 text-center">
         <p className="text-sm text-foreground">
           Muchas pantallas son <span className="font-medium">iguales entre modelos</span>.
           Podemos revisar si alguna que sí tenemos le queda a tu equipo.
         </p>
         <button
           onClick={run}
-          className="mt-3 inline-flex h-10 cursor-pointer items-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm shadow-blue-600/30 transition-colors hover:bg-blue-700"
+          className="mt-3 inline-flex h-10 cursor-pointer items-center gap-2 rounded-xl bg-tienda-600 px-4 text-sm font-semibold text-white shadow-sm shadow-tienda-600/30 transition-colors hover:bg-tienda-700"
         >
           <Sparkles className="h-4 w-4" />
           Buscar modelos compatibles
@@ -50,8 +50,8 @@ export function CompatibleBox({
 
   if (loading) {
     return (
-      <div className="mx-auto mt-8 max-w-3xl rounded-2xl border border-blue-100 dark:border-blue-900 bg-blue-50/50 dark:bg-blue-950/40 p-5">
-        <div className="flex items-center gap-2.5 text-sm text-blue-800 dark:text-blue-300">
+      <div className="mx-auto mt-8 max-w-3xl rounded-2xl border border-tienda-100 dark:border-tienda-900 bg-tienda-50/50 dark:bg-tienda-950/40 p-5">
+        <div className="flex items-center gap-2.5 text-sm text-tienda-800 dark:text-tienda-300">
           <Loader2 className="h-4 w-4 animate-spin" />
           Buscando modelos compatibles…
         </div>
@@ -59,7 +59,7 @@ export function CompatibleBox({
           {[0, 1, 2, 3].map((i) => (
             <div
               key={i}
-              className="aspect-square animate-pulse rounded-xl bg-blue-100/60 dark:bg-blue-900/40"
+              className="aspect-square animate-pulse rounded-xl bg-tienda-100/60 dark:bg-tienda-900/40"
             />
           ))}
         </div>
@@ -78,7 +78,7 @@ export function CompatibleBox({
         <div className="mt-3 flex flex-wrap justify-center gap-2">
           <button
             onClick={run}
-            className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm shadow-blue-600/30 transition-colors hover:bg-blue-700"
+            className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-xl bg-tienda-600 px-4 text-sm font-semibold text-white shadow-sm shadow-tienda-600/30 transition-colors hover:bg-tienda-700"
           >
             <RefreshCw className="h-4 w-4" />
             Reintentar
@@ -106,10 +106,10 @@ export function CompatibleBox({
   }
 
   return (
-    <section className="mx-auto mt-8 max-w-5xl overflow-hidden rounded-2xl border border-blue-200 dark:border-blue-900 bg-gradient-to-br from-blue-50 to-indigo-50/60 text-left">
-      <div className="border-b border-blue-100 dark:border-blue-900 px-5 py-4">
+    <section className="mx-auto mt-8 max-w-5xl overflow-hidden rounded-2xl border border-tienda-200 dark:border-tienda-900 bg-gradient-to-br from-tienda-50 to-indigo-50/60 text-left">
+      <div className="border-b border-tienda-100 dark:border-tienda-900 px-5 py-4">
         <div className="flex items-center gap-2">
-          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600 text-white">
+          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-tienda-600 text-white">
             <Sparkles className="h-4 w-4" />
           </span>
           <h2 className="text-sm font-semibold text-foreground [font-family:var(--font-display)]">
@@ -118,7 +118,7 @@ export function CompatibleBox({
         </div>
         {data.nota && (
           <p className="mt-2 flex items-start gap-1.5 text-xs leading-relaxed text-muted-foreground">
-            <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-500" />
+            <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-tienda-500" />
             {data.nota}
           </p>
         )}
@@ -126,7 +126,7 @@ export function CompatibleBox({
           {data.modelos.map((m) => (
             <span
               key={m}
-              className="rounded-full border border-blue-200 dark:border-blue-900 bg-background px-2.5 py-1 text-xs font-medium text-blue-800 dark:text-blue-300"
+              className="rounded-full border border-tienda-200 dark:border-tienda-900 bg-background px-2.5 py-1 text-xs font-medium text-tienda-800 dark:text-tienda-300"
             >
               {m}
             </span>
@@ -142,7 +142,7 @@ export function CompatibleBox({
           </p>
         ) : (
           <>
-            <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-300">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-tienda-700 dark:text-tienda-300">
               Resultados de modelos compatibles
             </p>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">

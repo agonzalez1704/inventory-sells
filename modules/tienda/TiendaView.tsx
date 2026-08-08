@@ -101,7 +101,7 @@ export function TiendaView({
   return (
     <div className="mx-auto max-w-6xl px-4 pb-4 sm:px-6">
       {/* Hero */}
-      <section className="relative mt-4 overflow-hidden rounded-3xl bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 text-white">
+      <section className="relative mt-4 overflow-hidden rounded-3xl bg-gradient-to-br from-tienda-600 via-tienda-700 to-indigo-800 text-white">
         {/* Product imagery sits on the right; the copy lives in the empty left
             third the image was composed around. Hidden on phones, where it
             would squash the headline. */}
@@ -114,21 +114,21 @@ export function TiendaView({
           />
           {/* Full-width wash instead of a panel: any hard edge between the flat
               gradient and the photo reads as a seam. */}
-          <div className="absolute inset-0 bg-gradient-to-r from-blue-700 from-25% via-blue-700/70 via-55% to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-r from-tienda-700 from-25% via-tienda-700/70 via-55% to-transparent" />
         </div>
         <div
           aria-hidden
           className="pointer-events-none absolute -bottom-28 -left-16 h-80 w-80 rounded-full bg-indigo-400/20 blur-3xl"
         />
         <div className="relative px-6 py-10 sm:px-10 sm:py-14 md:max-w-[52%]">
-          <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-medium text-blue-50">
+          <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-medium text-tienda-50">
             <BadgeCheck className="h-3.5 w-3.5" />
             Calidad original y genérica
           </span>
           <h1 className="mt-4 max-w-2xl text-balance text-3xl font-semibold leading-tight tracking-tight [font-family:var(--font-display)] sm:text-5xl">
             La refacción que tu celular necesita
           </h1>
-          <p className="mt-3 max-w-xl text-pretty text-sm text-blue-100 sm:text-base">
+          <p className="mt-3 max-w-xl text-pretty text-sm text-tienda-100 sm:text-base">
             Pantallas, baterías y más — busca por marca y modelo. Precios claros,
             disponibilidad al día.
           </p>
@@ -147,17 +147,17 @@ export function TiendaView({
                 onChange={(e) => setTexto(e.target.value)}
                 placeholder="Busca tu modelo (ej: moto g42, redmi note 7…)"
                 aria-label="Buscar producto"
-                className="h-[3.25rem] w-full rounded-2xl border border-white/10 bg-background py-3.5 pl-11 pr-11 text-base text-foreground shadow-lg shadow-blue-950/25 outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-blue-300"
+                className="h-[3.25rem] w-full rounded-2xl border border-white/10 bg-background py-3.5 pl-11 pr-11 text-base text-foreground shadow-lg shadow-tienda-950/25 outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-tienda-300"
               />
               {pending && (
-                <Loader2 className="absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 animate-spin text-blue-500" />
+                <Loader2 className="absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 animate-spin text-tienda-500" />
               )}
             </div>
           </div>
 
           {/* Quantified promises — competitors state a delivery time instead of
               just "we ship". No free-shipping claim: see lib/tienda-info.ts. */}
-          <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-xs text-blue-100">
+          <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-xs text-tienda-100">
             <span className="inline-flex items-center gap-1.5">
               <Clock className="h-4 w-4" /> Entrega en {TIENDA.entregaDias}
             </span>
@@ -188,7 +188,7 @@ export function TiendaView({
                   onClick={() => go({ marca: m.value })}
                   className="group flex w-24 shrink-0 flex-col items-center gap-2"
                 >
-                  <span className="flex h-20 w-20 items-center justify-center rounded-2xl border border-blue-100 dark:border-blue-900 bg-background p-3.5 text-blue-700 dark:text-blue-300 shadow-sm transition-all group-hover:-translate-y-0.5 group-hover:border-blue-300 dark:border-blue-800 group-hover:shadow-md group-hover:shadow-blue-900/5">
+                  <span className="flex h-20 w-20 items-center justify-center rounded-2xl border border-tienda-100 dark:border-tienda-900 bg-background p-3.5 text-tienda-700 dark:text-tienda-300 shadow-sm transition-all group-hover:-translate-y-0.5 group-hover:border-tienda-300 dark:border-tienda-800 group-hover:shadow-md group-hover:shadow-tienda-900/5">
                     {logo ? (
                       // eslint-disable-next-line @next/next/no-img-element -- static brand asset
                       <img src={logo.src} alt={logo.alt} className="max-h-full max-w-full object-contain" />
@@ -198,7 +198,7 @@ export function TiendaView({
                       </span>
                     )}
                   </span>
-                  <span className="w-full truncate text-center text-xs font-medium text-muted-foreground group-hover:text-blue-700 dark:text-blue-300">
+                  <span className="w-full truncate text-center text-xs font-medium text-muted-foreground group-hover:text-tienda-700 dark:text-tienda-300">
                     {m.value}
                   </span>
                 </button>
@@ -217,7 +217,7 @@ export function TiendaView({
           {filtrando && (
             <button
               onClick={() => go({ q: null, marca: null, cat: null, cal: null })}
-              className="text-xs font-medium text-blue-700 dark:text-blue-300 hover:underline"
+              className="text-xs font-medium text-tienda-700 dark:text-tienda-300 hover:underline"
             >
               Limpiar filtros
             </button>
@@ -313,7 +313,7 @@ function InfoCard({
   return (
     <div className="rounded-2xl border border-border bg-background p-4">
       <div className="flex items-center gap-2">
-        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300">
+        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-tienda-50 dark:bg-tienda-950/40 text-tienda-700 dark:text-tienda-300">
           <Icon className="h-4 w-4" />
         </span>
         <h3 className="text-sm font-semibold text-foreground">{title}</h3>
@@ -423,8 +423,8 @@ function PageBtn({
       className={cn(
         "flex h-9 min-w-9 cursor-pointer items-center justify-center rounded-lg px-3 text-sm font-medium transition-colors",
         active
-          ? "bg-blue-600 text-white shadow-sm shadow-blue-600/30"
-          : "border border-border bg-background text-muted-foreground hover:border-blue-200 dark:border-blue-900 hover:text-blue-700 dark:text-blue-300",
+          ? "bg-tienda-600 text-white shadow-sm shadow-tienda-600/30"
+          : "border border-border bg-background text-muted-foreground hover:border-tienda-200 dark:border-tienda-900 hover:text-tienda-700 dark:text-tienda-300",
         disabled && "cursor-not-allowed opacity-40 hover:border-border hover:text-muted-foreground",
       )}
     >
@@ -448,8 +448,8 @@ function Chip({
       className={cn(
         "cursor-pointer rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
         active
-          ? "bg-blue-600 text-white shadow-sm shadow-blue-600/30"
-          : "border border-blue-100 dark:border-blue-900 bg-background text-muted-foreground hover:border-blue-200 dark:border-blue-900 hover:text-blue-700 dark:text-blue-300",
+          ? "bg-tienda-600 text-white shadow-sm shadow-tienda-600/30"
+          : "border border-tienda-100 dark:border-tienda-900 bg-background text-muted-foreground hover:border-tienda-200 dark:border-tienda-900 hover:text-tienda-700 dark:text-tienda-300",
       )}
     >
       {children}
@@ -467,7 +467,7 @@ export function ProductCard({
   return (
     <div
       className={cn(
-        "group relative flex flex-col rounded-2xl border border-border bg-background p-3 transition-all hover:-translate-y-0.5 hover:border-blue-300 dark:border-blue-800 hover:shadow-lg hover:shadow-blue-900/5",
+        "group relative flex flex-col rounded-2xl border border-border bg-background p-3 transition-all hover:-translate-y-0.5 hover:border-tienda-300 dark:border-tienda-800 hover:shadow-lg hover:shadow-tienda-900/5",
         !p.disponible && "opacity-80",
       )}
     >
@@ -492,12 +492,12 @@ export function ProductCard({
               className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-105"
             />
           ) : (
-            <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-blue-50 to-slate-50 text-blue-400">
+            <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-tienda-50 to-slate-50 text-tienda-400">
               <Smartphone className="h-9 w-9" />
             </div>
           )}
         </div>
-        <p className="line-clamp-2 min-h-[2.5rem] text-sm font-medium leading-tight text-foreground group-hover:text-blue-800 dark:text-blue-300">
+        <p className="line-clamp-2 min-h-[2.5rem] text-sm font-medium leading-tight text-foreground group-hover:text-tienda-800 dark:text-tienda-300">
           {p.nombre}
         </p>
         {(p.marca || p.categoria) && (
@@ -508,7 +508,7 @@ export function ProductCard({
       </Link>
 
       <div className="mt-2 flex items-center justify-between gap-2">
-        <span className="font-semibold tabular-nums text-blue-800 dark:text-blue-300 [font-family:var(--font-display)]">
+        <span className="font-semibold tabular-nums text-tienda-800 dark:text-tienda-300 [font-family:var(--font-display)]">
           {p.precio_cents > 0 ? formatMXN(p.precio_cents) : "A cotizar"}
         </span>
         <div className="flex shrink-0 items-center gap-1.5">

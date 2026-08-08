@@ -34,9 +34,9 @@ export function PasePickup({ folio, pagada }: { folio: string; pagada: boolean }
   }
 
   return (
-    <div className="mt-5 overflow-hidden rounded-2xl border border-blue-200 dark:border-blue-900 bg-blue-50/50 dark:bg-blue-950/40">
-      <div className="flex items-center justify-between gap-3 border-b border-blue-100 dark:border-blue-900 px-4 py-3">
-        <span className="text-xs font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-300">
+    <div className="mt-5 overflow-hidden rounded-2xl border border-tienda-200 dark:border-tienda-900 bg-tienda-50/50 dark:bg-tienda-950/40">
+      <div className="flex items-center justify-between gap-3 border-b border-tienda-100 dark:border-tienda-900 px-4 py-3">
+        <span className="text-xs font-semibold uppercase tracking-wide text-tienda-700 dark:text-tienda-300">
           Pase de recolección
         </span>
         <span
@@ -57,7 +57,7 @@ export function PasePickup({ folio, pagada }: { folio: string; pagada: boolean }
         </p>
 
         <div className="mt-4 flex items-start gap-2 text-sm text-foreground">
-          <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
+          <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-tienda-600 dark:text-tienda-400" />
           <span>{TIENDA.direccion}</span>
         </div>
         <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">
@@ -70,14 +70,14 @@ export function PasePickup({ folio, pagada }: { folio: string; pagada: boolean }
             href={TIENDA.mapsUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex h-10 items-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+            className="inline-flex h-10 items-center gap-2 rounded-xl bg-tienda-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-tienda-700"
           >
             <Navigation className="h-4 w-4" />
             Cómo llegar
           </a>
           <button
             onClick={compartir}
-            className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-xl border border-border bg-background px-4 text-sm font-semibold text-foreground transition-colors hover:border-blue-300 dark:border-blue-800 hover:text-blue-700 dark:text-blue-300"
+            className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-xl border border-border bg-background px-4 text-sm font-semibold text-foreground transition-colors hover:border-tienda-300 dark:border-tienda-800 hover:text-tienda-700 dark:text-tienda-300"
           >
             {copiado ? <Check className="h-4 w-4 text-green-600 dark:text-green-400" /> : <Share2 className="h-4 w-4" />}
             {copiado ? "Copiado" : "Compartir con quien recoge"}

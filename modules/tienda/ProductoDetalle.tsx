@@ -68,7 +68,7 @@ export function ProductoDetalle({
     <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
       <Link
         href="/tienda"
-        className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-blue-700 dark:text-blue-300"
+        className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-tienda-700 dark:text-tienda-300"
       >
         <ArrowLeft className="h-4 w-4" />
         Catálogo
@@ -76,7 +76,7 @@ export function ProductoDetalle({
 
       <div className="mt-5 grid gap-8 md:grid-cols-2">
         {/* Image */}
-        <div className="flex aspect-square items-center justify-center overflow-hidden rounded-3xl border border-blue-100 dark:border-blue-900 bg-background">
+        <div className="flex aspect-square items-center justify-center overflow-hidden rounded-3xl border border-tienda-100 dark:border-tienda-900 bg-background">
           {p.imagen ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -85,7 +85,7 @@ export function ProductoDetalle({
               className="h-full w-full object-contain p-4"
             />
           ) : (
-            <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-blue-50 to-slate-50 text-blue-300">
+            <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-tienda-50 to-slate-50 text-tienda-300">
               <Smartphone className="h-24 w-24" />
             </div>
           )}
@@ -94,7 +94,7 @@ export function ProductoDetalle({
         {/* Info */}
         <div>
           {p.categoria && (
-            <span className="text-xs font-medium uppercase tracking-wide text-blue-600 dark:text-blue-400">
+            <span className="text-xs font-medium uppercase tracking-wide text-tienda-600 dark:text-tienda-400">
               {p.categoria}
             </span>
           )}
@@ -103,7 +103,7 @@ export function ProductoDetalle({
           </h1>
 
           <div className="mt-4 flex flex-wrap items-center gap-3">
-            <span className="text-3xl font-semibold tabular-nums text-blue-800 dark:text-blue-300 [font-family:var(--font-display)]">
+            <span className="text-3xl font-semibold tabular-nums text-tienda-800 dark:text-tienda-300 [font-family:var(--font-display)]">
               {p.precio_cents > 0 ? formatMXN(p.precio_cents) : "A cotizar"}
             </span>
             <span
@@ -158,7 +158,7 @@ export function ProductoDetalle({
 
           <div className="mt-5 space-y-2 text-xs text-muted-foreground">
             <p className="flex items-start gap-2">
-              <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" />
+              <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-tienda-500" />
               <span>
                 <strong className="text-foreground">
                   {TIENDA.garantiaDias} días de garantía
@@ -167,7 +167,7 @@ export function ProductoDetalle({
               </span>
             </p>
             <p className="flex items-start gap-2">
-              <Truck className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" />
+              <Truck className="mt-0.5 h-4 w-4 shrink-0 text-tienda-500" />
               <span>
                 Envíos a todo México · entrega en{" "}
                 <strong className="text-foreground">
@@ -193,7 +193,7 @@ export function ProductoDetalle({
                 key={r.id}
                 href={`/tienda/${r.id}`}
                 className={cn(
-                  "group flex flex-col rounded-2xl border border-border bg-background p-3 transition-all hover:border-blue-300 dark:border-blue-800 hover:shadow-lg hover:shadow-blue-900/5",
+                  "group flex flex-col rounded-2xl border border-border bg-background p-3 transition-all hover:border-tienda-300 dark:border-tienda-800 hover:shadow-lg hover:shadow-tienda-900/5",
                   !r.disponible && "opacity-75",
                 )}
               >
@@ -207,7 +207,7 @@ export function ProductoDetalle({
                       className="h-full w-full object-contain"
                     />
                   ) : (
-                    <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-blue-50 to-slate-50 text-blue-400 transition-colors group-hover:text-blue-500">
+                    <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-tienda-50 to-slate-50 text-tienda-400 transition-colors group-hover:text-tienda-500">
                       <Smartphone className="h-8 w-8" />
                     </div>
                   )}
@@ -215,7 +215,7 @@ export function ProductoDetalle({
                 <p className="line-clamp-2 min-h-[2.5rem] text-sm font-medium leading-tight text-foreground">
                   {r.nombre}
                 </p>
-                <span className="mt-1 font-semibold tabular-nums text-blue-800 dark:text-blue-300 [font-family:var(--font-display)]">
+                <span className="mt-1 font-semibold tabular-nums text-tienda-800 dark:text-tienda-300 [font-family:var(--font-display)]">
                   {r.precio_cents > 0 ? formatMXN(r.precio_cents) : "A cotizar"}
                 </span>
               </Link>

@@ -58,8 +58,8 @@ export function PagoSection({
                 // a label) made its whole grid row taller than the rest.
                 "flex min-h-[5.5rem] cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border p-3 text-center transition-colors",
                 activo
-                  ? "border-blue-500 bg-blue-50/60 dark:bg-blue-950/40 text-blue-800 dark:text-blue-300"
-                  : "border-border text-muted-foreground hover:border-blue-200 dark:border-blue-900",
+                  ? "border-tienda-500 bg-tienda-50/60 dark:bg-tienda-950/40 text-tienda-800 dark:text-tienda-300"
+                  : "border-border text-muted-foreground hover:border-tienda-200 dark:border-tienda-900",
               )}
             >
               {/* Fixed-height brand row so logos of different aspect ratios and
@@ -190,7 +190,7 @@ function Campo({
         inputMode={inputMode}
         placeholder={placeholder}
         autoComplete="off"
-        className="h-11 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-blue-400"
+        className="h-11 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-tienda-400"
       />
     </label>
   );

@@ -219,7 +219,7 @@ export function CheckoutView() {
           </p>
           <Link
             href="/tienda"
-            className="inline-flex h-11 items-center rounded-xl bg-blue-600 px-5 text-sm font-semibold text-white hover:bg-blue-700"
+            className="inline-flex h-11 items-center rounded-xl bg-tienda-600 px-5 text-sm font-semibold text-white hover:bg-tienda-700"
           >
             Ir al catálogo
           </Link>
@@ -232,7 +232,7 @@ export function CheckoutView() {
     <Wrap>
       <Link
         href="/tienda"
-        className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-blue-700 dark:text-blue-300"
+        className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-tienda-700 dark:text-tienda-300"
       >
         <ArrowLeft className="h-4 w-4" />
         Seguir comprando
@@ -282,8 +282,8 @@ export function CheckoutView() {
 
           {recoger ? (
             <Card titulo="Recoger en tienda">
-              <div className="flex items-start gap-3 rounded-xl bg-blue-50/60 dark:bg-blue-950/40 p-3">
-                <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
+              <div className="flex items-start gap-3 rounded-xl bg-tienda-50/60 dark:bg-tienda-950/40 p-3">
+                <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-tienda-600 dark:text-tienda-400" />
                 <div className="text-sm text-foreground">
                   <p className="font-medium text-foreground">{TIENDA.direccion}</p>
                   <p className="mt-0.5 text-xs text-muted-foreground">{TIENDA.horario}</p>
@@ -304,7 +304,7 @@ export function CheckoutView() {
                 <select
                   value={estado}
                   onChange={(e) => setEstado(e.target.value)}
-                  className="h-11 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-blue-400"
+                  className="h-11 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-tienda-400"
                 >
                   <option value="">Elige…</option>
                   {ESTADOS.map((e) => (
@@ -346,10 +346,10 @@ export function CheckoutView() {
                       onClick={() => setEnvio(o)}
                       className={cn(
                         "flex w-full cursor-pointer items-center gap-3 rounded-xl border p-3 text-left transition-colors",
-                        sel ? "border-blue-500 bg-blue-50/60 dark:bg-blue-950/40" : "border-border hover:border-blue-200 dark:border-blue-900",
+                        sel ? "border-tienda-500 bg-tienda-50/60 dark:bg-tienda-950/40" : "border-border hover:border-tienda-200 dark:border-tienda-900",
                       )}
                     >
-                      <span className={cn("flex h-5 w-5 shrink-0 items-center justify-center rounded-full border", sel ? "border-blue-600 bg-blue-600 text-white" : "border-border")}>
+                      <span className={cn("flex h-5 w-5 shrink-0 items-center justify-center rounded-full border", sel ? "border-tienda-600 bg-tienda-600 text-white" : "border-border")}>
                         {sel && <Check className="h-3 w-3" />}
                       </span>
                       <span className="min-w-0 flex-1">
@@ -367,7 +367,7 @@ export function CheckoutView() {
                     </button>
                   );
                 })}
-                <button onClick={cotizar} disabled={cotizando} className="cursor-pointer text-xs font-medium text-blue-700 dark:text-blue-300 hover:underline">
+                <button onClick={cotizar} disabled={cotizando} className="cursor-pointer text-xs font-medium text-tienda-700 dark:text-tienda-300 hover:underline">
                   Volver a cotizar
                 </button>
               </div>
@@ -396,7 +396,7 @@ export function CheckoutView() {
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={l.imagen} alt={l.nombre} className="h-full w-full object-contain" />
                     ) : (
-                      <span className="flex h-full w-full items-center justify-center text-blue-300">
+                      <span className="flex h-full w-full items-center justify-center text-tienda-300">
                         <Smartphone className="h-5 w-5" />
                       </span>
                     )}
@@ -431,14 +431,14 @@ export function CheckoutView() {
               </div>
               <div className="flex items-baseline justify-between border-t border-border pt-2">
                 <dt className="font-semibold text-foreground">Total</dt>
-                <dd className="text-xl font-semibold tabular-nums text-blue-800 dark:text-blue-300">{formatMXN(total)}</dd>
+                <dd className="text-xl font-semibold tabular-nums text-tienda-800 dark:text-tienda-300">{formatMXN(total)}</dd>
               </div>
             </dl>
 
             <button
               onClick={pagar}
               disabled={!datosListos || !envioListo || !tarjetaLista || pagando}
-              className="mt-4 flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-blue-600 text-sm font-semibold text-white shadow-sm shadow-blue-600/30 transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none"
+              className="mt-4 flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-tienda-600 text-sm font-semibold text-white shadow-sm shadow-tienda-600/30 transition-colors hover:bg-tienda-700 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none"
             >
               {pagando && <Loader2 className="h-4 w-4 animate-spin" />}
               {pagando
@@ -465,7 +465,7 @@ export function CheckoutView() {
             )}
 
             <p className="mt-3 flex items-start gap-1.5 text-[11px] leading-relaxed text-muted-foreground">
-              <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-500" />
+              <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-tienda-500" />
               {TIENDA.garantiaDias} días de garantía por defecto de fábrica,{" "}
               {TIENDA.garantiaCondicion}.
             </p>
@@ -498,7 +498,7 @@ function EntregaTile({
       onClick={onClick}
       className={cn(
         "flex cursor-pointer flex-col gap-1 rounded-xl border p-3 text-left transition-colors",
-        activo ? "border-blue-500 bg-blue-50/60 dark:bg-blue-950/40 text-blue-800 dark:text-blue-300" : "border-border text-muted-foreground hover:border-blue-200 dark:border-blue-900",
+        activo ? "border-tienda-500 bg-tienda-50/60 dark:bg-tienda-950/40 text-tienda-800 dark:text-tienda-300" : "border-border text-muted-foreground hover:border-tienda-200 dark:border-tienda-900",
       )}
     >
       <Icon className="h-5 w-5" />
@@ -542,7 +542,7 @@ function Field({
         inputMode={inputMode}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="h-11 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-blue-400"
+        className="h-11 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-tienda-400"
       />
       {hint && <span className="mt-1 block text-[11px] text-muted-foreground">{hint}</span>}
     </label>
