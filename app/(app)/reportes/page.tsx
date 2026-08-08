@@ -10,6 +10,8 @@ import { BarHorizontal } from "@/components/charts/BarHorizontal";
 
 type MonthSale = {
   created_at: string;
+  /** Set only on a fiado that was paid off; that is the day it counts. */
+  settled_at: string | null;
   total_cents: number;
   sale_items: {
     qty: number;
@@ -58,20 +60,42 @@ export default async function ReportesPage() {
   const insforge = await createInsForgeServerClient();
   const since = new Date(Date.now() - 30 * 86_400_000).toISOString();
 
-  const [{ data: monthData }, { data: pendingData }, { data: productData }] =
-    await Promise.all([
+  const [
+    { data: directasData },
+    { data: liquidadasData },
+    { data: pendingData },
+    { data: productData },
+  ] = await Promise.all([
+      // A sale counts on the day the money arrived, which for a fiado is the
+      // day it was settled — not the day the note was written. Filtering
+      // everything by created_at put a June note that was paid in August into
+      // June's revenue, and made August look like a slower month than it was.
+      //
+      // Two queries because they key off different columns. /caja and the MCP
+      // reports already split this way; this screen was the one left behind.
       insforge.database
         .from("sales")
         .select(
-          "created_at, total_cents, sale_items(qty, unit_price_cents, products(name, sku, cost_cents))",
+          "created_at, settled_at, total_cents, sale_items(qty, unit_price_cents, products(name, sku, cost_cents))",
         )
         .eq("status", "completed")
+        .is("settled_at", null)
         .gte("created_at", since),
+      insforge.database
+        .from("sales")
+        .select(
+          "created_at, settled_at, total_cents, sale_items(qty, unit_price_cents, products(name, sku, cost_cents))",
+        )
+        .eq("status", "completed")
+        .gte("settled_at", since),
       insforge.database.from("sales").select("total_cents").eq("status", "pending"),
       insforge.database.from("products").select("quantity").eq("is_active", true),
     ]);
 
-  const sales = (monthData ?? []) as unknown as MonthSale[];
+  const sales = [
+    ...((directasData ?? []) as unknown as MonthSale[]),
+    ...((liquidadasData ?? []) as unknown as MonthSale[]),
+  ];
   const pending = (pendingData ?? []) as { total_cents: number }[];
   const products = (productData ?? []) as { quantity: number }[];
 
@@ -100,7 +124,8 @@ export default async function ReportesPage() {
   const top = new Map<string, { name: string; qty: number; revenue: number }>();
 
   for (const s of sales) {
-    const when = new Date(s.created_at);
+    // settled_at when there is one: that is the day the cash landed.
+    const when = new Date(s.settled_at ?? s.created_at);
     revMonth += s.total_cents;
     if (when >= startToday) revToday += s.total_cents;
     if (when >= weekAgo) revWeek += s.total_cents;
