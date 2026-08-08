@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -75,7 +75,24 @@ export function TiendaView({
   const [pending, start] = useTransition();
   const [texto, setTexto] = useState(q);
 
-  useEffect(() => setTexto(q), [q]);
+  // The last query we asked the server for.
+  //
+  // The server echoes q back on every navigation, and adopting it
+  // unconditionally overwrites whatever the customer has typed since — the
+  // round trip takes long enough on a phone that they are always mid-word. The
+  // box then jumps back to an older value under their fingers and the next
+  // keystrokes land in the wrong place: typing "Note 10" produced "Note 1p0".
+  //
+  // So only adopt q when it did NOT come from our own navigation, which leaves
+  // exactly the cases where the URL is the authority: back/forward, or a
+  // filter chip clearing the search.
+  const pedido = useRef(q);
+
+  useEffect(() => {
+    if (q === pedido.current) return;
+    pedido.current = q;
+    setTexto(q);
+  }, [q]);
 
   function go(next: Record<string, string | null>) {
     const sp = new URLSearchParams(params.toString());
@@ -84,12 +101,21 @@ export function TiendaView({
       else sp.set(k, v);
     }
     if (!("page" in next)) sp.delete("page");
-    start(() => router.push(`/tienda?${sp.toString()}`, { scroll: false }));
+    if ("q" in next) pedido.current = next.q ?? "";
+    // replace, not push, when the query changed: a search-as-you-type that
+    // pushes leaves one history entry per pause, so Back from a product walks
+    // the customer through every half-typed word instead of leaving the shop.
+    const url = `/tienda?${sp.toString()}`;
+    start(() =>
+      "q" in next
+        ? router.replace(url, { scroll: false })
+        : router.push(url, { scroll: false }),
+    );
   }
 
   // Debounced search — typing navigates without a submit.
   useEffect(() => {
-    if (texto === q) return;
+    if (texto === pedido.current) return;
     const t = setTimeout(() => go({ q: texto || null }), 400);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
