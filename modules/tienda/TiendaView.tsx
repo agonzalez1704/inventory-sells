@@ -17,6 +17,8 @@ import {
   Clock,
   MapPin,
   Zap,
+  SlidersHorizontal,
+  ChevronDown,
 } from "lucide-react";
 import { formatMXN } from "@/lib/money";
 import { cn } from "@/lib/utils";
@@ -123,6 +125,11 @@ export function TiendaView({
 
   const filtrando = Boolean(q || marca || cat || cal);
   const sinResultados = productos.length === 0;
+  // The search box is not counted: the customer can read their own query in it.
+  const filtrosActivos = [marca, cat, cal].filter(Boolean).length;
+  // Open when a filter is already on, so arriving on a filtered link doesn't
+  // look like an unexplained short list.
+  const [verFiltros, setVerFiltros] = useState(filtrosActivos > 0);
 
   return (
     <div className="mx-auto max-w-6xl px-4 pb-4 sm:px-6">
@@ -250,12 +257,42 @@ export function TiendaView({
           )}
         </div>
 
-        {/* Filters left, results right. Below lg the aside stacks on top, so
-            phones keep the familiar chips-above-grid flow; from lg it's a
-            sticky 220px rail. Quality first — it's the customer's #1 question
-            and what competitors surface as top-level nav. */}
+        {/* On a phone the filters used to stack ABOVE the grid, so searching
+            filled the screen with three rows of chips and pushed the products
+            the customer just asked for below the fold. They answer a question
+            nobody has yet at that moment — the search box was the question.
+            So below lg they collapse behind a button and the results start
+            immediately; from lg there is room for both and the aside is a
+            sticky rail, unchanged. */}
+        <button
+          type="button"
+          onClick={() => setVerFiltros((v) => !v)}
+          aria-expanded={verFiltros}
+          className="mt-3 inline-flex w-full cursor-pointer items-center justify-between gap-2 rounded-xl border border-border bg-background px-3.5 py-2.5 text-sm font-medium lg:hidden"
+        >
+          <span className="inline-flex items-center gap-2">
+            <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
+            Filtros
+            {/* A collapsed panel must never hide that a filter is on: without
+                this the customer sees a short result list and no reason why. */}
+            {filtrosActivos > 0 && (
+              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-tienda-600 px-1.5 text-[11px] font-semibold text-white">
+                {filtrosActivos}
+              </span>
+            )}
+          </span>
+          <ChevronDown
+            className={cn("h-4 w-4 text-muted-foreground transition-transform", verFiltros && "rotate-180")}
+          />
+        </button>
+
         <div className="mt-3 lg:grid lg:grid-cols-[220px_1fr] lg:gap-8">
-          <aside className="mb-4 space-y-4 lg:mb-0 lg:sticky lg:top-4 lg:self-start">
+          <aside
+            className={cn(
+              "mb-4 space-y-4 lg:mb-0 lg:block lg:sticky lg:top-4 lg:self-start",
+              verFiltros ? "block" : "hidden",
+            )}
+          >
             {calidades.length > 1 && (
               <FacetRow
                 label="Calidad"
