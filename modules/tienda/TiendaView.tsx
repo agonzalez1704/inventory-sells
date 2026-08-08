@@ -153,7 +153,12 @@ export function TiendaView({
           aria-hidden
           className="pointer-events-none absolute -bottom-28 -left-16 h-80 w-80 rounded-full bg-tienda-400/20 blur-3xl"
         />
-        <div className="relative px-6 py-10 sm:px-10 sm:py-14 md:max-w-[52%]">
+        <div
+          className={cn(
+            "relative px-6 pt-10 sm:px-10 sm:py-14 md:max-w-[52%]",
+            filtrando ? "pb-5 sm:pb-14" : "pb-10",
+          )}
+        >
           <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-medium text-tienda-50">
             <BadgeCheck className="h-3.5 w-3.5" />
             Calidad original y genérica
@@ -189,8 +194,18 @@ export function TiendaView({
           </div>
 
           {/* Quantified promises — competitors state a delivery time instead of
-              just "we ship". No free-shipping claim: see lib/tienda-info.ts. */}
-          <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-xs text-tienda-100">
+              just "we ship". No free-shipping claim: see lib/tienda-info.ts.
+              Hidden on a phone once the customer is searching: they cost ~95px
+              directly under the box, which is the space the results need, and
+              the same three facts are repeated as cards further down. They stay
+              on every wider screen, and on the phone whenever nobody is
+              searching — which is when they do their selling. */}
+          <div
+            className={cn(
+              "mt-5 flex-wrap gap-x-5 gap-y-2 text-xs text-tienda-100",
+              filtrando ? "hidden sm:flex" : "flex",
+            )}
+          >
             <span className="inline-flex items-center gap-1.5">
               <Clock className="h-4 w-4" /> Entrega en {TIENDA.entregaDias}
             </span>
