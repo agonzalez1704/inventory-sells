@@ -47,7 +47,7 @@ Lo que Next necesita antes de que exista una sesión o una consulta: el
 query los volvería dinámicos y más lentos, a cambio de nada.
 
 ```
-NEXT_PUBLIC_MARCA=fiable | refaccionaria
+NEXT_PUBLIC_MARCA=fiable | ruli
 ```
 
 Un único módulo `lib/marca.ts` lee esa variable y expone todo lo demás:
@@ -114,7 +114,7 @@ aparte.
 6. `sw.js`: título por defecto neutro.
 7. Nombre comercial del agente → `config_negocio`.
 
-**Verificación:** levantar con `NEXT_PUBLIC_MARCA=refaccionaria` y comprobar
+**Verificación:** levantar con `NEXT_PUBLIC_MARCA=ruli` y comprobar
 título, manifest, logo y colores; después con `fiable` y comprobar que **nada**
 cambió respecto de hoy.
 
@@ -136,7 +136,7 @@ cambió respecto de hoy.
 
    | Variable | fiable | refaccionaria |
    |---|---|---|
-   | `NEXT_PUBLIC_MARCA` | fiable | refaccionaria |
+   | `NEXT_PUBLIC_MARCA` | `fiable` | `ruli` (`refaccionaria` sigue funcionando como alias) |
    | `NEGOCIO` | fiable | refaccionaria |
    | `NEXT_PUBLIC_INSFORGE_URL` | base A | base B |
    | `INSFORGE_API_KEY` / `ANON_KEY` | A | B |

@@ -130,12 +130,35 @@ const MARCAS: Record<MarcaId, Marca> = {
   },
 };
 
-const pedida = process.env.NEXT_PUBLIC_MARCA;
+const pedida = process.env.NEXT_PUBLIC_MARCA?.trim().toLowerCase();
 
-// Unknown or unset falls back to fiable — the business running today. A typo in
-// an env var should not produce a nameless app.
-export const MARCA: Marca =
-  (pedida && MARCAS[pedida as MarcaId]) || MARCAS.fiable;
+// The deploy guide told the team to set NEXT_PUBLIC_MARCA=refaccionaria while
+// the code only ever knew "ruli", so Ruli's deploy resolved to Fiable and had
+// been serving Fiable's name, colours and favicon. Both spellings are accepted
+// rather than making anyone go and edit a variable in Vercel to un-break a
+// live deploy.
+const ALIAS: Record<string, MarcaId> = {
+  fiable: "fiable",
+  ruli: "ruli",
+  refaccionaria: "ruli",
+};
+
+// Unset falls back to fiable: that is local development and the checkout, and
+// a missing variable there should not stop anyone working.
+//
+// Set to something unrecognised THROWS, which fails the build. The old code
+// fell back here too, and quietly — the cost of that convenience was one
+// business running for weeks under the other's brand, on a value nobody could
+// see was wrong because everything still rendered. A failed deploy names the
+// problem in one line; a silent fallback hands the wrong shop to the wrong
+// customer.
+if (pedida && !ALIAS[pedida]) {
+  throw new Error(
+    `NEXT_PUBLIC_MARCA="${pedida}" no existe. Usa: ${Object.keys(ALIAS).join(", ")}.`,
+  );
+}
+
+export const MARCA: Marca = MARCAS[(pedida && ALIAS[pedida]) || "fiable"];
 
 /** The --brand* block for this brand, injected into the root layout. */
 export function brandCssVars(): string {
