@@ -14,6 +14,7 @@ export default async function InventarioPage() {
   const puedeGestionar = admin || perms.has("inventario_gestionar");
   const verCostos = admin || perms.has("costos_ver");
   const puedePrecios = admin || perms.has("precios_gestionar");
+  const verVentas = admin || perms.has("ventas_ver");
 
   const insforge = await createInsForgeServerClient();
   // First page + aggregates. The full catalog used to arrive here and be
@@ -23,7 +24,7 @@ export default async function InventarioPage() {
     insforge.database
       .from("products")
       .select(
-        "id, inventory_id, sku, name, category, brand, size, price_cents, quantity, etiqueta, image_url",
+        "id, inventory_id, sku, name, category, brand, size, price_cents, quantity, etiqueta, image_url, ventas_anuales",
         { count: "exact" },
       )
       .eq("is_active", true)
@@ -54,6 +55,7 @@ export default async function InventarioPage() {
         puedeGestionar={puedeGestionar}
         verCostos={verCostos}
         puedePrecios={puedePrecios}
+        verVentas={verVentas}
       />
     </>
   );

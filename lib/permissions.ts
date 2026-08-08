@@ -19,6 +19,7 @@ export const PERMISOS = [
   "inventario_gestionar",
   "precios_gestionar",
   "costos_ver",
+  "ventas_ver",
   "corte_ver",
   "facturar",
   "devoluciones",
@@ -56,6 +57,7 @@ export const CATALOGO_PERMISOS: {
     permisos: [
       { key: "precios_gestionar", label: "Gestionar precios", desc: "Listas de precio y precios base." },
       { key: "costos_ver", label: "Ver costos y márgenes", desc: "Información sensible de rentabilidad." },
+      { key: "ventas_ver", label: "Ver ventas anuales", desc: "Columna de rotación en Inventario: cuántas piezas se vendieron en el año." },
       { key: "corte_ver", label: "Ver corte y reportes", desc: "Corte de caja y reportes financieros." },
       { key: "facturar", label: "Facturar", desc: "Emitir CFDI." },
       { key: "devoluciones", label: "Devoluciones y anulaciones", desc: "Devolver productos y anular ventas." },

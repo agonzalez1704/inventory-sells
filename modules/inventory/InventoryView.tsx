@@ -49,7 +49,7 @@ export type InventoryRow = Pick<
   | "quantity"
   | "etiqueta"
   | "image_url"
->;
+> & { ventas_anuales?: number | null };
 
 function StockCell({ qty }: { qty: number }) {
   // Color carries the meaning: red = sold out, amber = low, default = healthy.
@@ -115,7 +115,7 @@ function ExportMenu({ verCostos }: { verCostos: boolean }) {
   );
 }
 
-const SORT_KEYS = ["sku", "name", "category", "price", "quantity"] as const;
+const SORT_KEYS = ["sku", "name", "category", "price", "quantity", "ventas"] as const;
 type SortKey = (typeof SORT_KEYS)[number];
 type Sort = { key: SortKey; dir: "asc" | "desc" };
 
@@ -127,6 +127,9 @@ function compareRows(a: InventoryRow, b: InventoryRow, key: SortKey): number {
       return a.price_cents - b.price_cents;
     case "quantity":
       return a.quantity - b.quantity;
+    case "ventas":
+      // Never imported sorts last either way: an unknown figure is not a zero.
+      return (a.ventas_anuales ?? -1) - (b.ventas_anuales ?? -1);
     case "sku":
       return a.sku.localeCompare(b.sku, "es", { numeric: true, sensitivity: "base" });
     case "name":
@@ -206,6 +209,7 @@ export function InventoryView({
   puedeGestionar,
   verCostos,
   puedePrecios,
+  verVentas,
 }: {
   /** First page, rendered before any query runs. */
   products: InventoryRow[];
@@ -215,6 +219,7 @@ export function InventoryView({
   puedeGestionar: boolean;
   verCostos: boolean;
   puedePrecios: boolean;
+  verVentas: boolean;
 }) {
   // Search, sort and warehouse live in the URL: a refresh (or the reload a new
   // deploy forces) keeps the screen exactly where the user left it, and the
@@ -495,6 +500,16 @@ export function InventoryView({
                 <SortableTh label="Producto" k="name" sort={sort} onSort={toggleSort} />
                 <SortableTh label="Categoría" k="category" sort={sort} onSort={toggleSort} className="hidden sm:table-cell" />
                 <SortableTh label="Precio" k="price" sort={sort} onSort={toggleSort} align="right" className="hidden text-right sm:table-cell" />
+                {verVentas && (
+                  <SortableTh
+                    label="Ventas (año)"
+                    k="ventas"
+                    sort={sort}
+                    onSort={toggleSort}
+                    align="right"
+                    className="hidden text-right sm:table-cell"
+                  />
+                )}
                 <SortableTh label="Stock" k="quantity" sort={sort} onSort={toggleSort} align="right" className="text-right" />
                 <th className="w-10 px-2 py-2 font-medium">
                   <span className="sr-only">Historial</span>
@@ -589,6 +604,17 @@ export function InventoryView({
                   <td className="hidden px-4 py-2.5 text-right font-mono tabular-nums sm:table-cell">
                     {formatMXN(p.price_cents)}
                   </td>
+                  {verVentas && (
+                    <td className="hidden px-4 py-2.5 text-right font-mono tabular-nums sm:table-cell">
+                      {/* A dash, not a zero: most of the catalogue simply has no
+                          figure yet, and "0" would read as "never sold". */}
+                      {p.ventas_anuales == null ? (
+                        <span className="text-muted-foreground">—</span>
+                      ) : (
+                        p.ventas_anuales.toLocaleString("es-MX")
+                      )}
+                    </td>
+                  )}
                   <td className="px-4 py-2.5 text-right">
                     <StockCell qty={p.quantity} />
                   </td>

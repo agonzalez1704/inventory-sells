@@ -29,7 +29,7 @@ async function assertVerCatalogo(): Promise<void> {
 // at 21k products the difference between this and the full row is what the
 // shop's connection has to carry.
 const COLS =
-  "id, inventory_id, sku, name, brand, size, category, price_cents, cost_cents, quantity, etiqueta, image_url";
+  "id, inventory_id, sku, name, brand, size, category, price_cents, cost_cents, quantity, etiqueta, image_url, ventas_anuales";
 
 export type ProductoBuscado = {
   id: string;
@@ -44,6 +44,8 @@ export type ProductoBuscado = {
   quantity: number;
   etiqueta: string | null;
   image_url: string | null;
+  /** Units sold in the year, from the ERP import. Null when never imported. */
+  ventas_anuales: number | null;
 };
 
 export type Filtro = {
@@ -128,6 +130,22 @@ export async function productosPorId(ids: string[]): Promise<ProductoBuscado[]> 
 
 export type OrdenInventario = { key: string; dir: "asc" | "desc" } | null;
 
+// The table's sort keys are not column names — "price" is price_cents, "ventas"
+// is ventas_anuales — and passing one straight to order() sent PostgREST a
+// column that does not exist. The error was swallowed and the list came back
+// empty, so sorting by Precio looked like an inventory with nothing in it.
+//
+// Doubles as the guard that keeps an arbitrary string out of order(): this is a
+// server action, so the client's own list of valid keys is not a constraint.
+const COLUMNA_ORDEN: Record<string, string> = {
+  sku: "sku",
+  name: "name",
+  category: "category",
+  price: "price_cents",
+  quantity: "quantity",
+  ventas: "ventas_anuales",
+};
+
 export type PaginaInventario = { rows: ProductoBuscado[]; total: number };
 
 /**
@@ -159,11 +177,15 @@ export async function paginaInventario(opts: {
       .select(COLS, { count: "exact" })
       .eq("is_active", true);
     if (opts.inventoryId) q = q.eq("inventory_id", opts.inventoryId);
-    q = orden
-      ? q.order(orden.key, { ascending: orden.dir === "asc" })
+    const col = orden ? COLUMNA_ORDEN[orden.key] : null;
+    q = col
+      ? q.order(col, { ascending: orden!.dir === "asc", nullsFirst: false })
       : q.order("name", { ascending: true });
     const desde = (page - 1) * perPage;
-    const { data, count } = await q.range(desde, desde + perPage - 1);
+    const { data, count, error } = await q.range(desde, desde + perPage - 1);
+    // Surfaced rather than swallowed: an empty table that should be full is the
+    // hardest kind of failure to notice.
+    if (error) throw new Error(error.message ?? "No pude leer el inventario");
     return { rows: (data ?? []) as ProductoBuscado[], total: Number(count ?? 0) };
   }
 
@@ -176,8 +198,9 @@ export async function paginaInventario(opts: {
   if (error) throw new Error(error.message ?? "Error al buscar");
 
   let rows = searchProducts((data ?? []) as ProductoBuscado[], opts.query ?? "");
-  if (orden) {
-    const k = orden.key as keyof ProductoBuscado;
+  const colOrden = orden ? COLUMNA_ORDEN[orden.key] : null;
+  if (orden && colOrden) {
+    const k = colOrden as keyof ProductoBuscado;
     rows = [...rows].sort((a, b) => {
       const va = a[k], vb = b[k];
       const c =
