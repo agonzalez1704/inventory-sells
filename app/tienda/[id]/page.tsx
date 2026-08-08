@@ -1,5 +1,15 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { insforgeAdmin } from "@/lib/insforge/admin";
+
+// Not for search results: this catalogue is shared by link, and a crawler
+// walking 21k products across a paginated URL space is what emptied the egress
+// quota. robots.ts blocks the fetch; this covers a crawler that reads the page
+// anyway, or reaches it from a link somewhere else.
+export const metadata: Metadata = {
+  robots: { index: false, follow: false, nocache: true },
+};
+
 import {
   ProductoDetalle,
   type DetalleProducto,
