@@ -106,7 +106,7 @@ export function CompatibleBox({
   }
 
   return (
-    <section className="mx-auto mt-8 max-w-5xl overflow-hidden rounded-2xl border border-tienda-200 dark:border-tienda-900 bg-gradient-to-br from-tienda-50 to-indigo-50/60 text-left">
+    <section className="mx-auto mt-8 max-w-5xl overflow-hidden rounded-2xl border border-tienda-200 dark:border-tienda-900 bg-gradient-to-br from-tienda-50 to-tienda-50/60 text-left">
       <div className="border-b border-tienda-100 dark:border-tienda-900 px-5 py-4">
         <div className="flex items-center gap-2">
           <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-tienda-600 text-white">

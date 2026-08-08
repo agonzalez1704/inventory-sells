@@ -127,7 +127,7 @@ export function TiendaView({
   return (
     <div className="mx-auto max-w-6xl px-4 pb-4 sm:px-6">
       {/* Hero */}
-      <section className="relative mt-4 overflow-hidden rounded-3xl bg-gradient-to-br from-tienda-600 via-tienda-700 to-indigo-800 text-white">
+      <section className="relative mt-4 overflow-hidden rounded-3xl bg-gradient-to-br from-tienda-600 via-tienda-700 to-tienda-800 text-white">
         {/* Product imagery sits on the right; the copy lives in the empty left
             third the image was composed around. Hidden on phones, where it
             would squash the headline. */}
@@ -144,7 +144,7 @@ export function TiendaView({
         </div>
         <div
           aria-hidden
-          className="pointer-events-none absolute -bottom-28 -left-16 h-80 w-80 rounded-full bg-indigo-400/20 blur-3xl"
+          className="pointer-events-none absolute -bottom-28 -left-16 h-80 w-80 rounded-full bg-tienda-400/20 blur-3xl"
         />
         <div className="relative px-6 py-10 sm:px-10 sm:py-14 md:max-w-[52%]">
           <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-medium text-tienda-50">
