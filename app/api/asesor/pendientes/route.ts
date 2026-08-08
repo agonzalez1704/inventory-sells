@@ -10,10 +10,14 @@ export async function GET() {
   if (!userId) return Response.json({ count: 0 });
 
   const insforge = await createInsForgeServerClient();
-  const { data } = await insforge.database
+  // head: the badge needs the number, not the rows. This is the most frequent
+  // query in the app — every page polls it every 10 seconds — so shipping the
+  // matching rows just to call .length on them is the wrong default to leave
+  // lying around, however few of them there are today.
+  const { count } = await insforge.database
     .from("conversaciones")
-    .select("numero")
+    .select("numero", { count: "exact", head: true })
     .eq("estado", "asesor");
 
-  return Response.json({ count: (data as unknown[] | null)?.length ?? 0 });
+  return Response.json({ count: Number(count ?? 0) });
 }

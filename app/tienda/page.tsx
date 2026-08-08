@@ -1,5 +1,5 @@
 import { insforgeAdmin } from "@/lib/insforge/admin";
-import { searchProducts } from "@/lib/search";
+import { searchProducts, tokensDeConsulta, expand } from "@/lib/search";
 import { calidadDe } from "@/lib/calidad";
 import { TiendaView, type PublicProduct } from "@/modules/tienda/TiendaView";
 
@@ -40,59 +40,73 @@ export default async function TiendaPage({
   const cal = sp.cal ?? null;
   const page = Math.max(1, Number(sp.page ?? 1) || 1);
 
-  const { data } = await insforgeAdmin.database
-    .from("products")
-    .select("id, name, brand, category, sku, price_cents, quantity, image_url")
-    .eq("is_active", true);
+  // Facets are counted over the whole catalog so the chips never vanish
+  // mid-browse — in SQL, because doing it here meant reading 21k rows out of
+  // the database to show 24 of them.
+  const { data: fData } = await insforgeAdmin.database.rpc("tienda_facetas");
+  const facetas = (fData ?? []) as { tipo: string; valor: string; n: number }[];
+  const faceta = (tipo: string) =>
+    facetas
+      .filter((f) => f.tipo === tipo)
+      .map((f) => ({ value: f.valor, n: Number(f.n) }))
+      .sort((a, b) => b.n - a.n || a.value.localeCompare(b.value));
+  const marcas = faceta("brand");
+  const categorias = faceta("category");
+  const calidades = faceta("calidad");
 
-  const all = (data ?? []) as Row[];
+  let slice: Row[];
+  let total: number;
+  let current: number;
+  let totalPages: number;
 
-  // Facets come from the whole catalog so the chips never vanish mid-browse.
-  const count = (rows: Row[], key: "brand" | "category") => {
-    const m = new Map<string, number>();
-    for (const r of rows) {
-      const v = r[key];
-      if (v) m.set(v, (m.get(v) ?? 0) + 1);
+  if (q) {
+    // Searching keeps the JS scorer: relevance ranking is shared with the rest
+    // of the app and rewriting it in SQL would drift from it on the first
+    // change to either. The candidate set the database hands over is already
+    // capped, so this reads ~1k rows rather than the catalog.
+    const { data } = await insforgeAdmin.database.rpc("buscar_productos_candidatos", {
+      p_tokens: tokensDeConsulta(q).map(expand),
+      p_inventory_id: null,
+      p_categoria: cat,
+      p_limit: 1000,
+    });
+    const filtered = searchProducts((data ?? []) as Row[], q).filter(
+      (p) =>
+        (!marca || p.brand === marca) &&
+        (!cat || p.category === cat) &&
+        (!cal || calidadDe(p.name) === cal),
+    );
+    total = filtered.length;
+    totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
+    current = Math.min(page, totalPages);
+    slice = filtered.slice((current - 1) * PER_PAGE, current * PER_PAGE);
+  } else {
+    // Browsing has no relevance to preserve, so the database filters, orders,
+    // counts and slices, and only the 24 rows on screen travel.
+    const pagina = async (p: number) => {
+      const { data } = await insforgeAdmin.database.rpc("tienda_lista", {
+        p_marca: marca,
+        p_categoria: cat,
+        p_calidad: cal,
+        p_limit: PER_PAGE,
+        p_offset: (p - 1) * PER_PAGE,
+      });
+      return (data ?? []) as (Row & { total: number })[];
+    };
+
+    let rows = await pagina(page);
+    current = page;
+    // A hand-edited ?page= past the end comes back empty, which would render as
+    // "no hay productos" on a catalog that has plenty. Fall back to the first.
+    if (rows.length === 0 && page > 1) {
+      rows = await pagina(1);
+      current = 1;
     }
-    return [...m.entries()]
-      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-      .map(([value, n]) => ({ value, n }));
-  };
-  const marcas = count(all, "brand");
-  const categorias = count(all, "category");
-
-  // Quality (Original/OLED/Incell/AAA) is read from the name — the customer's
-  // first question, so it's a facet like brand.
-  const calCount = new Map<string, number>();
-  for (const p of all) {
-    const c = calidadDe(p.name);
-    if (c) calCount.set(c, (calCount.get(c) ?? 0) + 1);
+    total = Number(rows[0]?.total ?? 0);
+    totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
+    current = Math.min(current, totalPages);
+    slice = rows;
   }
-  const calidades = [...calCount.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .map(([value, n]) => ({ value, n }));
-
-  // Search (brand-alias aware) → facet filters → in-stock/priced ordering.
-  const matched = searchProducts(all, q);
-  const filtered = matched.filter(
-    (p) =>
-      (!marca || p.brand === marca) &&
-      (!cat || p.category === cat) &&
-      (!cal || calidadDe(p.name) === cal),
-  );
-  const ordered = q
-    ? filtered // keep relevance order when searching
-    : [...filtered].sort(
-        (a, b) =>
-          Number(b.quantity > 0) - Number(a.quantity > 0) ||
-          Number(b.price_cents > 0) - Number(a.price_cents > 0) ||
-          a.name.localeCompare(b.name),
-      );
-
-  const total = ordered.length;
-  const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
-  const current = Math.min(page, totalPages);
-  const slice = ordered.slice((current - 1) * PER_PAGE, current * PER_PAGE);
 
   const productos: PublicProduct[] = slice.map((p) => ({
     id: p.id,
