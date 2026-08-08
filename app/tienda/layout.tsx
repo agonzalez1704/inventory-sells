@@ -21,7 +21,14 @@ const display = Poppins({
 });
 
 export const metadata: Metadata = {
-  title: "Lead Displays — Pantallas y refacciones para celular",
+  // The template names the shop once, for every page under /tienda. A product
+  // page only has to say what it is — and it can't accidentally introduce
+  // itself as "Fiable", which is what this app is called internally, not what
+  // the storefront is called to a customer.
+  title: {
+    default: "Lead Displays — Pantallas y refacciones para celular",
+    template: "%s | Lead Displays",
+  },
   description:
     "Catálogo de pantallas, baterías y refacciones para tu celular. Explora modelos y disponibilidad.",
 };

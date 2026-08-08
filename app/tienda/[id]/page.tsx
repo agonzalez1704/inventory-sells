@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { insforgeAdmin } from "@/lib/insforge/admin";
-import { MARCA } from "@/lib/marca";
 
 import {
   ProductoDetalle,
@@ -28,9 +27,11 @@ export async function generateMetadata({
   if (!p || !p.is_active) return { robots: { index: false, follow: false } };
 
   const titulo = [p.name, p.brand].filter(Boolean).join(" · ");
+  // The shop's name comes from the layout's title template, not from MARCA —
+  // that one is the internal app name and the customer has never heard it.
   return {
-    title: `${titulo} | ${MARCA.nombre}`,
-    description: [p.name, p.brand, p.category, `Disponible en ${MARCA.nombre}.`]
+    title: titulo,
+    description: [p.name, p.brand, p.category, "Consulta disponibilidad y precio."]
       .filter(Boolean)
       .join(" · "),
     openGraph: { title: titulo, type: "website" },
