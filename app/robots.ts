@@ -1,21 +1,28 @@
 import type { MetadataRoute } from "next";
+import { urlBase } from "@/lib/url";
 
-// Nothing here is meant to be crawled. The app behind /(app) needs a session
-// anyway, and the two public routes are shared by link with a specific person:
-// /tienda from a WhatsApp conversation, /cotizacion/<token> with the customer
-// the quote belongs to.
+// The storefront is meant to be found. Everything else is not: /(app) needs a
+// session, and /cotizacion/<token> is shared with the one customer whose quote
+// it is — a quote has no business turning up in a search result.
 //
-// This exists for a second reason. /tienda is a catalogue with 21k products
-// and a paginated URL space, so a crawler walking it is a crawler reading the
-// database thousands of times over — that is what exhausted the egress quota.
-// The page is far cheaper now, but a Disallow stops the traffic instead of
-// making it affordable.
-//
-// Anything already indexed keeps its entry: a blocked page can't be re-read,
-// so the noindex on /tienda never reaches the crawler. Use Search Console's
-// removal tool if an old URL has to go now.
+// The query strings are blocked deliberately, and it is the whole point of
+// this file. /tienda takes marca, cat, cal and page, which multiply into a URL
+// space with no natural end: every combination is a distinct page, each one a
+// database read, and a crawler will happily walk all of them. That is the
+// shape of the traffic that emptied the egress quota. Products are reachable
+// through the sitemap by their own path instead, so blocking the filters costs
+// no coverage.
 export default function robots(): MetadataRoute.Robots {
   return {
-    rules: [{ userAgent: "*", disallow: "/" }],
+    rules: [
+      {
+        userAgent: "*",
+        allow: ["/tienda", "/tienda/"],
+        // "/*?" matches any URL carrying a query string. Order-independent,
+        // which matters: ?cat=x&page=2 and ?page=2&cat=x are the same trap.
+        disallow: ["/", "/*?"],
+      },
+    ],
+    sitemap: `${urlBase()}/sitemap.xml`,
   };
 }

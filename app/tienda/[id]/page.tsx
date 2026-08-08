@@ -1,14 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { insforgeAdmin } from "@/lib/insforge/admin";
-
-// Not for search results: this catalogue is shared by link, and a crawler
-// walking 21k products across a paginated URL space is what emptied the egress
-// quota. robots.ts blocks the fetch; this covers a crawler that reads the page
-// anyway, or reaches it from a link somewhere else.
-export const metadata: Metadata = {
-  robots: { index: false, follow: false, nocache: true },
-};
+import { MARCA } from "@/lib/marca";
 
 import {
   ProductoDetalle,
@@ -17,6 +10,32 @@ import {
 } from "@/modules/tienda/ProductoDetalle";
 
 export const dynamic = "force-dynamic";
+
+// Without this every product page carries the root title, which is indexed but
+// unfindable — nobody searches for the shop by name to reach one part.
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  const { data } = await insforgeAdmin.database
+    .from("products")
+    .select("name, brand, category, is_active")
+    .eq("id", id)
+    .maybeSingle();
+  const p = data as Pick<Row, "name" | "brand" | "category" | "is_active"> | null;
+  if (!p || !p.is_active) return { robots: { index: false, follow: false } };
+
+  const titulo = [p.name, p.brand].filter(Boolean).join(" · ");
+  return {
+    title: `${titulo} | ${MARCA.nombre}`,
+    description: [p.name, p.brand, p.category, `Disponible en ${MARCA.nombre}.`]
+      .filter(Boolean)
+      .join(" · "),
+    openGraph: { title: titulo, type: "website" },
+  };
+}
 
 type Row = {
   id: string;
