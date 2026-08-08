@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { MapPin, Navigation, Share2, Check, Clock } from "lucide-react";
 import { TIENDA } from "@/lib/tienda-info";
+import { MARCA } from "@/lib/marca";
 
 // The pickup "pass" the customer forwards to whoever collects — usually an Uber
 // driver who navigates to the store and gives the folio. So it carries the two
@@ -14,7 +15,7 @@ export function PasePickup({ folio, pagada }: { folio: string; pagada: boolean }
   async function compartir() {
     const url = typeof window !== "undefined" ? window.location.href : "";
     const texto = [
-      `Recoge mi pedido ${folio} en Lead Displays`,
+      `Recoge mi pedido ${folio} en ${MARCA.tienda.nombre}`,
       TIENDA.direccion,
       `Horario: ${TIENDA.horario}`,
       `Cómo llegar: ${TIENDA.mapsUrl}`,

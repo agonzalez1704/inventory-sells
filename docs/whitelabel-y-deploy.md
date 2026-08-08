@@ -21,12 +21,15 @@ todo el trabajo: proveedores, compras, FIFO, corte de caja, agente de WhatsApp.
 | `modules/agent/inventory-agent.ts` | el prompt dice "tienda … (Fiable)" | runtime |
 | `modules/notifications/actions.ts`, `InventoryPdf.tsx`, `BarVertical.tsx`, `sin-acceso/page.tsx`, `api/[transport]/route.ts` | textos sueltos | mixto |
 | `lib/tienda-info.ts` | dirección, horario, garantía — **datos del negocio**, no marca | build hoy |
-| `app/tienda/layout.tsx`, `app/cotizacion/page.tsx` | ya usan **otra** marca: "Lead Displays" | build |
+| ~~`app/tienda/layout.tsx`, `app/cotizacion/page.tsx`~~ | ~~ya usan **otra** marca: "Lead Displays"~~ → resuelto: `MARCA.tienda` | build |
 
 Dos cosas que esto revela:
 
 1. **Ya hay dos marcas conviviendo**: el back-office es "Fiable" y el storefront
-   público es "Lead Displays". El whitelabel no parte de cero.
+   público es "Lead Displays". El whitelabel no parte de cero. Eso ya está
+   modelado: `MARCA.nombre` es el nombre interno y `MARCA.tienda.nombre` el
+   público, porque el cliente nunca ha oído el primero. Cualquier texto que lea
+   un cliente toma el segundo.
 2. **`config_negocio` ya existe en la BD** (el agente lee de ahí la info del
    negocio). Como cada negocio tendrá su propia base, esa tabla es el lugar
    natural para todo lo que no necesite estar en el build.

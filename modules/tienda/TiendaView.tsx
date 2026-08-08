@@ -24,6 +24,7 @@ import { TIENDA } from "@/lib/tienda-info";
 import { AddToCart } from "./AddToCart";
 import { CompatibleBox } from "./CompatibleBox";
 import { logoDeMarca } from "./marca-logo";
+import { MARCA } from "@/lib/marca";
 
 export type PublicProduct = {
   id: string;
@@ -38,7 +39,7 @@ export type PublicProduct = {
 export type Facet = { value: string; n: number };
 
 function waHref(nombre: string, whatsapp: string | null) {
-  const text = encodeURIComponent(`Hola Lead Displays, me interesa: ${nombre}`);
+  const text = encodeURIComponent(`Hola ${MARCA.tienda.nombre}, me interesa: ${nombre}`);
   return whatsapp ? `https://wa.me/${whatsapp}?text=${text}` : `https://wa.me/?text=${text}`;
 }
 

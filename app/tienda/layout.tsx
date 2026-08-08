@@ -12,6 +12,7 @@ import {
 import { TIENDA } from "@/lib/tienda-info";
 import { CartProvider } from "@/modules/tienda/CartProvider";
 import { CartButton } from "@/modules/tienda/CartDrawer";
+import { MARCA } from "@/lib/marca";
 
 const display = Poppins({
   subsets: ["latin"],
@@ -26,29 +27,34 @@ export const metadata: Metadata = {
   // itself as "Fiable", which is what this app is called internally, not what
   // the storefront is called to a customer.
   title: {
-    default: "Lead Displays — Pantallas y refacciones para celular",
-    template: "%s | Lead Displays",
+    default: `${MARCA.tienda.nombre} — ${MARCA.tienda.tagline}`,
+    template: `%s | ${MARCA.tienda.nombre}`,
   },
-  description:
-    "Catálogo de pantallas, baterías y refacciones para tu celular. Explora modelos y disponibilidad.",
+  description: MARCA.tienda.descripcion,
 };
+
+// Two-tone on the first space, so a two-word shop name keeps the split without
+// the name having to be stored pre-cut. A single-word name simply renders whole.
+const [PRIMERA, ...RESTO] = MARCA.tienda.nombre.split(" ");
+const SEGUNDA = RESTO.join(" ");
 
 function Wordmark({ light = false }: { light?: boolean }) {
   return (
-    <Link href="/tienda" className="flex items-center gap-2" aria-label="Lead Displays">
+    <Link href="/tienda" className="flex items-center gap-2" aria-label={MARCA.tienda.nombre}>
       <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm shadow-blue-600/30">
         <MonitorSmartphone className="h-5 w-5" />
       </span>
       <span className="text-lg font-semibold tracking-tight [font-family:var(--font-display)]">
-        <span className={light ? "text-blue-300" : "text-blue-700 dark:text-blue-300"}>Lead</span>{" "}
-        <span className={light ? "text-white" : "text-foreground"}>Displays</span>
+        <span className={light ? "text-blue-300" : "text-blue-700 dark:text-blue-300"}>{PRIMERA}</span>
+        {SEGUNDA ? " " : null}
+        <span className={light ? "text-white" : "text-foreground"}>{SEGUNDA}</span>
       </span>
     </Link>
   );
 }
 
 function waHref(whatsapp: string | null) {
-  const text = encodeURIComponent("Hola Lead Displays, me interesa una refacción");
+  const text = encodeURIComponent(`Hola ${MARCA.tienda.nombre}, me interesa una refacción`);
   return whatsapp ? `https://wa.me/${whatsapp}?text=${text}` : `https://wa.me/?text=${text}`;
 }
 
@@ -171,7 +177,7 @@ export default function TiendaLayout({
         </div>
         <div className="border-t border-blue-100 dark:border-blue-900">
           <p className="mx-auto max-w-6xl px-4 py-4 text-center text-xs text-muted-foreground sm:px-6">
-            © Lead Displays. Precios sujetos a disponibilidad.
+            © {MARCA.tienda.nombre}. Precios sujetos a disponibilidad.
           </p>
         </div>
       </footer>

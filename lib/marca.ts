@@ -29,6 +29,12 @@ export type Marca = {
   /** How the inventory header values stock when nobody has chosen in Configuración:
    *  Ruli reads it as what the stock cost, Fiable as what it is worth to sell. */
   valorBase: ValorBase;
+  /** The public storefront's own identity.
+   *
+   *  Deliberately separate from `nombre`: that one is what the staff call this
+   *  app, and a customer has never heard it. Fiable's shop is Lead Displays,
+   *  and every customer-facing string has to reach for this one instead. */
+  tienda: { nombre: string; tagline: string; descripcion: string };
 };
 
 const MARCAS: Record<MarcaId, Marca> = {
@@ -47,6 +53,12 @@ const MARCAS: Record<MarcaId, Marca> = {
     themeColor: "#0f172a",
     icono: "/icono-fiable.svg",
     valorBase: "venta",
+    tienda: {
+      nombre: "Lead Displays",
+      tagline: "Pantallas y refacciones para celular",
+      descripcion:
+        "Catálogo de pantallas, baterías y refacciones para tu celular. Explora modelos y disponibilidad.",
+    },
   },
   ruli: {
     id: "ruli",
@@ -64,6 +76,12 @@ const MARCAS: Record<MarcaId, Marca> = {
     themeColor: "#1f2937",
     icono: "/icono-ruli.svg",
     valorBase: "costo",
+    tienda: {
+      nombre: "Refaccionaria Ruli",
+      tagline: "Refacciones y autopartes",
+      descripcion:
+        "Catálogo de refacciones y autopartes. Consulta modelos, precios y disponibilidad.",
+    },
   },
 };
 

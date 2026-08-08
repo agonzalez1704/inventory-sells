@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import { CheckoutView } from "@/modules/tienda/CheckoutView";
+import { MARCA } from "@/lib/marca";
 
 export const metadata: Metadata = {
-  title: "Finalizar compra — Lead Displays",
+  title: `Finalizar compra — ${MARCA.tienda.nombre}`,
   robots: { index: false }, // a checkout has nothing to index
 };
 

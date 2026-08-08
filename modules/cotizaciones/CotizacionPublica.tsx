@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { CheckCircle2, Clock, Loader2, ShieldCheck, ShoppingCart, XCircle } from "lucide-react";
 import { formatMXN } from "@/lib/money";
+import { MARCA } from "@/lib/marca";
 import {
   cargarCotizacionPublica,
   aceptarCotizacionPublica,
@@ -19,7 +20,7 @@ function Shell({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-[#f5f8ff] px-4 py-8 text-foreground">
       <div className="mx-auto max-w-lg space-y-4">
         <div className="text-center">
-          <h1 className="text-lg font-semibold tracking-tight">Lead Displays</h1>
+          <h1 className="text-lg font-semibold tracking-tight">{MARCA.tienda.nombre}</h1>
         </div>
         {children}
       </div>

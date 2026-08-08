@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { calidadDe, marcoDe, CALIDAD_LABEL } from "@/lib/calidad";
 import { TIENDA } from "@/lib/tienda-info";
 import { AddToCart } from "./AddToCart";
+import { MARCA } from "@/lib/marca";
 
 export type DetalleProducto = {
   id: string;
@@ -39,7 +40,7 @@ function calidadLabel(n: string): string | null {
 }
 
 function waHref(nombre: string, whatsapp: string | null) {
-  const text = encodeURIComponent(`Hola Lead Displays, me interesa: ${nombre}`);
+  const text = encodeURIComponent(`Hola ${MARCA.tienda.nombre}, me interesa: ${nombre}`);
   return whatsapp
     ? `https://wa.me/${whatsapp}?text=${text}`
     : `https://wa.me/?text=${text}`;
