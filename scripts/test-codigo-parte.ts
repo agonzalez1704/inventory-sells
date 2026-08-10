@@ -18,6 +18,15 @@ const CATALOGO = [
   { sku: "SHNC4501", name: "HORQUILLA INF DER ALUMINIO C/ROTULA", brand: null },
   { sku: "SHNA0112", name: "HORQ INF DER RIO 16-17", brand: null },
   { sku: "OP-03712101GA", name: "BOMBA DE AGUA POINTER", brand: null },
+  // Same SHN prefix, and the NAME mentions an 07 model year. These flooded the
+  // register when "SHN 07" was read as two independent tokens: sixty control
+  // arms for other cars, on top of the codes the seller asked for.
+  { sku: "SHNC2603", name: "HORQ INF DER C/ROT C/B SILVERADO 07-18 1500", brand: null },
+  { sku: "SHNN3201", name: "HORQ INF DER C/ROT C/BUJES ALTIMA 07-12 2.5L", brand: null },
+  { sku: "SHNH0311", name: "HORQ INF DER C/ROT C/BUJES CR-V 07-11 2.4L", brand: null },
+  { sku: "SHNN1401", name: "HORQ INF DER C/ROT C/BUJES SENTRA 07-12 B-16", brand: null },
+  // Ends in 07 without being the 07 family — an anchored rule must skip it.
+  { sku: "SHNC2607", name: "HORQ INF IZQ INVENTADA PARA LA PRUEBA", brand: null },
   { sku: "FILTR0088", name: "FILTRO ACEITE VERSA 12-19", brand: null },
 ];
 
@@ -77,6 +86,29 @@ if (!patrones.some((t) => t.includes("%"))) {
   console.error(`✗ expand() no produjo un patrón para el pre-filtro SQL: ${patrones.join(", ")}`);
 } else {
   console.log(`✓ el pre-filtro SQL recibe: ${patrones.join(", ")}`);
+}
+
+// The reported noise, pinned: a code search must not match a model year in the
+// name. This is the whole difference between "SHN 07" being useful and being a
+// wall of parts for other cars.
+for (const q of ["shn07", "shn 07", "shn-07", "shn*07"]) {
+  const ruido = CATALOGO.filter((p) => scoreProduct(p, q) > 0).filter(
+    (p) => !/^shn[a-z]*07/.test(p.sku.toLowerCase()),
+  );
+  if (ruido.length) {
+    fallos++;
+    console.error(`✗ "${q}" trajo por año de modelo: ${ruido.map((p) => p.sku).join(", ")}`);
+  } else {
+    console.log(`✓ "${q}" no trae nada por el año del nombre`);
+  }
+}
+
+// A name-and-year search is not a code search and must keep working.
+if (!CATALOGO.filter((p) => scoreProduct(p, "sentra 07") > 0).some((p) => p.sku === "SHNN1401")) {
+  fallos++;
+  console.error("✗ \"sentra 07\" dejó de encontrar la Sentra por nombre");
+} else {
+  console.log("✓ \"sentra 07\" sigue encontrando por nombre y año");
 }
 
 // Writing the letter must still narrow: "shna 07" is the A family, not every

@@ -125,6 +125,17 @@ function weight(term: string, idx: Index): number {
  * Only used when the strict reading found nothing, so no query that works today
  * changes its answer.
  */
+/**
+ * Does this product's code read as `letras` + optional sub-family + `numero`?
+ *
+ * Anchored on purpose: the number has to start where the digits of the code
+ * start. A plain substring would let "SHN 07" match SHNC2607, which is not the
+ * 07 family — it just ends in those two digits.
+ */
+function codigoCoincide(letras: string, numero: string, sku: string): boolean {
+  return new RegExp(`^${letras}[a-z]*${numero}`).test(sku);
+}
+
 function unirCodigo(tokens: string[]): string | null {
   if (tokens.length !== 2) return null;
   const [a, b] = tokens;
@@ -165,10 +176,7 @@ function tokenScore(token: string, idx: Index): number {
     // 1 also ranks it below an exact code (2) and below a clean prefix (1.5),
     // which is right: this is the loosest way a code can match.
     const m = CODIGO_PARTE.exec(term);
-    if (m) {
-      const suelto = new RegExp(`(^|[^a-z0-9])${m[1]}[a-z]*${m[2]}`);
-      if (suelto.test(idx.sku) || suelto.test(idx.compact)) return 1;
-    }
+    if (m && codigoCoincide(m[1], m[2], idx.sku)) return 1;
   }
   return 0;
 }
@@ -192,13 +200,26 @@ export function scoreProduct(p: Searchable, query: string): number {
     score += s;
   }
 
-  // Nothing matched every token. Before giving up, read a lone
-  // letters-then-number pair as one part code: the seller typed the separator
-  // the shelf label has.
+  // A lone letters-then-number pair, where the letters open THIS product's
+  // code, is a code search: the number has to be in the code too.
+  //
+  // Without this, "SHN 07" matched every SHN part whose NAME mentions an 07
+  // model — a Silverado 07-18, an Altima 07-12, a CR-V 07-11 — because "07" is
+  // a whole token of those names. Sixty right-hand control arms for other cars,
+  // burying the 07 codes the seller asked for.
+  //
+  // Only when the letters open the code. "sentra 07" is not a code — no SKU
+  // starts with "sentra" — so it keeps matching a Sentra by name and year.
+  const par = unirCodigo(tokens);
+  if (par && idx.sku.startsWith(tokens[0])) {
+    return codigoCoincide(tokens[0], tokens[1], idx.sku) ? 2 : 0;
+  }
+
+  // Nothing matched every token. Before giving up, read the pair as one part
+  // code: the seller typed the separator the shelf label has.
   if (falla) {
-    const junto = unirCodigo(tokens);
-    if (!junto) return 0;
-    const s = tokenScore(junto, idx);
+    if (!par) return 0;
+    const s = tokenScore(par, idx);
     if (s === 0) return 0;
     score = s;
   }
