@@ -48,8 +48,21 @@ const QUERY_STOPWORDS = new Set([
   "vendes",
 ]);
 
+// A part code typed without its sub-family letter: "shn07" for SHNA0711.
+//
+// The counter knows a family as letters plus a number; the ERP slots a letter
+// between them (SHN**A**0711, SHN**C**4501) and nobody memorises which. As a
+// plain substring "shn07" is in none of them, so the search answered "Sin
+// resultados" for a code the seller was reading off the shelf.
+const CODIGO_PARTE = /^([a-z]+)(\d+)$/;
+
 export function expand(token: string): string[] {
-  return [token, ...(ALIASES.get(token) ?? [])];
+  const alias = ALIASES.get(token) ?? [];
+  const m = CODIGO_PARTE.exec(token);
+  // The extra term is a LIKE pattern, not a literal. normalize() drops every
+  // non-alphanumeric character, so a customer can never type a % themselves —
+  // this is the only place one enters the query.
+  return m ? [token, `${m[1]}%${m[2]}`, ...alias] : [token, ...alias];
 }
 
 /**
@@ -103,6 +116,9 @@ function weight(term: string, idx: Index): number {
 // Score one query token against a product. 0 = no match.
 function tokenScore(token: string, idx: Index): number {
   for (const term of expand(token)) {
+    // The SQL pre-filter's wildcard form; the rule below covers it here.
+    if (term.includes("%")) continue;
+
     // Exact token hit — the safest signal.
     if (idx.tokens.has(term)) return weight(term, idx);
 
@@ -120,6 +136,21 @@ function tokenScore(token: string, idx: Index): number {
 
     // Joined spelling: "note12" → "note 12".
     if (idx.compact.includes(term)) return 1;
+
+    // Part code missing its sub-family letter: "shn07" → SHNA0711.
+    //
+    // A flat 1, not weight() minus something: weight() looks for the literal
+    // term, which by definition is not in the row — that is the whole point of
+    // this rule — so it always answered 1, and subtracting left 0, which the
+    // caller reads as "no match". The rule silently did nothing.
+    //
+    // 1 also ranks it below an exact code (2) and below a clean prefix (1.5),
+    // which is right: this is the loosest way a code can match.
+    const m = CODIGO_PARTE.exec(term);
+    if (m) {
+      const suelto = new RegExp(`(^|[^a-z0-9])${m[1]}[a-z]*${m[2]}`);
+      if (suelto.test(idx.sku) || suelto.test(idx.compact)) return 1;
+    }
   }
   return 0;
 }
