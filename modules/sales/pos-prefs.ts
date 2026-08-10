@@ -4,6 +4,7 @@ import { auth } from "@clerk/nextjs/server";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
 import { permisosDe } from "@/lib/auth/profile";
 import { attempt, type ActionResult } from "@/lib/errors";
+import { guardarPrefs } from "@/lib/prefs";
 
 export type PrecioBase = "venta" | "costo";
 
@@ -45,13 +46,12 @@ export async function setPrecioBasePos(base: PrecioBase): Promise<ActionResult<n
     }
 
     const insforge = await createInsForgeServerClient();
-    // Delete-then-insert, like notification_prefs: the SDK has no upsert and
-    // the row is one column, so there is nothing to lose by replacing it.
-    await insforge.database.from("pos_prefs").delete().eq("user_id", userId);
-    const { error } = await insforge.database
-      .from("pos_prefs")
-      .insert([{ user_id: userId, precio_base: base }]);
-    if (error) throw new Error(error.message ?? "No se pudo guardar");
+    await guardarPrefs(
+      insforge.database as never,
+      "pos_prefs",
+      userId,
+      { precio_base: base },
+    );
     return null;
   });
 }

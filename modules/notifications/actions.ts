@@ -5,6 +5,7 @@ import { getProfile } from "@/lib/auth/profile";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
 import { pushToUsers, DEFAULT_PREFS, type NotifKind } from "@/lib/push";
 import { MARCA } from "@/lib/marca";
+import { guardarPrefs } from "@/lib/prefs";
 
 export type WebPushSub = {
   endpoint: string;
@@ -94,12 +95,9 @@ export async function saveNotifPrefs(prefs: NotifPrefs): Promise<void> {
     abono: !!prefs.abono,
     cancelacion: !!prefs.cancelacion,
   };
-  await insforge.database
-    .from("notification_prefs")
-    .delete()
-    .eq("user_id", userId);
-  const { error } = await insforge.database
-    .from("notification_prefs")
-    .insert([row]);
-  if (error) throw new Error(error.message ?? "No se pudieron guardar");
+  // Same bug pos_prefs hit: RLS here has no DELETE policy, so the delete this
+  // used to do matched nothing and the insert then collided with the row that
+  // was still there — fine the first time an admin saved, broken every time
+  // after.
+  await guardarPrefs(insforge.database as never, "notification_prefs", userId, row);
 }
