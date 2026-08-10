@@ -113,6 +113,24 @@ function weight(term: string, idx: Index): number {
   return 1;
 }
 
+/**
+ * "SHN 07", "SHN-07", "SHN*07" — the same part code with something between the
+ * prefix and the number.
+ *
+ * There is nothing to choose between those separators: normalize() turns every
+ * non-alphanumeric run into a space, so all three arrive here as the same two
+ * tokens. What stopped them matching was the rule one line down — a pure number
+ * must match a whole stored token, and "07" is not a token of "shna0711".
+ *
+ * Only used when the strict reading found nothing, so no query that works today
+ * changes its answer.
+ */
+function unirCodigo(tokens: string[]): string | null {
+  if (tokens.length !== 2) return null;
+  const [a, b] = tokens;
+  return /^[a-z]+$/.test(a) && /^\d+$/.test(b) ? a + b : null;
+}
+
 // Score one query token against a product. 0 = no match.
 function tokenScore(token: string, idx: Index): number {
   for (const term of expand(token)) {
@@ -164,10 +182,25 @@ export function scoreProduct(p: Searchable, query: string): number {
 
   const idx = buildIndex(p);
   let score = 0;
+  let falla = false;
   for (const token of tokens) {
     const s = tokenScore(token, idx);
-    if (s === 0) return 0;
+    if (s === 0) {
+      falla = true;
+      break;
+    }
     score += s;
+  }
+
+  // Nothing matched every token. Before giving up, read a lone
+  // letters-then-number pair as one part code: the seller typed the separator
+  // the shelf label has.
+  if (falla) {
+    const junto = unirCodigo(tokens);
+    if (!junto) return 0;
+    const s = tokenScore(junto, idx);
+    if (s === 0) return 0;
+    score = s;
   }
 
   // Reward the whole query appearing in the model name, and an exact name.

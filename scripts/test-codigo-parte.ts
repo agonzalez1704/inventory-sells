@@ -33,6 +33,26 @@ const casos: { q: string; espera: string[]; nota: string }[] = [
     nota: "el código completo sigue funcionando",
   },
   { q: "shn45", espera: ["SHNC4501"], nota: "otra subfamilia, misma regla" },
+  {
+    q: "shn 07",
+    espera: ["SHNA0711", "SHNA0712", "SHNA0701"],
+    nota: "separado con espacio",
+  },
+  {
+    q: "shn-07",
+    espera: ["SHNA0711", "SHNA0712", "SHNA0701"],
+    nota: "separado con guion — normalize() lo vuelve un espacio",
+  },
+  {
+    q: "shn*07",
+    espera: ["SHNA0711", "SHNA0712", "SHNA0701"],
+    nota: "separado con asterisco — el mismo token que las otras dos",
+  },
+  {
+    q: "shna 07",
+    espera: ["SHNA0711", "SHNA0712", "SHNA0701"],
+    nota: "con la letra y separado: acota a la subfamilia A",
+  },
   { q: "shna0712", espera: ["SHNA0712"], nota: "un código exacto no se diluye" },
   { q: "filtro aceite", espera: ["FILTR0088"], nota: "la búsqueda por palabras no cambia" },
 ];
@@ -57,6 +77,15 @@ if (!patrones.some((t) => t.includes("%"))) {
   console.error(`✗ expand() no produjo un patrón para el pre-filtro SQL: ${patrones.join(", ")}`);
 } else {
   console.log(`✓ el pre-filtro SQL recibe: ${patrones.join(", ")}`);
+}
+
+// Writing the letter must still narrow: "shna 07" is the A family, not every
+// sub-family whose number starts 07. Losing this makes the separator pointless.
+if (CATALOGO.filter((p) => scoreProduct(p, "shna 07") > 0).some((p) => !p.sku.startsWith("SHNA"))) {
+  fallos++;
+  console.error("✗ \"shna 07\" trajo subfamilias que no son A");
+} else {
+  console.log("✓ \"shna 07\" se queda dentro de la subfamilia A");
 }
 
 // A code the shop does not carry must still come back empty.
