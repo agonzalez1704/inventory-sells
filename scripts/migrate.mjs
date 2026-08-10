@@ -12,7 +12,12 @@
 //
 //   node scripts/migrate.mjs --negocio=fiable      apply pending migrations
 //   node scripts/migrate.mjs --negocio=ruli --dry  list them without applying
-//   node scripts/migrate.mjs --check               compare both databases
+//   node scripts/migrate.mjs --check               compare production databases
+//
+// An entry may carry "check": false to stay out of --check. That is for
+// throwaway environments (a Kapso sandbox, a demo): they get migrated on
+// demand, but holding a scratch database level with production would fail the
+// pre-deploy gate over something nobody ships.
 //
 // Credentials live in .insforge/negocios.json, which is gitignored along with
 // the rest of .insforge:
@@ -81,13 +86,18 @@ function locales() {
 
 function check(cfgs) {
   const local = locales();
-  const estado = Object.entries(cfgs).map(([nombre, cfg]) => {
+  const produccion = Object.entries(cfgs).filter(([, cfg]) => cfg.check !== false);
+  const fuera = Object.entries(cfgs).filter(([, cfg]) => cfg.check === false);
+  const estado = produccion.map(([nombre, cfg]) => {
     const remoto = aplicadas(cfg);
     const faltan = local.filter((m) => ![...remoto].some((r) => m.startsWith(r.slice(0, 14))));
     return { nombre, aplicadas: remoto.size, faltan };
   });
 
   console.log(`Migraciones locales: ${local.length}\n`);
+  for (const [nombre] of fuera) {
+    console.log(`·  ${nombre}: fuera del check ("check": false)`);
+  }
   for (const e of estado) {
     const ok = e.faltan.length === 0;
     console.log(`${ok ? "✓" : "✗"} ${e.nombre}: ${e.aplicadas} aplicadas${ok ? "" : `, faltan ${e.faltan.length}`}`);
@@ -113,6 +123,13 @@ if (arg("check")) {
 } else {
   const negocio = valor("negocio");
   const cfg = cfgs[negocio];
+  if (cfg && JSON.stringify(cfg).includes("REEMPLAZAR")) {
+    console.error(
+      `"${negocio}" en .insforge/negocios.json todavía tiene valores REEMPLAZAR.\n` +
+        `Crea el proyecto en el dashboard de InsForge y pega su project.json ahí.`,
+    );
+    process.exit(1);
+  }
   if (!cfg) {
     console.error(`Usa --negocio=<${Object.keys(cfgs).join("|")}> o --check`);
     process.exit(1);

@@ -171,3 +171,41 @@ cambió respecto de hoy.
   dominio) que requiere accesos que el equipo tiene, no yo.
 
 Después de esto, **E1 y E2 se escriben una sola vez**.
+
+---
+
+## Entorno desechable (sandbox de Kapso, demos)
+
+`.insforge/negocios.json` ya tiene una entrada `sandbox` con los campos en
+`REEMPLAZAR`. Pega ahí el `project.json` del proyecto InsForge que crees en el
+dashboard y corre:
+
+```bash
+node scripts/migrate.mjs --negocio=sandbox
+```
+
+Mientras queden `REEMPLAZAR`, el script se detiene y lo dice en vez de fallar
+con un error de autenticación.
+
+La entrada lleva `"check": false`, así que `--check` la ignora. Eso es a
+propósito: `--check` es la reja antes de desplegar, y exigir que una base
+desechable esté al día con producción la haría fallar por algo que nadie
+publica.
+
+**El sandbox necesita su propia base.** Apuntarlo a la de producción no es
+"solo leer": el agente de WhatsApp **escribe** — crea cotizaciones
+(`agregar_a_cotizacion_whatsapp`) y da de alta clientes en `customers` — y cada
+mensaje de prueba entra a la bandeja que ven los vendedores.
+
+Además de las variables de Kapso (`KAPSO_API_KEY`, `KAPSO_PHONE_NUMBER_ID`,
+`KAPSO_WEBHOOK_SECRET`, y `KAPSO_API_BASE_URL` si el sandbox tiene otro host):
+
+- `NEXT_PUBLIC_APP_URL` al dominio del sandbox, o los links de cotización que
+  manda el bot apuntan a producción.
+- `NEXT_PUBLIC_MARCA` con un valor válido (`fiable` | `ruli`); uno desconocido
+  ahora truena el build.
+- El webhook se registra **del lado de Kapso**, apuntando a
+  `<sandbox>/api/webhooks/kapso`. El `secret_key` lo genera quien llama a
+  `crearWebhookMensajes()` y tiene que ser idéntico a `KAPSO_WEBHOOK_SECRET`, o
+  todo entra con 403.
+- Cargarle catálogo, o el agente contesta que no tiene nada.
