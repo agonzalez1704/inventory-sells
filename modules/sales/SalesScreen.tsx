@@ -27,6 +27,8 @@ import { CustomerPicker, type PickerCustomer } from "@/modules/customers/Custome
 import { CompatPanel } from "@/modules/compat/CompatPanel";
 import { PaymentSheet } from "./PaymentSheet";
 import { ProductoSheet } from "./ProductoSheet";
+import { CategoriaSheet } from "./CategoriaSheet";
+import type { CategoriaConteo } from "@/modules/inventory/buscar";
 import { useLongPress } from "./useLongPress";
 import type { PrecioBase } from "./pos-prefs";
 import { registerSale, registerLoan, type PagoSplit } from "./actions";
@@ -265,8 +267,9 @@ export function SalesScreen({
   /** First page of the catalog, rendered before any search runs. */
   products: SalesProduct[];
   /** Counted in SQL — deriving these needs the whole catalog, which is the
-   *  thing we stopped shipping. */
-  categorias: string[];
+   *  thing we stopped shipping. The count is what decides which ones are worth
+   *  a chip: Ruli has 216 and they are opaque ERP codes. */
+  categorias: CategoriaConteo[];
   customers: PickerCustomer[];
   /** Gates cost and margin in the detail sheet — the same permiso as elsewhere. */
   verCostos: boolean;
@@ -293,6 +296,26 @@ export function SalesScreen({
   // itself from the server while the sheet is open, and an id would point at a
   // row that is no longer in the page.
   const [detalle, setDetalle] = useState<SalesProduct | null>(null);
+  const [catsAbiertas, setCatsAbiertas] = useState(false);
+
+  // Chips are for the categories people actually reach for. On Ruli the twelve
+  // biggest cover 16,680 of 19,237 products — 87% — and rendering all 216 is
+  // what buried the product grid under a wall of five-letter codes.
+  //
+  // The selected one is pinned in even when it is not in the top twelve, or
+  // picking from the sheet would leave nothing on screen showing what is on.
+  const CHIPS = 12;
+  const chips = useMemo(() => {
+    const orden = [...categorias].sort(
+      (a, b) => b.productos - a.productos || a.categoria.localeCompare(b.categoria, "es"),
+    );
+    const top = orden.slice(0, CHIPS);
+    if (categoria && !top.some((c) => c.categoria === categoria)) {
+      const elegida = orden.find((c) => c.categoria === categoria);
+      if (elegida) return [elegida, ...top.slice(0, CHIPS - 1)];
+    }
+    return top;
+  }, [categorias, categoria]);
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [pending, startTransition] = useTransition();
 
@@ -467,21 +490,34 @@ export function SalesScreen({
             />
           </div>
 
-          {/* Category chips */}
+          {/* One scrolling line, never a wrapping block: this row must not be
+              allowed to grow, whether the shop has 6 categories or 216. */}
           {categorias.length > 1 && (
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              <CatChip active={categoria === null} onClick={() => setCategoria(null)}>
-                Todos
-              </CatChip>
-              {categorias.map((c) => (
-                <CatChip
-                  key={c}
-                  active={categoria === c}
-                  onClick={() => setCategoria(categoria === c ? null : c)}
-                >
-                  {c}
+            <div className="mt-3 flex items-center gap-1.5">
+              <div className="flex flex-1 gap-1.5 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <CatChip active={categoria === null} onClick={() => setCategoria(null)}>
+                  Todos
                 </CatChip>
-              ))}
+                {chips.map((c) => (
+                  <CatChip
+                    key={c.categoria}
+                    active={categoria === c.categoria}
+                    onClick={() =>
+                      setCategoria(categoria === c.categoria ? null : c.categoria)
+                    }
+                  >
+                    {c.categoria}
+                  </CatChip>
+                ))}
+              </div>
+              {categorias.length > CHIPS && (
+                <button
+                  onClick={() => setCatsAbiertas(true)}
+                  className="shrink-0 cursor-pointer rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-ring/40 hover:text-foreground"
+                >
+                  Todas ({categorias.length})
+                </button>
+              )}
             </div>
           )}
 
@@ -681,6 +717,15 @@ export function SalesScreen({
         onConfirm={(metodo, pagos) => submit(metodo, pagos)}
       />
 
+      {catsAbiertas && (
+        <CategoriaSheet
+          categorias={categorias}
+          activa={categoria}
+          onPick={setCategoria}
+          onClose={() => setCatsAbiertas(false)}
+        />
+      )}
+
       <ProductoSheet
         p={detalle}
         verCostos={verCostos}
@@ -704,7 +749,7 @@ function CatChip({
     <button
       onClick={onClick}
       className={cn(
-        "cursor-pointer rounded-full px-3.5 py-1.5 text-xs font-medium capitalize transition-colors",
+        "shrink-0 cursor-pointer whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-medium capitalize transition-colors",
         active
           ? "bg-accent text-white shadow-sm shadow-accent/25"
           : "border border-border bg-background text-muted-foreground hover:border-ring/40 hover:text-foreground",

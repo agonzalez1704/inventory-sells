@@ -63,7 +63,9 @@ export default async function PosPage() {
     is_system: boolean;
   }[];
 
-  const categorias = categoriasData.map((c) => c.categoria);
+  // Counts travel with them: they decide which get a chip and which sit in
+  // the searchable list.
+  const categorias = categoriasData;
 
   return (
     <section className="space-y-6">
