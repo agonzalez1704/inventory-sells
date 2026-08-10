@@ -6,18 +6,29 @@ import { Card } from "@/components/ui/card";
 import { PushToggle } from "@/components/push-toggle";
 import { NotifPrefs } from "@/modules/notifications/NotifPrefs";
 import { getNotifPrefs } from "@/modules/notifications/actions";
-import { Bell } from "lucide-react";
+import { Bell, ScanBarcode } from "lucide-react";
+import { getPermisos } from "@/lib/auth/profile";
+import { getPrecioBasePos } from "@/modules/sales/pos-prefs";
+import { PosPrefs } from "@/modules/sales/PosPrefs";
 
 export default async function ConfiguracionPage() {
   const { userId } = await auth();
   const profile = userId ? await getProfile(userId) : null;
   const isAdmin = profile?.role === "admin";
-  const [info, asesores, valorBase, tienda, notifPrefs] = await Promise.all([
+  // The register's cost view answers to costos_ver, like the cost column and
+  // the inventory valuation. Whoever cannot see costs is not offered a switch
+  // that only has one legal position.
+  const perms = userId ? await getPermisos(userId) : null;
+  const verCostos = Boolean(
+    perms && (perms.has("admin_total") || perms.has("costos_ver")),
+  );
+  const [info, asesores, valorBase, tienda, notifPrefs, precioBasePos] = await Promise.all([
     getNegocioInfo(),
     getAsesoresRaw(),
     getValorBase(),
     getTiendaInfo(),
     isAdmin ? getNotifPrefs() : null,
+    getPrecioBasePos(),
   ]);
 
   return (
@@ -29,6 +40,25 @@ export default async function ConfiguracionPage() {
         tienda={tienda}
         isAdmin={isAdmin}
       />
+
+      {verCostos && (
+        <Card className="p-4">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-soft text-brand-foreground">
+              <ScanBarcode className="h-5 w-5" />
+            </span>
+            <div>
+              <h2 className="text-sm font-semibold">Punto de venta</h2>
+              <p className="text-xs text-muted-foreground">
+                Preferencias tuyas, no del negocio.
+              </p>
+            </div>
+          </div>
+          <div className="mt-3">
+            <PosPrefs inicial={precioBasePos} />
+          </div>
+        </Card>
+      )}
 
       {isAdmin && (
         <Card className="p-4">

@@ -25,6 +25,23 @@ async function assertVerCatalogo(): Promise<void> {
   }
 }
 
+/**
+ * Blank the cost for anyone who may not see it.
+ *
+ * COLS carries cost_cents because the purchase and quote screens need it, and
+ * the register calls the same function — so every seller's browser has been
+ * receiving the cost of everything they search for, whether or not the screen
+ * drew it. Withheld here, once, rather than at each screen: a caller that
+ * forgets leaks it, and this is the only place they all pass through.
+ */
+async function sinCostosSiNoPuede<T extends { cost_cents: number }>(
+  rows: T[],
+): Promise<T[]> {
+  const perms = await permisosDe();
+  if (perms.has("admin_total") || perms.has("costos_ver")) return rows;
+  return rows.map((r) => ({ ...r, cost_cents: 0 }));
+}
+
 // Columns the register and the inventory table need. Deliberately not `*`:
 // at 21k products the difference between this and the full row is what the
 // shop's connection has to carry.
@@ -88,7 +105,7 @@ export async function buscarProductos(f: Filtro): Promise<ProductoBuscado[]> {
     if (f.inventoryId) q = q.eq("inventory_id", f.inventoryId);
     if (f.categoria) q = q.eq("category", f.categoria);
     const { data } = await q;
-    return (data ?? []) as ProductoBuscado[];
+    return sinCostosSiNoPuede((data ?? []) as ProductoBuscado[]);
   }
 
   const { data, error } = await insforge.database.rpc("buscar_productos_candidatos", {
@@ -99,7 +116,7 @@ export async function buscarProductos(f: Filtro): Promise<ProductoBuscado[]> {
   });
   if (error) throw new Error(error.message ?? "Error al buscar");
 
-  const candidatos = (data ?? []) as ProductoBuscado[];
+  const candidatos = await sinCostosSiNoPuede((data ?? []) as ProductoBuscado[]);
   return searchProducts(candidatos, f.query ?? "", {
     limit: limite,
     // Same tie-break the register used when it filtered in the browser:
@@ -125,7 +142,7 @@ export async function productosPorId(ids: string[]): Promise<ProductoBuscado[]> 
   if (limpios.length === 0) return [];
   const insforge = await createInsForgeServerClient();
   const { data } = await insforge.database.from("products").select(COLS).in("id", limpios);
-  return (data ?? []) as ProductoBuscado[];
+  return sinCostosSiNoPuede((data ?? []) as ProductoBuscado[]);
 }
 
 export type OrdenInventario = { key: string; dir: "asc" | "desc" } | null;

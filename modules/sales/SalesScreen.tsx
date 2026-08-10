@@ -26,16 +26,25 @@ import { imprimirTicketNavegador, type TicketData } from "@/lib/ticket";
 import { CustomerPicker, type PickerCustomer } from "@/modules/customers/CustomerPicker";
 import { CompatPanel } from "@/modules/compat/CompatPanel";
 import { PaymentSheet } from "./PaymentSheet";
+import { ProductoSheet } from "./ProductoSheet";
+import { useLongPress } from "./useLongPress";
+import type { PrecioBase } from "./pos-prefs";
 import { registerSale, registerLoan, type PagoSplit } from "./actions";
 
 export type SalesProduct = Pick<
   Product,
   "id" | "sku" | "name" | "brand" | "size" | "category" | "price_cents" | "quantity"
-> & { inventory_name?: string | null; image_url?: string | null };
+> & {
+  inventory_name?: string | null;
+  image_url?: string | null;
+  /** Absent, or 0, for a reader who may not see costs — the server strips it. */
+  cost_cents?: number;
+  etiqueta?: string | null;
+};
 
 const GRID_LIMIT = 30;
 
-function Thumb({
+export function Thumb({
   src,
   alt,
   className,
@@ -62,21 +71,38 @@ function Thumb({
   );
 }
 
-// Grid card (photo-first) — the whole card adds to the order.
+// Grid card (photo-first) — the whole card adds to the order, and holding it
+// opens the detail sheet instead.
 function ProductCard({
   p,
   inCart,
   onAdd,
+  onVerDetalle,
+  precioBase,
 }: {
   p: SalesProduct;
   inCart: number;
   onAdd: () => void;
+  onVerDetalle: () => void;
+  precioBase: PrecioBase;
 }) {
   const soldOut = p.quantity === 0;
   const maxed = inCart >= p.quantity;
+  const { handlers, consumioElTap } = useLongPress(onVerDetalle);
+  const alCosto = precioBase === "costo";
+  const importe = alCosto ? p.cost_cents ?? 0 : p.price_cents;
   return (
     <button
-      onClick={onAdd}
+      // A long press already opened the sheet; the click it leaves behind must
+      // not also drop the product into the sale.
+      onClick={() => {
+        if (consumioElTap()) return;
+        onAdd();
+      }}
+      {...handlers}
+      // Without this the browser's own text-selection callout fires at the same
+      // time and the sheet opens under a selection handle.
+      style={{ WebkitTouchCallout: "none", WebkitUserSelect: "none", userSelect: "none" }}
       disabled={soldOut || maxed}
       className={cn(
         "group relative flex flex-col rounded-2xl border border-border bg-background p-2.5 text-left transition-all",
@@ -112,9 +138,18 @@ function ProductCard({
         </p>
       )}
       <div className="mt-1 flex items-center justify-between gap-1">
-        {p.price_cents ? (
-          <span className="font-mono text-sm font-semibold tabular-nums text-accent">
-            {formatMXN(p.price_cents)}
+        {importe ? (
+          <span
+            className={cn(
+              "font-mono text-sm font-semibold tabular-nums",
+              // Cost is a different number with the same shape as the price,
+              // and confusing the two at the counter charges the wrong amount.
+              // Different colour and an explicit label, not just a swap.
+              alCosto ? "text-amber-700 dark:text-amber-400" : "text-accent",
+            )}
+          >
+            {alCosto && <span className="mr-1 text-[10px] font-medium uppercase">costo</span>}
+            {formatMXN(importe)}
           </span>
         ) : (
           <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700 ring-1 ring-inset ring-amber-600/20 dark:bg-amber-950/40 dark:text-amber-300">
@@ -224,6 +259,8 @@ export function SalesScreen({
   products,
   categorias,
   customers,
+  verCostos,
+  precioBase,
 }: {
   /** First page of the catalog, rendered before any search runs. */
   products: SalesProduct[];
@@ -231,6 +268,10 @@ export function SalesScreen({
    *  thing we stopped shipping. */
   categorias: string[];
   customers: PickerCustomer[];
+  /** Gates cost and margin in the detail sheet — the same permiso as elsewhere. */
+  verCostos: boolean;
+  /** This user's own choice of which figure the cards show. */
+  precioBase: PrecioBase;
 }) {
   const router = useRouter();
   const mostrador = useMemo(
@@ -248,6 +289,10 @@ export function SalesScreen({
   const [mode, setMode] = useState<"venta" | "prestamo">("venta");
   const [customer, setCustomer] = useState<PickerCustomer>(mostrador);
   const [note, setNote] = useState("");
+  // Held open by the card the seller pressed, not by an id: the grid re-reads
+  // itself from the server while the sheet is open, and an id would point at a
+  // row that is no longer in the page.
+  const [detalle, setDetalle] = useState<SalesProduct | null>(null);
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [pending, startTransition] = useTransition();
 
@@ -458,7 +503,14 @@ export function SalesScreen({
           ) : (
             <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
               {results.map((p) => (
-                <ProductCard key={p.id} p={p} inCart={cart[p.id] ?? 0} onAdd={() => add(p)} />
+                <ProductCard
+                  key={p.id}
+                  p={p}
+                  inCart={cart[p.id] ?? 0}
+                  onAdd={() => add(p)}
+                  onVerDetalle={() => setDetalle(p)}
+                  precioBase={precioBase}
+                />
               ))}
             </div>
           )}
@@ -627,6 +679,13 @@ export function SalesScreen({
         total={total}
         pending={pending}
         onConfirm={(metodo, pagos) => submit(metodo, pagos)}
+      />
+
+      <ProductoSheet
+        p={detalle}
+        verCostos={verCostos}
+        onClose={() => setDetalle(null)}
+        onAgregar={add}
       />
     </>
   );
