@@ -16,6 +16,7 @@ export default async function EditarCotizacionPage({ params }: { params: Promise
   const { userId } = await auth();
   if (!userId) redirect("/");
   const perms = await getPermisos(userId);
+  const verCostos = perms.has("admin_total") || perms.has("costos_ver");
   if (!perms.has("cotizar")) redirect("/");
 
   const { data: cotData } = await insforgeAdmin.database
@@ -80,6 +81,7 @@ export default async function EditarCotizacionPage({ params }: { params: Promise
         <h1 className="mt-2 text-2xl font-semibold tracking-tight">Editar cotización</h1>
       </div>
       <CotizacionBuilder
+        verCostos={verCostos}
         products={(productData ?? []) as SalesProduct[]}
         productosDeLaCotizacion={(itemProductData ?? []) as SalesProduct[]}
         customers={(customerData ?? []) as PickerCustomer[]}

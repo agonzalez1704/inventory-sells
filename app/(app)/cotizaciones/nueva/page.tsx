@@ -14,6 +14,7 @@ export default async function NuevaCotizacionPage() {
   const { userId } = await auth();
   if (!userId) redirect("/");
   const perms = await getPermisos(userId);
+  const verCostos = perms.has("admin_total") || perms.has("costos_ver");
   if (!perms.has("cotizar")) redirect("/cotizaciones");
   const puedeAsignar = perms.has("cotizaciones_reasignar");
 
@@ -48,6 +49,7 @@ export default async function NuevaCotizacionPage() {
         <h1 className="mt-2 text-2xl font-semibold tracking-tight">Nueva cotización</h1>
       </div>
       <CotizacionBuilder
+        verCostos={verCostos}
         products={(productData ?? []) as SalesProduct[]}
         customers={(customerData ?? []) as PickerCustomer[]}
         vendedores={vendedores}

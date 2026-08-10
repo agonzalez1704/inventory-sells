@@ -13,6 +13,8 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { CustomerPicker, type PickerCustomer } from "@/modules/customers/CustomerPicker";
 import type { SalesProduct } from "@/modules/sales/SalesScreen";
+import { ProductoSheet } from "@/modules/sales/ProductoSheet";
+import { useLongPress } from "@/modules/sales/useLongPress";
 import { crearCotizacion, editarCotizacion } from "./actions";
 
 const GRID_LIMIT = 24;
@@ -23,6 +25,34 @@ export type CotizacionInicial = {
   customerId: string | null;
   notas: string;
 };
+
+// The card, wrapped so a long press opens the detail sheet instead of adding a
+// line — the same gesture the register has. Its own component because the hook
+// cannot be called inside the .map() that renders the grid.
+function TarjetaProducto({
+  onAdd,
+  onVerDetalle,
+  children,
+}: {
+  onAdd: () => void;
+  onVerDetalle: () => void;
+  children: React.ReactNode;
+}) {
+  const { handlers, consumioElTap } = useLongPress(onVerDetalle);
+  return (
+    <button
+      onClick={() => {
+        if (consumioElTap()) return;
+        onAdd();
+      }}
+      {...handlers}
+      style={{ WebkitTouchCallout: "none", WebkitUserSelect: "none", userSelect: "none" }}
+      className="group relative flex flex-col rounded-2xl border border-border bg-background p-2.5 text-left transition-all hover:-translate-y-0.5 hover:border-ring/40 hover:shadow-md hover:shadow-black/5"
+    >
+      {children}
+    </button>
+  );
+}
 
 function Thumb({ src, alt }: { src?: string | null; alt: string }) {
   if (src)
@@ -39,6 +69,7 @@ export function CotizacionBuilder({
   products,
   productosDeLaCotizacion = [],
   customers,
+  verCostos = false,
   initial,
   vendedores = [],
   puedeAsignar = false,
@@ -55,6 +86,8 @@ export function CotizacionBuilder({
    */
   productosDeLaCotizacion?: SalesProduct[];
   customers: PickerCustomer[];
+  /** Gates cost and margin in the detail sheet, like everywhere else. */
+  verCostos?: boolean;
   initial?: CotizacionInicial;
   vendedores?: { id: string; nombre: string }[];
   puedeAsignar?: boolean;
@@ -97,6 +130,7 @@ export function CotizacionBuilder({
   // Searching happens in the database: the catalog is 21k products at the
   // refaccionaria, too big to hand the browser and re-filter per keystroke.
   const [results, setResults] = useState<SalesProduct[]>(products);
+  const [detalle, setDetalle] = useState<SalesProduct | null>(null);
   useEffect(() => {
     let cancelado = false;
     const t = setTimeout(async () => {
@@ -211,10 +245,10 @@ export function CotizacionBuilder({
             {results.map((p) => {
               const inCart = cart[p.id] ?? 0;
               return (
-                <button
+                <TarjetaProducto
                   key={p.id}
-                  onClick={() => add(p.id)}
-                  className="group relative flex flex-col rounded-2xl border border-border bg-background p-2.5 text-left transition-all hover:-translate-y-0.5 hover:border-ring/40 hover:shadow-md hover:shadow-black/5"
+                  onAdd={() => add(p.id)}
+                  onVerDetalle={() => setDetalle(p)}
                 >
                   {inCart > 0 && (
                     <span className="absolute right-4 top-4 z-10 flex h-6 min-w-6 items-center justify-center rounded-full bg-accent px-1.5 text-xs font-semibold text-white shadow-sm">
@@ -241,7 +275,7 @@ export function CotizacionBuilder({
                     </span>
                     <span className="shrink-0 text-[11px] text-muted-foreground">{p.quantity} disp.</span>
                   </div>
-                </button>
+                </TarjetaProducto>
               );
             })}
           </div>
@@ -371,6 +405,13 @@ export function CotizacionBuilder({
       >
         {actionButtons}
       </div>
+
+      <ProductoSheet
+        p={detalle}
+        verCostos={verCostos}
+        onClose={() => setDetalle(null)}
+        onAgregar={(prod) => add(prod.id)}
+      />
     </div>
   );
 }
