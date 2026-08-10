@@ -131,6 +131,13 @@ function ProductCard({
           </span>
         )}
       </div>
+      {/* The part number, first and unmissable. Searching "SHN07" returns the
+          721 and the 712 of the same family, and the code is the only thing
+          that tells them apart — the names differ by a word buried mid-string,
+          which is no use when you are scanning a grid. */}
+      <p className="font-mono text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        {p.sku}
+      </p>
       <p className="line-clamp-2 min-h-[2.25rem] text-sm font-medium leading-tight">
         {p.name}
       </p>
@@ -194,8 +201,16 @@ function ProductRow({
       </span>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium">{p.name}</p>
-        <p className="truncate text-xs capitalize text-muted-foreground">
-          {[p.brand, p.category].filter(Boolean).join(" · ") || p.sku}
+        {/* The code was only a fallback here. On a line the seller is about to
+            charge for, it is the thing they check against the shelf. */}
+        <p className="truncate text-xs text-muted-foreground">
+          <span className="font-mono font-medium uppercase">{p.sku}</span>
+          {[p.brand, p.category].filter(Boolean).length > 0 && (
+            <span className="capitalize">
+              {" · "}
+              {[p.brand, p.category].filter(Boolean).join(" · ")}
+            </span>
+          )}
         </p>
       </div>
       <span className="shrink-0 font-mono text-sm font-semibold tabular-nums">

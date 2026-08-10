@@ -227,6 +227,13 @@ export function CotizacionBuilder({
                       <Plus className="h-4 w-4" />
                     </span>
                   </div>
+                  {/* The part number, first and unmissable. Searching "SHN07"
+                      returns the 721 and the 712 of the same family, and the
+                      code is the only thing that tells them apart — the names
+                      differ by a word buried mid-string. */}
+                  <p className="font-mono text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    {p.sku}
+                  </p>
                   <p className="line-clamp-2 min-h-[2.25rem] text-sm font-medium leading-tight">{p.name}</p>
                   <div className="mt-1 flex items-center justify-between gap-1">
                     <span className="font-mono text-sm font-semibold tabular-nums text-accent">
