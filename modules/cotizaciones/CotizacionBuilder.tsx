@@ -13,6 +13,9 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { CustomerPicker, type PickerCustomer } from "@/modules/customers/CustomerPicker";
 import type { SalesProduct } from "@/modules/sales/SalesScreen";
+import { AnimatePresence, m } from "framer-motion";
+import NumberFlow from "@number-flow/react";
+import { Motion } from "@/components/ui/motion";
 import { ProductoSheet } from "@/modules/sales/ProductoSheet";
 import { useLongPress } from "@/modules/sales/useLongPress";
 import { crearCotizacion, editarCotizacion } from "./actions";
@@ -40,17 +43,24 @@ function TarjetaProducto({
 }) {
   const { handlers, consumioElTap } = useLongPress(onVerDetalle);
   return (
-    <button
+    <m.button
+      // Same motion as the register: results arrive rather than appear, and the
+      // 2px lift moves from CSS to framer because framer owns `transform` once
+      // it animates y.
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2 }}
+      whileHover={{ y: -2 }}
       onClick={() => {
         if (consumioElTap()) return;
         onAdd();
       }}
       {...handlers}
       style={{ WebkitTouchCallout: "none", WebkitUserSelect: "none", userSelect: "none" }}
-      className="group relative flex flex-col rounded-2xl border border-border bg-background p-2.5 text-left transition-all hover:-translate-y-0.5 hover:border-ring/40 hover:shadow-md hover:shadow-black/5"
+      className="group relative flex flex-col rounded-2xl border border-border bg-background p-2.5 text-left transition-all hover:border-ring/40 hover:shadow-md hover:shadow-black/5"
     >
       {children}
-    </button>
+    </m.button>
   );
 }
 
@@ -225,6 +235,7 @@ export function CotizacionBuilder({
   );
 
   return (
+    <Motion>
     <div className="gap-5 pb-28 lg:grid lg:grid-cols-5 lg:pb-0">
       {/* Product picker */}
       <div className="lg:col-span-3">
@@ -304,8 +315,20 @@ export function CotizacionBuilder({
           ) : (
             <>
               <ul className="max-h-[20rem] divide-y divide-border overflow-auto">
+                {/* initial={false}: lines restored when editing an existing
+                    quote are not new. popLayout so removing one lets the rest
+                    close the gap. */}
+                <AnimatePresence initial={false} mode="popLayout">
                 {lines.map((l) => (
-                  <li key={l.product.id} className="flex gap-3 px-4 py-3">
+                  <m.li
+                    key={l.product.id}
+                    layout
+                    initial={{ opacity: 0, scale: 0.96 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.96 }}
+                    transition={{ opacity: { duration: 0.2 }, layout: { duration: 0.2 } }}
+                    className="flex gap-3 px-4 py-3"
+                  >
                     <span className="h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-border">
                       <Thumb src={l.product.image_url} alt={l.product.name} />
                     </span>
@@ -317,41 +340,45 @@ export function CotizacionBuilder({
                             {formatMXN(l.product.price_cents)} c/u
                           </p>
                         </div>
-                        <button
+                        <m.button
+                          whileTap={{ scale: 0.95 }}
                           onClick={() => setQty(l.product.id, 0)}
                           aria-label={`Quitar ${l.product.name}`}
                           className="-mr-1 -mt-1 shrink-0 cursor-pointer rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-red-50 dark:bg-red-950/40 hover:text-red-600 dark:text-red-400"
                         >
                           <Trash2 className="h-4 w-4" />
-                        </button>
+                        </m.button>
                       </div>
                       <div className="mt-2 flex items-center justify-between gap-2">
                         <div className="inline-flex items-center overflow-hidden rounded-lg border border-border">
-                          <button
+                          <m.button
+                            whileTap={{ scale: 0.95 }}
                             onClick={() => setQty(l.product.id, l.qty - 1)}
                             aria-label="Quitar uno"
                             className="flex h-8 w-9 cursor-pointer items-center justify-center text-muted-foreground transition-colors hover:bg-muted"
                           >
                             <Minus className="h-3.5 w-3.5" />
-                          </button>
+                          </m.button>
                           <div className="flex h-8 min-w-9 items-center justify-center border-x border-border px-1 text-sm font-medium tabular-nums">
-                            {l.qty}
+                            <NumberFlow value={l.qty} />
                           </div>
-                          <button
+                          <m.button
+                            whileTap={{ scale: 0.95 }}
                             onClick={() => setQty(l.product.id, l.qty + 1)}
                             aria-label="Agregar uno"
                             className="flex h-8 w-9 cursor-pointer items-center justify-center text-muted-foreground transition-colors hover:bg-muted"
                           >
                             <Plus className="h-3.5 w-3.5" />
-                          </button>
+                          </m.button>
                         </div>
                         <span className="text-sm font-semibold tabular-nums text-accent">
                           {formatMXN(l.product.price_cents * l.qty)}
                         </span>
                       </div>
                     </div>
-                  </li>
+                  </m.li>
                 ))}
+                </AnimatePresence>
               </ul>
 
               <div className="space-y-3 border-t border-border p-4">
@@ -376,12 +403,18 @@ export function CotizacionBuilder({
                 <div className="space-y-1.5 border-t border-dashed border-border pt-3">
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
                     <span>Artículos</span>
-                    <span className="tabular-nums">{count}</span>
+                    <span className="tabular-nums">
+                      <NumberFlow value={count} />
+                    </span>
                   </div>
                   <div className="flex items-baseline justify-between">
                     <span className="text-sm font-medium">Total</span>
                     <span className="font-mono text-2xl font-semibold tabular-nums tracking-tight">
-                      {formatMXN(total)}
+                      <NumberFlow
+                        value={total / 100}
+                        locales="es-MX"
+                        format={{ style: "currency", currency: "MXN" }}
+                      />
                     </span>
                   </div>
                 </div>
@@ -413,5 +446,6 @@ export function CotizacionBuilder({
         onAgregar={(prod) => add(prod.id)}
       />
     </div>
+    </Motion>
   );
 }
