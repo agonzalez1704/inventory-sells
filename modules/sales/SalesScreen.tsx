@@ -25,6 +25,9 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { imprimirTicketNavegador, type TicketData } from "@/lib/ticket";
 import { CustomerPicker, type PickerCustomer } from "@/modules/customers/CustomerPicker";
 import { CompatPanel } from "@/modules/compat/CompatPanel";
+import { AnimatePresence, m } from "framer-motion";
+import NumberFlow from "@number-flow/react";
+import { Motion } from "@/components/ui/motion";
 import { PaymentSheet } from "./PaymentSheet";
 import { ProductoSheet } from "./ProductoSheet";
 import { CategoriaSheet } from "./CategoriaSheet";
@@ -94,7 +97,15 @@ function ProductCard({
   const alCosto = precioBase === "costo";
   const importe = alCosto ? p.cost_cents ?? 0 : p.price_cents;
   return (
-    <button
+    <m.button
+      // Results fade up as they arrive instead of snapping in mid-search.
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2 }}
+      // The lift used to be hover:-translate-y-0.5. Framer owns `transform`
+      // once it animates y, so a CSS translate on the same element would be
+      // overwritten — same 2px, moved to where it still works.
+      whileHover={soldOut || maxed ? undefined : { y: -2 }}
       // A long press already opened the sheet; the click it leaves behind must
       // not also drop the product into the sale.
       onClick={() => {
@@ -110,7 +121,7 @@ function ProductCard({
         "group relative flex flex-col rounded-2xl border border-border bg-background p-2.5 text-left transition-all",
         soldOut
           ? "opacity-60"
-          : "cursor-pointer hover:-translate-y-0.5 hover:border-ring/40 hover:shadow-md hover:shadow-black/5 active:translate-y-0",
+          : "cursor-pointer hover:border-ring/40 hover:shadow-md hover:shadow-black/5",
       )}
     >
       {inCart > 0 && (
@@ -169,7 +180,7 @@ function ProductCard({
           {soldOut ? "—" : `${p.quantity} disp.`}
         </span>
       </div>
-    </button>
+    </m.button>
   );
 }
 
@@ -250,24 +261,28 @@ function Stepper({
     // of its parent, so the fixed-width buttons packed left and left a big empty
     // bordered gap to the right. inline-flex sizes the control to its contents.
     <div className="inline-flex items-center overflow-hidden rounded-lg border border-border">
-      <button
+      <m.button
+        whileTap={{ scale: 0.95 }}
         onClick={onDec}
         aria-label="Quitar uno"
         className="flex h-8 w-9 cursor-pointer items-center justify-center text-muted-foreground transition-colors hover:bg-muted active:bg-muted"
       >
         <Minus className="h-3.5 w-3.5" />
-      </button>
+      </m.button>
+      {/* The number rolls rather than swapping, so a mistaken double-tap is
+          visible as movement instead of a digit that was already different. */}
       <div className="flex h-8 min-w-9 items-center justify-center border-x border-border px-1 text-sm font-medium tabular-nums">
-        {value}
+        <NumberFlow value={value} />
       </div>
-      <button
+      <m.button
+        whileTap={{ scale: 0.95 }}
         onClick={onInc}
         disabled={!canInc}
         aria-label="Agregar uno"
         className="flex h-8 w-9 cursor-pointer items-center justify-center text-muted-foreground transition-colors hover:bg-muted active:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
       >
         <Plus className="h-3.5 w-3.5" />
-      </button>
+      </m.button>
     </div>
   );
 }
@@ -491,6 +506,7 @@ export function SalesScreen({
   const cta = mode === "prestamo" ? "Registrar crédito" : "Cobrar";
 
   return (
+    <Motion>
     <>
       <div className="gap-5 pb-28 lg:grid lg:grid-cols-5 lg:pb-0">
         {/* Product picker */}
@@ -605,8 +621,21 @@ export function SalesScreen({
             ) : (
               <>
                 <ul className="max-h-[20rem] divide-y divide-border overflow-auto">
+                  {/* initial={false}: lines already in the order when the panel
+                      mounts are not new, and animating them would replay the
+                      whole cart on every re-render. popLayout so a removed line
+                      leaves while the ones under it slide up. */}
+                  <AnimatePresence initial={false} mode="popLayout">
                   {lines.map((l) => (
-                    <li key={l.product.id} className="flex gap-3 px-4 py-3">
+                    <m.li
+                      key={l.product.id}
+                      layout
+                      initial={{ opacity: 0, scale: 0.96 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.96 }}
+                      transition={{ opacity: { duration: 0.2 }, layout: { duration: 0.2 } }}
+                      className="flex gap-3 px-4 py-3"
+                    >
                       <span className="h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-border">
                         <Thumb src={l.product.image_url} alt={l.product.name} />
                       </span>
@@ -620,13 +649,14 @@ export function SalesScreen({
                               {formatMXN(l.product.price_cents)} c/u
                             </p>
                           </div>
-                          <button
+                          <m.button
+                            whileTap={{ scale: 0.95 }}
                             onClick={() => remove(l.product.id)}
                             aria-label={`Quitar ${l.product.name}`}
                             className="-mr-1 -mt-1 shrink-0 cursor-pointer rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-red-50 dark:bg-red-950/40 hover:text-red-600 dark:text-red-400"
                           >
                             <Trash2 className="h-4 w-4" />
-                          </button>
+                          </m.button>
                         </div>
                         {/* Stepper left, running line total right — the total
                             sits where the eye lands after changing quantity. */}
@@ -642,8 +672,9 @@ export function SalesScreen({
                           </span>
                         </div>
                       </div>
-                    </li>
+                    </m.li>
                   ))}
+                  </AnimatePresence>
                 </ul>
 
                 <div className="space-y-3 border-t border-border p-4">
@@ -666,12 +697,21 @@ export function SalesScreen({
                   <div className="space-y-1.5 border-t border-dashed border-border pt-3">
                     <div className="flex items-center justify-between text-xs text-muted-foreground">
                       <span>Artículos</span>
-                      <span className="tabular-nums">{count}</span>
+                      <span className="tabular-nums">
+                        <NumberFlow value={count} />
+                      </span>
                     </div>
                     <div className="flex items-baseline justify-between">
                       <span className="text-sm font-medium">Total</span>
+                      {/* Same formatter as formatMXN — es-MX currency — so the
+                          rolling total reads identically to every other amount
+                          on the screen. Cents, because that is how it is held. */}
                       <span className="font-mono text-2xl font-semibold tabular-nums tracking-tight">
-                        {formatMXN(total)}
+                        <NumberFlow
+                          value={total / 100}
+                          locales="es-MX"
+                          format={{ style: "currency", currency: "MXN" }}
+                        />
                       </span>
                     </div>
                   </div>
@@ -748,6 +788,7 @@ export function SalesScreen({
         onAgregar={add}
       />
     </>
+    </Motion>
   );
 }
 
