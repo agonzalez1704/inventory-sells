@@ -738,34 +738,42 @@ export function SalesScreen({
         </div>
       </div>
 
-      {/* Fixed mobile checkout bar */}
-      {lines.length > 0 && (
-        <div
-          className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 px-4 py-3 backdrop-blur lg:hidden"
-          style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
-        >
-          <div className="mx-auto flex max-w-6xl items-center gap-3">
-            <div className="leading-tight">
-              <p className="text-xs text-muted-foreground">
-                {count} art. · {mode === "prestamo" ? "Crédito" : "Total"}
-              </p>
-              <p className="font-mono text-lg font-semibold tabular-nums">
-                {formatMXN(total)}
-              </p>
-            </div>
-            <Button
-              variant="accent"
-              size="lg"
-              className="ml-auto h-12 flex-1 text-base"
-              onClick={onCta}
-              loading={pending}
-              disabled={!canSubmit}
-            >
-              {cta}
-            </Button>
+      {/* Fixed mobile checkout bar.
+          Always mounted, like the quote builder's. It used to appear with the
+          first product, which meant its total arrived already written and never
+          rolled — the same reason the panel's total was moved out of the
+          conditional. The grid's pb-28 already reserved this space whether the
+          bar was there or not, so nothing shifts. */}
+      <div
+        className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 px-4 py-3 backdrop-blur lg:hidden"
+        style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+      >
+        <div className="mx-auto flex max-w-6xl items-center gap-3">
+          <div className="leading-tight">
+            <p className="text-xs text-muted-foreground">
+              <NumberFlow value={count} /> art. ·{" "}
+              {mode === "prestamo" ? "Crédito" : "Total"}
+            </p>
+            <p className="font-mono text-lg font-semibold tabular-nums">
+              <NumberFlow
+                value={total / 100}
+                locales="es-MX"
+                format={{ style: "currency", currency: "MXN" }}
+              />
+            </p>
           </div>
+          <Button
+            variant="accent"
+            size="lg"
+            className="ml-auto h-12 flex-1 text-base"
+            onClick={onCta}
+            loading={pending}
+            disabled={!canSubmit}
+          >
+            {cta}
+          </Button>
         </div>
-      )}
+      </div>
 
       <PaymentSheet
         open={paymentOpen}
