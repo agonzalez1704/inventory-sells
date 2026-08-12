@@ -609,6 +609,11 @@ export function SalesScreen({
               </div>
             </div>
 
+            {/* Only the LIST is swapped for the empty state. The totals below
+                stay mounted at zero: a bar that appears already reading $1,240
+                has nothing to count up from, so the first product added was the
+                one whose total never animated. It also reads better — the panel
+                says what it is for before it holds anything. */}
             {lines.length === 0 ? (
               <div className="p-4">
                 <EmptyState
@@ -619,8 +624,7 @@ export function SalesScreen({
                 />
               </div>
             ) : (
-              <>
-                <ul className="max-h-[20rem] divide-y divide-border overflow-auto">
+              <ul className="max-h-[20rem] divide-y divide-border overflow-auto">
                   {/* initial={false}: lines already in the order when the panel
                       mounts are not new, and animating them would replay the
                       whole cart on every re-render. popLayout so a removed line
@@ -674,64 +678,63 @@ export function SalesScreen({
                       </div>
                     </m.li>
                   ))}
-                  </AnimatePresence>
-                </ul>
-
-                <div className="space-y-3 border-t border-border p-4">
-                  <CustomerPicker customers={customers} value={customer} onChange={setCustomer} />
-                  {mode === "prestamo" && (
-                    <>
-                      <Input
-                        value={note}
-                        onChange={(e) => setNote(e.target.value)}
-                        placeholder="Nota (opcional): plazo, referencia…"
-                      />
-                      {!clienteReal && (
-                        <p className="text-xs text-amber-700 dark:text-amber-300">
-                          Un crédito necesita cliente registrado. Elige o crea uno arriba.
-                        </p>
-                      )}
-                    </>
-                  )}
-
-                  <div className="space-y-1.5 border-t border-dashed border-border pt-3">
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span>Artículos</span>
-                      <span className="tabular-nums">
-                        <NumberFlow value={count} />
-                      </span>
-                    </div>
-                    <div className="flex items-baseline justify-between">
-                      <span className="text-sm font-medium">Total</span>
-                      {/* Same formatter as formatMXN — es-MX currency — so the
-                          rolling total reads identically to every other amount
-                          on the screen. Cents, because that is how it is held. */}
-                      <span className="font-mono text-2xl font-semibold tabular-nums tracking-tight">
-                        <NumberFlow
-                          value={total / 100}
-                          locales="es-MX"
-                          format={{ style: "currency", currency: "MXN" }}
-                        />
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Desktop action — mobile uses the fixed bottom bar */}
-                  <Button
-                    variant="accent"
-                    size="lg"
-                    className="hidden w-full lg:flex"
-                    onClick={onCta}
-                    loading={pending}
-                    disabled={!canSubmit}
-                  >
-                    <Check className="h-4 w-4" />
-                    {cta} {formatMXN(total)}
-                  </Button>
-                </div>
-              </>
+                </AnimatePresence>
+              </ul>
             )}
-          </Card>
+
+          <div className="space-y-3 border-t border-border p-4">
+                <CustomerPicker customers={customers} value={customer} onChange={setCustomer} />
+                {mode === "prestamo" && (
+                  <>
+                    <Input
+                      value={note}
+                      onChange={(e) => setNote(e.target.value)}
+                      placeholder="Nota (opcional): plazo, referencia…"
+                    />
+                    {!clienteReal && (
+                      <p className="text-xs text-amber-700 dark:text-amber-300">
+                        Un crédito necesita cliente registrado. Elige o crea uno arriba.
+                      </p>
+                    )}
+                  </>
+                )}
+
+                <div className="space-y-1.5 border-t border-dashed border-border pt-3">
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>Artículos</span>
+                    <span className="tabular-nums">
+                      <NumberFlow value={count} />
+                    </span>
+                  </div>
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-sm font-medium">Total</span>
+                    {/* Same formatter as formatMXN — es-MX currency — so the
+                        rolling total reads identically to every other amount
+                        on the screen. Cents, because that is how it is held. */}
+                    <span className="font-mono text-2xl font-semibold tabular-nums tracking-tight">
+                      <NumberFlow
+                        value={total / 100}
+                        locales="es-MX"
+                        format={{ style: "currency", currency: "MXN" }}
+                      />
+                    </span>
+                  </div>
+                </div>
+
+                {/* Desktop action — mobile uses the fixed bottom bar */}
+                <Button
+                  variant="accent"
+                  size="lg"
+                  className="hidden w-full lg:flex"
+                  onClick={onCta}
+                  loading={pending}
+                  disabled={!canSubmit}
+                >
+                  <Check className="h-4 w-4" />
+                  {cta} {formatMXN(total)}
+                </Button>
+              </div>
+            </Card>
         </div>
       </div>
 

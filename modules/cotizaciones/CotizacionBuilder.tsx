@@ -303,6 +303,9 @@ export function CotizacionBuilder({
             <h2 className="text-sm font-semibold">{initial ? "Editar cotización" : "Nueva cotización"}</h2>
           </div>
 
+          {/* Same as the register: only the list is swapped out, so the totals
+              stay mounted at zero and the first line added has a number to
+              count up from. */}
           {lines.length === 0 ? (
             <div className="p-4">
               <EmptyState
@@ -313,8 +316,7 @@ export function CotizacionBuilder({
               />
             </div>
           ) : (
-            <>
-              <ul className="max-h-[20rem] divide-y divide-border overflow-auto">
+            <ul className="max-h-[20rem] divide-y divide-border overflow-auto">
                 {/* initial={false}: lines restored when editing an existing
                     quote are not new. popLayout so removing one lets the rest
                     close the gap. */}
@@ -378,49 +380,48 @@ export function CotizacionBuilder({
                     </div>
                   </m.li>
                 ))}
-                </AnimatePresence>
-              </ul>
+              </AnimatePresence>
+            </ul>
+          )}
 
-              <div className="space-y-3 border-t border-border p-4">
-                <CustomerPicker customers={customers} value={customer} onChange={setCustomer} />
-                {mostrarVendedor && (
-                  <select
-                    value={vendedorId}
-                    onChange={(e) => setVendedorId(e.target.value)}
-                    className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm"
-                    aria-label="Asignar vendedor"
-                  >
-                    <option value="">Asignar vendedor (opcional)</option>
-                    {vendedores.map((v) => (
-                      <option key={v.id} value={v.id}>
-                        {v.nombre}
-                      </option>
-                    ))}
-                  </select>
-                )}
-                <Input value={notas} onChange={(e) => setNotas(e.target.value)} placeholder="Notas (opcional)" />
+          <div className="space-y-3 border-t border-border p-4">
+              <CustomerPicker customers={customers} value={customer} onChange={setCustomer} />
+              {mostrarVendedor && (
+                <select
+                  value={vendedorId}
+                  onChange={(e) => setVendedorId(e.target.value)}
+                  className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm"
+                  aria-label="Asignar vendedor"
+                >
+                  <option value="">Asignar vendedor (opcional)</option>
+                  {vendedores.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.nombre}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <Input value={notas} onChange={(e) => setNotas(e.target.value)} placeholder="Notas (opcional)" />
 
-                <div className="space-y-1.5 border-t border-dashed border-border pt-3">
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>Artículos</span>
-                    <span className="tabular-nums">
-                      <NumberFlow value={count} />
-                    </span>
-                  </div>
-                  <div className="flex items-baseline justify-between">
-                    <span className="text-sm font-medium">Total</span>
-                    <span className="font-mono text-2xl font-semibold tabular-nums tracking-tight">
-                      <NumberFlow
-                        value={total / 100}
-                        locales="es-MX"
-                        format={{ style: "currency", currency: "MXN" }}
-                      />
-                    </span>
-                  </div>
+              <div className="space-y-1.5 border-t border-dashed border-border pt-3">
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>Artículos</span>
+                  <span className="tabular-nums">
+                    <NumberFlow value={count} />
+                  </span>
+                </div>
+                <div className="flex items-baseline justify-between">
+                  <span className="text-sm font-medium">Total</span>
+                  <span className="font-mono text-2xl font-semibold tabular-nums tracking-tight">
+                    <NumberFlow
+                      value={total / 100}
+                      locales="es-MX"
+                      format={{ style: "currency", currency: "MXN" }}
+                    />
+                  </span>
                 </div>
               </div>
-            </>
-          )}
+            </div>
 
           {/* Desktop actions live inside the sticky panel and are ALWAYS shown
               (disabled while empty) — never buried at the end of a long product
