@@ -41,6 +41,12 @@ function useAreaVisible(activo: boolean) {
   return v;
 }
 
+// What the sheet gives back at the top: the grab handle's own box, mt-2.5 (10px)
+// plus h-1.5 (6px). The sheet is otherwise as tall as the visible area, so this
+// sliver of overlay is the only thing saying it is a sheet and not a page — and
+// it is where a thumb reaches to drag it shut.
+const RESPIRO_HANDLE = 16;
+
 // Bottom drawer (vaul / shadcn-style) — the mobile counterpart to Modal.
 export function Drawer({
   open,
@@ -86,7 +92,7 @@ export function Drawer({
             // chrome weren't there, so a 94vh sheet is taller than the screen
             // actually is and its top starts off-screen. Only the fallback —
             // once visualViewport reports, the inline values win.
-            "fixed inset-x-0 bottom-0 z-50 flex max-h-[90dvh] flex-col rounded-t-2xl border-t border-border bg-background outline-none",
+            "fixed inset-x-0 bottom-0 z-50 flex max-h-[calc(100dvh-16px)] flex-col rounded-t-2xl border-t border-border bg-background outline-none",
             className,
           )}
           style={
@@ -95,7 +101,7 @@ export function Drawer({
                   // Sit on top of the keyboard rather than behind it, and never
                   // be taller than what is left above it.
                   bottom: area.teclado,
-                  maxHeight: Math.round(area.alto * 0.9),
+                  maxHeight: area.alto - RESPIRO_HANDLE,
                 }
               : undefined
           }
