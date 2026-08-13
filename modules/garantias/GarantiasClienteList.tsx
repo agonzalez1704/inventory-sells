@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import Link from "next/link";
@@ -14,8 +14,10 @@ import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
+import { proveedoresDelProducto, type ProveedorDelProducto } from "@/modules/cardex/actions";
 import {
   resolverGarantia,
+  reclamarAProveedor,
   type GarantiaCliente,
   type ResolucionGarantia,
 } from "./cliente-actions";
@@ -37,6 +39,7 @@ const RESOLUCION = {
 
 export function GarantiasClienteList({ garantias }: { garantias: GarantiaCliente[] }) {
   const [resolver, setResolver] = useState<GarantiaCliente | null>(null);
+  const [reclamar, setReclamar] = useState<GarantiaCliente | null>(null);
   const pendientes = garantias.filter((g) => g.estado === "pendiente");
   const resueltas = garantias.filter((g) => g.estado !== "pendiente");
 
@@ -60,7 +63,12 @@ export function GarantiasClienteList({ garantias }: { garantias: GarantiaCliente
             Por resolver ({pendientes.length})
           </h2>
           {pendientes.map((g) => (
-            <Fila key={g.id} g={g} onResolver={() => setResolver(g)} />
+            <Fila
+              key={g.id}
+              g={g}
+              onResolver={() => setResolver(g)}
+              onReclamar={() => setReclamar(g)}
+            />
           ))}
         </div>
       )}
@@ -69,17 +77,30 @@ export function GarantiasClienteList({ garantias }: { garantias: GarantiaCliente
         <div className="space-y-2">
           <h2 className="text-sm font-semibold text-muted-foreground">Resueltas</h2>
           {resueltas.map((g) => (
-            <Fila key={g.id} g={g} />
+            <Fila key={g.id} g={g} onReclamar={() => setReclamar(g)} />
           ))}
         </div>
       )}
 
       {resolver && <ResolverModal g={resolver} onClose={() => setResolver(null)} />}
+      {reclamar && <ReclamoModal g={reclamar} onClose={() => setReclamar(null)} />}
     </div>
   );
 }
 
-function Fila({ g, onResolver }: { g: GarantiaCliente; onResolver?: () => void }) {
+function Fila({
+  g,
+  onResolver,
+  onReclamar,
+}: {
+  g: GarantiaCliente;
+  onResolver?: () => void;
+  onReclamar?: () => void;
+}) {
+  // Only when the part did NOT go back on the shelf. Claiming one the shop
+  // still has and can sell is asking the supplier to pay for stock — the
+  // database refuses it, and offering the button would be offering a dead end.
+  const puedeReclamar = !g.reingresa_stock && !g.garantia_proveedor_id;
   return (
     <Card className={cn("p-4", g.estado === "rechazada" && "opacity-70")}>
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -122,11 +143,22 @@ function Fila({ g, onResolver }: { g: GarantiaCliente; onResolver?: () => void }
               ver venta
             </Link>
           </p>
+          {g.garantia_proveedor_id && (
+            <p className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground">
+              <ShieldCheck className="h-3.5 w-3.5" />
+              Reclamada a {g.proveedor ?? "proveedor"}
+            </p>
+          )}
         </div>
         <div className="flex shrink-0 items-center gap-3">
           <span className="font-mono text-sm font-semibold tabular-nums">
             {formatMXN(g.monto_cents)}
           </span>
+          {puedeReclamar && onReclamar && (
+            <Button variant="secondary" size="sm" onClick={onReclamar}>
+              Reclamar
+            </Button>
+          )}
           {onResolver && (
             <Button size="sm" onClick={onResolver}>
               Resolver
@@ -226,6 +258,125 @@ function ResolverModal({ g, onClose }: { g: GarantiaCliente; onClose: () => void
           </Button>
           <Button onClick={guardar} loading={pending}>
             Resolver
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function ReclamoModal({ g, onClose }: { g: GarantiaCliente; onClose: () => void }) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [provs, setProvs] = useState<ProveedorDelProducto[] | null>(null);
+  const [proveedorId, setProveedorId] = useState("");
+  const [monto, setMonto] = useState("");
+  const [notas, setNotas] = useState(g.motivo ?? "");
+
+  useEffect(() => {
+    let cancelado = false;
+    proveedoresDelProducto(g.product_id)
+      .then((r) => {
+        if (cancelado) return;
+        setProvs(r.proveedores);
+        const primero = r.proveedores[0];
+        if (primero) {
+          setProveedorId(primero.proveedor_id);
+          // Cost, not what the customer paid. Those are different numbers and
+          // claiming the second asks the supplier for the shop's margin too.
+          setMonto(((primero.costo_ultimo_cents * g.qty) / 100).toFixed(2));
+        }
+      })
+      .catch(() => !cancelado && setProvs([]));
+    return () => {
+      cancelado = true;
+    };
+  }, [g.product_id, g.qty]);
+
+  function elegir(id: string) {
+    setProveedorId(id);
+    const p = provs?.find((x) => x.proveedor_id === id);
+    if (p) setMonto(((p.costo_ultimo_cents * g.qty) / 100).toFixed(2));
+  }
+
+  function guardar() {
+    if (!proveedorId) return toast.error("Elige el proveedor");
+    const cents = Math.round((Number(monto.replace(",", ".")) || 0) * 100);
+    start(async () => {
+      try {
+        unwrap(await reclamarAProveedor(g.id, proveedorId, cents || null, notas || null));
+        toast.success("Reclamo creado y ligado a la garantía");
+        onClose();
+        router.refresh();
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "No se pudo crear el reclamo");
+      }
+    });
+  }
+
+  return (
+    <Modal open onClose={onClose} title="Reclamar al proveedor" className="max-w-md">
+      <div className="space-y-4">
+        <div className="rounded-xl border border-border p-3">
+          <p className="text-sm font-medium">{g.pieza}</p>
+          <p className="text-xs text-muted-foreground">
+            {g.qty} {g.qty === 1 ? "pieza" : "piezas"} · el cliente pagó{" "}
+            {formatMXN(g.monto_cents)}
+          </p>
+        </div>
+
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-muted-foreground">
+            Proveedor
+          </span>
+          {provs === null ? (
+            <p className="text-sm text-muted-foreground">Buscando quién nos la vendió…</p>
+          ) : provs.length === 0 ? (
+            <p className="text-sm text-amber-700 dark:text-amber-300">
+              Esta pieza no tiene compras registradas, así que no sabemos quién
+              la surtió. Captura el reclamo desde la pestaña “A proveedor”.
+            </p>
+          ) : (
+            <Select value={proveedorId} onChange={(e) => elegir(e.target.value)}>
+              {provs.map((p) => (
+                <option key={p.proveedor_id} value={p.proveedor_id}>
+                  {p.nombre} — último costo {formatMXN(p.costo_ultimo_cents)}
+                </option>
+              ))}
+            </Select>
+          )}
+        </label>
+
+        {provs && provs.length > 0 && (
+          <>
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-muted-foreground">
+                Monto a reclamar
+              </span>
+              <Input value={monto} onChange={(e) => setMonto(e.target.value)} inputMode="decimal" />
+              {/* The gap is the shop's margin and is not the supplier's to pay. */}
+              <span className="mt-1.5 block text-xs text-muted-foreground">
+                Va a costo, no a lo que pagó el cliente ({formatMXN(g.monto_cents)}).
+              </span>
+            </label>
+
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-muted-foreground">Notas</span>
+              <Input
+                value={notas}
+                onChange={(e) => setNotas(e.target.value)}
+                placeholder="Qué falló"
+              />
+            </label>
+          </>
+        )}
+
+        <div className="flex justify-end gap-2 border-t border-border pt-3">
+          <Button variant="secondary" onClick={onClose} disabled={pending}>
+            Cancelar
+          </Button>
+          <Button onClick={guardar} loading={pending} disabled={!proveedorId}>
+            Crear reclamo
           </Button>
         </div>
       </div>

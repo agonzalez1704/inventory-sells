@@ -176,6 +176,10 @@ export type GarantiaCliente = {
   resolucion: ResolucionGarantia | null;
   created_at: string;
   resuelta_at: string | null;
+  product_id: string;
+  /** Set once the shop has filed the claim upstream. */
+  garantia_proveedor_id: string | null;
+  proveedor: string | null;
 };
 
 /** Pending first — those are the ones somebody still has to act on. */
@@ -214,5 +218,33 @@ export async function resolverGarantia(
     });
     if (error) throw new Error(error.message ?? "No se pudo resolver");
     return null;
+  });
+}
+
+/**
+ * File the supplier claim for a customer's warranty, and chain the two.
+ *
+ * The amount defaults to COST, not to what the customer paid — those are
+ * different numbers and claiming the second over-claims. The operator can
+ * override when they know better than the last purchase price.
+ */
+export async function reclamarAProveedor(
+  garantiaId: string,
+  proveedorId: string,
+  montoCents: number | null,
+  notas: string | null,
+): Promise<ActionResult<string>> {
+  return attempt("reclamarAProveedor", async () => {
+    const { userId } = await auth();
+    if (!userId) throw new Error("No autenticado");
+    const insforge = await createInsForgeServerClient();
+    const { data, error } = await insforge.database.rpc("reclamar_garantia_a_proveedor", {
+      p_garantia_id: garantiaId,
+      p_proveedor_id: proveedorId,
+      p_monto_cents: montoCents,
+      p_notas: notas,
+    });
+    if (error) throw new Error(error.message ?? "No se pudo crear el reclamo");
+    return String(data);
   });
 }
