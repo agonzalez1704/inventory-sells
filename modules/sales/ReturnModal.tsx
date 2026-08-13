@@ -67,8 +67,13 @@ export function ReturnModal({
   const router = useRouter();
   // A split sale has no single method to refund with, so the operator picks
   // one; anything else keeps the sale's own method as the default.
+  // A sale settled with store credit has no cash method to refund by, same as
+  // a split one — the operator picks. Credit itself is never a refund method:
+  // it is created by a warranty, not handed back at the counter.
   const [metodo, setMetodo] = useState<PaymentMethod>(
-    sale.payment_method && sale.payment_method !== "mixto"
+    sale.payment_method &&
+      sale.payment_method !== "mixto" &&
+      sale.payment_method !== "saldo"
       ? sale.payment_method
       : "efectivo",
   );

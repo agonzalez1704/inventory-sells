@@ -9,13 +9,18 @@ import {
   type Devolucion,
   type IngresoLinea,
 } from "@/modules/caja/CajaView";
-import type { PaymentMethodStored, PaymentMethod } from "@/lib/types";
+import type { PaymentMethodStored, PaymentMethod, PaymentMethodVenta } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-const METODOS: PaymentMethod[] = ["efectivo", "tarjeta", "transferencia", "otro"];
+// 'saldo' is here so it has a column of its own, not so it counts as money.
+// The cash came in on the day of the original sale; a sale paid with credit is
+// the shop settling a debt it already owed. efectivoCaja only reads .efectivo,
+// so it stays out of the drawer either way — this just stops it being silently
+// filed under "otro".
+const METODOS: PaymentMethodVenta[] = ["efectivo", "tarjeta", "transferencia", "otro", "saldo"];
 const cero = () =>
-  Object.fromEntries(METODOS.map((m) => [m, 0])) as Record<PaymentMethod, number>;
+  Object.fromEntries(METODOS.map((m) => [m, 0])) as Record<PaymentMethodVenta, number>;
 
 type VentaRow = {
   id?: string;
@@ -152,7 +157,8 @@ export default async function CajaPage({
   const devoluciones = (devolucionesData ?? []) as Devolucion[];
   const salePagos = (salePagosData ?? []) as unknown as {
     monto_cents: number;
-    metodo: PaymentMethod;
+    // A split sale can settle part of itself with store credit.
+    metodo: PaymentMethodVenta;
     created_at: string;
     sales: {
       customer_name: string | null;
@@ -181,7 +187,7 @@ export default async function CajaPage({
   // --- Income (cash in by day/method) ---
   const ingresosPorMetodo = cero();
   let ingresosTotal = 0;
-  const addIngreso = (m: PaymentMethod, c: number) => {
+  const addIngreso = (m: PaymentMethodVenta, c: number) => {
     ingresosPorMetodo[m] += c;
     ingresosTotal += c;
   };

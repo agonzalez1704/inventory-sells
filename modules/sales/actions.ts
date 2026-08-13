@@ -6,7 +6,7 @@ import { getProfile } from "@/lib/auth/profile";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
 import { toCents } from "@/lib/money";
 import { notifyNuevaVenta, notifyAbono, notifyCancelacion } from "@/lib/push";
-import type { CartLine, PaymentMethod } from "@/lib/types";
+import type { CartLine, PaymentMethod, PaymentMethodVenta } from "@/lib/types";
 import type { SaleWithItems } from "./RecentSales";
 
 // Search completed sales by creator (seller), customer, sold products, or total.
@@ -65,11 +65,12 @@ export async function buscarVentas(q: string): Promise<SaleWithItems[]> {
 
 // Register a sale atomically via the register_sale() RPC: it locks each product
 // row, rejects oversell, and writes sale + items + stock movements in one tx.
-export type PagoSplit = { metodo: PaymentMethod; monto_cents: number };
+// A sale is the one thing store credit can pay for.
+export type PagoSplit = { metodo: PaymentMethodVenta; monto_cents: number };
 
 export async function registerSale(
   items: CartLine[],
-  paymentMethod: PaymentMethod,
+  paymentMethod: PaymentMethodVenta,
   customerId: string | null,
   // Split payment (part transfer, part cash…). The RPC requires these to add
   // up to the sale total and marks the sale 'mixto'; one entry is treated as a
@@ -87,7 +88,13 @@ export async function registerSale(
     p_items: items.map((i) => ({ product_id: i.product_id, qty: i.qty })),
     p_payment_method: paymentMethod,
     p_customer_id: customerId,
-    p_pagos: pagos && pagos.length > 1 ? pagos : null,
+    // A split, OR anything paid with store credit: a credit-only sale is one
+    // payment, and dropping it here would leave register_sale with no way to
+    // know the ledger has to move.
+    p_pagos:
+      pagos && (pagos.length > 1 || pagos.some((p) => p.metodo === "saldo"))
+        ? pagos
+        : null,
   });
 
   if (error) throw new Error(error.message ?? "Error al registrar la venta");

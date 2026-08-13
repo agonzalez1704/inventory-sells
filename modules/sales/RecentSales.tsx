@@ -13,6 +13,7 @@ import {
   Search,
   Loader2,
   Trash2,
+  ShieldCheck,
 } from "lucide-react";
 import { formatMXN } from "@/lib/money";
 import type { PaymentMethod, Sale } from "@/lib/types";
@@ -27,6 +28,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { PrintTicketButtons } from "@/components/ticket/PrintTicketButtons";
 import { ItemSwapModal, type SwapProduct } from "@/modules/sales/ItemSwapModal";
 import { ReturnModal } from "@/modules/sales/ReturnModal";
+import { GarantiaModal } from "@/modules/garantias/GarantiaModal";
 import {
   editarVenta,
   convertirAFiado,
@@ -68,9 +70,11 @@ function EditModal({
   const router = useRouter();
   const [confirmar, dialogoConfirm] = useConfirm();
   // A split sale has no single method to refund with, so the operator picks
-  // one; anything else keeps the sale's own method as the default.
+  // one; anything else keeps the sale's own method as the default. 'saldo' is
+  // in the same boat — store credit is not something a correction can re-book
+  // the sale to, so the editor starts from cash.
   const [payment, setPayment] = useState<PaymentMethod>(
-    sale.payment_method && sale.payment_method !== "mixto"
+    sale.payment_method && sale.payment_method !== "mixto" && sale.payment_method !== "saldo"
       ? sale.payment_method
       : "efectivo",
   );
@@ -256,6 +260,7 @@ export function RecentSales({
 }) {
   const [edit, setEdit] = useState<SaleWithItems | null>(null);
   const [returnSale, setReturnSale] = useState<SaleWithItems | null>(null);
+  const [garantiaSale, setGarantiaSale] = useState<SaleWithItems | null>(null);
   // Deep-link from a push notification: open + scroll to + briefly flash that
   // sale so it's obvious which one the notification was about.
   const [open, setOpen] = useState<Set<string>>(() => new Set(abrirId ? [abrirId] : []));
@@ -503,6 +508,20 @@ export function RecentSales({
                                   Devolver
                                 </Button>
                               )}
+                              {/* Beside Devolver, not inside it: a return hands
+                                  money back, a warranty is a claim about a part
+                                  that failed. Only the second can leave credit. */}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setGarantiaSale(s);
+                                }}
+                              >
+                                <ShieldCheck className="h-4 w-4" />
+                                Garantía
+                              </Button>
                               <PrintTicketButtons
                                 data={() => ({
                                   folio: s.id,
@@ -535,6 +554,9 @@ export function RecentSales({
 
       {edit && (
         <EditModal sale={edit} onClose={() => setEdit(null)} />
+      )}
+      {garantiaSale && (
+        <GarantiaModal sale={garantiaSale} onClose={() => setGarantiaSale(null)} />
       )}
       {returnSale && (
         <ReturnModal

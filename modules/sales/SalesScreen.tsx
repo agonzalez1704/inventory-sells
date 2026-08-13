@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { formatMXN } from "@/lib/money";
 import { buscarProductos } from "@/modules/inventory/buscar";
-import type { PaymentMethod, Product } from "@/lib/types";
+import type { PaymentMethod, PaymentMethodVenta, Product } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -35,6 +35,7 @@ import type { CategoriaConteo } from "@/modules/inventory/buscar";
 import { useLongPress } from "./useLongPress";
 import type { PrecioBase } from "./pos-prefs";
 import { registerSale, registerLoan, type PagoSplit } from "./actions";
+import { saldoDeCliente } from "@/modules/garantias/cliente-actions";
 
 export type SalesProduct = Pick<
   Product,
@@ -326,6 +327,9 @@ export function SalesScreen({
   // itself from the server while the sheet is open, and an id would point at a
   // row that is no longer in the page.
   const [detalle, setDetalle] = useState<SalesProduct | null>(null);
+  // Read per customer, not once: the seller switches customer mid-sale and the
+  // credit belongs to whoever is standing there now.
+  const [saldo, setSaldo] = useState(0);
   const [catsAbiertas, setCatsAbiertas] = useState(false);
 
   // Chips are for the categories people actually reach for. On Ruli the twelve
@@ -447,15 +451,30 @@ export function SalesScreen({
   // walk-in placeholder, not a person. The note used to stand in for the
   // customer and was therefore required; now it is just an optional reminder.
   const clienteReal = !customer.is_system;
+
+  // Mostrador can never hold credit, so it is not even asked for. Cleared on
+  // every switch before the fetch lands: showing the previous customer's credit
+  // for a beat is how the wrong person spends it.
+  useEffect(() => {
+    setSaldo(0);
+    if (customer.is_system) return;
+    let cancelado = false;
+    saldoDeCliente(customer.id)
+      .then((c) => !cancelado && setSaldo(c))
+      .catch(() => {});
+    return () => {
+      cancelado = true;
+    };
+  }, [customer.id, customer.is_system]);
   const canSubmit = lines.length > 0 && !(mode === "prestamo" && !clienteReal);
 
-  function submit(metodo?: PaymentMethod, pagos?: PagoSplit[]) {
+  function submit(metodo?: PaymentMethodVenta, pagos?: PagoSplit[]) {
     if (!canSubmit) return;
     const items = lines.map((l) => ({ product_id: l.product.id, qty: l.qty }));
     // Snapshot ticket data now — the cart is cleared before the user taps
     // "Imprimir" in the toast, so the closure must capture, not read state.
     const esFiado = mode === "prestamo";
-    const pm: PaymentMethod = metodo ?? "efectivo";
+    const pm: PaymentMethodVenta = metodo ?? "efectivo";
     const ticketItems = lines.map((l) => ({
       nombre: l.product.name,
       qty: l.qty,
@@ -780,6 +799,7 @@ export function SalesScreen({
         onClose={() => setPaymentOpen(false)}
         total={total}
         pending={pending}
+        saldoDisponible={saldo}
         onConfirm={(metodo, pagos) => submit(metodo, pagos)}
       />
 

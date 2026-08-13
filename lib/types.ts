@@ -2,7 +2,13 @@ export type Role = "admin" | "seller";
 // What a payment can be made with. "mixto" is not a method you pick — it marks
 // a sale settled with several methods, whose amounts live in sale_pagos.
 export type PaymentMethod = "efectivo" | "tarjeta" | "transferencia" | "otro";
-export type PaymentMethodStored = PaymentMethod | "mixto";
+export type PaymentMethodStored = PaymentMethod | "mixto" | "saldo";
+/**
+ * What a SALE can be paid with. Store credit is not a payment method anywhere
+ * else — an expense or a supplier advance cannot be paid with it — so it stays
+ * out of PaymentMethod, which those screens share.
+ */
+export type PaymentMethodVenta = PaymentMethod | "saldo";
 
 export interface Profile {
   id: string;

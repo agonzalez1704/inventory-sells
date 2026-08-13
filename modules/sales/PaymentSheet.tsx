@@ -9,15 +9,16 @@ import {
   Delete,
   Check,
   Split as SplitIcon,
+  PiggyBank,
 } from "lucide-react";
 import { formatMXN } from "@/lib/money";
 import { cn } from "@/lib/utils";
-import type { PaymentMethod } from "@/lib/types";
+import type { PaymentMethodVenta } from "@/lib/types";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 
 const METODOS: {
-  value: PaymentMethod;
+  value: PaymentMethodVenta;
   label: string;
   icon: typeof Banknote;
 }[] = [
@@ -25,6 +26,7 @@ const METODOS: {
   { value: "tarjeta", label: "Tarjeta", icon: CreditCard },
   { value: "transferencia", label: "Transfer.", icon: ArrowLeftRight },
   { value: "otro", label: "Otro", icon: Wallet },
+  { value: "saldo", label: "Saldo", icon: PiggyBank },
 ];
 
 const ceilTo = (cents: number, step: number) => Math.ceil(cents / step) * step;
@@ -33,35 +35,46 @@ export function PaymentSheet({
   open,
   onClose,
   total,
+  saldoDisponible,
   pending,
   onConfirm,
 }: {
   open: boolean;
   onClose: () => void;
   total: number; // cents
+  /** This customer's store credit, in cents. 0 hides the method entirely. */
+  saldoDisponible: number;
   pending: boolean;
-  onConfirm: (metodo: PaymentMethod, pagos?: { metodo: PaymentMethod; monto_cents: number }[]) => void;
+  onConfirm: (metodo: PaymentMethodVenta, pagos?: { metodo: PaymentMethodVenta; monto_cents: number }[]) => void;
 }) {
   // Modal is the drawer on phones now — no local switch needed.
   return (
     <Modal open={open} onClose={onClose} title="Cobrar" className="max-w-md">
-      <PaymentContent total={total} pending={pending} onCancel={onClose} onConfirm={onConfirm} />
+      <PaymentContent
+        total={total}
+        saldoDisponible={saldoDisponible}
+        pending={pending}
+        onCancel={onClose}
+        onConfirm={onConfirm}
+      />
     </Modal>
   );
 }
 
 function PaymentContent({
   total,
+  saldoDisponible,
   pending,
   onCancel,
   onConfirm,
 }: {
   total: number;
+  saldoDisponible: number;
   pending: boolean;
   onCancel: () => void;
-  onConfirm: (metodo: PaymentMethod, pagos?: { metodo: PaymentMethod; monto_cents: number }[]) => void;
+  onConfirm: (metodo: PaymentMethodVenta, pagos?: { metodo: PaymentMethodVenta; monto_cents: number }[]) => void;
 }) {
-  const [metodo, setMetodo] = useState<PaymentMethod>("efectivo");
+  const [metodo, setMetodo] = useState<PaymentMethodVenta>("efectivo");
   const [recibido, setRecibido] = useState(""); // pesos, as typed
   // Split payment: an amount per method, as typed. Off by default — the common
   // sale is one method and shouldn't pay for this.
@@ -74,7 +87,14 @@ function PaymentContent({
   })).filter((p) => p.monto_cents > 0);
   const asignado = pagos.reduce((s, p) => s + p.monto_cents, 0);
   const restante = total - asignado;
-  const splitCuadra = dividir && restante === 0 && pagos.length > 0;
+
+  // Store credit is the one method with a ceiling. Blocked rather than clamped:
+  // silently lowering it would charge the customer a different split than the
+  // one on screen.
+  const saldoAsignado = pagos.find((p) => p.metodo === "saldo")?.monto_cents ?? 0;
+  const saldoExcedido = saldoAsignado > saldoDisponible;
+
+  const splitCuadra = dividir && restante === 0 && pagos.length > 0 && !saldoExcedido;
 
   // Reset the typed amount when switching away from cash.
   useEffect(() => {
@@ -87,7 +107,9 @@ function PaymentContent({
   const cambio = hayRecibido ? recibidoCents - total : 0;
   const insuficiente = hayRecibido && recibidoCents < total;
   // Cash: allow "exact" (empty) or received ≥ total. Non-cash: always ok.
-  const puedeCobrarSimple = !esEfectivo || !hayRecibido || recibidoCents >= total;
+  const alcanzaSaldo = metodo !== "saldo" || saldoDisponible >= total;
+  const puedeCobrarSimple =
+    (!esEfectivo || !hayRecibido || recibidoCents >= total) && alcanzaSaldo;
   const puedeCobrar = dividir ? splitCuadra : puedeCobrarSimple;
 
   const sugerencias = useMemo(() => {
@@ -140,7 +162,7 @@ function PaymentContent({
       {dividir ? (
         <div className="space-y-3">
           <div className="space-y-2">
-            {METODOS.map((m) => (
+            {METODOS.filter((m) => m.value !== "saldo" || saldoDisponible > 0).map((m) => (
               <label key={m.value} className="flex items-center gap-3">
                 <span className="flex w-32 shrink-0 items-center gap-2 text-sm">
                   <m.icon className="h-4 w-4 text-muted-foreground" />
@@ -266,7 +288,7 @@ function PaymentContent({
         <Button
           variant="accent"
           className="flex-1"
-          onClick={() => (dividir ? onConfirm("mixto" as PaymentMethod, pagos) : onConfirm(metodo))}
+          onClick={() => (dividir ? onConfirm("mixto" as PaymentMethodVenta, pagos) : onConfirm(metodo, metodo === "saldo" ? [{ metodo, monto_cents: total }] : undefined))}
           loading={pending}
           disabled={!puedeCobrar}
         >
