@@ -123,3 +123,40 @@ export async function lineasDeVenta(saleId: string): Promise<LineaVenta[]> {
       sku: l.products?.sku ?? "",
     }));
 }
+
+/**
+ * Every customer who is owed something, keyed by id.
+ *
+ * One call for the whole list. saldoDeCliente answers for one customer, which
+ * is right at the register and one round trip per row on a screen.
+ */
+export async function saldosDeClientes(): Promise<Record<string, number>> {
+  const { userId } = await auth();
+  if (!userId) return {};
+  const { data } = await insforgeAdmin.database.rpc("saldos_de_clientes");
+  const filas = (data ?? []) as { customer_id: string; saldo_cents: number }[];
+  return Object.fromEntries(filas.map((f) => [f.customer_id, Number(f.saldo_cents)]));
+}
+
+export type MovimientoSaldo = {
+  id: string;
+  monto_cents: number;
+  origen: "garantia" | "venta";
+  motivo: string | null;
+  created_at: string;
+  /** The part under warranty, or the sale that spent it. */
+  detalle: string;
+};
+
+/** The trail behind one balance: what put it there and what spent it. */
+export async function movimientosDeSaldo(customerId: string): Promise<MovimientoSaldo[]> {
+  const { userId } = await auth();
+  if (!userId) return [];
+  const { data } = await insforgeAdmin.database.rpc("movimientos_de_saldo", {
+    p_customer_id: customerId,
+  });
+  return ((data ?? []) as MovimientoSaldo[]).map((m) => ({
+    ...m,
+    monto_cents: Number(m.monto_cents),
+  }));
+}

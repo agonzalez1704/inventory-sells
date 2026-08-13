@@ -13,6 +13,7 @@ import {
   Archive,
   Percent,
   X,
+  Wallet,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
@@ -21,6 +22,8 @@ import { useConfirm } from "@/components/ui/use-confirm";
 import { Input, Select } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { Badge } from "@/components/ui/badge";
+import { formatMXN } from "@/lib/money";
+import { SaldoModal } from "./SaldoModal";
 import { EmptyState } from "@/components/ui/empty-state";
 import {
   crearCliente,
@@ -51,7 +54,16 @@ function pct(v: number | string): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-export function ClientesView({ initial }: { initial: Customer[] }) {
+export function ClientesView({
+  initial,
+  saldos = {},
+}: {
+  initial: Customer[];
+  /** Store credit by customer id — only those who are owed something. */
+  saldos?: Record<string, number>;
+}) {
+  const [verSaldo, setVerSaldo] = useState<Customer | null>(null);
+  const totalSaldo = Object.values(saldos).reduce((s, n) => s + n, 0);
   const [query, setQuery] = useState("");
   const [nuevo, setNuevo] = useState(false);
   const [editar, setEditar] = useState<Customer | null>(null);
@@ -83,6 +95,24 @@ export function ClientesView({ initial }: { initial: Customer[] }) {
         </Button>
       </div>
 
+      {/* What the shop owes its customers. A liability, so it is stated once
+          at the top rather than left to be added up from the badges below. */}
+      {totalSaldo > 0 && (
+        <Card className="flex flex-wrap items-center justify-between gap-2 p-4">
+          <div>
+            <p className="text-sm font-medium">Saldo a favor de clientes</p>
+            <p className="text-xs text-muted-foreground">
+              {Object.keys(saldos).length}{" "}
+              {Object.keys(saldos).length === 1 ? "cliente" : "clientes"} · se usa
+              al cobrar en el punto de venta
+            </p>
+          </div>
+          <p className="font-mono text-2xl font-semibold tabular-nums text-emerald-700 dark:text-emerald-400">
+            {formatMXN(totalSaldo)}
+          </p>
+        </Card>
+      )}
+
       {/* Search */}
       <div className="relative">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -107,11 +137,25 @@ export function ClientesView({ initial }: { initial: Customer[] }) {
       ) : (
         <div className="space-y-2.5">
           {filtrados.map((c) => (
-            <ClienteRow key={c.id} c={c} onEdit={() => setEditar(c)} />
+            <ClienteRow
+              key={c.id}
+              c={c}
+              saldo={saldos[c.id] ?? 0}
+              onEdit={() => setEditar(c)}
+              onVerSaldo={() => setVerSaldo(c)}
+            />
           ))}
         </div>
       )}
 
+      {verSaldo && (
+        <SaldoModal
+          customerId={verSaldo.id}
+          nombre={verSaldo.nombre}
+          saldo={saldos[verSaldo.id] ?? 0}
+          onClose={() => setVerSaldo(null)}
+        />
+      )}
       {nuevo && <ClienteModal onClose={() => setNuevo(false)} />}
       {editar && (
         <ClienteModal cliente={editar} onClose={() => setEditar(null)} />
@@ -120,7 +164,17 @@ export function ClientesView({ initial }: { initial: Customer[] }) {
   );
 }
 
-function ClienteRow({ c, onEdit }: { c: Customer; onEdit: () => void }) {
+function ClienteRow({
+  c,
+  saldo,
+  onEdit,
+  onVerSaldo,
+}: {
+  c: Customer;
+  saldo: number;
+  onEdit: () => void;
+  onVerSaldo: () => void;
+}) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [confirmar, dialogoConfirm] = useConfirm();
@@ -157,6 +211,21 @@ function ClienteRow({ c, onEdit }: { c: Customer; onEdit: () => void }) {
               <Badge tone="neutral">Sistema</Badge>
             ) : (
               <Badge tone={TIPO_TONE[c.tipo]}>{TIPO_LABEL[c.tipo]}</Badge>
+            )}
+            {saldo > 0 && (
+              // Clickable, because the number alone confirms nothing: the next
+              // question is always "from what?".
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onVerSaldo();
+                }}
+                className="inline-flex cursor-pointer items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/20 transition-colors hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300"
+              >
+                <Wallet className="h-3 w-3" />
+                {formatMXN(saldo)} a favor
+              </button>
             )}
             {descuento > 0 && (
               <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-300 ring-1 ring-inset ring-emerald-600/20">

@@ -1,19 +1,23 @@
 import { createInsForgeServerClient } from "@/lib/insforge/server";
 import { ClientesView } from "@/modules/customers/ClientesView";
 import type { Customer } from "@/modules/customers/actions";
+import { saldosDeClientes } from "@/modules/garantias/cliente-actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function ClientesPage() {
   const insforge = await createInsForgeServerClient();
-  const { data } = await insforge.database
+  const [{ data }, saldos] = await Promise.all([
+    insforge.database
     .from("customers")
-    .select(
+      .select(
       "id, nombre, telefono, email, descuento_pct, tipo, notas, is_active, is_system, created_at, customer_phones(id, telefono, etiqueta)",
     )
-    .eq("is_active", true)
-    .order("is_system", { ascending: false })
-    .order("nombre", { ascending: true });
+      .eq("is_active", true)
+      .order("is_system", { ascending: false })
+      .order("nombre", { ascending: true }),
+    saldosDeClientes(),
+  ]);
 
-  return <ClientesView initial={(data ?? []) as Customer[]} />;
+  return <ClientesView initial={(data ?? []) as Customer[]} saldos={saldos} />;
 }
