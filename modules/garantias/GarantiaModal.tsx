@@ -129,7 +129,7 @@ export function GarantiaModal({
   }
 
   return (
-    <Modal open onClose={onClose} title="Garantía" className="max-w-lg">
+    <Modal open onClose={onClose} title="Garantía de cliente" className="max-w-lg">
       {!saleId ? (
         <BuscarVenta onElegir={setElegida} />
       ) : (

@@ -3,10 +3,13 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Plus, Search, ShieldAlert, Check, X, RotateCcw, Trash2 } from "lucide-react";
+import { Plus, Search, ShieldAlert, Check, X, RotateCcw, Trash2,
+  ShieldCheck,
+} from "lucide-react";
 import { formatMXN } from "@/lib/money";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { GarantiaModal } from "./GarantiaModal";
 import { useConfirm } from "@/components/ui/use-confirm";
 import { unwrap, type ActionResult } from "@/lib/errors";
 import { Input, Select } from "@/components/ui/input";
@@ -49,6 +52,7 @@ export function GarantiasView({
 }) {
   const [query, setQuery] = useState("");
   const [nueva, setNueva] = useState(false);
+  const [garantiaCliente, setGarantiaCliente] = useState(false);
   const [verResueltas, setVerResueltas] = useState(false);
 
   const { pendientes, resueltas } = useMemo(() => {
@@ -75,10 +79,21 @@ export function GarantiasView({
             Piezas que regresamos y que el proveedor nos debe rebajar
           </p>
         </div>
-        <Button onClick={() => setNueva(true)}>
-          <Plus className="h-4 w-4" />
-          Registrar garantía
-        </Button>
+        {/* Two different things are called "garantía" here and anyone looking
+            for either one comes to this page. The one against a supplier is
+            what this screen lists; the one a customer claims lives on a sale,
+            so it opens its own search. Both are reachable from where people
+            actually look. */}
+        <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" onClick={() => setGarantiaCliente(true)}>
+            <ShieldCheck className="h-4 w-4" />
+            De un cliente
+          </Button>
+          <Button onClick={() => setNueva(true)}>
+            <Plus className="h-4 w-4" />
+            A proveedor
+          </Button>
+        </div>
       </div>
 
       {saldos.length > 0 && (
@@ -143,6 +158,9 @@ export function GarantiasView({
         </div>
       )}
 
+      {garantiaCliente && (
+        <GarantiaModal onClose={() => setGarantiaCliente(false)} />
+      )}
       {nueva && <NuevaGarantia proveedores={proveedores} onClose={() => setNueva(false)} />}
     </section>
   );
@@ -341,7 +359,7 @@ function NuevaGarantia({
 
   if (proveedores.length === 0) {
     return (
-      <Modal open onClose={onClose} title="Registrar garantía" className="max-w-md">
+      <Modal open onClose={onClose} title="Garantía a proveedor" className="max-w-md">
         <p className="text-sm text-muted-foreground">
           Primero registra un proveedor para poder anotarle garantías.
         </p>
@@ -350,7 +368,7 @@ function NuevaGarantia({
   }
 
   return (
-    <Modal open onClose={onClose} title="Registrar garantía" className="max-w-md">
+    <Modal open onClose={onClose} title="Garantía a proveedor" className="max-w-md">
       <div className="space-y-3">
         <label className="block">
           <span className="mb-1 block text-xs font-medium text-muted-foreground">Proveedor</span>
