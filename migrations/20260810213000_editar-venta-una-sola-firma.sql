@@ -1,0 +1,11 @@
+-- Drop the three-argument editar_venta.
+--
+-- Adding p_customer_id with a default created a second function rather than
+-- replacing the first, so both were live. A call naming only the original three
+-- arguments matches the old signature exactly AND the new one by default —
+-- Postgres cannot choose, and answers "function is not unique" instead of
+-- correcting a sale.
+--
+-- Nothing calls the old one after this deploy; dropping it is what makes the
+-- new parameter reachable at all.
+DROP FUNCTION IF EXISTS public.editar_venta(uuid, text, text);

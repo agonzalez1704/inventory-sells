@@ -191,6 +191,13 @@ export async function editarVenta(
   saleId: string,
   paymentMethod: PaymentMethod,
   customerName: string | null,
+  /**
+   * The registered customer, by id. Omit to leave the assignment untouched;
+   * null detaches it. Writing only the name looks like an assignment and is
+   * not — a warranty hangs off the id, so a sale "assigned" by name keeps
+   * being refused.
+   */
+  customerId?: string | null,
 ): Promise<void> {
   const { userId } = await auth();
   if (!userId) throw new Error("No autenticado");
@@ -200,6 +207,11 @@ export async function editarVenta(
     p_sale_id: saleId,
     p_payment_method: paymentMethod,
     p_customer_name: customerName?.trim() || null,
+    // The RPC's sentinel for "leave it alone" — NULL is a real value here, it
+    // is how a sale is detached from its customer.
+    ...(customerId === undefined
+      ? {}
+      : { p_customer_id: customerId }),
   });
   if (error) throw new Error(error.message ?? "Error al editar la venta");
 }

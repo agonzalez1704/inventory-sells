@@ -29,6 +29,7 @@ import { PrintTicketButtons } from "@/components/ticket/PrintTicketButtons";
 import { ItemSwapModal, type SwapProduct } from "@/modules/sales/ItemSwapModal";
 import { ReturnModal } from "@/modules/sales/ReturnModal";
 import { GarantiaModal } from "@/modules/garantias/GarantiaModal";
+import { CustomerPicker, type PickerCustomer } from "@/modules/customers/CustomerPicker";
 import {
   editarVenta,
   convertirAFiado,
@@ -62,9 +63,11 @@ const LABEL = { ...Object.fromEntries(PAYMENT), mixto: "Mixto" } as Record<strin
 
 function EditModal({
   sale,
+  customers,
   onClose,
 }: {
   sale: SaleWithItems;
+  customers: PickerCustomer[];
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -79,13 +82,19 @@ function EditModal({
       : "efectivo",
   );
   const [customer, setCustomer] = useState(sale.customer_name ?? "");
+  // Seeded by name: the sales list does not carry customer_id, and matching on
+  // the name is enough to preselect. Whatever the operator picks is what gets
+  // written, by id.
+  const [cliente, setCliente] = useState<PickerCustomer | null>(
+    () => customers.find((c) => c.nombre === sale.customer_name) ?? null,
+  );
   const [swapOpen, setSwapOpen] = useState(false);
   const [pending, start] = useTransition();
 
   function save() {
     start(async () => {
       try {
-        await editarVenta(sale.id, payment, customer);
+        await editarVenta(sale.id, payment, customer, cliente?.id ?? null);
         toast.success("Venta corregida");
         onClose();
         router.refresh();
@@ -163,9 +172,30 @@ function EditModal({
         </label>
         <label className="block">
           <span className="mb-1 block text-xs font-medium text-muted-foreground">
-            Cliente (opcional)
+            Cliente
           </span>
-          <Input value={customer} onChange={(e) => setCustomer(e.target.value)} />
+          {customers.length > 0 ? (
+            <>
+              <CustomerPicker
+                customers={customers}
+                value={cliente}
+                onChange={setCliente}
+                placeholder="Elegir cliente"
+                openUp={false}
+              />
+              {/* Why it is worth doing rather than typing a name: everything
+                  that belongs to the person and not the label hangs off this —
+                  a warranty, and the credit a warranty leaves. A sale on
+                  Mostrador with someone's name typed in reads as assigned and
+                  is not. */}
+              <span className="mt-1.5 block text-xs text-muted-foreground">
+                Mostrador no puede llevar garantía ni saldo a favor. Asigna al
+                cliente registrado para que pueda.
+              </span>
+            </>
+          ) : (
+            <Input value={customer} onChange={(e) => setCustomer(e.target.value)} />
+          )}
         </label>
 
         <div className="rounded-lg border border-border bg-muted/30 p-3">
@@ -248,12 +278,15 @@ function EditModal({
 export function RecentSales({
   sales,
   isAdmin,
+  customers = [],
   titulo = "Ventas recientes",
   subtitulo = "Toca una venta para ver sus productos.",
   abrirId,
 }: {
   sales: SaleWithItems[];
   isAdmin: boolean;
+  /** For assigning one when correcting a sale. Empty disables the picker. */
+  customers?: PickerCustomer[];
   titulo?: string;
   subtitulo?: string;
   abrirId?: string | null;
@@ -568,7 +601,7 @@ export function RecentSales({
       )}
 
       {edit && (
-        <EditModal sale={edit} onClose={() => setEdit(null)} />
+        <EditModal sale={edit} customers={customers} onClose={() => setEdit(null)} />
       )}
       {garantiaSale && (
         <GarantiaModal sale={garantiaSale} onClose={() => setGarantiaSale(null)} />

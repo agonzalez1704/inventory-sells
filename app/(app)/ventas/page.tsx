@@ -39,6 +39,19 @@ export default async function VentasPage({
 
   const insforge = await createInsForgeServerClient();
 
+  const { data: customerData } = await insforge.database
+    .from("customers")
+    .select("id, nombre, telefono, is_system")
+    .eq("is_active", true)
+    .order("is_system", { ascending: false })
+    .order("nombre", { ascending: true });
+  const customers = (customerData ?? []) as {
+    id: string;
+    nombre: string;
+    telefono: string;
+    is_system: boolean;
+  }[];
+
   let ventasQuery = insforge.database
     .from("sales")
     .select(
@@ -154,6 +167,7 @@ export default async function VentasPage({
       <RecentSales
         sales={lista}
         isAdmin={isAdmin}
+        customers={customers}
         abrirId={abrirId}
         titulo="Ventas del periodo"
         subtitulo="Toca una venta para ver sus productos. La búsqueda abarca todas las ventas."
