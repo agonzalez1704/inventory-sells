@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { ShieldCheck, Receipt } from "lucide-react";
 import { formatMXN } from "@/lib/money";
 import { cn } from "@/lib/utils";
@@ -72,10 +73,37 @@ export function SaldoModal({
                     {abona ? <ShieldCheck className="h-4 w-4" /> : <Receipt className="h-4 w-4" />}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{m.detalle}</p>
+                    <p className="text-sm font-medium">
+                      {abona ? (
+                        <>
+                          Regresó {m.qty} {m.qty === 1 ? "pieza" : "piezas"}
+                          {/* Says how many of how many. A partial return is the
+                              norm — three sold, one back — and without the
+                              denominator the amount looks arbitrary. */}
+                          {m.vendidas && m.vendidas > (m.qty ?? 0) ? ` de ${m.vendidas}` : ""}
+                          {m.pieza ? `: ${m.pieza}` : ""}
+                        </>
+                      ) : (
+                        "Pagó con su saldo"
+                      )}
+                    </p>
+                    {m.motivo && (
+                      <p className="text-xs text-foreground/80">{m.motivo}</p>
+                    )}
                     <p className="text-xs text-muted-foreground">
                       {fecha(m.created_at)}
-                      {m.motivo ? ` · ${m.motivo}` : ""}
+                      {m.sku ? ` · ${m.sku.toUpperCase()}` : ""}
+                      {m.sale_id && (
+                        <>
+                          {" · "}
+                          <Link
+                            href={`/ventas?venta=${m.sale_id}`}
+                            className="underline-offset-2 hover:underline"
+                          >
+                            {abona ? "ver la venta original" : "ver la venta"}
+                          </Link>
+                        </>
+                      )}
                     </p>
                   </div>
                   <span

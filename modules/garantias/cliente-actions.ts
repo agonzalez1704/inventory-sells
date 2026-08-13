@@ -144,8 +144,16 @@ export type MovimientoSaldo = {
   origen: "garantia" | "venta";
   motivo: string | null;
   created_at: string;
-  /** The part under warranty, or the sale that spent it. */
-  detalle: string;
+  /** The part, on a credit. Null on a spend. */
+  pieza: string | null;
+  sku: string | null;
+  /** How many came back. */
+  qty: number | null;
+  /** How many were on that line — a partial return is the norm. */
+  vendidas: number | null;
+  /** The sale to go look at: the one the warranty came from, or the one that spent it. */
+  sale_id: string | null;
+  garantia_id: string | null;
 };
 
 /** The trail behind one balance: what put it there and what spent it. */
