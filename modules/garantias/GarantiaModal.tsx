@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { formatMXN } from "@/lib/money";
@@ -10,36 +10,86 @@ import { Modal } from "@/components/ui/modal";
 import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import type { SaleWithItems } from "@/modules/sales/RecentSales";
-import { registrarGarantia, type ResolucionGarantia } from "./cliente-actions";
+import { BuscarVenta } from "./BuscarVenta";
+import {
+  registrarGarantia,
+  lineasDeVenta,
+  type ResolucionGarantia,
+  type LineaVenta,
+  type VentaGarantia,
+} from "./cliente-actions";
 
 // One part per claim. A warranty is a statement about a specific piece that
 // failed — bundling several into one record would leave the shop unable to say
 // which of them the supplier owes for.
+/**
+ * Two entry points, one modal.
+ *
+ * From a sale (the Garantía button on /ventas) it opens straight on the form.
+ * Without one it starts on the search, because the usual case is a customer
+ * walking in with a part and no idea which sale it came from.
+ */
 export function GarantiaModal({
   sale,
   onClose,
 }: {
-  sale: SaleWithItems;
+  /** Omitted when the operator has to find the sale first. */
+  sale?: SaleWithItems;
   onClose: () => void;
 }) {
+  const [elegida, setElegida] = useState<VentaGarantia | null>(null);
+  const [lineasBuscadas, setLineasBuscadas] = useState<LineaVenta[]>([]);
+  const [cargandoLineas, setCargandoLineas] = useState(false);
+
+  const saleId = sale?.id ?? elegida?.id ?? null;
+  const nombreCliente = sale?.customer_name ?? elegida?.customer_name ?? null;
+
+  // Only when the sale came from the search — one already in hand carries its
+  // own lines.
+  useEffect(() => {
+    if (!elegida) return;
+    let cancelado = false;
+    setCargandoLineas(true);
+    lineasDeVenta(elegida.id)
+      .then((l) => !cancelado && setLineasBuscadas(l))
+      .catch(() => {})
+      .finally(() => !cancelado && setCargandoLineas(false));
+    return () => {
+      cancelado = true;
+    };
+  }, [elegida]);
+
   const router = useRouter();
   const [pending, start] = useTransition();
 
   const lineas = useMemo(
     () =>
-      sale.sale_items
-        .filter((it) => it.product_id)
-        .map((it) => ({
-          product_id: it.product_id as string,
-          nombre: it.products?.name ?? "Producto",
-          sku: it.products?.sku ?? "",
-          sold: it.qty,
-          unit: it.unit_price_cents,
-        })),
-    [sale.sale_items],
+      sale
+        ? sale.sale_items
+            .filter((it) => it.product_id)
+            .map((it) => ({
+              product_id: it.product_id as string,
+              nombre: it.products?.name ?? "Producto",
+              sku: it.products?.sku ?? "",
+              sold: it.qty,
+              unit: it.unit_price_cents,
+            }))
+        : lineasBuscadas.map((l) => ({
+            product_id: l.product_id,
+            nombre: l.nombre,
+            sku: l.sku,
+            sold: l.qty,
+            unit: l.unit_price_cents,
+          })),
+    [sale, lineasBuscadas],
   );
 
-  const [productId, setProductId] = useState(lineas[0]?.product_id ?? "");
+  const [productId, setProductId] = useState("");
+  // The lines arrive after the sale is picked, so the default cannot be seeded
+  // at mount. Only fills an empty choice — never overrides the operator's.
+  useEffect(() => {
+    setProductId((p) => (p && lineas.some((l) => l.product_id === p) ? p : lineas[0]?.product_id ?? ""));
+  }, [lineas]);
   const [qty, setQty] = useState(1);
   const [motivo, setMotivo] = useState("");
   // No default: the operator has to say whether the part is still sellable.
@@ -51,13 +101,13 @@ export function GarantiaModal({
   const monto = (linea?.unit ?? 0) * qty;
 
   function guardar() {
-    if (!linea) return toast.error("Elige la pieza");
+    if (!saleId || !linea) return toast.error("Elige la pieza");
     if (reingresa === null) return toast.error("Falta decir si la pieza sirve");
     start(async () => {
       try {
         unwrap(
           await registrarGarantia(
-            sale.id,
+            saleId!,
             linea.product_id,
             qty,
             motivo || null,
@@ -80,15 +130,23 @@ export function GarantiaModal({
 
   return (
     <Modal open onClose={onClose} title="Garantía" className="max-w-lg">
+      {!saleId ? (
+        <BuscarVenta onElegir={setElegida} />
+      ) : (
       <div className="space-y-4">
         <p className="text-sm text-muted-foreground">
-          Queda ligada a esta venta{sale.customer_name ? ` de ${sale.customer_name}` : ""}.
+          Queda ligada a esta venta{nombreCliente ? ` de ${nombreCliente}` : ""}.
           Se valúa a lo que el cliente pagó ese día, no al precio de hoy.
         </p>
 
         <label className="block">
           <span className="mb-1 block text-xs font-medium text-muted-foreground">Pieza</span>
-          <Select value={productId} onChange={(e) => setProductId(e.target.value)}>
+          <Select
+            value={productId}
+            onChange={(e) => setProductId(e.target.value)}
+            disabled={cargandoLineas}
+          >
+            {cargandoLineas && <option>Cargando piezas…</option>}
             {lineas.map((l) => (
               <option key={l.product_id} value={l.product_id}>
                 {l.sku} · {l.nombre} — {formatMXN(l.unit)} c/u
@@ -193,6 +251,7 @@ export function GarantiaModal({
           </Button>
         </div>
       </div>
+      )}
     </Modal>
   );
 }

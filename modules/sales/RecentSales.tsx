@@ -261,6 +261,7 @@ export function RecentSales({
   const [edit, setEdit] = useState<SaleWithItems | null>(null);
   const [returnSale, setReturnSale] = useState<SaleWithItems | null>(null);
   const [garantiaSale, setGarantiaSale] = useState<SaleWithItems | null>(null);
+  const [garantiaBuscar, setGarantiaBuscar] = useState(false);
   // Deep-link from a push notification: open + scroll to + briefly flash that
   // sale so it's obvious which one the notification was about.
   const [open, setOpen] = useState<Set<string>>(() => new Set(abrirId ? [abrirId] : []));
@@ -354,6 +355,19 @@ export function RecentSales({
           </h2>
           <p className="mt-0.5 text-xs text-muted-foreground">{subtitulo}</p>
         </div>
+        <div className="flex w-full items-center gap-2 sm:w-auto">
+          {/* The usual case is a customer at the counter holding a part and no
+              idea which sale it came from, so the warranty starts from its own
+              search rather than only from a row in this list. That search runs
+              in SQL over every sale — this list's does not, see below. */}
+          <Button
+            variant="secondary"
+            className="shrink-0"
+            onClick={() => setGarantiaBuscar(true)}
+          >
+            <ShieldCheck className="h-4 w-4" />
+            Garantía
+          </Button>
         <div className="relative w-full sm:w-72">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           {searching && (
@@ -365,6 +379,7 @@ export function RecentSales({
             placeholder="Buscar por vendedor, cliente, producto o total…"
             className="h-9 pl-9"
           />
+        </div>
         </div>
       </div>
       {displayed.length === 0 ? (
@@ -558,6 +573,7 @@ export function RecentSales({
       {garantiaSale && (
         <GarantiaModal sale={garantiaSale} onClose={() => setGarantiaSale(null)} />
       )}
+      {garantiaBuscar && <GarantiaModal onClose={() => setGarantiaBuscar(false)} />}
       {returnSale && (
         <ReturnModal
           sale={returnSale}
