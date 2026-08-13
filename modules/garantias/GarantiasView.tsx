@@ -9,7 +9,10 @@ import { Plus, Search, ShieldAlert, Check, X, RotateCcw, Trash2,
 import { formatMXN } from "@/lib/money";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { GarantiaModal } from "./GarantiaModal";
+import { GarantiasClienteList } from "./GarantiasClienteList";
+import type { GarantiaCliente } from "./cliente-actions";
 import { useConfirm } from "@/components/ui/use-confirm";
 import { unwrap, type ActionResult } from "@/lib/errors";
 import { Input, Select } from "@/components/ui/input";
@@ -45,14 +48,20 @@ export function GarantiasView({
   garantias,
   saldos,
   proveedores,
+  deClientes = [],
 }: {
   garantias: Garantia[];
   saldos: GarantiaSaldo[];
   proveedores: Proveedor[];
+  deClientes?: GarantiaCliente[];
 }) {
   const [query, setQuery] = useState("");
   const [nueva, setNueva] = useState(false);
   const [garantiaCliente, setGarantiaCliente] = useState(false);
+  // Customer warranties open first when any is waiting on a decision.
+  const [tab, setTab] = useState<"proveedor" | "cliente">(
+    deClientes.some((g) => g.estado === "pendiente") ? "cliente" : "proveedor",
+  );
   const [verResueltas, setVerResueltas] = useState(false);
 
   const { pendientes, resueltas } = useMemo(() => {
@@ -74,9 +83,11 @@ export function GarantiasView({
     <section className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Garantías a proveedor</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Garantías</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Piezas que regresamos y que el proveedor nos debe rebajar
+            {tab === "proveedor"
+              ? "Piezas que regresamos y que el proveedor nos debe rebajar"
+              : "Piezas que un cliente nos regresó, y cómo se le resolvió"}
           </p>
         </div>
         {/* Two different things are called "garantía" here and anyone looking
@@ -96,6 +107,36 @@ export function GarantiasView({
         </div>
       </div>
 
+      {/* Two ledgers that run in opposite directions under one word. Tabs
+          rather than one merged list: "nos deben" and "les debemos" are read
+          by different people asking different questions. */}
+      <div className="inline-flex rounded-lg bg-muted p-0.5 text-sm">
+        {(
+          [
+            ["proveedor", "A proveedor", garantias.length],
+            ["cliente", "De clientes", deClientes.length],
+          ] as const
+        ).map(([v, label, n]) => (
+          <button
+            key={v}
+            onClick={() => setTab(v)}
+            className={cn(
+              "cursor-pointer rounded-md px-3 py-1.5 font-medium transition-colors",
+              tab === v
+                ? "bg-background text-foreground shadow-xs"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {label}
+            {n > 0 && <span className="ml-1.5 text-xs text-muted-foreground">{n}</span>}
+          </button>
+        ))}
+      </div>
+
+      {tab === "cliente" ? (
+        <GarantiasClienteList garantias={deClientes} />
+      ) : (
+      <>
       {saldos.length > 0 && (
         <Card className="p-4">
           <div className="flex items-center justify-between gap-2">
@@ -156,6 +197,8 @@ export function GarantiasView({
           </button>
           {verResueltas && resueltas.map((g) => <GarantiaRow key={g.id} g={g} />)}
         </div>
+      )}
+      </>
       )}
 
       {garantiaCliente && (

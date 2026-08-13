@@ -160,3 +160,59 @@ export async function movimientosDeSaldo(customerId: string): Promise<Movimiento
     monto_cents: Number(m.monto_cents),
   }));
 }
+
+export type GarantiaCliente = {
+  id: string;
+  sale_id: string;
+  cliente: string;
+  customer_id: string;
+  pieza: string;
+  sku: string;
+  qty: number;
+  monto_cents: number;
+  motivo: string | null;
+  reingresa_stock: boolean;
+  estado: "pendiente" | "aceptada" | "rechazada";
+  resolucion: ResolucionGarantia | null;
+  created_at: string;
+  resuelta_at: string | null;
+};
+
+/** Pending first — those are the ones somebody still has to act on. */
+export async function listarGarantiasCliente(): Promise<GarantiaCliente[]> {
+  const { userId } = await auth();
+  if (!userId) return [];
+  const { data } = await insforgeAdmin.database.rpc("listar_garantias_cliente", {
+    p_limite: 200,
+  });
+  return ((data ?? []) as GarantiaCliente[]).map((g) => ({
+    ...g,
+    qty: Number(g.qty),
+    monto_cents: Number(g.monto_cents),
+  }));
+}
+
+/**
+ * Settle a pending warranty. A null resolution rejects it.
+ *
+ * Rejecting is an outcome, not a delete: "we looked at it and it is not
+ * covered" is something the shop has to be able to show the customer later.
+ */
+export async function resolverGarantia(
+  id: string,
+  resolucion: ResolucionGarantia | null,
+  motivo: string | null,
+): Promise<ActionResult<null>> {
+  return attempt("resolverGarantia", async () => {
+    const { userId } = await auth();
+    if (!userId) throw new Error("No autenticado");
+    const insforge = await createInsForgeServerClient();
+    const { error } = await insforge.database.rpc("resolver_garantia_cliente", {
+      p_id: id,
+      p_resolucion: resolucion,
+      p_motivo: motivo,
+    });
+    if (error) throw new Error(error.message ?? "No se pudo resolver");
+    return null;
+  });
+}
