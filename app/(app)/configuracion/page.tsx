@@ -4,8 +4,9 @@ import { getNegocioInfo, getAsesoresRaw, getValorBase, getTiendaInfo } from "@/m
 import { ConfigView } from "@/modules/config/ConfigView";
 import { Card } from "@/components/ui/card";
 import { PushToggle } from "@/components/push-toggle";
-import { NotifPrefs } from "@/modules/notifications/NotifPrefs";
-import { getNotifPrefs } from "@/modules/notifications/actions";
+import { NotifRoles } from "@/modules/notifications/NotifRoles";
+import { notificacionesPorRol } from "@/modules/notifications/rol-actions";
+
 import { Bell, ScanBarcode } from "lucide-react";
 import { getPermisos } from "@/lib/auth/profile";
 import { getPrecioBasePos } from "@/modules/sales/pos-prefs";
@@ -19,15 +20,18 @@ export default async function ConfiguracionPage() {
   // the inventory valuation. Whoever cannot see costs is not offered a switch
   // that only has one legal position.
   const perms = userId ? await getPermisos(userId) : null;
+  const puedeGestionarUsuarios = Boolean(
+    perms && (perms.has("admin_total") || perms.has("usuarios_gestionar")),
+  );
   const verCostos = Boolean(
     perms && (perms.has("admin_total") || perms.has("costos_ver")),
   );
-  const [info, asesores, valorBase, tienda, notifPrefs, precioBasePos] = await Promise.all([
+  const [info, asesores, valorBase, tienda, notifRoles, precioBasePos] = await Promise.all([
     getNegocioInfo(),
     getAsesoresRaw(),
     getValorBase(),
     getTiendaInfo(),
-    isAdmin ? getNotifPrefs() : null,
+    puedeGestionarUsuarios ? notificacionesPorRol() : null,
     getPrecioBasePos(),
   ]);
 
@@ -60,23 +64,45 @@ export default async function ConfiguracionPage() {
         </Card>
       )}
 
-      {isAdmin && (
+      {/* Everyone, not just admins. Which events reach you is decided by your
+          role now, so a seller whose role gets warranty alerts still has to be
+          able to turn push on for their own phone. */}
+      <Card className="p-4">
+        <div className="flex items-center gap-2.5">
+          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-soft text-brand-foreground">
+            <Bell className="h-5 w-5" />
+          </span>
+          <div>
+            <h2 className="text-sm font-semibold">Notificaciones en este teléfono</h2>
+            <p className="text-xs text-muted-foreground">
+              Actívalas en cada dispositivo donde quieras recibirlas. Qué avisos
+              te llegan depende de tu rol.
+            </p>
+          </div>
+        </div>
+        <div className="mt-3">
+          <PushToggle />
+        </div>
+      </Card>
+
+      {/* Deciding who hears what is managing staff, so it rides the permission
+          that already means exactly that. */}
+      {puedeGestionarUsuarios && notifRoles && (
         <Card className="p-4">
           <div className="flex items-center gap-2.5">
             <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-soft text-brand-foreground">
               <Bell className="h-5 w-5" />
             </span>
             <div>
-              <h2 className="text-sm font-semibold">Notificaciones</h2>
+              <h2 className="text-sm font-semibold">Avisos por rol</h2>
               <p className="text-xs text-muted-foreground">
-                Recibe un aviso en tu teléfono por cada venta y nota de crédito. Actívalo
-                en cada dispositivo donde quieras recibirlas.
+                Qué eventos recibe cada rol. Cambia con el puesto, no con la
+                persona.
               </p>
             </div>
           </div>
-          <div className="mt-3 space-y-4">
-            <PushToggle />
-            {notifPrefs && <NotifPrefs initial={notifPrefs} />}
+          <div className="mt-3">
+            <NotifRoles inicial={notifRoles} />
           </div>
         </Card>
       )}

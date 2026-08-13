@@ -29,14 +29,6 @@ export type PushPayload = {
 
 // Which events can notify, and the default when a user has no saved prefs.
 export type NotifKind = "venta" | "fiado" | "abono" | "cancelacion" | "garantia";
-export const DEFAULT_PREFS: Record<NotifKind, boolean> = {
-  venta: true,
-  fiado: true,
-  abono: false,
-  cancelacion: false,
-  // On by default: an unapproved warranty is a customer waiting at the counter.
-  garantia: true,
-};
 
 // Low-level: push to specific users' devices. Best-effort; prunes dead subs.
 export async function pushToUsers(
@@ -246,35 +238,19 @@ export async function notifyCotizacionAutorizada(cotizacionId: string): Promise<
   }
 }
 
-// Admins who opted into this event kind (falling back to DEFAULT_PREFS).
+/**
+ * Who hears about one kind of event.
+ *
+ * Asked of the role, not of the person. The old version read
+ * profiles.role = 'admin' — a label from before roles were data — and then
+ * filtered by a per-user preference only an admin could set. A Jefe de almacén
+ * approving warranties was never going to be told one arrived.
+ */
 async function adminsForKind(kind: NotifKind): Promise<string[]> {
-  // A warranty goes to whoever can approve one, which is a permission and not
-  // the legacy role = 'admin' label — Jefe de almacén holds it and is not an
-  // admin. Everything else keeps the old audience.
-  const { data: admins } =
-    kind === "garantia"
-      ? await insforgeAdmin.database.rpc("usuarios_con_permiso", {
-          p_permiso: "garantias_aprobar",
-        })
-      : await insforgeAdmin.database.from("profiles").select("id").eq("role", "admin");
-  const ids = (
-    (admins ?? []) as ({ id: string } | { user_id: string })[]
-  ).map((a) => ("id" in a ? a.id : a.user_id));
-  if (!ids.length) return [];
-
-  const { data: prefs } = await insforgeAdmin.database
-    .from("notification_prefs")
-    .select("user_id, venta, fiado, abono, cancelacion, garantia")
-    .in("user_id", ids);
-  const byUser = new Map(
-    ((prefs ?? []) as (Record<NotifKind, boolean> & { user_id: string })[]).map(
-      (p) => [p.user_id, p],
-    ),
-  );
-  return ids.filter((id) => {
-    const p = byUser.get(id);
-    return p ? p[kind] : DEFAULT_PREFS[kind];
+  const { data } = await insforgeAdmin.database.rpc("usuarios_a_notificar", {
+    p_kind: kind,
   });
+  return ((data ?? []) as { user_id: string }[]).map((r) => r.user_id);
 }
 
 export async function notifyAdmins(

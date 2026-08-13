@@ -3,16 +3,14 @@
 import { auth } from "@clerk/nextjs/server";
 import { getProfile } from "@/lib/auth/profile";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
-import { pushToUsers, DEFAULT_PREFS, type NotifKind } from "@/lib/push";
+import { pushToUsers } from "@/lib/push";
 import { MARCA } from "@/lib/marca";
-import { guardarPrefs } from "@/lib/prefs";
 
 export type WebPushSub = {
   endpoint: string;
   keys: { p256dh: string; auth: string };
 };
 
-export type NotifPrefs = Record<NotifKind, boolean>;
 
 // Store this device's push subscription. Any signed-in staff member — sellers
 // receive quote assignments + unassigned broadcasts, not only admins. RLS pins
@@ -67,38 +65,4 @@ export async function sendTestPush(): Promise<void> {
   });
 }
 
-// Which events notify this admin (resolved with defaults).
-export async function getNotifPrefs(): Promise<NotifPrefs> {
-  const { userId } = await auth();
-  if (!userId) return { ...DEFAULT_PREFS };
 
-  const insforge = await createInsForgeServerClient();
-  const { data } = await insforge.database
-    .from("notification_prefs")
-    .select("venta, fiado, abono, cancelacion, garantia")
-    .eq("user_id", userId)
-    .maybeSingle();
-  const row = data as NotifPrefs | null;
-  return row ? { ...DEFAULT_PREFS, ...row } : { ...DEFAULT_PREFS };
-}
-
-export async function saveNotifPrefs(prefs: NotifPrefs): Promise<void> {
-  const { userId } = await auth();
-  if (!userId) throw new Error("No autenticado");
-  const profile = await getProfile(userId);
-  if (profile?.role !== "admin") throw new Error("Solo administradores");
-
-  const insforge = await createInsForgeServerClient();
-  const row = {
-    venta: !!prefs.venta,
-    fiado: !!prefs.fiado,
-    abono: !!prefs.abono,
-    cancelacion: !!prefs.cancelacion,
-    garantia: !!prefs.garantia,
-  };
-  // Same bug pos_prefs hit: RLS here has no DELETE policy, so the delete this
-  // used to do matched nothing and the insert then collided with the row that
-  // was still there — fine the first time an admin saved, broken every time
-  // after.
-  await guardarPrefs(insforge.database as never, "notification_prefs", userId, row);
-}
