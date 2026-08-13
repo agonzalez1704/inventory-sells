@@ -175,8 +175,30 @@ function PaymentContent({
                   }
                   inputMode="decimal"
                   placeholder="0.00"
-                  className="h-10 w-full rounded-lg border border-border bg-background px-3 text-right font-mono tabular-nums outline-none focus:border-ring/40"
+                  className={cn(
+                    "h-10 w-full rounded-lg border bg-background px-3 text-right font-mono tabular-nums outline-none focus:border-ring/40",
+                    m.value === "saldo" && saldoExcedido
+                      ? "border-red-500"
+                      : "border-border",
+                  )}
                 />
+                {/* Credit is the one row with a ceiling, so it says what the
+                    ceiling is and fills itself — the common case is "use all
+                    of it and charge me the difference". */}
+                {m.value === "saldo" && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setMontos((cur) => ({
+                        ...cur,
+                        saldo: (Math.min(saldoDisponible, total) / 100).toFixed(2),
+                      }))
+                    }
+                    className="shrink-0 cursor-pointer whitespace-nowrap text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                  >
+                    de {formatMXN(saldoDisponible)}
+                  </button>
+                )}
               </label>
             ))}
           </div>
@@ -191,6 +213,12 @@ function PaymentContent({
             />
           </div>
 
+          {saldoExcedido && (
+            <p className="text-xs text-red-600 dark:text-red-400">
+              El saldo del cliente es {formatMXN(saldoDisponible)}. No se puede
+              asignar más de eso.
+            </p>
+          )}
           {restante !== 0 && (
             <p className="text-xs text-muted-foreground">
               Los montos deben sumar exactamente el total para poder cobrar.
@@ -220,6 +248,42 @@ function PaymentContent({
           );
         })}
       </div>
+
+      {/* Credit chosen on its own but short. The Cobrar button greys out either
+          way; without this it greys out for no visible reason, and the seller
+          is one tap from the answer without knowing the tap exists. */}
+      {metodo === "saldo" && !alcanzaSaldo && (
+        <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm dark:border-amber-800 dark:bg-amber-950/40">
+          <p className="font-medium text-amber-900 dark:text-amber-200">
+            El saldo no alcanza
+          </p>
+          <p className="mt-0.5 text-xs text-amber-800 dark:text-amber-300">
+            Tiene {formatMXN(saldoDisponible)} y la venta es {formatMXN(total)}.
+            Faltan {formatMXN(total - saldoDisponible)}.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setDividir(true);
+              setMontos((cur) => ({
+                ...cur,
+                saldo: (saldoDisponible / 100).toFixed(2),
+              }));
+            }}
+            className="mt-2 cursor-pointer text-xs font-medium text-amber-900 underline underline-offset-2 dark:text-amber-200"
+          >
+            Usar su saldo y cobrar la diferencia
+          </button>
+        </div>
+      )}
+
+      {/* Credit chosen and enough: say what is left, because the whole reason
+          for a partial spend is that the rest stays with them. */}
+      {metodo === "saldo" && alcanzaSaldo && saldoDisponible > total && (
+        <p className="text-xs text-muted-foreground">
+          Le quedarán {formatMXN(saldoDisponible - total)} a favor.
+        </p>
+      )}
 
       {esEfectivo && (
         <>

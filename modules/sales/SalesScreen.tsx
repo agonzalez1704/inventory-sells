@@ -499,8 +499,16 @@ export function SalesScreen({
           cliente: ticketCliente,
           tipo: esFiado ? "fiado" : "venta",
         };
+        // What was spent of the credit, and what is left. The point of a
+        // partial spend is that the rest stays with the customer, and the
+        // seller has to be able to tell them so before they walk out.
+        const usoSaldo = (pagos ?? []).find((p) => p.metodo === "saldo")?.monto_cents ?? 0;
+        const restante = Math.max(0, saldo - usoSaldo);
         toast.success(
-          `${esFiado ? "Nota de crédito registrada" : "Venta registrada"} · ${formatMXN(ticketTotal)}`,
+          `${esFiado ? "Nota de crédito registrada" : "Venta registrada"} · ${formatMXN(ticketTotal)}` +
+            (usoSaldo > 0
+              ? ` · ${formatMXN(usoSaldo)} de saldo${restante > 0 ? `, le quedan ${formatMXN(restante)}` : ""}`
+              : ""),
           { action: { label: "Imprimir", onClick: () => imprimirTicketNavegador(ticket) } },
         );
         setCart({});
