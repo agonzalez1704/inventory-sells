@@ -75,7 +75,7 @@ export async function getNotifPrefs(): Promise<NotifPrefs> {
   const insforge = await createInsForgeServerClient();
   const { data } = await insforge.database
     .from("notification_prefs")
-    .select("venta, fiado, abono, cancelacion")
+    .select("venta, fiado, abono, cancelacion, garantia")
     .eq("user_id", userId)
     .maybeSingle();
   const row = data as NotifPrefs | null;
@@ -94,6 +94,7 @@ export async function saveNotifPrefs(prefs: NotifPrefs): Promise<void> {
     fiado: !!prefs.fiado,
     abono: !!prefs.abono,
     cancelacion: !!prefs.cancelacion,
+    garantia: !!prefs.garantia,
   };
   // Same bug pos_prefs hit: RLS here has no DELETE policy, so the delete this
   // used to do matched nothing and the insert then collided with the row that

@@ -37,8 +37,26 @@ const RESOLUCION = {
   efectivo: "Efectivo",
 } as const;
 
-export function GarantiasClienteList({ garantias }: { garantias: GarantiaCliente[] }) {
-  const [resolver, setResolver] = useState<GarantiaCliente | null>(null);
+const PIDE: Record<string, string> = {
+  saldo: "Pide saldo a favor",
+  cambio: "Se lleva otra pieza",
+  devolucion: "Escalada: quiere su dinero",
+};
+
+export function GarantiasClienteList({
+  garantias,
+  puedeAprobar,
+  abrirId,
+}: {
+  garantias: GarantiaCliente[];
+  /** Whoever reported it does not decide it. */
+  puedeAprobar: boolean;
+  /** From the notification's deep link — opens that claim straight away. */
+  abrirId?: string | null;
+}) {
+  const [resolver, setResolver] = useState<GarantiaCliente | null>(
+    () => (abrirId && puedeAprobar ? garantias.find((g) => g.id === abrirId && g.estado === "pendiente") ?? null : null),
+  );
   const [reclamar, setReclamar] = useState<GarantiaCliente | null>(null);
   const pendientes = garantias.filter((g) => g.estado === "pendiente");
   const resueltas = garantias.filter((g) => g.estado !== "pendiente");
@@ -62,12 +80,19 @@ export function GarantiasClienteList({ garantias }: { garantias: GarantiaCliente
           <h2 className="text-sm font-semibold text-muted-foreground">
             Por resolver ({pendientes.length})
           </h2>
+          {!puedeAprobar && (
+            <p className="text-xs text-muted-foreground">
+              Ya está reportada. La aprueba alguien con permiso; al cliente se le
+              confirma después.
+            </p>
+          )}
           {pendientes.map((g) => (
             <Fila
               key={g.id}
               g={g}
-              onResolver={() => setResolver(g)}
+              onResolver={puedeAprobar ? () => setResolver(g) : undefined}
               onReclamar={() => setReclamar(g)}
+              resaltar={g.id === abrirId}
             />
           ))}
         </div>
@@ -92,17 +117,25 @@ function Fila({
   g,
   onResolver,
   onReclamar,
+  resaltar,
 }: {
   g: GarantiaCliente;
   onResolver?: () => void;
   onReclamar?: () => void;
+  resaltar?: boolean;
 }) {
   // Only when the part did NOT go back on the shelf. Claiming one the shop
   // still has and can sell is asking the supplier to pay for stock — the
   // database refuses it, and offering the button would be offering a dead end.
   const puedeReclamar = !g.reingresa_stock && !g.garantia_proveedor_id;
   return (
-    <Card className={cn("p-4", g.estado === "rechazada" && "opacity-70")}>
+    <Card
+      className={cn(
+        "p-4",
+        g.estado === "rechazada" && "opacity-70",
+        resaltar && "ring-2 ring-ring",
+      )}
+    >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -133,8 +166,14 @@ function Fila({
             <span className="font-mono text-xs uppercase text-muted-foreground">{g.sku}</span>{" "}
             {g.pieza} {g.qty > 1 && `× ${g.qty}`}
           </p>
+          {g.estado === "pendiente" && g.resolucion_propuesta && (
+            <p className="mt-1 text-sm font-medium text-amber-700 dark:text-amber-300">
+              {PIDE[g.resolucion_propuesta]}
+            </p>
+          )}
           <p className="mt-0.5 text-xs text-muted-foreground">
             {fecha(g.created_at)}
+            {g.reportada_por ? ` · reportó ${g.reportada_por}` : ""}
             {g.motivo ? ` · ${g.motivo}` : ""} ·{" "}
             <Link
               href={`/ventas?venta=${g.sale_id}`}

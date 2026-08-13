@@ -23,6 +23,7 @@ export const PERMISOS = [
   "corte_ver",
   "facturar",
   "devoluciones",
+  "garantias_aprobar",
   "usuarios_gestionar",
 ] as const;
 
@@ -61,6 +62,7 @@ export const CATALOGO_PERMISOS: {
       { key: "corte_ver", label: "Ver corte y reportes", desc: "Corte de caja y reportes financieros." },
       { key: "facturar", label: "Facturar", desc: "Emitir CFDI." },
       { key: "devoluciones", label: "Devoluciones y anulaciones", desc: "Devolver productos y anular ventas." },
+      { key: "garantias_aprobar", label: "Aprobar garantías", desc: "Decidir qué se le da al cliente. Quien reporta la garantía no la aprueba." },
     ],
   },
   {

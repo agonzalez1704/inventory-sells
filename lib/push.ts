@@ -28,12 +28,14 @@ export type PushPayload = {
 };
 
 // Which events can notify, and the default when a user has no saved prefs.
-export type NotifKind = "venta" | "fiado" | "abono" | "cancelacion";
+export type NotifKind = "venta" | "fiado" | "abono" | "cancelacion" | "garantia";
 export const DEFAULT_PREFS: Record<NotifKind, boolean> = {
   venta: true,
   fiado: true,
   abono: false,
   cancelacion: false,
+  // On by default: an unapproved warranty is a customer waiting at the counter.
+  garantia: true,
 };
 
 // Low-level: push to specific users' devices. Best-effort; prunes dead subs.
@@ -246,16 +248,23 @@ export async function notifyCotizacionAutorizada(cotizacionId: string): Promise<
 
 // Admins who opted into this event kind (falling back to DEFAULT_PREFS).
 async function adminsForKind(kind: NotifKind): Promise<string[]> {
-  const { data: admins } = await insforgeAdmin.database
-    .from("profiles")
-    .select("id")
-    .eq("role", "admin");
-  const ids = ((admins ?? []) as { id: string }[]).map((a) => a.id);
+  // A warranty goes to whoever can approve one, which is a permission and not
+  // the legacy role = 'admin' label — Jefe de almacén holds it and is not an
+  // admin. Everything else keeps the old audience.
+  const { data: admins } =
+    kind === "garantia"
+      ? await insforgeAdmin.database.rpc("usuarios_con_permiso", {
+          p_permiso: "garantias_aprobar",
+        })
+      : await insforgeAdmin.database.from("profiles").select("id").eq("role", "admin");
+  const ids = (
+    (admins ?? []) as ({ id: string } | { user_id: string })[]
+  ).map((a) => ("id" in a ? a.id : a.user_id));
   if (!ids.length) return [];
 
   const { data: prefs } = await insforgeAdmin.database
     .from("notification_prefs")
-    .select("user_id, venta, fiado, abono, cancelacion")
+    .select("user_id, venta, fiado, abono, cancelacion, garantia")
     .in("user_id", ids);
   const byUser = new Map(
     ((prefs ?? []) as (Record<NotifKind, boolean> & { user_id: string })[]).map(
@@ -407,5 +416,51 @@ export async function notifyCancelacion(
     });
   } catch (e) {
     console.error("notifyCancelacion failed:", e);
+  }
+}
+
+/**
+ * A warranty was reported and needs a decision.
+ *
+ * Deep-links to the claim itself, so tapping the notification opens what has to
+ * be decided rather than a list to hunt through.
+ */
+export async function notifyGarantia(garantiaId: string): Promise<void> {
+  try {
+    const { data } = await insforgeAdmin.database
+      .from("garantias_cliente")
+      .select("qty, monto_cents, motivo, resolucion_propuesta, customers(nombre), products(name)")
+      .eq("id", garantiaId)
+      .maybeSingle();
+    const g = data as unknown as {
+      qty: number;
+      monto_cents: number;
+      motivo: string | null;
+      resolucion_propuesta: string | null;
+      customers: { nombre: string } | null;
+      products: { name: string } | null;
+    } | null;
+    if (!g) return;
+
+    const PIDE: Record<string, string> = {
+      saldo: "Pide saldo a favor",
+      cambio: "Se lleva otra pieza",
+      devolucion: "Escalada para devolución",
+    };
+    const lineas = [
+      `${g.qty} × ${g.products?.name ?? "Pieza"}`,
+      g.customers?.nombre ? `Cliente: ${g.customers.nombre}` : null,
+      g.motivo,
+      g.resolucion_propuesta ? PIDE[g.resolucion_propuesta] : null,
+    ];
+
+    await notifyAdmins("garantia", {
+      title: `Garantía por aprobar · ${formatMXN(g.monto_cents)}`,
+      body: lineas.filter(Boolean).join("\n"),
+      url: `/garantias?garantia=${garantiaId}`,
+      tag: garantiaId,
+    });
+  } catch (e) {
+    console.error("notifyGarantia failed:", e);
   }
 }

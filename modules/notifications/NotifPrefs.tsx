@@ -10,6 +10,11 @@ const EVENTS: { key: keyof Prefs; label: string; desc: string }[] = [
   { key: "fiado", label: "Notas de crédito", desc: "Cada nota de crédito nueva" },
   { key: "abono", label: "Abonos y cobros", desc: "Pagos a una nota de crédito" },
   {
+    key: "garantia",
+    label: "Garantías por aprobar",
+    desc: "Un vendedor reportó una y espera decisión",
+  },
+  {
     key: "cancelacion",
     label: "Cancelaciones",
     desc: "Ventas anuladas y notas de crédito canceladas",

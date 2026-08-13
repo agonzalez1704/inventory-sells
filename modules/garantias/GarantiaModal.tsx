@@ -14,7 +14,7 @@ import { BuscarVenta } from "./BuscarVenta";
 import {
   registrarGarantia,
   lineasDeVenta,
-  type ResolucionGarantia,
+  type PropuestaGarantia,
   type LineaVenta,
   type VentaGarantia,
 } from "./cliente-actions";
@@ -95,7 +95,10 @@ export function GarantiaModal({
   // No default: the operator has to say whether the part is still sellable.
   // A failed part put back on the shelf is sold again and comes back again.
   const [reingresa, setReingresa] = useState<boolean | null>(null);
-  const [resolucion, setResolucion] = useState<ResolucionGarantia | "">("");
+  // What the customer is asking for, not what they get. Whoever takes the part
+  // in cannot decide — that is the point of the approval step — so this is the
+  // only thing they answer about the outcome.
+  const [propuesta, setPropuesta] = useState<PropuestaGarantia | null>(null);
 
   const linea = lineas.find((l) => l.product_id === productId);
   const monto = (linea?.unit ?? 0) * qty;
@@ -103,6 +106,7 @@ export function GarantiaModal({
   function guardar() {
     if (!saleId || !linea) return toast.error("Elige la pieza");
     if (reingresa === null) return toast.error("Falta decir si la pieza sirve");
+    if (!propuesta) return toast.error("Falta qué pide el cliente");
     start(async () => {
       try {
         unwrap(
@@ -112,14 +116,12 @@ export function GarantiaModal({
             qty,
             motivo || null,
             reingresa,
-            resolucion || null,
+            propuesta,
           ),
         );
-        toast.success(
-          resolucion === "saldo"
-            ? `Garantía registrada · ${formatMXN(monto)} de saldo a favor`
-            : "Garantía registrada",
-        );
+        toast.success("Garantía enviada a aprobación", {
+          description: "Le llega el aviso a quien puede aprobarla.",
+        });
         onClose();
         router.refresh();
       } catch (e) {
@@ -216,38 +218,52 @@ export function GarantiaModal({
           </div>
         </fieldset>
 
-        <label className="block">
-          <span className="mb-1 block text-xs font-medium text-muted-foreground">
-            ¿Cómo se resuelve?
-          </span>
-          <Select
-            value={resolucion}
-            onChange={(e) => setResolucion(e.target.value as ResolucionGarantia | "")}
-          >
-            <option value="">Dejar pendiente</option>
-            <option value="saldo">Saldo a favor</option>
-            <option value="cambio">Cambio físico</option>
-            <option value="efectivo">Devolución en efectivo</option>
-          </Select>
-          {resolucion === "saldo" && (
-            <span className="mt-1.5 block text-xs text-muted-foreground">
-              Se abonan {formatMXN(monto)} al cliente para su próxima compra.
-            </span>
-          )}
-          {resolucion === "efectivo" && (
-            <span className="mt-1.5 block text-xs text-amber-700 dark:text-amber-300">
-              Esto solo deja el registro. El dinero se entrega con una devolución
-              aparte, para que salga en el corte del día.
-            </span>
-          )}
-        </label>
+        <fieldset>
+          <legend className="mb-1.5 text-xs font-medium text-muted-foreground">
+            ¿Qué pide el cliente?
+          </legend>
+          <div className="space-y-2">
+            {(
+              [
+                ["cambio", "Se lleva otra pieza", "Cambio en el mostrador."],
+                ["saldo", "Le queda a favor", `${formatMXN(monto)} para su próxima compra.`],
+                [
+                  "devolucion",
+                  "Quiere su dinero",
+                  "Se escala: la devolución en efectivo no se resuelve en el mostrador.",
+                ],
+              ] as const
+            ).map(([v, titulo, detalle]) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => setPropuesta(v)}
+                className={cn(
+                  "flex w-full cursor-pointer gap-2.5 rounded-lg border p-3 text-left transition-colors",
+                  propuesta === v ? "border-ring bg-muted" : "border-border hover:border-ring/40",
+                )}
+              >
+                <span>
+                  <span className="block text-sm font-medium">{titulo}</span>
+                  <span className="block text-xs text-muted-foreground">{detalle}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+          {/* Said plainly, because the seller is about to tell the customer
+              something and should not promise what they cannot grant. */}
+          <p className="mt-2 text-xs text-muted-foreground">
+            Nada se aplica todavía: queda registrada y alguien con permiso
+            decide. Dile al cliente que se le confirma.
+          </p>
+        </fieldset>
 
         <div className="flex justify-end gap-2 border-t border-border pt-3">
           <Button variant="secondary" onClick={onClose} disabled={pending}>
             Cancelar
           </Button>
           <Button onClick={guardar} loading={pending}>
-            Registrar garantía
+            Enviar a aprobación
           </Button>
         </div>
       </div>

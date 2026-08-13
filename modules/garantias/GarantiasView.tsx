@@ -49,18 +49,24 @@ export function GarantiasView({
   saldos,
   proveedores,
   deClientes = [],
+  puedeAprobar = false,
+  abrirGarantia = null,
 }: {
   garantias: Garantia[];
   saldos: GarantiaSaldo[];
   proveedores: Proveedor[];
   deClientes?: GarantiaCliente[];
+  puedeAprobar?: boolean;
+  abrirGarantia?: string | null;
 }) {
   const [query, setQuery] = useState("");
   const [nueva, setNueva] = useState(false);
   const [garantiaCliente, setGarantiaCliente] = useState(false);
   // Customer warranties open first when any is waiting on a decision.
   const [tab, setTab] = useState<"proveedor" | "cliente">(
-    deClientes.some((g) => g.estado === "pendiente") ? "cliente" : "proveedor",
+    abrirGarantia || deClientes.some((g) => g.estado === "pendiente")
+      ? "cliente"
+      : "proveedor",
   );
   const [verResueltas, setVerResueltas] = useState(false);
 
@@ -134,7 +140,11 @@ export function GarantiasView({
       </div>
 
       {tab === "cliente" ? (
-        <GarantiasClienteList garantias={deClientes} />
+        <GarantiasClienteList
+          garantias={deClientes}
+          puedeAprobar={puedeAprobar}
+          abrirId={abrirGarantia}
+        />
       ) : (
       <>
       {saldos.length > 0 && (

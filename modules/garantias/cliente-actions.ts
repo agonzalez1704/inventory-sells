@@ -3,10 +3,21 @@
 import { auth } from "@clerk/nextjs/server";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
 import { insforgeAdmin } from "@/lib/insforge/admin";
+import { after } from "next/server";
 import { attempt, type ActionResult } from "@/lib/errors";
+import { notifyGarantia } from "@/lib/push";
 
-/** How a warranty was settled. NULL means it was taken in and left pending. */
+/** How a warranty was settled, once somebody with the permission decided. */
 export type ResolucionGarantia = "saldo" | "cambio" | "efectivo";
+
+/**
+ * What the customer is asking for, as reported by whoever took the part in.
+ *
+ * Deliberately not the same set as ResolucionGarantia: "devolucion" is a
+ * request to escalate — the seller cannot hand cash back — and it is only ever
+ * a proposal, never an outcome.
+ */
+export type PropuestaGarantia = "saldo" | "cambio" | "devolucion";
 
 /**
  * Register a warranty claim against a sale.
@@ -23,7 +34,8 @@ export async function registrarGarantia(
   motivo: string | null,
   /** Whether the part goes back on the shelf. The counter's call, no default. */
   reingresa: boolean,
-  resolucion: ResolucionGarantia | null,
+  /** What the customer wants. A proposal — it grants nothing on its own. */
+  propuesta: PropuestaGarantia | null,
 ): Promise<ActionResult<string>> {
   return attempt("registrarGarantia", async () => {
     const { userId } = await auth();
@@ -36,10 +48,14 @@ export async function registrarGarantia(
       p_qty: qty,
       p_motivo: motivo,
       p_reingresa: reingresa,
-      p_resolucion: resolucion,
+      p_propuesta: propuesta,
     });
     if (error) throw new Error(error.message ?? "No se pudo registrar la garantía");
-    return String(data);
+    const id = String(data);
+    // After the response: the seller should not wait on a push round trip, and
+    // a failed notification must never lose the warranty.
+    after(() => notifyGarantia(id));
+    return id;
   });
 }
 
@@ -184,6 +200,8 @@ export type GarantiaCliente = {
   resolucion: ResolucionGarantia | null;
   created_at: string;
   resuelta_at: string | null;
+  resolucion_propuesta: PropuestaGarantia | null;
+  reportada_por: string | null;
   product_id: string;
   /** Set once the shop has filed the claim upstream. */
   garantia_proveedor_id: string | null;
