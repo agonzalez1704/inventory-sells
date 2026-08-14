@@ -23,19 +23,17 @@ import {
 /** A proposed line plus the quantity the buyer actually wants. */
 type Linea = LineaRequisicion & { qty: number };
 
-const TONO_FUENTE = {
-  agotado: "warning",
-  minimo: "accent",
-  ritmo: "neutral",
-  ia: "accent",
-} as const;
-
-const ETIQUETA_FUENTE = {
-  agotado: "Agotada",
-  minimo: "Bajo mínimo",
-  ritmo: "Por ritmo",
-  ia: "Criterio IA",
-} as const;
+/**
+ * What the badge says comes from the shelf, not from how the line was found.
+ * An empty part tagged "Por ritmo" reads as a contradiction next to a note that
+ * says it is out of stock.
+ */
+function etiqueta(l: Linea): { tono: "warning" | "accent" | "neutral"; texto: string } {
+  if (l.existencia <= 0) return { tono: "warning", texto: "Agotada" };
+  if (l.fuente === "ia") return { tono: "accent", texto: "Criterio IA" };
+  if (l.es_override) return { tono: "accent", texto: "Nivel fijado" };
+  return { tono: "neutral", texto: "Bajo el nivel" };
+}
 
 export function NuevaRequisicion({ inventarios }: { inventarios: Inventario[] }) {
   const router = useRouter();
@@ -175,9 +173,9 @@ export function NuevaRequisicion({ inventarios }: { inventarios: Inventario[] })
           </Button>
         </div>
         <p className="mt-2 text-xs text-muted-foreground">
-          Cuánto tiempo debe aguantar el pedido. Las cantidades salen del ritmo
-          de venta de las últimas 8 semanas más el tiempo de entrega del
-          proveedor.
+          Cuánto tiempo debe aguantar el pedido. Aparece todo lo que esté abajo
+          de ese nivel: el ritmo de venta de las últimas 8 semanas más el tiempo
+          de entrega del proveedor.
         </p>
       </Card>
 
@@ -262,7 +260,7 @@ export function NuevaRequisicion({ inventarios }: { inventarios: Inventario[] })
                       <span className="font-mono text-xs uppercase text-muted-foreground">
                         {l.sku}
                       </span>
-                      <Badge tone={TONO_FUENTE[l.fuente]}>{ETIQUETA_FUENTE[l.fuente]}</Badge>
+                      <Badge tone={etiqueta(l).tono}>{etiqueta(l).texto}</Badge>
                     </div>
                     <p className="mt-0.5 text-sm font-medium">{l.nombre}</p>
                     <p className="text-xs text-muted-foreground">

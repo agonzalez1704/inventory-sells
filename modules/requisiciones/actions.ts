@@ -58,10 +58,13 @@ export async function listarInventarios(): Promise<Inventario[]> {
  */
 function explicar(l: LineaRequisicion): string {
   const ritmo = l.ritmo_semanal > 0 ? `vende ${l.ritmo_semanal}/sem` : "sin ventas registradas";
-  const pedido = l.ya_pedido > 0 ? `, ${l.ya_pedido} ya pedidas` : "";
+  const pedido = l.ya_pedido > 0 ? ` · ${l.ya_pedido} ya pedidas` : "";
   if (l.existencia <= 0) return `Agotada · ${ritmo}${pedido}`;
-  if (l.es_override) return `Bajo el mínimo fijado (${l.stock_min}) · quedan ${l.existencia}${pedido}`;
-  return `Quedan ${l.existencia}, cubre ${l.lead_dias} días de espera · ${ritmo}${pedido}`;
+  // Says the level it is measured against. Without it the quantity looks
+  // arbitrary — the whole complaint about the first version was not being able
+  // to see why a part with stock on the shelf still needed ordering.
+  const nivel = l.es_override ? `${l.stock_max} fijadas` : `${l.stock_max} deseadas`;
+  return `Quedan ${l.existencia} de ${nivel} · ${ritmo}${pedido}`;
 }
 
 /**
