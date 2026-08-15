@@ -18,6 +18,7 @@ import { buscarProductos } from "@/modules/inventory/buscar";
 import type { PaymentMethod, PaymentMethodVenta, Product } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
+import { BarraInferior } from "@/components/ui/barra-inferior";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -544,7 +545,7 @@ export function SalesScreen({
   return (
     <Motion>
     <>
-      <div className="gap-5 pb-28 lg:grid lg:grid-cols-5 lg:pb-0">
+      <div className="gap-5 pb-32 lg:grid lg:grid-cols-5 lg:pb-0">
         {/* Product picker */}
         <div className="lg:col-span-3">
           <div className="relative">
@@ -788,12 +789,9 @@ export function SalesScreen({
           Always mounted, like the quote builder's. It used to appear with the
           first product, which meant its total arrived already written and never
           rolled — the same reason the panel's total was moved out of the
-          conditional. The grid's pb-28 already reserved this space whether the
+          conditional. The grid's pb-32 already reserved this space whether the
           bar was there or not, so nothing shifts. */}
-      <div
-        className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 px-4 py-3 backdrop-blur lg:hidden"
-        style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
-      >
+      <BarraInferior>
         <div className="mx-auto flex max-w-6xl items-center gap-3">
           <div className="leading-tight">
             <p className="text-xs text-muted-foreground">
@@ -819,7 +817,7 @@ export function SalesScreen({
             {cta}
           </Button>
         </div>
-      </div>
+      </BarraInferior>
 
       <PaymentSheet
         open={paymentOpen}

@@ -8,6 +8,7 @@ import { formatMXN } from "@/lib/money";
 import { buscarProductos } from "@/modules/inventory/buscar";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
+import { BarraInferior } from "@/components/ui/barra-inferior";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -236,7 +237,7 @@ export function CotizacionBuilder({
 
   return (
     <Motion>
-    <div className="gap-5 pb-28 lg:grid lg:grid-cols-5 lg:pb-0">
+    <div className="gap-5 pb-32 lg:grid lg:grid-cols-5 lg:pb-0">
       {/* Product picker */}
       <div className="lg:col-span-3">
         <div className="relative">
@@ -433,12 +434,7 @@ export function CotizacionBuilder({
       {/* Fixed bottom bar — mobile/narrow only (desktop actions live in the
           sticky panel). Always shown so the CTA never disappears below the
           single-column product grid; disabled while the cart is empty. */}
-      <div
-        className="fixed inset-x-0 bottom-0 z-30 flex gap-2 border-t border-border bg-background/95 px-4 py-3 backdrop-blur lg:hidden"
-        style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
-      >
-        {actionButtons}
-      </div>
+      <BarraInferior className="flex gap-2">{actionButtons}</BarraInferior>
 
       <ProductoSheet
         p={detalle}
