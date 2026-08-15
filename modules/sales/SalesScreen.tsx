@@ -294,6 +294,7 @@ export function SalesScreen({
   customers,
   verCostos,
   precioBase,
+  fiadoExigeCliente,
 }: {
   /** First page of the catalog, rendered before any search runs. */
   products: SalesProduct[];
@@ -306,6 +307,9 @@ export function SalesScreen({
   verCostos: boolean;
   /** This user's own choice of which figure the cards show. */
   precioBase: PrecioBase;
+  /** This shop's rule, not the code's: Ruli demands a registered debtor, Fiable
+   *  cannot make a walk-in stand still to be registered. */
+  fiadoExigeCliente: boolean;
 }) {
   const router = useRouter();
   const mostrador = useMemo(
@@ -447,10 +451,15 @@ export function SalesScreen({
     });
   }
 
-  // A credit note is a debt, so it needs a real customer — "Mostrador" is the
-  // walk-in placeholder, not a person. The note used to stand in for the
-  // customer and was therefore required; now it is just an optional reminder.
-  const clienteReal = !customer.is_system;
+  // A credit note is a debt, and somebody has to be identifiable as owing it.
+  // Which shop demands a registered customer is a business rule, so it arrives
+  // from config. Where a walk-in debt is allowed the note becomes the debtor —
+  // the only thing on the row that will ever say who owes — so it is required
+  // there, and required means an identification and not two characters. The
+  // length matches the database, which is the actual guard.
+  const aMostrador = mode === "prestamo" && customer.is_system;
+  const faltaCliente = aMostrador && fiadoExigeCliente;
+  const faltaNota = aMostrador && !fiadoExigeCliente && note.trim().length < 5;
 
   // Mostrador can never hold credit, so it is not even asked for. Cleared on
   // every switch before the fetch lands: showing the previous customer's credit
@@ -466,7 +475,7 @@ export function SalesScreen({
       cancelado = true;
     };
   }, [customer.id, customer.is_system]);
-  const canSubmit = lines.length > 0 && !(mode === "prestamo" && !clienteReal);
+  const canSubmit = lines.length > 0 && !faltaCliente && !faltaNota;
 
   function submit(metodo?: PaymentMethodVenta, pagos?: PagoSplit[]) {
     if (!canSubmit) return;
@@ -488,7 +497,7 @@ export function SalesScreen({
     startTransition(async () => {
       try {
         const { saleId } = esFiado
-          ? await registerLoan(items, customer.id, note)
+          ? await registerLoan(items, customer.is_system ? null : customer.id, note)
           : await registerSale(items, pm, customer.id, pagos);
         const ticket: TicketData = {
           folio: saleId,
@@ -716,11 +725,21 @@ export function SalesScreen({
                     <Input
                       value={note}
                       onChange={(e) => setNote(e.target.value)}
-                      placeholder="Nota (opcional): plazo, referencia…"
+                      placeholder={
+                        aMostrador
+                          ? "¿Quién debe? Nombre, teléfono o seña"
+                          : "Nota (opcional): plazo, referencia…"
+                      }
                     />
-                    {!clienteReal && (
+                    {faltaCliente && (
                       <p className="text-xs text-amber-700 dark:text-amber-300">
                         Un crédito necesita cliente registrado. Elige o crea uno arriba.
+                      </p>
+                    )}
+                    {aMostrador && !fiadoExigeCliente && (
+                      <p className="text-xs text-amber-700 dark:text-amber-300">
+                        Sin cliente registrado, la nota es lo único que dirá quién
+                        debe. Escribe nombre, teléfono o una seña.
                       </p>
                     )}
                   </>

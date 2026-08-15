@@ -3,6 +3,7 @@ import { requirePagePermiso, getPermisos } from "@/lib/auth/profile";
 import { getPrecioBasePos } from "@/modules/sales/pos-prefs";
 import { SalesScreen, type SalesProduct } from "@/modules/sales/SalesScreen";
 import { listarCategorias } from "@/modules/inventory/buscar";
+import { fiadoExigeCliente } from "@/modules/config/negocio";
 
 export const dynamic = "force-dynamic";
 
@@ -38,7 +39,10 @@ export default async function PosPage() {
       listarCategorias(),
     ]);
 
-  const precioBase = await getPrecioBasePos();
+  const [precioBase, exigeCliente] = await Promise.all([
+    getPrecioBasePos(),
+    fiadoExigeCliente(),
+  ]);
 
   const invName = new Map(
     ((invData ?? []) as { id: string; name: string }[]).map((i) => [i.id, i.name]),
@@ -82,6 +86,7 @@ export default async function PosPage() {
         customers={customers}
         verCostos={verCostos}
         precioBase={precioBase}
+        fiadoExigeCliente={exigeCliente}
       />
     </section>
   );

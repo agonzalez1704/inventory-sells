@@ -87,7 +87,7 @@ export async function registerSale(
   const { data, error } = await insforge.database.rpc("register_sale", {
     p_items: items.map((i) => ({ product_id: i.product_id, qty: i.qty })),
     p_payment_method: paymentMethod,
-    p_customer_id: customerId,
+    p_customer_id: customerId ?? null,
     // A split, OR anything paid with store credit: a credit-only sale is one
     // payment, and dropping it here would leave register_sale with no way to
     // know the ledger has to move.
@@ -104,25 +104,26 @@ export async function registerSale(
   return { saleId };
 }
 
-// Lend items on credit (fiado): stock leaves now, payment pending. `note` is a
-// free-text reminder (person/place) — no client record is created.
+// Lend items on credit (fiado): stock leaves now, payment pending. With a
+// customer the note is an optional reminder; on a walk-in debt it IS the
+// debtor, and the RPC requires it.
 export async function registerLoan(
   items: CartLine[],
-  customerId: string,
+  /** Null means the walk-in placeholder — only some shops allow that. */
+  customerId: string | null,
   note: string | null,
 ): Promise<{ saleId: string }> {
   const { userId } = await auth();
   if (!userId) throw new Error("No autenticado");
   if (items.length === 0) throw new Error("Carrito vacío");
-  // A credit note is a debt: it has to be owed by a registered customer, not by
-  // a name typed into a box. The RPC refuses it too — this is the early, clearer
-  // message, not the guard.
-  if (!customerId) throw new Error("Elige el cliente al que se le fía");
+  // Whether a debt can be anonymous is the shop's rule, so the check is not
+  // repeated here — the RPC reads the shop's config and its message is the one
+  // worth showing. A copy here could only drift out of step with it.
 
   const insforge = await createInsForgeServerClient();
   const { data, error } = await insforge.database.rpc("register_loan", {
     p_items: items.map((i) => ({ product_id: i.product_id, qty: i.qty })),
-    p_customer_id: customerId,
+    p_customer_id: customerId ?? null,
     p_note: note?.trim() || null,
   });
 
@@ -144,7 +145,7 @@ export async function asignarClienteFiado(
   const insforge = await createInsForgeServerClient();
   const { error } = await insforge.database.rpc("asignar_cliente_venta", {
     p_sale_id: saleId,
-    p_customer_id: customerId,
+    p_customer_id: customerId ?? null,
   });
   if (error) throw new Error(error.message ?? "Error al asignar el cliente");
 }
