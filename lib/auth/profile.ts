@@ -42,14 +42,37 @@ export async function getProfile(userId: string): Promise<Profile | null> {
   return (data as Profile | null) ?? null;
 }
 
+/**
+ * Raised when the role could not be read at all — not when it grants nothing.
+ *
+ * Separate from a denial on purpose. This lookup used to drop the error and
+ * return an empty set, which meant every backend hiccup arrived at the user as
+ * "Sin permiso": the register refusing to search, and the owner sent hunting
+ * through the roles screen for a problem that was never there. Production logs
+ * showed the two interleaved minute for minute during an InsForge outage, and
+ * an earlier blip that showed up ONLY as permission errors — a backend problem
+ * completely disguised as an authorization one.
+ */
+export class PermisosNoDisponibles extends Error {
+  constructor() {
+    super("No pudimos verificar tus permisos. Vuelve a intentarlo.");
+    this.name = "PermisosNoDisponibles";
+  }
+}
+
 // The permission set granted by a user's role. Features gate on this instead of
-// the legacy role text so custom roles work. Empty set for a user with no role.
+// the legacy role text so custom roles work. Empty set for a user with no role
+// — which is a real answer, unlike a failed read.
 export async function getPermisos(userId: string): Promise<Set<Permiso>> {
-  const { data } = await insforgeAdmin.database
+  const { data, error } = await insforgeAdmin.database
     .from("profiles")
     .select("role_id, roles(role_permissions(permiso))")
     .eq("id", userId)
     .maybeSingle();
+  // Fails closed either way — nothing here can grant access on an error. What
+  // changes is that the caller can tell "you may not" from "we do not know",
+  // and say so.
+  if (error) throw new PermisosNoDisponibles();
   const row = data as
     | { role_id: string | null; roles: { role_permissions: { permiso: string }[] } | null }
     | null;
@@ -84,12 +107,17 @@ export async function getAsignables(): Promise<{ id: string; nombre: string }[]>
 // this so `role = 'admin'` checks stay consistent with the permission model.
 async function rolEsAdmin(roleId: string | null): Promise<boolean> {
   if (!roleId) return false;
-  const { data } = await insforgeAdmin.database
+  const { data, error } = await insforgeAdmin.database
     .from("role_permissions")
     .select("permiso")
     .eq("role_id", roleId)
     .eq("permiso", "admin_total")
     .maybeSingle();
+  // Its one caller WRITES the answer into profiles.role. Swallowing the error
+  // files the first owner as a seller against a Dueño role_id — two fields
+  // disagreeing about the same person, on the account that sets up the shop.
+  // ensureProfile already throws on its own failed lookup; this matches.
+  if (error) throw new Error(error.message ?? "no se pudo leer el rol");
   return Boolean(data);
 }
 
