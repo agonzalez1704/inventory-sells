@@ -6,6 +6,7 @@ import {
   Truck,
   MessageCircle,
 } from "lucide-react";
+import { foto } from "@/lib/foto";
 import { formatMXN } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { calidadDe, marcoDe, CALIDAD_LABEL } from "@/lib/calidad";
@@ -81,7 +82,7 @@ export async function ProductoDetalle({
           {p.imagen ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={p.imagen}
+              src={foto(p.imagen, 828)}
               alt={p.nombre}
               className="h-full w-full object-contain p-4"
             />
@@ -210,7 +211,7 @@ export async function ProductoDetalle({
                   {r.imagen ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={r.imagen}
+                      src={foto(r.imagen, 256)}
                       alt={r.nombre}
                       loading="lazy"
                       className="h-full w-full object-contain"

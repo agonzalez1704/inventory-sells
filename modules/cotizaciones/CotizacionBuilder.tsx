@@ -7,6 +7,7 @@ import { Search, Plus, Minus, Package, Trash2, FileText } from "lucide-react";
 import { formatMXN } from "@/lib/money";
 import { buscarProductos } from "@/modules/inventory/buscar";
 import { cn } from "@/lib/utils";
+import { foto } from "@/lib/foto";
 import { Card } from "@/components/ui/card";
 import { BarraInferior } from "@/components/ui/barra-inferior";
 import { Input } from "@/components/ui/input";
@@ -68,7 +69,7 @@ function TarjetaProducto({
 function Thumb({ src, alt }: { src?: string | null; alt: string }) {
   if (src)
     // eslint-disable-next-line @next/next/no-img-element
-    return <img src={src} alt={alt} loading="lazy" className="h-full w-full object-contain" />;
+    return <img src={foto(src, 256)} alt={alt} loading="lazy" className="h-full w-full object-contain" />;
   return (
     <span className="flex h-full w-full items-center justify-center bg-muted text-muted-foreground">
       <Package className="h-5 w-5" />

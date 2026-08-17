@@ -16,6 +16,7 @@ import {
 import { formatMXN } from "@/lib/money";
 import { buscarProductos } from "@/modules/inventory/buscar";
 import type { PaymentMethod, PaymentMethodVenta, Product } from "@/lib/types";
+import { foto } from "@/lib/foto";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { BarraInferior } from "@/components/ui/barra-inferior";
@@ -64,7 +65,7 @@ export function Thumb({
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
-        src={src}
+        src={foto(src, 256)}
         alt={alt}
         loading="lazy"
         className={cn("h-full w-full object-contain", className)}

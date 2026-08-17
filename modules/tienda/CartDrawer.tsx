@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Drawer as Vaul } from "vaul";
 import { ShoppingCart, Trash2, Minus, Plus, Smartphone } from "lucide-react";
+import { foto } from "@/lib/foto";
 import { formatMXN } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/components/use-is-mobile";
@@ -79,7 +80,7 @@ function CartBody({ mobile }: { mobile: boolean }) {
                 <span className="h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-border bg-background">
                   {i.imagen ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={i.imagen} alt={i.nombre} className="h-full w-full object-contain" />
+                    <img src={foto(i.imagen, 128)} alt={i.nombre} className="h-full w-full object-contain" />
                   ) : (
                     <span className="flex h-full w-full items-center justify-center text-tienda-300">
                       <Smartphone className="h-6 w-6" />

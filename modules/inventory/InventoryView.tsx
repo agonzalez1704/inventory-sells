@@ -17,6 +17,7 @@ import {
   History,
 } from "lucide-react";
 import type { Inventory, Product } from "@/lib/types";
+import { foto as urlFoto } from "@/lib/foto";
 import { formatMXN } from "@/lib/money";
 import {
   paginaInventario,
@@ -546,7 +547,7 @@ export function InventoryView({
                       {p.image_url ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
-                          src={p.image_url}
+                          src={urlFoto(p.image_url, 128)}
                           alt=""
                           loading="lazy"
                           className="h-full w-full object-contain"

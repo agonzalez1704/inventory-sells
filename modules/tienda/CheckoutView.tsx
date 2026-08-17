@@ -13,6 +13,7 @@ import {
   Store as StoreIcon,
   MapPin,
 } from "lucide-react";
+import { foto } from "@/lib/foto";
 import { formatMXN } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { useTiendaInfo } from "./TiendaInfoProvider";
@@ -402,7 +403,7 @@ export function CheckoutView() {
                   <span className="h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-border bg-background">
                     {l.imagen ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={l.imagen} alt={l.nombre} className="h-full w-full object-contain" />
+                      <img src={foto(l.imagen, 128)} alt={l.nombre} className="h-full w-full object-contain" />
                     ) : (
                       <span className="flex h-full w-full items-center justify-center text-tienda-300">
                         <Smartphone className="h-5 w-5" />

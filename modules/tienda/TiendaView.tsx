@@ -20,6 +20,7 @@ import {
   SlidersHorizontal,
   ChevronDown,
 } from "lucide-react";
+import { foto } from "@/lib/foto";
 import { formatMXN } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { useTiendaInfo } from "./TiendaInfoProvider";
@@ -583,7 +584,7 @@ export function ProductCard({
           {p.imagen ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={p.imagen}
+              src={foto(p.imagen, 384)}
               alt={p.nombre}
               loading="lazy"
               className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-105"
