@@ -64,11 +64,19 @@ export class PermisosNoDisponibles extends Error {
 // the legacy role text so custom roles work. Empty set for a user with no role
 // — which is a real answer, unlike a failed read.
 export async function getPermisos(userId: string): Promise<Set<Permiso>> {
-  const { data, error } = await insforgeAdmin.database
-    .from("profiles")
-    .select("role_id, roles(role_permissions(permiso))")
-    .eq("id", userId)
-    .maybeSingle();
+  // One retry before giving up. The backend has been answering 502 in short
+  // bursts — eleven in two hours during the last one — and a single blip on a
+  // lookup this cheap should never reach the person using the till.
+  let data: unknown, error: unknown;
+  for (let intento = 0; intento < 2; intento++) {
+    if (intento) await new Promise((s) => setTimeout(s, 250));
+    ({ data, error } = await insforgeAdmin.database
+      .from("profiles")
+      .select("role_id, roles(role_permissions(permiso))")
+      .eq("id", userId)
+      .maybeSingle());
+    if (!error) break;
+  }
   // Fails closed either way — nothing here can grant access on an error. What
   // changes is that the caller can tell "you may not" from "we do not know",
   // and say so.
@@ -190,4 +198,23 @@ export async function ensureProfile(
   }
 
   return created as Profile;
+}
+
+/**
+ * The nav's copy of the question, which is allowed to shrug.
+ *
+ * Which links to draw is cosmetic: showing none is a worse-looking page, not a
+ * wrong one, and it fails closed anyway. The root layout must not throw — doing
+ * that takes down every route at once, including the ones that would have
+ * worked, and lands the user on the global error page with no per-screen retry.
+ * The page guards still refuse to render on an unknown, which is where refusing
+ * belongs.
+ */
+export async function permisosParaNav(userId: string): Promise<Set<Permiso>> {
+  try {
+    return await getPermisos(userId);
+  } catch (e) {
+    if (e instanceof PermisosNoDisponibles) return new Set();
+    throw e;
+  }
 }
