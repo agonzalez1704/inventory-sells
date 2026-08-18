@@ -26,6 +26,7 @@ import { crearOrdenYPagar, crearOrdenTransferencia, type TipoEntrega } from "./p
 import {
   validarCarrito,
   cotizarParaCP,
+  lugarDeCP,
   type Resumen,
   type OpcionEnvio,
 } from "./checkout-actions";
@@ -110,6 +111,31 @@ export function CheckoutView() {
     setOpciones(null);
     setEnvio(null);
   }, [cp, estado, municipio]);
+
+  // The postal code implies the state and the municipality, so the customer
+  // types five digits instead of filling three fields. Both stay editable: this
+  // is a shortcut, and a lookup that guesses wrong must not trap anybody.
+  const [colonias, setColonias] = useState<string[]>([]);
+  useEffect(() => {
+    if (!/^\d{5}$/.test(cp)) {
+      setColonias([]);
+      return;
+    }
+    let cancelado = false;
+    lugarDeCP(cp)
+      .then((l) => {
+        if (cancelado || !l) return;
+        setColonias(l.colonias);
+        // Only fills what is empty — never overwrites a correction the customer
+        // already made.
+        setEstado((e) => e || l.estado);
+        setMunicipio((m) => m || l.municipio);
+      })
+      .catch(() => {});
+    return () => {
+      cancelado = true;
+    };
+  }, [cp]);
 
   const piezas = resumen?.lineas.reduce((s, l) => s + l.qty, 0) ?? 0;
   const subtotal = resumen?.subtotal_cents ?? 0;

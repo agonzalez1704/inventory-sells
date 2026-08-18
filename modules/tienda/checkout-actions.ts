@@ -2,6 +2,7 @@
 
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { cotizarEnvio, paqueteParaPiezas, type Tarifa } from "@/lib/skydropx";
+import { buscarCP, type LugarCP } from "@/lib/cp-mexico";
 import { attempt, type ActionResult } from "@/lib/errors";
 
 // Public checkout. Everything the browser sends is untrusted: prices and
@@ -103,4 +104,15 @@ export async function cotizarParaCP(
     // Only the cheapest few — a 13-option list is a decision, not a service.
     return rates.slice(0, 4);
   });
+}
+
+
+/**
+ * What a postal code implies, so the customer does not retype it.
+ *
+ * Public on purpose — the storefront has no session, and a postal code is not
+ * anybody's secret.
+ */
+export async function lugarDeCP(cp: string): Promise<LugarCP | null> {
+  return buscarCP(cp);
 }
