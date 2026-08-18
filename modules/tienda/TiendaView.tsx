@@ -610,17 +610,24 @@ export function ProductCard({
           {p.precio_cents > 0 ? formatMXN(p.precio_cents) : "A cotizar"}
         </span>
         <div className="flex shrink-0 items-center gap-1.5">
-          <a
-            href={waHref(p.nombre, whatsapp)}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            aria-label={`Preguntar por ${p.nombre} en WhatsApp`}
-            title="Preguntar por WhatsApp"
-            className="flex h-9 w-9 items-center justify-center rounded-xl border border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-300 transition-colors hover:bg-green-100 dark:bg-green-900/40"
-          >
-            <MessageCircle className="h-4 w-4" />
-          </a>
+          {/* Only where there is nothing to buy. Sitting next to the add
+              button on a priced card, this was an escape hatch out of a
+              purchase the customer had already decided on — and a conversation
+              always beats a form. On "A cotizar" it is the only way forward,
+              so it stays. */}
+          {p.precio_cents <= 0 && (
+            <a
+              href={waHref(p.nombre, whatsapp)}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              aria-label={`Preguntar por ${p.nombre} en WhatsApp`}
+              title="Preguntar por WhatsApp"
+              className="flex h-9 w-9 items-center justify-center rounded-xl border border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-300 transition-colors hover:bg-green-100 dark:bg-green-900/40"
+            >
+              <MessageCircle className="h-4 w-4" />
+            </a>
+          )}
           {/* Priced items only — "A cotizar" has no price to charge. */}
           {p.precio_cents > 0 && (
             <AddToCart

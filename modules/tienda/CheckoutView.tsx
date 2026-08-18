@@ -141,6 +141,11 @@ export function CheckoutView() {
   const subtotal = resumen?.subtotal_cents ?? 0;
   const total = subtotal + (recoger ? 0 : envio?.totalCents ?? 0);
 
+  // Email stays required, against the instinct to trim the form: Conekta
+  // demands customer_info.email on every order — card, OXXO, SPEI and Aplazo —
+  // and ordenes_web.email is NOT NULL. Making it optional here would move the
+  // failure to the moment the customer presses pay, which is the worst place a
+  // form can break. Unlike state and municipality, this field is load-bearing.
   const datosBase =
     nombre.trim().length > 2 &&
     /^\S+@\S+\.\S+$/.test(email) &&
