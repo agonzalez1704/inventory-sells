@@ -25,7 +25,9 @@ export function AddToCart({
   className,
 }: {
   p: AddableProduct;
-  size?: "sm" | "lg";
+  /** xs exists for stacked variant rows: a 36px button in a 44px row leaves
+   *  8px of air, and three of them read as one solid column. */
+  size?: "xs" | "sm" | "lg";
   className?: string;
 }) {
   const { add, items } = useCart();
@@ -39,11 +41,11 @@ export function AddToCart({
         aria-label="Agotado"
         className={cn(
           "flex items-center justify-center rounded-xl bg-muted font-semibold text-muted-foreground",
-          size === "lg" ? "h-12 w-full text-sm" : "h-9 w-9",
+          size === "lg" ? "h-12 w-full text-sm" : size === "xs" ? "h-7 w-7 rounded-lg" : "h-9 w-9",
           className,
         )}
       >
-        {size === "lg" ? "Agotado" : <ShoppingCart className="h-4 w-4" />}
+        {size === "lg" ? "Agotado" : <ShoppingCart className={size === "xs" ? "h-3.5 w-3.5" : "h-4 w-4"} />}
       </button>
     );
   }
@@ -70,18 +72,18 @@ export function AddToCart({
       title={maxed ? "Máximo por pieza en línea" : "Agregar al carrito"}
       className={cn(
         "flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-tienda-600 font-semibold text-white shadow-sm shadow-tienda-600/30 transition-colors hover:bg-tienda-700 disabled:cursor-not-allowed disabled:bg-muted disabled:shadow-none",
-        size === "lg" ? "h-12 w-full text-sm" : "h-9 w-9",
+        size === "lg" ? "h-12 w-full text-sm" : size === "xs" ? "h-7 w-7 rounded-lg" : "h-9 w-9",
         className,
       )}
     >
       {maxed ? (
         <>
-          <Check className="h-4 w-4" />
+          <Check className={size === "xs" ? "h-3.5 w-3.5" : "h-4 w-4"} />
           {size === "lg" && "Máximo por pieza"}
         </>
       ) : (
         <>
-          <ShoppingCart className="h-4 w-4" />
+          <ShoppingCart className={size === "xs" ? "h-3.5 w-3.5" : "h-4 w-4"} />
           {size === "lg" && "Agregar al carrito"}
         </>
       )}

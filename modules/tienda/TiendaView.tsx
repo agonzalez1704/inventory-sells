@@ -656,6 +656,7 @@ function FilaVariante({
       </span>
       {v.precio_cents > 0 && (
         <AddToCart
+          size="xs"
           p={{
             id: v.id,
             nombre: v.nombre,
