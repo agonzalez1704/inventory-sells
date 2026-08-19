@@ -40,4 +40,9 @@ assert.equal(glosaDe("OLED"), "Calidad muy parecida a la original.");
 assert.ok(!/parecida a la original/.test(glosaDe("Incell") ?? ""), "Incell no puede decirse parecida a la original");
 assert.equal(glosaDe(null), null, "sin calidad, sin glosa inventada");
 
+// El escaparate no publica inventario: sólo señales.
+const v = por("13")!.variantes[0];
+assert.equal(v.disponible, true);
+assert.ok(!("existencia" in v), "una variante no debe cargar el conteo de stock");
+
 console.log("✓ agrupa por modelo sin mezclar categorías, y la glosa no promete de más");
