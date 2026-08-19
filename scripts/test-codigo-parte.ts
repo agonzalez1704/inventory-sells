@@ -28,9 +28,23 @@ const CATALOGO = [
   // Ends in 07 without being the 07 family — an anchored rule must skip it.
   { sku: "SHNC2607", name: "HORQ INF IZQ INVENTADA PARA LA PRUEBA", brand: null },
   { sku: "FILTR0088", name: "FILTRO ACEITE VERSA 12-19", brand: null },
+  // The hyphenated world: storefront skus. "iphone 12" parses as a part code
+  // (letters + number), and before the separator was allowed in the regex the
+  // rule killed every display — while the batteries, whose sku does not start
+  // with "iphone", dodged the rule and matched normally. The customer searched
+  // "iphone 12" and saw only batteries.
+  { sku: "iphone-12-12-pro-oled", name: "12 / 12 PRO OLED", brand: "IPHONE" },
+  { sku: "iphone-12-mini-incell", name: "12 MINI INCELL", brand: "IPHONE" },
+  { sku: "bat-iph-12-cobalto", name: "BAT IPH 12 (2do) - COBALTO", brand: "Three Suns" },
+  { sku: "iphone-13-oled", name: "13 OLED", brand: "IPHONE" },
 ];
 
 const casos: { q: string; espera: string[]; nota: string }[] = [
+  {
+    q: "iphone 12",
+    espera: ["iphone-12-12-pro-oled", "iphone-12-mini-incell", "bat-iph-12-cobalto"],
+    nota: "marca + número debe traer displays Y pilas — el 13 no",
+  },
   {
     q: "shn07",
     espera: ["SHNA0711", "SHNA0712", "SHNA0701"],

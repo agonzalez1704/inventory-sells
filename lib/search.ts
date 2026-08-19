@@ -133,7 +133,12 @@ function weight(term: string, idx: Index): number {
  * 07 family — it just ends in those two digits.
  */
 function codigoCoincide(letras: string, numero: string, sku: string): boolean {
-  return new RegExp(`^${letras}[a-z]*${numero}`).test(sku);
+  // The optional separator is what lets "iphone 12" match sku "iphone-12-…".
+  // Without it, the part-code rule — written for "SHN 07" → "shnc2607" —
+  // hijacked any brand-plus-number query and killed every display whose sku
+  // hyphenates, while batteries (bat-iph-…) dodged the rule entirely by not
+  // starting with the letters. The customer saw batteries only.
+  return new RegExp(`^${letras}[a-z]*[-_ ]?${numero}`).test(sku);
 }
 
 function unirCodigo(tokens: string[]): string | null {
