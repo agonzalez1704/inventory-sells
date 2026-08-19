@@ -16,7 +16,6 @@ import {
 import { mxHoy } from "@/lib/caja-range";
 import { MARCA } from "@/lib/marca";
 
-export const runtime = "nodejs";
 export const maxDuration = 60;
 
 const PERIODO = z.enum(["hoy", "7d", "30d"]);

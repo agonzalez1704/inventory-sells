@@ -1,10 +1,10 @@
 import { insforgeAdmin } from "@/lib/insforge/admin";
+import { facetasTienda, modelosTienda } from "@/modules/tienda/lecturas";
 import { searchProducts, tokensDeConsulta, expand } from "@/lib/search";
 import { calidadDe } from "@/lib/calidad";
 import { TiendaView } from "@/modules/tienda/TiendaView";
 import { agruparPorModelo, type ModeloTienda } from "@/lib/calidades";
 
-export const dynamic = "force-dynamic";
 
 const PER_PAGE = 24;
 
@@ -46,7 +46,7 @@ export default async function TiendaPage({
   // Facets are counted over the whole catalog so the chips never vanish
   // mid-browse — in SQL, because doing it here meant reading 21k rows out of
   // the database to show 24 of them.
-  const { data: fData } = await insforgeAdmin.database.rpc("tienda_facetas");
+  const fData = await facetasTienda();
   const facetas = (fData ?? []) as { tipo: string; valor: string; n: number }[];
   const faceta = (tipo: string) =>
     facetas
@@ -91,14 +91,7 @@ export default async function TiendaPage({
     // Browsing has no relevance to preserve, so the database filters, orders,
     // counts and slices, and only the 24 rows on screen travel.
     const pagina = async (p: number) => {
-      const { data } = await insforgeAdmin.database.rpc("tienda_modelos", {
-        p_marca: marca,
-        p_categoria: cat,
-        p_calidad: cal,
-        p_limit: PER_PAGE,
-        p_offset: (p - 1) * PER_PAGE,
-      });
-      return (data ?? []) as (ModeloTienda & { total: number })[];
+      return modelosTienda(marca, cat, cal, PER_PAGE, (p - 1) * PER_PAGE);
     };
 
     let rows = await pagina(page);

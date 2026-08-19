@@ -9,7 +9,6 @@ import {
   type InviteRow,
 } from "@/modules/usuarios/UsuariosView";
 
-export const dynamic = "force-dynamic";
 
 export default async function UsuariosPage() {
   const { userId } = await auth();

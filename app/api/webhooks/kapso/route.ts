@@ -8,8 +8,6 @@ import { resolverRemitente, etiqueta } from "@/modules/agent/identidad";
 import { getAsesores } from "@/modules/config/lib";
 import { enviarTexto, descargarMedia } from "@/lib/kapso";
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 function firmaValida(secret: string, raw: string, firma: string | null): boolean {

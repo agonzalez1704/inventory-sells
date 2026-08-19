@@ -5,7 +5,6 @@ import { getPermisos, getAsignables } from "@/lib/auth/profile";
 import { CotizacionDetalle, type CotDetalle, type CotItem } from "@/modules/cotizaciones/CotizacionDetalle";
 import { planSurtido, type ProductoSurtido } from "@/lib/surtido";
 
-export const dynamic = "force-dynamic";
 
 type Row = {
   id: string;

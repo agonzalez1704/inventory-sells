@@ -9,7 +9,6 @@ import { CotizacionBuilder } from "@/modules/cotizaciones/CotizacionBuilder";
 import type { SalesProduct } from "@/modules/sales/SalesScreen";
 import type { PickerCustomer } from "@/modules/customers/CustomerPicker";
 
-export const dynamic = "force-dynamic";
 
 export default async function EditarCotizacionPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

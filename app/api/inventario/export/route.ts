@@ -11,7 +11,6 @@ import {
   type PdfVariant,
 } from "@/modules/inventory/InventoryPdf";
 
-export const runtime = "nodejs";
 
 export async function GET(request: Request) {
   const { userId } = await auth();

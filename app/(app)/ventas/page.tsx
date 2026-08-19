@@ -6,7 +6,6 @@ import { RecentSales, type SaleWithItems } from "@/modules/sales/RecentSales";
 import { VentasFiltros } from "@/modules/sales/VentasFiltros";
 import type { PaymentMethod } from "@/lib/types";
 
-export const dynamic = "force-dynamic";
 
 const METODOS: PaymentMethod[] = ["efectivo", "tarjeta", "transferencia", "otro"];
 const CANALES = ["mostrador", "online"] as const;

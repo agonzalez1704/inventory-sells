@@ -2,6 +2,7 @@ import "server-only";
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { MARCA, type ValorBase } from "@/lib/marca";
 import { cache } from "react";
+import { cacheLife, cacheTag } from "next/cache";
 import { normalizarTienda, type TiendaInfo } from "@/lib/tienda-info";
 
 // Business info blob injected into the WhatsApp agent. Read with the admin
@@ -58,6 +59,13 @@ export async function getValorBase(): Promise<ValorBase> {
  * pass all ask for it while rendering the same page.
  */
 export const getTiendaInfo = cache(async (): Promise<TiendaInfo> => {
+  "use cache";
+  // Hot read, step 2 of nextjs-app-like.md: the storefront layout awaits this
+  // on every page under /tienda, and it changes only when somebody saves
+  // Configuración → Tienda — which calls updateTag below. Cached, the whole
+  // storefront chrome prerenders instead of blocking on a database round trip.
+  cacheLife("hours");
+  cacheTag("tienda-info");
   const { data } = await insforgeAdmin.database
     .from("config_negocio")
     .select("tienda")

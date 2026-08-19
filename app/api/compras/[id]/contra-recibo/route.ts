@@ -11,7 +11,6 @@ import {
   type LineaContraRecibo,
 } from "@/modules/compras/ContraReciboPdf";
 
-export const runtime = "nodejs";
 
 // The counter-receipt for a shipment that didn't match its invoice: what was
 // ordered against what actually arrived, to hand back to the supplier.

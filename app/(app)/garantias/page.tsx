@@ -4,7 +4,6 @@ import { listarProveedores } from "@/modules/proveedores/actions";
 import { GarantiasView } from "@/modules/garantias/GarantiasView";
 import { listarGarantiasCliente } from "@/modules/garantias/cliente-actions";
 
-export const dynamic = "force-dynamic";
 
 export default async function GarantiasPage({
   searchParams,

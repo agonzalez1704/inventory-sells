@@ -1,9 +1,11 @@
+import { HeaderPublico } from "@/components/app-shell";
 import { ShieldX } from "lucide-react";
 import { SignOutButton } from "@clerk/nextjs";
 import { MARCA } from "@/lib/marca";
 
 export default function SinAccesoPage() {
   return (
+    <HeaderPublico>
     <main className="mx-auto flex max-w-md flex-col items-center px-6 py-24 text-center">
       <span className="flex h-12 w-12 items-center justify-center rounded-full bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400">
         <ShieldX className="h-6 w-6" />
@@ -21,5 +23,6 @@ export default function SinAccesoPage() {
         </button>
       </SignOutButton>
     </main>
+    </HeaderPublico>
   );
 }

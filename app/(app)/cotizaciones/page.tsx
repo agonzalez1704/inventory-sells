@@ -4,7 +4,6 @@ import { insforgeAdmin } from "@/lib/insforge/admin";
 import { getPermisos } from "@/lib/auth/profile";
 import { CotizacionesView, type CotizacionRow } from "@/modules/cotizaciones/CotizacionesView";
 
-export const dynamic = "force-dynamic";
 
 export default async function CotizacionesPage() {
   const { userId } = await auth();

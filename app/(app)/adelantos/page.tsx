@@ -4,7 +4,6 @@ import {
   type Adelanto,
 } from "@/modules/adelantos/AdelantosView";
 
-export const dynamic = "force-dynamic";
 
 type Row = {
   id: string;

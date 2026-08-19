@@ -3,7 +3,6 @@ import { getProfile } from "@/lib/auth/profile";
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { PedidosView, type PedidoWeb } from "@/modules/pedidos/PedidosView";
 
-export const dynamic = "force-dynamic";
 
 export default async function PedidosPage() {
   const { userId } = await auth();

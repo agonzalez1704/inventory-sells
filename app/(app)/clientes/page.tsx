@@ -3,7 +3,6 @@ import { ClientesView } from "@/modules/customers/ClientesView";
 import type { Customer } from "@/modules/customers/actions";
 import { saldosDeClientes } from "@/modules/garantias/cliente-actions";
 
-export const dynamic = "force-dynamic";
 
 export default async function ClientesPage() {
   const insforge = await createInsForgeServerClient();

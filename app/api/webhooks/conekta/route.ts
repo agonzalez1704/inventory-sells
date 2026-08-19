@@ -3,8 +3,6 @@ import { insforgeAdmin } from "@/lib/insforge/admin";
 import { getConektaOrder } from "@/lib/conekta";
 import { notifyNuevaVenta } from "@/lib/push";
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
 // Conekta webhook — the ONLY place a web order becomes a sale.
 //
