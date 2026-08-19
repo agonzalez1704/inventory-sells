@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { foto } from "@/lib/foto";
 import { formatMXN } from "@/lib/money";
-import { glosaDe, type ModeloTienda, type VarianteModelo } from "@/lib/calidades";
+import { type ModeloTienda, type VarianteModelo } from "@/lib/calidades";
 import { cn } from "@/lib/utils";
 import { useTiendaInfo } from "./TiendaInfoProvider";
 import { AddToCart } from "./AddToCart";
@@ -557,15 +557,16 @@ function Chip({
 }
 
 /**
- * One card per model: the photo on the left, the qualities on the right.
+ * One card per model: photo left, qualities right — and every card the same
+ * size, one variant or three.
  *
- * One layout whether the model has one quality or four — the earlier version
- * fell back to a different card for single-quality models, and the grid read as
- * two unrelated designs sitting together. Same repair, same shape; the right
- * panel just has fewer rows.
+ * The height fits the worst case, which in both shops' data is three variants
+ * (465 models have one, 57 two, 12 three). A card that grows with its rows made
+ * the grid ragged, which read as inconsistency even when every card was the
+ * same shape.
  *
- * The customer is choosing how much to spend on a repair, so the rows read
- * upwards from the entry price and the card is the decision.
+ * No glosses: the customers are technicians, and OLED / Incell / Original is
+ * already their vocabulary. The tier name and the price are the decision.
  */
 export function ModeloCard({ m }: { m: ModeloTienda }) {
   const hayStock = m.variantes.some((v) => v.disponible);
@@ -574,19 +575,19 @@ export function ModeloCard({ m }: { m: ModeloTienda }) {
   return (
     <div
       className={cn(
-        "group flex overflow-hidden rounded-2xl border border-border bg-background transition-all hover:border-tienda-300 dark:border-tienda-800",
+        "group flex h-52 overflow-hidden rounded-2xl border border-border bg-background transition-all hover:border-tienda-300 dark:border-tienda-800",
         !hayStock && "opacity-80",
       )}
     >
-      {/* The photo: variants are the same part, so one picture stands for all. */}
-      <div className="flex w-28 shrink-0 items-center justify-center bg-muted/30 sm:w-40">
+      {/* Variants are the same physical part; one photo stands for all. */}
+      <div className="flex w-28 shrink-0 items-center justify-center bg-muted/30 sm:w-36">
         {m.imagen ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={foto(m.imagen, 256)}
             alt={titulo}
             loading="lazy"
-            className="h-full max-h-44 w-full object-contain p-2"
+            className="h-full w-full object-contain p-2"
           />
         ) : (
           <Smartphone className="h-8 w-8 text-tienda-300 dark:text-tienda-700" />
@@ -595,10 +596,9 @@ export function ModeloCard({ m }: { m: ModeloTienda }) {
 
       <div className="min-w-0 flex-1 p-3">
         <p className="truncate text-sm font-semibold text-foreground">{titulo}</p>
-        <p className="mt-0.5 text-xs text-muted-foreground">
+        <p className="truncate text-xs text-muted-foreground">
           {m.category}
           {m.variantes.length > 1 ? ` · ${m.variantes.length} calidades` : ""}
-          {m.desde_cents && m.variantes.length > 1 ? ` · desde ${formatMXN(m.desde_cents)}` : ""}
         </p>
         <ul className="mt-2">
           {m.variantes.map((v) => (
@@ -606,8 +606,7 @@ export function ModeloCard({ m }: { m: ModeloTienda }) {
               key={v.id}
               v={v}
               imagenModelo={m.imagen}
-              // "Best seller" among what? With one quality there is no
-              // comparison to win, and the badge would decorate every card.
+              // "Best seller" among what? One quality has no comparison to win.
               top={m.variantes.length > 1 && m.mas_vendida === v.id}
             />
           ))}
@@ -618,8 +617,10 @@ export function ModeloCard({ m }: { m: ModeloTienda }) {
 }
 
 /**
- * One quality tier: name, gloss, price, add. Kept apart from the card so the
- * row owns everything about a variant and the card owns only the arrangement.
+ * One tier: name, price, add. A single fixed-height line, so three rows always
+ * land at the same card height. The badges float on the row's top edge with
+ * position:absolute — they annotate without costing a pixel of layout, which is
+ * what keeps every card the same size.
  */
 function FilaVariante({
   v,
@@ -630,32 +631,26 @@ function FilaVariante({
   imagenModelo: string | null;
   top: boolean;
 }) {
-  const glosa = glosaDe(v.calidad);
   return (
-    <li
-      className={cn(
-        "flex items-center gap-2.5 border-t border-border py-2 first:border-t-0",
-        top && "-mx-3 border-tienda-200 bg-tienda-50/60 px-3 dark:border-tienda-800 dark:bg-tienda-950/40",
+    <li className="relative flex h-11 items-center gap-2.5 border-t border-border first:border-t-0">
+      {top && (
+        <span className="absolute -top-2 left-0 z-10 rounded-full bg-tienda-600 px-1.5 py-px text-[10px] font-semibold text-white">
+          La que más se vende
+        </span>
       )}
-    >
-      <div className="min-w-0 flex-1">
-        <p className="flex flex-wrap items-center gap-1.5 text-sm font-medium text-foreground">
-          {v.calidad ?? v.nombre}
-          {/* Only when this shop's own sales earned it. */}
-          {top && (
-            <span className="rounded-full bg-background px-1.5 py-0.5 text-[10px] font-semibold text-tienda-700 dark:text-tienda-300">
-              La que más se vende
-            </span>
-          )}
-        </p>
-        {glosa && <p className="text-xs text-muted-foreground">{glosa}</p>}
-        {v.disponible && v.ultima && (
-          <p className="mt-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-400">
-            Última pieza
-          </p>
-        )}
-        {!v.disponible && <p className="mt-0.5 text-[11px] text-muted-foreground">Agotada</p>}
-      </div>
+      {v.disponible && v.ultima && (
+        <span className="absolute -top-2 right-0 z-10 rounded-full bg-amber-100 px-1.5 py-px text-[10px] font-semibold text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+          Última pieza
+        </span>
+      )}
+      {!v.disponible && (
+        <span className="absolute -top-2 right-0 z-10 rounded-full bg-muted px-1.5 py-px text-[10px] font-semibold text-muted-foreground">
+          Agotada
+        </span>
+      )}
+      <p className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
+        {v.calidad ?? v.nombre}
+      </p>
       <span className="shrink-0 font-semibold tabular-nums text-tienda-800 dark:text-tienda-300 [font-family:var(--font-display)]">
         {v.precio_cents > 0 ? formatMXN(v.precio_cents) : "A cotizar"}
       </span>
