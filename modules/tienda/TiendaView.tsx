@@ -571,6 +571,11 @@ function Chip({
 export function ModeloCard({ m }: { m: ModeloTienda }) {
   const hayStock = m.variantes.some((v) => v.disponible);
   const titulo = [m.brand, m.modelo].filter(Boolean).join(" ");
+  // Where the photo and title lead: the cheapest variant still in stock, or the
+  // cheapest at all. Unifying the card silently deleted the old ProductCard
+  // link and with it every path from the grid to a product page — the photos,
+  // the full name, the description all became unreachable.
+  const destino = m.variantes.find((v) => v.disponible) ?? m.variantes[0];
 
   return (
     <div
@@ -580,7 +585,12 @@ export function ModeloCard({ m }: { m: ModeloTienda }) {
       )}
     >
       {/* Variants are the same physical part; one photo stands for all. */}
-      <div className="flex w-28 shrink-0 items-center justify-center bg-muted/30 sm:w-36">
+      <Link
+        prefetch={true}
+        href={`/tienda/${destino.id}`}
+        aria-label={`Ver ${titulo}`}
+        className="flex w-28 shrink-0 items-center justify-center bg-muted/30 sm:w-36"
+      >
         {m.imagen ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -595,10 +605,12 @@ export function ModeloCard({ m }: { m: ModeloTienda }) {
         ) : (
           <Smartphone className="h-8 w-8 text-tienda-300 dark:text-tienda-700" />
         )}
-      </div>
+      </Link>
 
       <div className="min-w-0 flex-1 p-3">
-        <p className="truncate text-sm font-semibold text-foreground">{titulo}</p>
+        <Link prefetch={true} href={`/tienda/${destino.id}`} className="hover:underline">
+          <p className="truncate text-sm font-semibold text-foreground">{titulo}</p>
+        </Link>
         <p className="truncate text-xs text-muted-foreground">
           {m.category}
           {m.variantes.length > 1 ? ` · ${m.variantes.length} calidades` : ""}
@@ -651,9 +663,14 @@ function FilaVariante({
           Agotada
         </span>
       )}
-      <p className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
+      {/* Each tier's name opens ITS product — photos and full name differ per
+          variant even when the repair is the same. */}
+      <Link
+        href={`/tienda/${v.id}`}
+        className="min-w-0 flex-1 truncate text-sm font-medium text-foreground hover:underline"
+      >
         {v.calidad ?? v.nombre}
-      </p>
+      </Link>
       <span className="shrink-0 font-semibold tabular-nums text-tienda-800 dark:text-tienda-300 [font-family:var(--font-display)]">
         {v.precio_cents > 0 ? formatMXN(v.precio_cents) : "A cotizar"}
       </span>
