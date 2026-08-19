@@ -1,8 +1,7 @@
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { searchProducts, tokensDeConsulta, expand } from "@/lib/search";
 import { calidadDe } from "@/lib/calidad";
-import { TiendaView } from "@/modules/tienda/TiendaView";
-import { agruparPorModelo, type ModeloTienda } from "@/lib/calidades";
+import { TiendaView, type PublicProduct } from "@/modules/tienda/TiendaView";
 
 export const dynamic = "force-dynamic";
 
@@ -11,8 +10,6 @@ const PER_PAGE = 24;
 type Row = {
   id: string;
   name: string;
-  modelo: string | null;
-  calidad: string | null;
   brand: string | null;
   category: string | null;
   sku: string;
@@ -57,7 +54,7 @@ export default async function TiendaPage({
   const categorias = faceta("category");
   const calidades = faceta("calidad");
 
-  let modelos: ModeloTienda[];
+  let slice: Row[];
   let total: number;
   let current: number;
   let totalPages: number;
@@ -79,26 +76,22 @@ export default async function TiendaPage({
         (!cat || p.category === cat) &&
         (!cal || calidadDe(p.name) === cal),
     );
-    // Grouped after scoring, not before: relevance is per product, and a model
-    // is as relevant as its best-matching variant. Grouping first would average
-    // that away.
-    const agrupados = agruparPorModelo(filtered);
-    total = agrupados.length;
+    total = filtered.length;
     totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
     current = Math.min(page, totalPages);
-    modelos = agrupados.slice((current - 1) * PER_PAGE, current * PER_PAGE);
+    slice = filtered.slice((current - 1) * PER_PAGE, current * PER_PAGE);
   } else {
     // Browsing has no relevance to preserve, so the database filters, orders,
     // counts and slices, and only the 24 rows on screen travel.
     const pagina = async (p: number) => {
-      const { data } = await insforgeAdmin.database.rpc("tienda_modelos", {
+      const { data } = await insforgeAdmin.database.rpc("tienda_lista", {
         p_marca: marca,
         p_categoria: cat,
         p_calidad: cal,
         p_limit: PER_PAGE,
         p_offset: (p - 1) * PER_PAGE,
       });
-      return (data ?? []) as (ModeloTienda & { total: number })[];
+      return (data ?? []) as (Row & { total: number })[];
     };
 
     let rows = await pagina(page);
@@ -112,12 +105,22 @@ export default async function TiendaPage({
     total = Number(rows[0]?.total ?? 0);
     totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
     current = Math.min(current, totalPages);
-    modelos = rows;
+    slice = rows;
   }
+
+  const productos: PublicProduct[] = slice.map((p) => ({
+    id: p.id,
+    nombre: p.name,
+    marca: p.brand,
+    categoria: p.category,
+    precio_cents: p.price_cents,
+    disponible: p.quantity > 0,
+    imagen: p.image_url,
+  }));
 
   return (
     <TiendaView
-      modelos={modelos}
+      productos={productos}
       marcas={marcas}
       categorias={categorias}
       calidades={calidades}
