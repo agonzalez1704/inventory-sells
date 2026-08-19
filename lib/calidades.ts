@@ -26,7 +26,10 @@ export type VarianteModelo = {
   nombre: string;
   calidad: string | null;
   precio_cents: number;
-  existencia: number;
+  disponible: boolean;
+  /** Last one on the shelf. A flag, never the count — the storefront publishes
+   *  no inventory numbers. */
+  ultima: boolean;
   imagen: string | null;
 };
 
@@ -82,7 +85,8 @@ export function agruparPorModelo<
       nombre: f.name,
       calidad: f.calidad ?? null,
       precio_cents: f.price_cents,
-      existencia: f.quantity,
+      disponible: f.quantity > 0,
+      ultima: f.quantity === 1,
       imagen: f.image_url,
     });
     if (!g.imagen && f.image_url) g.imagen = f.image_url;

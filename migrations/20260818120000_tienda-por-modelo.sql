@@ -81,7 +81,11 @@ AS $$
           'nombre', f.name,
           'calidad', f.calidad,
           'precio_cents', f.price_cents,
-          'existencia', f.quantity,
+          -- A flag, not a count. This page states it exposes no inventory
+          -- numbers, and "last one" carries the urgency without publishing the
+          -- shelf to whoever is comparing prices.
+          'disponible', f.quantity > 0,
+          'ultima', f.quantity = 1,
           'imagen', f.image_url
         )
         -- Cheapest first: the ladder is read upwards, and the entry price is
