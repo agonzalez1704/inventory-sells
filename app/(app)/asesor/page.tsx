@@ -2,7 +2,6 @@ import { requirePagePermiso } from "@/lib/auth/profile";
 import { listarConversaciones } from "@/modules/agent/bandeja-actions";
 import { BandejaView } from "@/modules/agent/BandejaView";
 
-export const dynamic = "force-dynamic";
 
 export default async function AsesorPage() {
   // This page had no guard at all: any signed-in session could read every

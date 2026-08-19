@@ -6,7 +6,6 @@ import { getCompra, getSaldo, listarNotas, listarPagos } from "@/modules/compras
 import { CompraDetalle } from "@/modules/compras/CompraDetalle";
 import { CompraFinanzas } from "@/modules/compras/CompraFinanzas";
 
-export const dynamic = "force-dynamic";
 
 export default async function CompraPage({ params }: { params: Promise<{ id: string }> }) {
   await requirePagePermiso("inventario_gestionar", "/inventario");

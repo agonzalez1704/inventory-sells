@@ -10,7 +10,6 @@ import { VOUCHER_HORAS_UI } from "@/modules/tienda/pago-const";
 import { PasePickup } from "@/modules/tienda/PasePickup";
 import { MARCA } from "@/lib/marca";
 
-export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: `Tu pedido — ${MARCA.tienda.nombre}`, robots: { index: false } };
 
 type Orden = {

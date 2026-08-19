@@ -13,8 +13,6 @@ import { urlBase } from "@/lib/url";
 // makes every deploy depend on the database answering during the build, and a
 // database that has just been paused for quota is exactly when you need to be
 // able to deploy. The cache means the read still happens once a day, not once
-// per crawler fetch.
-export const dynamic = "force-dynamic";
 const UN_DIA = 86400;
 
 // The protocol's ceiling is 50,000 URLs per file. Ruli is at 21k and this stays

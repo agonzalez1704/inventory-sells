@@ -11,7 +11,6 @@ import {
 } from "@/modules/caja/CajaView";
 import type { PaymentMethodStored, PaymentMethod, PaymentMethodVenta } from "@/lib/types";
 
-export const dynamic = "force-dynamic";
 
 // 'saldo' is here so it has a column of its own, not so it counts as money.
 // The cash came in on the day of the original sale; a sale paid with credit is

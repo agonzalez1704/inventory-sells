@@ -697,7 +697,13 @@ export function ProductCard({
         {p.disponible ? "Disponible" : "Agotado"}
       </span>
 
-      <Link href={`/tienda/${p.id}`} className="flex flex-1 flex-col">
+      <Link
+        // Step 4: resolve the product page's data when the card enters the
+        // viewport, so the detail arrives with content instead of a skeleton.
+        prefetch={true}
+        href={`/tienda/${p.id}`}
+        className="flex flex-1 flex-col"
+      >
         <div className="mb-3 flex aspect-square items-center justify-center overflow-hidden rounded-xl bg-background">
           {p.imagen ? (
             // eslint-disable-next-line @next/next/no-img-element

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { SignInButton } from "@clerk/nextjs";
 import { Camera, Boxes, ShoppingCart, ArrowRight } from "lucide-react";
 import { Logo } from "@/components/logo";
+import { HeaderPublico } from "@/components/app-shell";
 
 const features = [
   {
@@ -23,11 +24,27 @@ const features = [
   },
 ];
 
-export default async function Home() {
+import { Suspense } from "react";
+
+/**
+ * The signed-in redirect, streamed. Awaiting auth at the top of the page made
+ * the landing — the most static page in the app — block its own prerender.
+ * The hero paints immediately; a signed-in visitor is whisked to /inventario
+ * the instant Clerk answers.
+ */
+async function RedirigirSiEntrado() {
   const { userId } = await auth();
   if (userId) redirect("/inventario");
+  return null;
+}
 
+export default function Home() {
   return (
+    <>
+    <Suspense fallback={null}>
+      <RedirigirSiEntrado />
+    </Suspense>
+    <HeaderPublico>
     <div className="mx-auto max-w-5xl px-4 sm:px-6">
       <section className="relative flex flex-col items-center overflow-hidden rounded-3xl border border-border bg-dots py-20 text-center sm:py-28">
         <Logo className="mb-6 h-10 w-auto text-foreground" />
@@ -73,5 +90,7 @@ export default async function Home() {
         ))}
       </section>
     </div>
+  </HeaderPublico>
+  </>
   );
 }

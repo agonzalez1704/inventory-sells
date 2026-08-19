@@ -1,6 +1,7 @@
 "use server";
 
 import { auth } from "@clerk/nextjs/server";
+import { updateTag } from "next/cache";
 import { getProfile } from "@/lib/auth/profile";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
 import type { ValorBase } from "@/lib/marca";
@@ -32,7 +33,11 @@ export async function updateNegocioInfo(
       fiado_exige_cliente: fiadoExige,
     })
     .eq("id", 1);
-  if (error) throw new Error(error.message ?? "Error al guardar");
+  if (error) throw new Error(error.message ??"Error al guardar");
+  // The storefront chrome caches this read ("use cache" in getTiendaInfo);
+  // saving here is the only writer, so this pairing is the whole invalidation
+  // story (nextjs-app-like.md steps 2+3).
+  updateTag("tienda-info");
 }
 
 /**

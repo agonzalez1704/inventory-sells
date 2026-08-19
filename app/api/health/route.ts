@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 
-export const dynamic = "force-dynamic";
 
 // Public build marker. Without it there's no way to tell whether a bug report
 // is against the code we just shipped or the previous deploy. Exposes only the

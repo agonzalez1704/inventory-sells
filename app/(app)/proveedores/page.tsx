@@ -2,7 +2,6 @@ import { getPermisos, requirePagePermiso } from "@/lib/auth/profile";
 import { ProveedoresView } from "@/modules/proveedores/ProveedoresView";
 import { listarProveedores, conteoPorProveedor } from "@/modules/proveedores/actions";
 
-export const dynamic = "force-dynamic";
 
 export default async function ProveedoresPage() {
   const userId = await requirePagePermiso("inventario_ver");

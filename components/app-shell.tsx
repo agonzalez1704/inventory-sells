@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, use, useState } from "react";
 import Link from "next/link";
+// usePathname is legal INSIDE a Suspense boundary; NavList renders under one.
 import { usePathname } from "next/navigation";
 import { useAuth, UserButton, SignInButton, SignUpButton } from "@clerk/nextjs";
 import {
@@ -124,34 +125,53 @@ function NavList({ permisos, onNavigate }: { permisos: Set<string>; onNavigate?:
   );
 }
 
+/**
+ * Resolves the permisos promise the layout hands down, inside its own Suspense.
+ *
+ * The links are the ONLY thing in the shell that needs the user's role, so the
+ * links are the only thing that waits for it. The chrome around them is static
+ * and prerenders; awaiting in the layout instead would hold every route's first
+ * paint hostage to a Clerk round trip.
+ */
+function NavListAsync({
+  permisos,
+  onNavigate,
+}: {
+  permisos: Promise<string[]>;
+  onNavigate?: () => void;
+}) {
+  return <NavList permisos={new Set(use(permisos))} onNavigate={onNavigate} />;
+}
+
+function NavFallback() {
+  return (
+    <nav aria-hidden className="flex-1 space-y-3 overflow-hidden px-3 py-4">
+      {Array.from({ length: 7 }, (_, i) => (
+        <div key={i} className="h-8 animate-pulse rounded-lg bg-muted/60" />
+      ))}
+    </nav>
+  );
+}
+
 export function AppShell({
   children,
-  permisos = [],
+  permisos,
 }: {
   children: React.ReactNode;
-  permisos?: string[];
+  permisos: Promise<string[]>;
 }) {
-  const pathname = usePathname();
-  const { isSignedIn } = useAuth();
   const [open, setOpen] = useState(false);
-  const permSet = new Set(permisos);
 
-  useEffect(() => setOpen(false), [pathname]);
-  useEffect(() => {
-    if (!open) return;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [open]);
-
-  // Public, customer-facing pages carry their own branding and must never show
-  // the app chrome or sign-in prompts: the storefront and the shareable quote.
-  if (pathname.startsWith("/tienda") || pathname === "/cotizacion") return <>{children}</>;
+  // No usePathname here: reading the URL in the root shell blocks the
+  // prerendered shell of every route (the value only exists at runtime).
+  // Which pages carry this chrome is a structural fact — this component is
+  // rendered by the (app) layout and nowhere else — so the old runtime check
+  // for /tienda and /cotizacion became the route tree itself. The drawer
+  // closes via NavList's onNavigate instead of watching the path.
 
   return (
     <>
-      {isSignedIn ? (
+      {(
         <>
           {/* Desktop sidebar — fixed, so main just pads left to clear it. */}
           <aside className="fixed inset-y-0 left-0 z-30 hidden w-56 flex-col border-r border-border bg-background lg:flex">
@@ -161,7 +181,9 @@ export function AppShell({
                 <Logo className="h-6 w-auto text-foreground" />
               </Link>
             </div>
-            <NavList permisos={permSet} />
+            <Suspense fallback={<NavFallback />}>
+              <NavListAsync permisos={permisos} />
+            </Suspense>
             <div className="flex shrink-0 items-center justify-between gap-2 border-t border-border p-3">
               <UserButton showName />
               <ThemeToggle />
@@ -206,14 +228,23 @@ export function AppShell({
                     <X className="h-4 w-4" />
                   </button>
                 </div>
-                <NavList permisos={permSet} onNavigate={() => setOpen(false)} />
+                <Suspense fallback={<NavFallback />}>
+                  <NavListAsync permisos={permisos} onNavigate={() => setOpen(false)} />
+                </Suspense>
               </div>
             </div>
           )}
 
           <main className="min-w-0 lg:pl-56">{children}</main>
         </>
-      ) : (
+      )}
+    </>
+  );
+}
+
+/** The signed-out header: the landing page and /sin-acceso, nothing else. */
+export function HeaderPublico({ children }: { children: React.ReactNode }) {
+  return (
         <div className="min-h-screen">
           <header className="sticky top-0 z-30 border-b border-border bg-background/80 backdrop-blur">
             <div className="brand-gradient h-[2px] w-full" />
@@ -244,7 +275,5 @@ export function AppShell({
           </header>
           <main>{children}</main>
         </div>
-      )}
-    </>
   );
 }

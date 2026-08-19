@@ -2,6 +2,12 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // App-like navigation (nextjs-app-like.md, adoption steps 1 and 6): the
+  // static shell of every route is prerendered and can be prefetched before the
+  // click; anything dynamic streams in through Suspense. partialPrefetching
+  // fetches that shell for visible <Link>s, so the next page paints instantly.
+  cacheComponents: true,
+  partialPrefetching: true,
   // Baked into the client bundle at build time so a loaded tab knows which
   // build it came from. Compared against /api/health to spot a new deploy —
   // otherwise the tab keeps calling Server Action ids that no longer exist.

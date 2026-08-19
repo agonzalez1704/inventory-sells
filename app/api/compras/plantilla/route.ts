@@ -6,7 +6,6 @@ import { insforgeAdmin } from "@/lib/insforge/admin";
 import { MARCA } from "@/lib/marca";
 import { COLUMNAS, ENCABEZADOS, PLANTILLA_HOJA } from "@/lib/plantilla-compra";
 
-export const runtime = "nodejs";
 
 // The blank sheet a supplier fills in, or the shop types into. Generated from
 // the same COLUMNAS the parser reads, so the file and the reader can never

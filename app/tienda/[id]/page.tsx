@@ -8,7 +8,6 @@ import {
   type RelacionadoProducto,
 } from "@/modules/tienda/ProductoDetalle";
 
-export const dynamic = "force-dynamic";
 
 // Without this every product page carries the root title, which is indexed but
 // unfindable — nobody searches for the shop by name to reach one part.

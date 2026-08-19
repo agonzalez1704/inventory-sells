@@ -1,7 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
 
-export const dynamic = "force-dynamic";
 
 // Lightweight count of conversations waiting for a human, polled by the nav
 // badge so staff notice handoffs from any page.

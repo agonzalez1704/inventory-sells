@@ -1,5 +1,7 @@
 "use server";
 
+import { updateTag } from "next/cache";
+
 import { auth } from "@clerk/nextjs/server";
 import { assertPermiso, permisosDe } from "@/lib/auth/profile";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
@@ -95,6 +97,9 @@ export async function subirImagenProducto(
     });
     if (upErr) throw new Error(upErr.message ?? "No se pudo guardar la imagen");
 
+    // The storefront caches its catalog reads under this tag (step 3): a new
+    // photo must show on the next visit, not next TTL.
+    updateTag("tienda");
     return { url: data.url };
   });
 }
@@ -128,6 +133,7 @@ export async function quitarImagenProducto(
       p_key: null,
     });
     if (error) throw new Error(error.message ?? "No se pudo quitar la imagen");
+    updateTag("tienda");
     return null;
   });
 }
@@ -192,6 +198,7 @@ export async function updateProduct(
     })
     .eq("id", id);
   if (error) throw new Error(error.message ?? "Error al guardar");
+  updateTag("tienda");
   return null;
   });
 }
@@ -216,6 +223,7 @@ export async function adjustStock(
     p_note: note?.trim() || null,
   });
   if (error) throw new Error(error.message ?? "Error al ajustar stock");
+  updateTag("tienda");
   return Number(data);
   });
 }

@@ -8,7 +8,6 @@ import { CotizacionBuilder } from "@/modules/cotizaciones/CotizacionBuilder";
 import type { SalesProduct } from "@/modules/sales/SalesScreen";
 import type { PickerCustomer } from "@/modules/customers/CustomerPicker";
 
-export const dynamic = "force-dynamic";
 
 export default async function NuevaCotizacionPage() {
   const { userId } = await auth();

@@ -5,7 +5,6 @@ import { getPermisos, requirePagePermiso } from "@/lib/auth/profile";
 import { getCardex, proveedoresDelProducto } from "@/modules/cardex/actions";
 import { CardexView } from "@/modules/cardex/CardexView";
 
-export const dynamic = "force-dynamic";
 
 export default async function CardexPage({ params }: { params: Promise<{ id: string }> }) {
   const userId = await requirePagePermiso("inventario_ver");
