@@ -587,7 +587,10 @@ export function ModeloCard({ m }: { m: ModeloTienda }) {
             src={foto(m.imagen, 256)}
             alt={titulo}
             loading="lazy"
-            className="h-full w-full object-contain p-2"
+            // Cover, not contain: the photo owns the full left column, edge to
+            // edge, like the reference card. contain floated the part in a sea
+            // of card background and the column read as half-empty.
+            className="h-full w-full object-cover"
           />
         ) : (
           <Smartphone className="h-8 w-8 text-tienda-300 dark:text-tienda-700" />
