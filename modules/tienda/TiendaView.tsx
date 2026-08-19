@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { foto } from "@/lib/foto";
 import { formatMXN } from "@/lib/money";
-import { glosaDe, type ModeloTienda } from "@/lib/calidades";
+import { glosaDe, type ModeloTienda, type VarianteModelo } from "@/lib/calidades";
 import { cn } from "@/lib/utils";
 import { useTiendaInfo } from "./TiendaInfoProvider";
 import { AddToCart } from "./AddToCart";
@@ -353,16 +353,12 @@ export function TiendaView({
                 </p>
                 <div
                   className={cn(
-                    "mt-3 grid grid-cols-2 gap-3 transition-opacity sm:grid-cols-3",
+                    "mt-3 grid grid-cols-1 gap-3 transition-opacity xl:grid-cols-2",
                     pending && "opacity-60",
                   )}
                 >
                   {modelos.map((m) => (
-                    <ModeloCard
-                      key={`${m.brand}|${m.category}|${m.modelo}`}
-                      m={m}
-                      whatsapp={whatsapp}
-                    />
+                    <ModeloCard key={`${m.brand}|${m.category}|${m.modelo}`} m={m} />
                   ))}
                 </div>
 
@@ -561,113 +557,120 @@ function Chip({
 }
 
 /**
- * A model, with its qualities as a price ladder.
+ * One card per model: the photo on the left, the qualities on the right.
  *
- * The same repair used to be several cards: an iPhone 13 screen at $280, $810
- * and $2,080 under three pieces of trade shorthand, on whichever pages the
- * alphabet put them. The customer is not picking a product, they are picking
- * how much to spend on a repair — so the card IS the decision, read upwards
- * from the entry price.
+ * One layout whether the model has one quality or four — the earlier version
+ * fell back to a different card for single-quality models, and the grid read as
+ * two unrelated designs sitting together. Same repair, same shape; the right
+ * panel just has fewer rows.
  *
- * A model with one quality falls back to the plain card: a ladder of one rung
- * is just a product with extra chrome.
+ * The customer is choosing how much to spend on a repair, so the rows read
+ * upwards from the entry price and the card is the decision.
  */
-export function ModeloCard({
-  m,
-  whatsapp = null,
-}: {
-  m: ModeloTienda;
-  whatsapp?: string | null;
-}) {
-  const unica = m.variantes.length === 1;
+export function ModeloCard({ m }: { m: ModeloTienda }) {
   const hayStock = m.variantes.some((v) => v.disponible);
-
-  if (unica) {
-    const v = m.variantes[0];
-    return (
-      <ProductCard
-        p={{
-          id: v.id,
-          nombre: v.nombre,
-          marca: m.brand,
-          categoria: m.category,
-          precio_cents: v.precio_cents,
-          disponible: v.disponible,
-          imagen: v.imagen ?? m.imagen,
-        }}
-        whatsapp={whatsapp}
-      />
-    );
-  }
+  const titulo = [m.brand, m.modelo].filter(Boolean).join(" ");
 
   return (
     <div
       className={cn(
-        "group relative col-span-2 flex flex-col rounded-2xl border border-border bg-background p-3 transition-all hover:border-tienda-300 dark:border-tienda-800 sm:col-span-3",
+        "group flex overflow-hidden rounded-2xl border border-border bg-background transition-all hover:border-tienda-300 dark:border-tienda-800",
         !hayStock && "opacity-80",
       )}
     >
-      <div className="flex items-center gap-3">
-        <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-muted/40">
-          {m.imagen ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={foto(m.imagen, 128)} alt={m.modelo} loading="lazy" className="h-full w-full object-contain" />
-          ) : (
-            <Smartphone className="h-6 w-6 text-tienda-400" />
-          )}
-        </div>
-        <div className="min-w-0">
-          <p className="truncate text-sm font-medium text-foreground">
-            {[m.brand, m.modelo].filter(Boolean).join(" ")}
-          </p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            {m.variantes.length} calidades
-            {m.desde_cents ? ` · desde ${formatMXN(m.desde_cents)}` : ""}
-          </p>
-        </div>
+      {/* The photo: variants are the same part, so one picture stands for all. */}
+      <div className="flex w-28 shrink-0 items-center justify-center bg-muted/30 sm:w-40">
+        {m.imagen ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={foto(m.imagen, 256)}
+            alt={titulo}
+            loading="lazy"
+            className="h-full max-h-44 w-full object-contain p-2"
+          />
+        ) : (
+          <Smartphone className="h-8 w-8 text-tienda-300 dark:text-tienda-700" />
+        )}
       </div>
 
-      <ul className="mt-2">
-        {m.variantes.map((v) => {
-          const glosa = glosaDe(v.calidad);
-          const top = m.mas_vendida === v.id;
-          return (
-            <li
+      <div className="min-w-0 flex-1 p-3">
+        <p className="truncate text-sm font-semibold text-foreground">{titulo}</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          {m.category}
+          {m.variantes.length > 1 ? ` · ${m.variantes.length} calidades` : ""}
+          {m.desde_cents && m.variantes.length > 1 ? ` · desde ${formatMXN(m.desde_cents)}` : ""}
+        </p>
+        <ul className="mt-2">
+          {m.variantes.map((v) => (
+            <FilaVariante
               key={v.id}
-              className={cn(
-                "flex items-center gap-3 border-t border-border py-2.5",
-                top && "-mx-3 border-tienda-200 bg-tienda-50/60 px-3 dark:border-tienda-800 dark:bg-tienda-950/40",
-              )}
-            >
-              <div className="min-w-0 flex-1">
-                <p className="flex flex-wrap items-center gap-1.5 text-sm font-medium text-foreground">
-                  {v.calidad ?? v.nombre}
-                  {/* Only when this shop's own sales earned it. */}
-                  {top && (
-                    <span className="rounded-full bg-background px-1.5 py-0.5 text-[10px] font-semibold text-tienda-700 dark:text-tienda-300">
-                      La que más se vende
-                    </span>
-                  )}
-                </p>
-                {glosa && <p className="text-xs text-muted-foreground">{glosa}</p>}
-                {v.disponible && v.ultima && (
-                  <p className="mt-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-400">Última pieza</p>
-                )}
-                {!v.disponible && <p className="mt-0.5 text-[11px] text-muted-foreground">Agotada</p>}
-              </div>
-              <span className="shrink-0 font-semibold tabular-nums text-tienda-800 dark:text-tienda-300 [font-family:var(--font-display)]">
-                {v.precio_cents > 0 ? formatMXN(v.precio_cents) : "A cotizar"}
-              </span>
-              {v.precio_cents > 0 && (
-                <AddToCart
-                  p={{ id: v.id, nombre: v.nombre, precio_cents: v.precio_cents, imagen: v.imagen ?? m.imagen, disponible: v.disponible }}
-                />
-              )}
-            </li>
-          );
-        })}
-      </ul>
+              v={v}
+              imagenModelo={m.imagen}
+              // "Best seller" among what? With one quality there is no
+              // comparison to win, and the badge would decorate every card.
+              top={m.variantes.length > 1 && m.mas_vendida === v.id}
+            />
+          ))}
+        </ul>
+      </div>
     </div>
+  );
+}
+
+/**
+ * One quality tier: name, gloss, price, add. Kept apart from the card so the
+ * row owns everything about a variant and the card owns only the arrangement.
+ */
+function FilaVariante({
+  v,
+  imagenModelo,
+  top,
+}: {
+  v: VarianteModelo;
+  imagenModelo: string | null;
+  top: boolean;
+}) {
+  const glosa = glosaDe(v.calidad);
+  return (
+    <li
+      className={cn(
+        "flex items-center gap-2.5 border-t border-border py-2 first:border-t-0",
+        top && "-mx-3 border-tienda-200 bg-tienda-50/60 px-3 dark:border-tienda-800 dark:bg-tienda-950/40",
+      )}
+    >
+      <div className="min-w-0 flex-1">
+        <p className="flex flex-wrap items-center gap-1.5 text-sm font-medium text-foreground">
+          {v.calidad ?? v.nombre}
+          {/* Only when this shop's own sales earned it. */}
+          {top && (
+            <span className="rounded-full bg-background px-1.5 py-0.5 text-[10px] font-semibold text-tienda-700 dark:text-tienda-300">
+              La que más se vende
+            </span>
+          )}
+        </p>
+        {glosa && <p className="text-xs text-muted-foreground">{glosa}</p>}
+        {v.disponible && v.ultima && (
+          <p className="mt-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-400">
+            Última pieza
+          </p>
+        )}
+        {!v.disponible && <p className="mt-0.5 text-[11px] text-muted-foreground">Agotada</p>}
+      </div>
+      <span className="shrink-0 font-semibold tabular-nums text-tienda-800 dark:text-tienda-300 [font-family:var(--font-display)]">
+        {v.precio_cents > 0 ? formatMXN(v.precio_cents) : "A cotizar"}
+      </span>
+      {v.precio_cents > 0 && (
+        <AddToCart
+          p={{
+            id: v.id,
+            nombre: v.nombre,
+            precio_cents: v.precio_cents,
+            imagen: v.imagen ?? imagenModelo,
+            disponible: v.disponible,
+          }}
+        />
+      )}
+    </li>
   );
 }
 
