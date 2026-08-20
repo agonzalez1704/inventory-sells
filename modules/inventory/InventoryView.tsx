@@ -15,6 +15,7 @@ import {
   Plus,
   Camera,
   History,
+  Pencil,
 } from "lucide-react";
 import type { Inventory, Product } from "@/lib/types";
 import { foto as urlFoto } from "@/lib/foto";
@@ -36,6 +37,7 @@ import { ImportPanel } from "./import/ImportPanel";
 import { ProductEditModal } from "./ProductEditModal";
 import { ProductPhotoModal } from "./ProductPhotoModal";
 import { ManualProductModal } from "./ManualProductModal";
+import { EditarInventarioModal } from "./EditarInventarioModal";
 
 export type InventoryRow = Pick<
   Product,
@@ -263,6 +265,7 @@ export function InventoryView({
   const [editId, setEditId] = useState<string | null>(null);
   const [foto, setFoto] = useState<InventoryRow | null>(null);
   const [newInvOpen, setNewInvOpen] = useState(false);
+  const [editInv, setEditInv] = useState<Inventory | null>(null);
   const [manualOpen, setManualOpen] = useState(false);
 
   const invName = useMemo(
@@ -380,9 +383,19 @@ export function InventoryView({
           <InvTab
             key={inv.id}
             active={selectedInv === inv.id}
-            onClick={() => setSelectedInv(inv.id)}
+            // Second tap on the already-selected chip opens the editor: the
+            // chip is the inventory's only presence in the UI, so editing
+            // lives where the thing itself lives. First tap only selects.
+            onClick={() =>
+              selectedInv === inv.id && puedeGestionar
+                ? setEditInv(inv)
+                : setSelectedInv(inv.id)
+            }
           >
             {inv.name}
+            {selectedInv === inv.id && puedeGestionar && (
+              <Pencil className="ml-1.5 inline h-3 w-3 opacity-60" />
+            )}
           </InvTab>
         ))}
         {puedeGestionar && (
@@ -688,6 +701,10 @@ export function InventoryView({
           verCostos={verCostos}
           onClose={() => setManualOpen(false)}
         />
+      )}
+
+      {editInv && (
+        <EditarInventarioModal inventario={editInv} onClose={() => setEditInv(null)} />
       )}
 
       {editId && (

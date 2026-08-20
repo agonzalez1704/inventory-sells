@@ -32,7 +32,7 @@ export default async function InventarioPage() {
       .range(0, 49),
     insforge.database
       .from("inventories")
-      .select("id, name")
+      .select("id, name, ciudad, entrega_dias_habiles")
       .order("name", { ascending: true }),
     estadisticasInventario(),
   ]);

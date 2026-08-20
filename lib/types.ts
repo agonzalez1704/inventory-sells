@@ -19,6 +19,10 @@ export interface Profile {
 export interface Inventory {
   id: string;
   name: string;
+  /** Where the stock physically sits, when not at the shop. */
+  ciudad?: string | null;
+  /** Extra business days for delivery from this warehouse. Null = local. */
+  entrega_dias_habiles?: number | null;
 }
 
 export interface Product {
