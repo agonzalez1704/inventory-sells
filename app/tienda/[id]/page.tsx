@@ -59,7 +59,7 @@ export default async function ProductoPage({
 
   const { data } = await insforgeAdmin.database
     .from("products")
-    .select("id, name, brand, category, size, color, price_cents, quantity, is_active, image_url")
+    .select("id, name, brand, category, size, color, price_cents, quantity, is_active, image_url, inventories(entrega_dias_habiles)")
     .eq("id", id)
     .maybeSingle();
 
@@ -76,6 +76,9 @@ export default async function ProductoPage({
     precio_cents: row.price_cents,
     disponible: row.quantity > 0,
     imagen: row.image_url,
+    entrega_dias:
+      (row as unknown as { inventories: { entrega_dias_habiles: number | null } | null })
+        .inventories?.entrega_dias_habiles ?? 0,
   };
 
   // Related: same category (or brand), a few active products.

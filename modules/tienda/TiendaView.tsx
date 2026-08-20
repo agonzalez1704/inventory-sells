@@ -665,12 +665,21 @@ function FilaVariante({
       )}
       {/* Each tier's name opens ITS product — photos and full name differ per
           variant even when the repair is the same. */}
-      <Link
-        href={`/tienda/${v.id}`}
-        className="min-w-0 flex-1 truncate text-sm font-medium text-foreground hover:underline"
-      >
-        {v.calidad ?? v.nombre}
-      </Link>
+      <span className="flex min-w-0 flex-1 items-center gap-1.5">
+        <Link
+          href={`/tienda/${v.id}`}
+          className="truncate text-sm font-medium text-foreground hover:underline"
+        >
+          {v.calidad ?? v.nombre}
+        </Link>
+        {/* Stock in another city: the promise changes, so it is said where the
+            choice is made — not discovered at checkout. */}
+        {(v.entrega_dias ?? 0) > 0 && (
+          <span className="shrink-0 rounded-full bg-muted px-1.5 py-px text-[10px] font-medium text-muted-foreground">
+            +{v.entrega_dias} días
+          </span>
+        )}
+      </span>
       <span className="shrink-0 font-semibold tabular-nums text-tienda-800 dark:text-tienda-300 [font-family:var(--font-display)]">
         {v.precio_cents > 0 ? formatMXN(v.precio_cents) : "A cotizar"}
       </span>

@@ -24,6 +24,8 @@ export type DetalleProducto = {
   precio_cents: number;
   disponible: boolean;
   imagen: string | null;
+  /** Extra business days: this piece's stock sits in another city. */
+  entrega_dias?: number;
 };
 export type RelacionadoProducto = {
   id: string;
@@ -183,6 +185,14 @@ export async function ProductoDetalle({
                     </strong>
                   </>
                 ) : null}
+                {(p.entrega_dias ?? 0) > 0 && (
+                  <>
+                    {" "}· esta pieza sale de otra ciudad:{" "}
+                    <strong className="text-foreground">
+                      +{p.entrega_dias} día{(p.entrega_dias ?? 0) > 1 ? "s" : ""} hábil{(p.entrega_dias ?? 0) > 1 ? "es" : ""}
+                    </strong>
+                  </>
+                )}
                 . El costo de envío se calcula según tu destino. Precio sujeto a
                 disponibilidad.
               </span>

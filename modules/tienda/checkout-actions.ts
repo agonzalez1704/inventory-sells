@@ -17,6 +17,8 @@ export type LineaValidada = {
   precio_cents: number;
   imagen: string | null;
   qty: number;
+  /** Extra business days because this line's stock sits in another city. */
+  entrega_dias: number;
 };
 
 export type Resumen = {
@@ -24,6 +26,8 @@ export type Resumen = {
   subtotal_cents: number;
   /** Dropped because they went out of stock / inactive while browsing. */
   removidos: string[];
+  /** The whole order's extra business days: the slowest warehouse wins. */
+  demora_dias: number;
 };
 
 type Row = {
@@ -33,6 +37,7 @@ type Row = {
   quantity: number;
   image_url: string | null;
   is_active: boolean;
+  inventories: { entrega_dias_habiles: number | null } | null;
 };
 
 // Re-price the cart from the catalog. Never trust client prices.
@@ -45,9 +50,9 @@ export async function validarCarrito(
 
     const { data } = await insforgeAdmin.database
       .from("products")
-      .select("id, name, price_cents, quantity, image_url, is_active")
+      .select("id, name, price_cents, quantity, image_url, is_active, inventories(entrega_dias_habiles)")
       .in("id", ids);
-    const rows = (data ?? []) as Row[];
+    const rows = (data ?? []) as unknown as Row[];
     const byId = new Map(rows.map((r) => [r.id, r]));
 
     const out: LineaValidada[] = [];
@@ -67,6 +72,7 @@ export async function validarCarrito(
         imagen: p.image_url,
         // Silently cap at what's really available — never reveal the number.
         qty: Math.min(qty, p.quantity),
+        entrega_dias: p.inventories?.entrega_dias_habiles ?? 0,
       });
     }
     if (out.length === 0)
@@ -76,6 +82,11 @@ export async function validarCarrito(
       lineas: out,
       subtotal_cents: out.reduce((s, l) => s + l.precio_cents * l.qty, 0),
       removidos,
+      // One shipment, one promise: the slowest warehouse in the cart sets the
+      // extra days for the whole order. 2 screens from the shop plus 5 flexes
+      // from Irapuato is an Irapuato-paced order — saying otherwise at
+      // checkout would be a promise the parcel cannot keep.
+      demora_dias: Math.max(0, ...out.map((l) => l.entrega_dias)),
     };
   });
 }

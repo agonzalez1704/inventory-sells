@@ -30,6 +30,8 @@ export type VarianteModelo = {
   /** Last one on the shelf. A flag, never the count — the storefront publishes
    *  no inventory numbers. */
   ultima: boolean;
+  /** Extra business days when the stock sits in another city. Null = local. */
+  entrega_dias?: number | null;
   imagen: string | null;
 };
 

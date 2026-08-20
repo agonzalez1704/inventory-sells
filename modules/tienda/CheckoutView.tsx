@@ -275,6 +275,17 @@ export function CheckoutView() {
         Finalizar compra
       </h1>
 
+      {/* The slowest warehouse sets the whole order's pace. Said before the
+          form, not after the payment. */}
+      {resumen && resumen.demora_dias > 0 && (
+        <p className="mt-3 flex items-start gap-2 rounded-xl border border-tienda-200 dark:border-tienda-800 bg-tienda-50/60 dark:bg-tienda-950/40 p-3 text-xs text-foreground">
+          <Truck className="mt-0.5 h-4 w-4 shrink-0 text-tienda-600 dark:text-tienda-400" />
+          Parte de tu pedido sale de otra ciudad: agrega{" "}
+          <strong>{resumen.demora_dias} día{resumen.demora_dias > 1 ? "s" : ""} hábil{resumen.demora_dias > 1 ? "es" : ""}</strong>{" "}
+          a la entrega estimada.
+        </p>
+      )}
+
       {resumen && resumen.removidos.length > 0 && (
         <p className="mt-3 flex items-start gap-2 rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/40 p-3 text-xs text-amber-800 dark:text-amber-300">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
