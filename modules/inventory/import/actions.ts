@@ -251,7 +251,7 @@ export async function createInventoryWithImport(
 export async function addProduct(
   inventoryId: string,
   row: ExtractedRow,
-): Promise<void> {
+): Promise<{ id: string }> {
   await requireAdmin();
   if (!inventoryId) throw new Error("Inventario requerido");
 
@@ -266,4 +266,17 @@ export async function addProduct(
     p_inventory_id: inventoryId,
   });
   if (error) throw new Error(error.message ?? "Error al agregar el producto");
+
+  // The form attaches the photo AFTER the product exists, so it needs the id.
+  // commit_import returns aggregate jsonb, not rows — but the sku it wrote is
+  // deterministic (given, or slugified name), so the lookup is exact.
+  const { data } = await insforge.database
+    .from("products")
+    .select("id")
+    .eq("inventory_id", inventoryId)
+    .eq("sku", payload[0].sku)
+    .maybeSingle();
+  const id = (data as { id: string } | null)?.id;
+  if (!id) throw new Error("El producto se guardó pero no se pudo recuperar");
+  return { id };
 }
