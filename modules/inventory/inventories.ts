@@ -2,16 +2,17 @@
 
 import { updateTag } from "next/cache";
 
-import { auth } from "@clerk/nextjs/server";
-import { getProfile } from "@/lib/auth/profile";
+import { assertPermiso } from "@/lib/auth/profile";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
 import type { Inventory } from "@/lib/types";
 
 export async function createInventory(name: string): Promise<Inventory> {
-  const { userId } = await auth();
-  if (!userId) throw new Error("No autenticado");
-  const profile = await getProfile(userId);
-  if (profile?.role !== "admin") throw new Error("Solo administradores");
+  // The permission, not the legacy role text. The shop renamed a seller's role
+  // and granted it inventario_gestionar; the UI (which reads permisos) showed
+  // the button while this check (which read profile.role) refused the click —
+  // two authorization systems disagreeing about the same person. The permiso
+  // is the one the roles screen edits, so it is the one that decides.
+  await assertPermiso("inventario_gestionar");
 
   const clean = name.trim();
   if (!clean) throw new Error("El nombre es obligatorio");
@@ -39,10 +40,7 @@ export async function editarInventario(
   id: string,
   campos: { nombre: string; ciudad: string | null; entregaDias: number | null },
 ): Promise<void> {
-  const { userId } = await auth();
-  if (!userId) throw new Error("No autenticado");
-  const profile = await getProfile(userId);
-  if (profile?.role !== "admin") throw new Error("Solo administradores");
+  await assertPermiso("inventario_gestionar");
 
   const nombre = campos.nombre.trim();
   if (!nombre) throw new Error("El nombre es obligatorio");
