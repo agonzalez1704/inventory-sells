@@ -1,5 +1,7 @@
 "use server";
 
+import { slugify } from "@/lib/slug";
+
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
 import { assertPermiso } from "@/lib/auth/profile";
@@ -405,4 +407,78 @@ export async function cuentasPorPagar(): Promise<CuentaPorPagar[]> {
     out.set(s.proveedor_id, cur);
   }
   return [...out.values()].sort((a, b) => b.saldo_cents - a.saldo_cents);
+}
+
+/**
+ * A product that does not exist yet, born inside the purchase that buys it.
+ *
+ * "LG Q60 prime" arrives in the shipment and is in no inventory. The old path
+ * was leaving the purchase, creating the product in Inventario, coming back and
+ * searching for it — four screens for one line. Now the capture creates it in
+ * place.
+ *
+ * What the new product carries, and why:
+ * - quantity 0 — stock enters when the purchase is RECEIVED, like every other
+ *   line. Creating with stock would double-count on receive.
+ * - cost 0 — the purchase line's cost is the cost, and receiving writes the
+ *   FIFO layer. Two places stating the cost would disagree by the second buy.
+ * - price 0 — "A cotizar". Inventing a sale price at capture time would put a
+ *   made-up number in front of customers; the storefront already hides
+ *   unpriced products.
+ * - the compra's proveedor — the first thing anyone asks about a new part is
+ *   who sells it, and this is the moment that answer is certain.
+ */
+export async function crearProductoEnCompra(
+  compraId: string,
+  nombre: string,
+  inventoryId: string,
+): Promise<{ id: string; name: string; sku: string }> {
+  await assertPermiso("inventario_gestionar");
+  await assertBorrador(compraId);
+
+  const name = nombre.trim();
+  if (name.length < 3) throw new Error("Escribe el nombre de la pieza");
+  const sku = slugify(name);
+  if (!sku) throw new Error("El nombre no genera un SKU válido");
+
+  const { data: compra } = await insforgeAdmin.database
+    .from("compras")
+    .select("proveedor_id")
+    .eq("id", compraId)
+    .maybeSingle();
+
+  // A duplicate sku in the same inventory is the same part typed twice —
+  // point at the existing one instead of minting a twin.
+  const { data: existente } = await insforgeAdmin.database
+    .from("products")
+    .select("id, name")
+    .eq("inventory_id", inventoryId)
+    .eq("sku", sku)
+    .maybeSingle();
+  if (existente) {
+    throw new Error(
+      `Ya existe "${(existente as { name: string }).name}" con ese SKU en este inventario — búscalo arriba`,
+    );
+  }
+
+  const userId = await assertPermiso("inventario_gestionar");
+  const { data, error } = await insforgeAdmin.database
+    .from("products")
+    .insert([
+      {
+        sku,
+        name,
+        inventory_id: inventoryId,
+        quantity: 0,
+        cost_cents: 0,
+        price_cents: 0,
+        is_active: true,
+        proveedor_id: (compra as { proveedor_id: string } | null)?.proveedor_id ?? null,
+        created_by: userId,
+      },
+    ])
+    .select("id, name, sku")
+    .maybeSingle();
+  if (error || !data) throw new Error(error?.message ?? "No se pudo crear el producto");
+  return data as { id: string; name: string; sku: string };
 }

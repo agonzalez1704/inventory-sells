@@ -11,14 +11,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import type { SalesProduct } from "@/modules/sales/SalesScreen";
-import { ponerItem, quitarItem, recibirCompra, cancelarCompra, registrarNota, type Compra } from "./actions";
+import { ponerItem, quitarItem, recibirCompra, cancelarCompra, registrarNota, crearProductoEnCompra, type Compra } from "./actions";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { CargarFactura } from "./CargarFactura";
 
 const fecha = (iso: string) =>
   new Date(iso).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
 
-export function CompraDetalle({ compra }: { compra: Compra }) {
+export function CompraDetalle({
+  compra,
+  inventarios,
+}: {
+  compra: Compra;
+  inventarios: { id: string; name: string }[];
+}) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [query, setQuery] = useState("");
@@ -38,6 +44,8 @@ export function CompraDetalle({ compra }: { compra: Compra }) {
   // filter it here, which is 21k products at the refaccionaria; the lines
   // already captured come embedded in compra_items and never needed it.
   const [resultados, setResultados] = useState<SalesProduct[]>([]);
+  // Creating a part that is in no inventory yet, without leaving the capture.
+  const [invNueva, setInvNueva] = useState(inventarios[0]?.id ?? "");
   useEffect(() => {
     if (!query.trim()) {
       setResultados([]);
@@ -73,6 +81,22 @@ export function CompraDetalle({ compra }: { compra: Compra }) {
         router.refresh();
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Error al agregar");
+      }
+    });
+  }
+
+  function crearPieza() {
+    start(async () => {
+      try {
+        const p = await crearProductoEnCompra(compra.id, query, invNueva);
+        toast.success(`"${p.name}" creado — captura cantidad y costo`);
+        // The created part becomes the selected one: the line continues
+        // exactly as if the search had found it.
+        setElegido({ id: p.id, sku: p.sku, name: p.name, quantity: 0 } as SalesProduct);
+        setQuery("");
+        router.refresh();
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "No se pudo crear");
       }
     });
   }
@@ -320,6 +344,27 @@ export function CompraDetalle({ compra }: { compra: Compra }) {
               className="h-10 pl-9"
             />
           </div>
+          {!elegido && query.trim().length >= 3 && (
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-border px-3 py-2">
+              <span className="text-sm text-muted-foreground">
+                ¿Pieza nueva? Crear <strong className="text-foreground">“{query.trim()}”</strong>
+              </span>
+              {inventarios.length > 1 && (
+                <select
+                  value={invNueva}
+                  onChange={(e) => setInvNueva(e.target.value)}
+                  className="h-8 rounded-lg border border-border bg-background px-2 text-base sm:text-sm"
+                >
+                  {inventarios.map((i) => (
+                    <option key={i.id} value={i.id}>{i.name}</option>
+                  ))}
+                </select>
+              )}
+              <Button size="sm" variant="secondary" onClick={crearPieza} disabled={pending}>
+                Crear y capturar
+              </Button>
+            </div>
+          )}
           {!elegido && resultados.length > 0 && (
             <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border">
               {resultados.map((p) => (
