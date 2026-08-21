@@ -8,6 +8,7 @@ import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { resizeImage } from "@/lib/image";
+import { slugify } from "@/lib/slug";
 import { subirImagenProducto } from "./actions";
 import { addProduct } from "./import/actions";
 import type { ExtractedRow } from "./import/schema";
@@ -60,7 +61,14 @@ export function ManualProductModal({
   const camRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // The sku follows the name — with the SAME function the server uses when the
+  // field is blank, so what the form shows is what gets written. It stops
+  // following the moment the seller edits it: a hand-typed sku is information,
+  // and overwriting it because the name changed would throw that away.
+  const [skuManual, setSkuManual] = useState(false);
   const set = (k: keyof typeof f, v: string) => setF((s) => ({ ...s, [k]: v }));
+  const setNombre = (v: string) =>
+    setF((s) => ({ ...s, name: v, ...(skuManual ? {} : { sku: slugify(v) }) }));
   const canSave = f.name.trim() !== "" || f.sku.trim() !== "";
   const num = (v: string) => (v.trim() === "" ? undefined : Number(v));
 
@@ -130,6 +138,7 @@ export function ManualProductModal({
         // Batch momentum: the shelf keeps its brand and category; the part
         // changes. Focus back on Nombre so the next one starts immediately.
         setF((s) => ({ ...LIMPIOS, category: s.category, brand: s.brand }));
+        setSkuManual(false);
         quitarFoto();
         nombreRef.current?.focus();
         router.refresh();
@@ -209,10 +218,16 @@ export function ManualProductModal({
           </div>
           <div className="min-w-0 flex-1 space-y-3">
             <Field label="Nombre">
-              <Input ref={nombreRef} value={f.name} onChange={(e) => set("name", e.target.value)} autoFocus />
+              <Input ref={nombreRef} value={f.name} onChange={(e) => setNombre(e.target.value)} autoFocus />
             </Field>
-            <Field label="SKU (opcional — se genera del nombre)">
-              <Input value={f.sku} onChange={(e) => set("sku", e.target.value)} />
+            <Field label="SKU (se genera del nombre)">
+              <Input
+                value={f.sku}
+                onChange={(e) => {
+                  setSkuManual(e.target.value.trim() !== "");
+                  set("sku", e.target.value);
+                }}
+              />
             </Field>
           </div>
         </div>

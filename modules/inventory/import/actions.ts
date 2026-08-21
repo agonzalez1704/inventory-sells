@@ -1,5 +1,6 @@
 "use server";
 
+import { slugify } from "@/lib/slug";
 import { assertPermiso } from "@/lib/auth/profile";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
 import { toCents } from "@/lib/money";
@@ -70,16 +71,6 @@ export type CommitResult = {
   bajas: number; // de esos, cuántos bajaron — la señal de alarma en espejo
   sin_precio: number; // entran visibles pero no vendibles
 };
-
-function slugify(s: string): string {
-  return s
-    .trim()
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "");
-}
 
 // Sanitize rows into the DB payload: require sku (derive from name if blank),
 // convert pesos → centavos, round qty, clamp negatives.
