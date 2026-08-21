@@ -392,7 +392,7 @@ export function CotizacionBuilder({
                 <select
                   value={vendedorId}
                   onChange={(e) => setVendedorId(e.target.value)}
-                  className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm"
+                  className="h-10 w-full rounded-lg border border-border bg-background px-3 text-base sm:text-sm"
                   aria-label="Asignar vendedor"
                 >
                   <option value="">Asignar vendedor (opcional)</option>

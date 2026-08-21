@@ -169,7 +169,7 @@ export function ManualProductModal({
             <select
               value={invId}
               onChange={(e) => setInvId(e.target.value)}
-              className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+              className="h-10 w-full rounded-lg border border-input bg-background px-3 text-base sm:text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
             >
               {inventories.map((i) => (
                 <option key={i.id} value={i.id}>{i.name}</option>

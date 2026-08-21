@@ -307,7 +307,7 @@ function InvitarModal({ roles, onClose }: { roles: RolRow[]; onClose: () => void
           <select
             value={roleId}
             onChange={(e) => setRoleId(e.target.value)}
-            className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm"
+            className="h-10 w-full rounded-lg border border-border bg-background px-3 text-base sm:text-sm"
           >
             {roles.map((r) => (
               <option key={r.id} value={r.id}>

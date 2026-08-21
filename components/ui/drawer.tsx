@@ -83,6 +83,12 @@ export function Drawer({
         RemoveScroll, so the page behind stays put either way.
       */
       repositionInputs={false}
+      // Dismissal belongs to the handle, the backdrop and the X — not to any
+      // downward drag on the content. The reported chain: iOS auto-zooms on a
+      // small input, the pinch to undo the zoom puts one finger travelling
+      // down, vaul reads it as a dismiss drag, and a half-filled form is gone.
+      // Forms are exactly where accidental dismissal costs the most.
+      handleOnly
     >
       <Vaul.Portal>
         <Vaul.Overlay className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm" />
@@ -106,10 +112,10 @@ export function Drawer({
               : undefined
           }
         >
-          <div
-            aria-hidden
-            className="mx-auto mt-2.5 h-1.5 w-10 shrink-0 rounded-full bg-muted"
-          />
+          {/* Vaul's own Handle, not a decorative div: with handleOnly, this
+              is the one place a drag can dismiss from. Larger hit area than
+              the visible pill, which is what a thumb actually needs. */}
+          <Vaul.Handle className="!mx-auto !mt-2.5 !h-1.5 !w-10 shrink-0 !rounded-full !bg-muted" />
           <Vaul.Title className="shrink-0 px-5 pb-2 pt-3 text-sm font-semibold">
             {title}
           </Vaul.Title>

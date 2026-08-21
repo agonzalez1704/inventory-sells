@@ -252,7 +252,7 @@ export function CheckoutView() {
           </p>
           <Link
             href="/tienda"
-            className="inline-flex h-11 items-center rounded-xl bg-tienda-600 px-5 text-sm font-semibold text-white hover:bg-tienda-700"
+            className="inline-flex h-11 items-center rounded-xl bg-tienda-600 px-5 text-base sm:text-sm font-semibold text-white hover:bg-tienda-700"
           >
             Ir al catálogo
           </Link>
@@ -355,7 +355,7 @@ export function CheckoutView() {
                 <select
                   value={estado}
                   onChange={(e) => setEstado(e.target.value)}
-                  className="h-11 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-tienda-400"
+                  className="h-11 w-full rounded-xl border border-border bg-background px-3 text-base sm:text-sm outline-none focus:ring-2 focus:ring-tienda-400"
                 >
                   <option value="">Elige…</option>
                   {ESTADOS.map((e) => (
@@ -378,7 +378,7 @@ export function CheckoutView() {
                 <button
                   onClick={cotizar}
                   disabled={!/^\d{5}$/.test(cp) || !estado || municipio.trim().length < 2 || cotizando}
-                  className="mt-3 inline-flex h-11 cursor-pointer items-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
+                  className="mt-3 inline-flex h-11 cursor-pointer items-center gap-2 rounded-xl bg-primary px-4 text-base sm:text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
                 >
                   {cotizando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Truck className="h-4 w-4" />}
                   Cotizar envío
@@ -595,7 +595,7 @@ function Field({
         inputMode={inputMode}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="h-11 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-tienda-400"
+        className="h-11 w-full rounded-xl border border-border bg-background px-3 text-base sm:text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-tienda-400"
       />
       {hint && <span className="mt-1 block text-[11px] text-muted-foreground">{hint}</span>}
     </label>

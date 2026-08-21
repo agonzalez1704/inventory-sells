@@ -29,7 +29,7 @@ export const Input = React.forwardRef<
       ref={ref}
       autoFocus={autoFocus && !enPhone}
       className={cn(
-        "h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground transition-colors placeholder:text-muted-foreground/70 focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/10 disabled:opacity-50",
+        "h-10 w-full rounded-lg border border-border bg-background px-3 text-base sm:text-sm text-foreground transition-colors placeholder:text-muted-foreground/70 focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/10 disabled:opacity-50",
         className,
       )}
       {...props}
@@ -45,7 +45,7 @@ export const Select = React.forwardRef<
   <select
     ref={ref}
     className={cn(
-      "h-10 w-full cursor-pointer rounded-lg border border-border bg-background px-3 text-sm text-foreground transition-colors focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/10 disabled:opacity-50",
+      "h-10 w-full cursor-pointer rounded-lg border border-border bg-background px-3 text-base sm:text-sm text-foreground transition-colors focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/10 disabled:opacity-50",
       className,
     )}
     {...props}

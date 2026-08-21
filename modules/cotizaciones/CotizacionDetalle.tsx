@@ -285,7 +285,7 @@ export function CotizacionDetalle({
             <select
               value={asignado}
               onChange={(e) => setAsignado(e.target.value)}
-              className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm"
+              className="h-10 w-full rounded-lg border border-border bg-background px-3 text-base sm:text-sm"
             >
               <option value="">Sin asignar</option>
               {vendedores.map((v) => (
