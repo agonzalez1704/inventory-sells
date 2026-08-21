@@ -225,6 +225,14 @@ export function CompraDetalle({ compra }: { compra: Compra }) {
             {compra.notas && <p className="mt-1.5 text-xs text-muted-foreground">{compra.notas}</p>}
           </div>
           <div className="flex shrink-0 gap-2">
+            {/* Always available: the purchase is a document whether it is a
+                draft, received or cancelled — the PDF states which. */}
+            <a href={`/api/compras/${compra.id}/pdf`} target="_blank" rel="noreferrer">
+              <Button variant="secondary" disabled={pending}>
+                <FileDown className="h-4 w-4" />
+                PDF
+              </Button>
+            </a>
             {editable && (
               <Button onClick={recibir} loading={pending} disabled={items.length === 0}>
                 <PackageCheck className="h-4 w-4" />
