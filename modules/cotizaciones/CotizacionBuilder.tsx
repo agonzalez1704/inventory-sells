@@ -297,7 +297,12 @@ export function CotizacionBuilder({
 
       {/* Quote panel */}
       <div className="mt-5 lg:col-span-2 lg:mt-0">
-        <Card className="overflow-hidden lg:sticky lg:top-20">
+        {/* overflow-visible, not hidden: the customer picker's dropdown opens
+              UPWARD with its search box at the top, and the card's clip was
+              eating exactly that end of it — a list with no search, which is
+              how it got reported. Everything inside that needs clipping
+              (images, thumbs) carries its own overflow-hidden. */}
+          <Card className="overflow-visible lg:sticky lg:top-20">
           <div className="flex items-center gap-2 border-b border-border px-4 py-3">
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent-soft text-accent">
               <FileText className="h-4 w-4" />
