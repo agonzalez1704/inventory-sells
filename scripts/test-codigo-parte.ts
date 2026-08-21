@@ -37,9 +37,20 @@ const CATALOGO = [
   { sku: "iphone-12-mini-incell", name: "12 MINI INCELL", brand: "IPHONE" },
   { sku: "bat-iph-12-cobalto", name: "BAT IPH 12 (2do) - COBALTO", brand: "Three Suns" },
   { sku: "iphone-13-oled", name: "13 OLED", brand: "IPHONE" },
+  // The single-letter models. "iphone x" must find the X — not every iPhone
+  // with the X buried under the batteries by alphabetical tie — and must NOT
+  // leak into XR/XS, which is why a 1-char token may only match exactly.
+  { sku: "iphone-x-incell-negro", name: "X INCELL", brand: "IPHONE" },
+  { sku: "iphone-xr-incell-negro", name: "XR INCELL", brand: "IPHONE" },
+  { sku: "iphone-xs-max-oled", name: "XS MAX OLED", brand: "IPHONE" },
 ];
 
 const casos: { q: string; espera: string[]; nota: string }[] = [
+  {
+    q: "iphone x",
+    espera: ["iphone-x-incell-negro"],
+    nota: "la letra suelta es el discriminador: solo el X, ni XR ni XS ni pilas",
+  },
   {
     q: "iphone 12",
     espera: ["iphone-12-12-pro-oled", "iphone-12-mini-incell", "bat-iph-12-cobalto"],
@@ -100,6 +111,21 @@ if (!patrones.some((t) => t.includes("%"))) {
   console.error(`✗ expand() no produjo un patrón para el pre-filtro SQL: ${patrones.join(", ")}`);
 } else {
   console.log(`✓ el pre-filtro SQL recibe: ${patrones.join(", ")}`);
+}
+
+// The single-letter discriminator, pinned as EXCLUSION — the subset check
+// above cannot see this failure. With the "x" dropped by the tokenizer,
+// "iphone x" matched every iPhone and the X drowned under the batteries by
+// alphabetical tie; the report read "no sale nada".
+{
+  const traidos = CATALOGO.filter((p) => scoreProduct(p, "iphone x") > 0).map((p) => p.sku);
+  const ruido = traidos.filter((sku) => sku.startsWith("iphone-") && !sku.startsWith("iphone-x-"));
+  if (ruido.length) {
+    fallos++;
+    console.error(`✗ "iphone x" trae de más: ${ruido.join(", ")}`);
+  } else {
+    console.log(`✓ "iphone x" no arrastra XR/XS ni otros modelos`);
+  }
 }
 
 // The reported noise, pinned: a code search must not match a model year in the

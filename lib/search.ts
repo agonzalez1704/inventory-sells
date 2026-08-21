@@ -42,6 +42,9 @@ for (const group of ALIAS_GROUPS) {
 // Conversational filler should not make a catalog lookup fail. Product nouns
 // stay meaningful: "display", "pantalla" and "batería" are aliases above.
 const QUERY_STOPWORDS = new Set([
+  // Single-letter connectors too, now that 1-char tokens survive: "y", "o",
+  // "e", "u" are conjunctions, never models. "x" and digits stay.
+  "y", "o", "e", "u",
   "a", "al", "buenas", "con", "de", "del", "el", "es", "hay", "hola", "la",
   "las", "lo", "los", "maneja", "manejas", "me", "para", "por", "que", "quiero",
   "tardes", "tendras", "tendrás", "tiene", "tienen", "tienes", "un", "una", "venden",
@@ -77,7 +80,12 @@ export function expand(token: string): string[] {
 export function tokensDeConsulta(query: string): string[] {
   return normalize(query)
     .split(" ")
-    .filter((token) => token.length >= 2 && !QUERY_STOPWORDS.has(token));
+    // Length 1 is allowed: this catalog's models ARE single letters — iPhone
+    // X, XS vs X, Samsung serie A. tokenScore only ever matches a short token
+    // exactly (never as prefix or substring), so "x" finds "X INCELL" and
+    // cannot leak into XR, XS or MAX. Dropping it made "iphone x" mean "every
+    // iPhone", with the X buried under the batteries by alphabetical tie.
+    .filter((token) => token.length >= 1 && !QUERY_STOPWORDS.has(token));
 }
 
 type Index = {
