@@ -606,6 +606,15 @@ export function InventoryView({
                       <span className="font-mono text-xs font-medium tabular-nums">
                         {formatMXN(p.price_cents)}
                       </span>
+                      {/* The annual-sales figure was desktop-only since the day
+                          it shipped — hidden sm: on the column meant a phone
+                          never saw it, and Ruli's staff read this table from
+                          phones. Same compact treatment as the rest. */}
+                      {verVentas && p.ventas_anuales != null && (
+                        <span className="text-xs text-muted-foreground">
+                          {p.ventas_anuales.toLocaleString("es-MX")}/año
+                        </span>
+                      )}
                     </div>
                   </td>
                   <td className="hidden px-4 py-2.5 sm:table-cell">
