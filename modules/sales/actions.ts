@@ -2,7 +2,7 @@
 
 import { after } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { getProfile } from "@/lib/auth/profile";
+import { getPermisos, getProfile } from "@/lib/auth/profile";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
 import { toCents } from "@/lib/money";
 import { notifyNuevaVenta, notifyAbono, notifyCancelacion } from "@/lib/push";
@@ -17,16 +17,24 @@ export async function buscarVentas(q: string): Promise<SaleWithItems[]> {
   const query = q.trim().toLowerCase();
   if (!query) return [];
 
+  // The search honors the same scope as the list. Without this it was the
+  // leak that undid the list's filter: type anything and read every seller's
+  // last 500 tickets.
+  const perms = await getPermisos(userId);
+  const veTodas = perms.has("admin_total") || perms.has("ventas_ver");
+
   const insforge = await createInsForgeServerClient();
+  let ventasQ = insforge.database
+    .from("sales")
+    .select(
+      "id, total_cents, payment_method, customer_name, created_at, sold_by, sale_items(product_id, qty, unit_price_cents, products(name, sku))",
+    )
+    .eq("status", "completed")
+    .order("created_at", { ascending: false })
+    .limit(500);
+  if (!veTodas) ventasQ = ventasQ.eq("sold_by", userId);
   const [{ data: salesData }, { data: profileData }] = await Promise.all([
-    insforge.database
-      .from("sales")
-      .select(
-        "id, total_cents, payment_method, customer_name, created_at, sold_by, sale_items(product_id, qty, unit_price_cents, products(name, sku))",
-      )
-      .eq("status", "completed")
-      .order("created_at", { ascending: false })
-      .limit(500),
+    ventasQ,
     insforge.database.from("profiles").select("id, full_name"),
   ]);
 

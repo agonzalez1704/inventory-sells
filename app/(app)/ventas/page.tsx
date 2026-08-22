@@ -1,6 +1,5 @@
-import { auth } from "@clerk/nextjs/server";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
-import { getProfile, requirePagePermiso } from "@/lib/auth/profile";
+import { getPermisos, getProfile, requirePagePermiso } from "@/lib/auth/profile";
 import { mxHoy, rangoUTC } from "@/lib/caja-range";
 import { RecentSales, type SaleWithItems } from "@/modules/sales/RecentSales";
 import { VentasFiltros } from "@/modules/sales/VentasFiltros";
@@ -31,10 +30,14 @@ export default async function VentasPage({
   const canal = (CANALES as readonly string[]).includes(sp.canal ?? "") ? sp.canal! : null;
   const { startISO, endISO } = rangoUTC(from, to);
 
-  await requirePagePermiso("pos_vender");
-  const { userId } = await auth();
-  const profile = userId ? await getProfile(userId) : null;
+  const userId = await requirePagePermiso("pos_vender");
+  const profile = await getProfile(userId);
   const isAdmin = profile?.role === "admin";
+  // A seller sees only their own sales. Seeing everyone's rides the same
+  // permiso that already means "read sales beyond your own" everywhere else
+  // (ventas_ver); admin_total passes as always.
+  const perms = await getPermisos(userId);
+  const veTodas = perms.has("admin_total") || perms.has("ventas_ver");
 
   const insforge = await createInsForgeServerClient();
 
@@ -61,6 +64,7 @@ export default async function VentasPage({
     .lt("created_at", endISO)
     .order("created_at", { ascending: false })
     .limit(300);
+  if (!veTodas) ventasQuery = ventasQuery.eq("sold_by", userId);
   if (metodo) ventasQuery = ventasQuery.eq("payment_method", metodo);
   if (canal) ventasQuery = ventasQuery.eq("canal", canal);
 
@@ -133,7 +137,12 @@ export default async function VentasPage({
       .eq("id", abrirId)
       .eq("status", "completed")
       .maybeSingle();
-    if (one) {
+    // The deep link honors the same scope as the list: a seller tapping a
+    // notification for someone else's sale gets nothing pinned, not a
+    // stranger's ticket.
+    const esVisible =
+      one && (veTodas || (one as { sold_by?: string | null }).sold_by === userId);
+    if (esVisible) {
       const s = one as unknown as SaleWithItems;
       lista = [
         { ...s, vendedor: (s.sold_by ? sellerName.get(s.sold_by) : null) ?? null },
