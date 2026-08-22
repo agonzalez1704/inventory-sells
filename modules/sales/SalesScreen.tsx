@@ -147,8 +147,20 @@ function ProductCard({
           </span>
         )}
         {!soldOut && !maxed && (
-          <span className="absolute bottom-1.5 right-1.5 flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md transition-transform group-hover:scale-110">
-            <Plus className="h-4 w-4" />
+          // A real control, not decoration: in detail-first mode the card body
+          // opens the sheet, so the + is the one-tap add that mode takes away.
+          // stopPropagation keeps the tap from ALSO opening the sheet. Bigger
+          // on phones — 40px is a thumb target, 32px was a stylus one.
+          <span
+            role="button"
+            aria-label={`Agregar ${p.name}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onAdd();
+            }}
+            className="absolute bottom-1.5 right-1.5 flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md transition-transform group-hover:scale-110 active:scale-95 sm:h-8 sm:w-8"
+          >
+            <Plus className="h-5 w-5 sm:h-4 sm:w-4" />
           </span>
         )}
       </div>
