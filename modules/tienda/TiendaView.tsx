@@ -144,7 +144,7 @@ export function TiendaView({
         <div aria-hidden className="pointer-events-none absolute inset-0 hidden md:block">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/hero.webp"
+            src={MARCA.hero}
             alt=""
             className="h-full w-full object-cover object-right"
           />

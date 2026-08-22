@@ -26,6 +26,9 @@ export type Marca = {
   /** Favicon / app icon. A static file per brand: the browser fetches it on its
    *  own, so it cannot use the CSS variables the in-app logo relies on. */
   icono: string;
+  /** The storefront hero photo — brand-specific, like the icon. Composed with
+   *  the subject on the RIGHT: the copy lives in the empty left third. */
+  hero: string;
   /** How the inventory header values stock when nobody has chosen in Configuración:
    *  Ruli reads it as what the stock cost, Fiable as what it is worth to sell. */
   valorBase: ValorBase;
@@ -66,6 +69,7 @@ const MARCAS: Record<MarcaId, Marca> = {
     },
     themeColor: "#0f172a",
     icono: "/icono-fiable.svg",
+    hero: "/hero.webp",
     valorBase: "venta",
     tienda: {
       nombre: "Lead Displays",
@@ -104,6 +108,7 @@ const MARCAS: Record<MarcaId, Marca> = {
     },
     themeColor: "#1f2937",
     icono: "/icono-ruli.svg",
+    hero: "/hero-ruli.webp",
     valorBase: "costo",
     tienda: {
       nombre: "Refaccionaria Ruli",
