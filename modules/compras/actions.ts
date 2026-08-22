@@ -434,7 +434,13 @@ export async function crearProductoEnCompra(
   inventoryId: string,
 ): Promise<{ id: string; name: string; sku: string }> {
   await assertPermiso("inventario_gestionar");
-  await assertBorrador(compraId);
+  // Draft or received: creating a product moves no stock, and the combined
+  // case is real — the forgotten line is often a model the shop never carried.
+  // Only a cancelled purchase refuses.
+  const { data: est } = await insforgeAdmin.database
+    .from("compras").select("estado").eq("id", compraId).maybeSingle();
+  if (!est || (est as { estado: string }).estado === "cancelada")
+    throw new Error("La compra no admite captura");
 
   const name = nombre.trim();
   if (name.length < 3) throw new Error("Escribe el nombre de la pieza");
@@ -481,4 +487,28 @@ export async function crearProductoEnCompra(
     .maybeSingle();
   if (error || !data) throw new Error(error?.message ?? "No se pudo crear el producto");
   return data as { id: string; name: string; sku: string };
+}
+
+/**
+ * The forgotten line, added after receiving.
+ *
+ * A received purchase's existing lines are history — their FIFO layers may be
+ * partially sold. The RPC therefore only ADDS: movement, layer and first-cost
+ * happen atomically for the new line, exactly what receiving did for the rest.
+ */
+export async function agregarItemRecibida(
+  compraId: string,
+  productId: string,
+  qty: number,
+  costoPesos: number,
+): Promise<void> {
+  await assertPermiso("inventario_gestionar");
+  if (!Number.isInteger(qty) || qty <= 0) throw new Error("Cantidad inválida");
+  const { error } = await insforgeAdmin.database.rpc("agregar_item_compra_recibida", {
+    p_compra_id: compraId,
+    p_product_id: productId,
+    p_qty: qty,
+    p_costo_cents: Math.max(0, toCents(costoPesos || 0)),
+  });
+  if (error) throw new Error(error.message ?? "No se pudo agregar");
 }

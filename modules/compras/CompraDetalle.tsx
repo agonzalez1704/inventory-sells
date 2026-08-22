@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import type { SalesProduct } from "@/modules/sales/SalesScreen";
-import { ponerItem, quitarItem, recibirCompra, cancelarCompra, registrarNota, crearProductoEnCompra, type Compra } from "./actions";
+import { ponerItem, quitarItem, recibirCompra, cancelarCompra, registrarNota, crearProductoEnCompra, agregarItemRecibida, type Compra } from "./actions";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { CargarFactura } from "./CargarFactura";
 
@@ -39,6 +39,11 @@ export function CompraDetalle({
   const diferencia = papel - capturado;
   const cuadra = papel === 0 || diferencia === 0;
   const editable = compra.estado === "borrador";
+  // A received purchase accepts ADDITIONS only: the forgotten line enters the
+  // inventory immediately (movement + FIFO layer), while the lines that were
+  // already received stay untouchable — their layers may be partially sold.
+  const recibida = compra.estado === "recibida";
+  const capturable = editable || recibida;
 
   // Search runs in the database. The whole catalog used to be loaded just to
   // filter it here, which is 21k products at the refaccionaria; the lines
@@ -72,8 +77,14 @@ export function CompraDetalle({
     if (!Number.isInteger(q) || q <= 0) return toast.error("Cantidad inválida");
     start(async () => {
       try {
-        await ponerItem(compra.id, elegido.id, q, parseFloat(costo.replace(",", ".")) || 0);
-        toast.success(`${elegido.name} agregado`);
+        const costoNum = parseFloat(costo.replace(",", ".")) || 0;
+        if (recibida) {
+          await agregarItemRecibida(compra.id, elegido.id, q, costoNum);
+          toast.success(`${elegido.name} agregado — ya entró al inventario`);
+        } else {
+          await ponerItem(compra.id, elegido.id, q, costoNum);
+          toast.success(`${elegido.name} agregado`);
+        }
         setElegido(null);
         setQuery("");
         setQty("1");
@@ -328,10 +339,19 @@ export function CompraDetalle({
           rápido y el manual queda como el de una línea suelta. */}
       {editable && <CargarFactura compraId={compra.id} />}
 
-      {/* Alta de productos (solo borrador) */}
-      {editable && (
+      {/* Captura: full en borrador; en recibida solo AGREGAR lo olvidado. */}
+      {capturable && (
         <Card className="space-y-3 p-4">
-          <p className="text-sm font-medium">Agregar producto</p>
+          <p className="text-sm font-medium">
+            {recibida ? "Agregar producto olvidado" : "Agregar producto"}
+          </p>
+          {recibida && (
+            <p className="text-xs text-amber-700 dark:text-amber-400">
+              La compra ya fue recibida: lo que agregues entra al inventario de
+              inmediato, con su costo. Las líneas ya recibidas no se pueden
+              editar ni quitar.
+            </p>
+          )}
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
