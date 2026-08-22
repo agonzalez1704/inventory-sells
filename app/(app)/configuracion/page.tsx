@@ -12,6 +12,7 @@ import { Bell, ScanBarcode } from "lucide-react";
 import { getPermisos } from "@/lib/auth/profile";
 import { getPrecioBasePos } from "@/modules/sales/pos-prefs";
 import { PosPrefs } from "@/modules/sales/PosPrefs";
+import { PosModoClick } from "@/modules/config/PosModoClick";
 
 export default async function ConfiguracionPage() {
   const { userId } = await auth();
@@ -46,11 +47,13 @@ export default async function ConfiguracionPage() {
         valorBase={valorBase}
         tienda={tienda}
         fiadoExige={fiadoExige}
-        posDetalle={posDetalle}
         isAdmin={isAdmin}
       />
 
-      {verCostos && (
+      {/* One POS card, two scopes, each labeled: the shop-wide behavior an
+          admin sets for everyone, and the personal display preference. Two
+          cards both named "Punto de venta" was the confusion reported. */}
+      {(verCostos || isAdmin) && (
         <Card className="p-4">
           <div className="flex items-center gap-2.5">
             <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-soft text-brand-foreground">
@@ -58,14 +61,29 @@ export default async function ConfiguracionPage() {
             </span>
             <div>
               <h2 className="text-sm font-semibold">Punto de venta</h2>
-              <p className="text-xs text-muted-foreground">
-                Preferencias tuyas, no del negocio.
-              </p>
             </div>
           </div>
-          <div className="mt-3">
-            <PosPrefs inicial={precioBasePos} />
-          </div>
+          {isAdmin && (
+            <div className="mt-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Del negocio · afecta a todos
+              </p>
+              <p className="mb-2 mt-0.5 text-xs text-muted-foreground">
+                Qué hace un clic sobre un producto. Se guarda al elegir.
+              </p>
+              <PosModoClick inicial={posDetalle} />
+            </div>
+          )}
+          {verCostos && (
+            <div className="mt-4 border-t border-border pt-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Tuyo · no cambia lo que ven los demás
+              </p>
+              <div className="mt-2">
+                <PosPrefs inicial={precioBasePos} />
+              </div>
+            </div>
+          )}
         </Card>
       )}
 

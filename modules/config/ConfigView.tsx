@@ -24,7 +24,6 @@ export function ConfigView({
   valorBase,
   tienda,
   fiadoExige,
-  posDetalle,
   isAdmin,
 }: {
   info: string;
@@ -33,8 +32,6 @@ export function ConfigView({
   tienda: TiendaInfo;
   /** Whether a credit note here needs a registered customer. Differs by shop. */
   fiadoExige: boolean;
-  /** POS: click adds directly, or opens the product detail first. */
-  posDetalle: boolean;
   isAdmin: boolean;
 }) {
   const router = useRouter();
@@ -42,7 +39,6 @@ export function ConfigView({
   const [nums, setNums] = useState(asesores);
   const [base, setBase] = useState<ValorBase>(valorBase);
   const [exige, setExige] = useState(fiadoExige);
-  const [detallePos, setDetallePos] = useState(posDetalle);
   // Held as strings: these are form fields, and the action normalises on save.
   const [t, setT] = useState({
     entregaDias: tienda.entregaDias ?? "",
@@ -84,13 +80,12 @@ export function ConfigView({
   const [pending, start] = useTransition();
 
   const dirty =
-    text !== info || nums !== asesores || base !== valorBase || exige !== fiadoExige ||
-    detallePos !== posDetalle || tiendaSucia;
+    text !== info || nums !== asesores || base !== valorBase || exige !== fiadoExige || tiendaSucia;
 
   function save() {
     start(async () => {
       try {
-        await updateNegocioInfo(text, nums, base, tiendaEnviada, exige, detallePos);
+        await updateNegocioInfo(text, nums, base, tiendaEnviada, exige);
         toast.success("Guardado");
         router.refresh();
       } catch (e) {
@@ -189,42 +184,6 @@ export function ConfigView({
             tienen permiso de ver costos; a los demás se les sigue mostrando a
             venta, y la etiqueta lo dice.
           </span>
-        </fieldset>
-      </Card>
-
-      <Card className="p-4">
-        <h2 className="text-sm font-semibold">Punto de venta</h2>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Qué hace un clic sobre un producto. Aplica a todos los usuarios.
-        </p>
-        <fieldset className="mt-3 grid gap-2 sm:grid-cols-2" disabled={!isAdmin || pending}>
-          {(
-            [
-              [
-                false,
-                "Agregar directo",
-                "Un clic mete la pieza a la venta. Para mostradores de venta rápida y repetida.",
-              ],
-              [
-                true,
-                "Abrir la descripción",
-                "Un clic muestra la pieza (foto, precio, existencia); agregar es el botón del detalle. Para catálogos donde se verifica antes de vender.",
-              ],
-            ] as const
-          ).map(([v, titulo, detalle]) => (
-            <button
-              key={String(v)}
-              type="button"
-              onClick={() => setDetallePos(v)}
-              className={cn(
-                "cursor-pointer rounded-lg border p-3 text-left transition-colors",
-                detallePos === v ? "border-ring bg-muted" : "border-border hover:border-ring/40",
-              )}
-            >
-              <span className="block text-sm font-medium">{titulo}</span>
-              <span className="block text-xs text-muted-foreground">{detalle}</span>
-            </button>
-          ))}
         </fieldset>
       </Card>
 

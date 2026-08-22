@@ -13,7 +13,6 @@ export async function updateNegocioInfo(
   valorBase: ValorBase,
   tienda: TiendaInfo,
   fiadoExige: boolean,
-  posDetalle: boolean,
 ): Promise<void> {
   const { userId } = await auth();
   if (!userId) throw new Error("No autenticado");
@@ -32,7 +31,6 @@ export async function updateNegocioInfo(
       valor_base: valorBase,
       tienda: normalizarTienda(tienda),
       fiado_exige_cliente: fiadoExige,
-      pos_click_abre_detalle: posDetalle,
     })
     .eq("id", 1);
   if (error) throw new Error(error.message ??"Error al guardar");
@@ -80,4 +78,19 @@ export async function posClickAbreDetalle(): Promise<boolean> {
     .eq("id", 1)
     .maybeSingle();
   return (data as { pos_click_abre_detalle: boolean } | null)?.pos_click_abre_detalle ?? false;
+}
+
+
+/** Flip the shop-wide POS click behavior. Admin only; applies to everyone. */
+export async function setPosClickAbreDetalle(valor: boolean): Promise<void> {
+  const { userId } = await auth();
+  if (!userId) throw new Error("No autenticado");
+  const profile = await getProfile(userId);
+  if (profile?.role !== "admin") throw new Error("Solo administradores");
+  const insforge = await createInsForgeServerClient();
+  const { error } = await insforge.database
+    .from("config_negocio")
+    .update({ pos_click_abre_detalle: valor })
+    .eq("id", 1);
+  if (error) throw new Error(error.message ?? "No se pudo guardar");
 }
