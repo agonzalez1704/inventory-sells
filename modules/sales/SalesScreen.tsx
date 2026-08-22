@@ -87,12 +87,15 @@ function ProductCard({
   onAdd,
   onVerDetalle,
   precioBase,
+  clickAbreDetalle,
 }: {
   p: SalesProduct;
   inCart: number;
   onAdd: () => void;
   onVerDetalle: () => void;
   precioBase: PrecioBase;
+  /** Admin's shop-wide choice: click opens the sheet instead of adding. */
+  clickAbreDetalle: boolean;
 }) {
   const soldOut = p.quantity === 0;
   const maxed = inCart >= p.quantity;
@@ -113,13 +116,17 @@ function ProductCard({
       // not also drop the product into the sale.
       onClick={() => {
         if (consumioElTap()) return;
+        if (clickAbreDetalle) return onVerDetalle();
         onAdd();
       }}
       {...handlers}
       // Without this the browser's own text-selection callout fires at the same
       // time and the sheet opens under a selection handle.
       style={{ WebkitTouchCallout: "none", WebkitUserSelect: "none", userSelect: "none" }}
-      disabled={soldOut || maxed}
+      // In detail-first mode the card must stay pressable even sold out or
+      // maxed: reading the part is the point, and the sheet's own button
+      // handles "Agotado". In add-first mode the old behavior stands.
+      disabled={clickAbreDetalle ? false : soldOut || maxed}
       className={cn(
         "group relative flex flex-col rounded-2xl border border-border bg-background p-2.5 text-left transition-all",
         soldOut
@@ -192,17 +199,24 @@ function ProductRow({
   p,
   inCart,
   onAdd,
+  onVerDetalle,
+  clickAbreDetalle,
 }: {
   p: SalesProduct;
   inCart: number;
   onAdd: () => void;
+  onVerDetalle: () => void;
+  clickAbreDetalle: boolean;
 }) {
   const soldOut = p.quantity === 0;
   const maxed = inCart >= p.quantity;
   return (
     <button
-      onClick={onAdd}
-      disabled={soldOut || maxed}
+      onClick={clickAbreDetalle ? onVerDetalle : onAdd}
+      // In detail-first mode the card must stay pressable even sold out or
+      // maxed: reading the part is the point, and the sheet's own button
+      // handles "Agotado". In add-first mode the old behavior stands.
+      disabled={clickAbreDetalle ? false : soldOut || maxed}
       className={cn(
         "flex w-full items-center gap-3 rounded-xl border border-border bg-background p-2.5 text-left transition-colors",
         soldOut || maxed
@@ -297,6 +311,7 @@ export function SalesScreen({
   verCostos,
   precioBase,
   fiadoExigeCliente,
+  clickAbreDetalle,
 }: {
   /** First page of the catalog, rendered before any search runs. */
   products: SalesProduct[];
@@ -312,6 +327,8 @@ export function SalesScreen({
   /** This shop's rule, not the code's: Ruli demands a registered debtor, Fiable
    *  cannot make a walk-in stand still to be registered. */
   fiadoExigeCliente: boolean;
+  /** Admin's shop-wide POS behavior: click opens detail instead of adding. */
+  clickAbreDetalle: boolean;
 }) {
   const router = useRouter();
   const mostrador = useMemo(
@@ -600,7 +617,7 @@ export function SalesScreen({
                   query={query}
                   buscar={buscarCompat}
                   renderItem={(p) => (
-                    <ProductRow key={p.id} p={p} inCart={cart[p.id] ?? 0} onAdd={() => add(p)} />
+                    <ProductRow key={p.id} p={p} inCart={cart[p.id] ?? 0} onAdd={() => add(p)} onVerDetalle={() => setDetalle(p)} clickAbreDetalle={clickAbreDetalle} />
                   )}
                 />
               )}
@@ -614,6 +631,7 @@ export function SalesScreen({
                   inCart={cart[p.id] ?? 0}
                   onAdd={() => add(p)}
                   onVerDetalle={() => setDetalle(p)}
+                  clickAbreDetalle={clickAbreDetalle}
                   precioBase={precioBase}
                 />
               ))}

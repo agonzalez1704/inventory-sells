@@ -13,6 +13,7 @@ export async function updateNegocioInfo(
   valorBase: ValorBase,
   tienda: TiendaInfo,
   fiadoExige: boolean,
+  posDetalle: boolean,
 ): Promise<void> {
   const { userId } = await auth();
   if (!userId) throw new Error("No autenticado");
@@ -31,6 +32,7 @@ export async function updateNegocioInfo(
       valor_base: valorBase,
       tienda: normalizarTienda(tienda),
       fiado_exige_cliente: fiadoExige,
+      pos_click_abre_detalle: posDetalle,
     })
     .eq("id", 1);
   if (error) throw new Error(error.message ??"Error al guardar");
@@ -60,4 +62,22 @@ export async function fiadoExigeCliente(): Promise<boolean> {
     .eq("id", 1)
     .maybeSingle();
   return (data as { fiado_exige_cliente: boolean } | null)?.fiado_exige_cliente ?? true;
+}
+
+
+/**
+ * POS behavior: does a plain click add to the sale, or open the detail sheet?
+ * An admin's choice for the whole shop. Defaults to click-adds on any failure —
+ * the behavior every shop had before the switch existed.
+ */
+export async function posClickAbreDetalle(): Promise<boolean> {
+  const { userId } = await auth();
+  if (!userId) return false;
+  const insforge = await createInsForgeServerClient();
+  const { data } = await insforge.database
+    .from("config_negocio")
+    .select("pos_click_abre_detalle")
+    .eq("id", 1)
+    .maybeSingle();
+  return (data as { pos_click_abre_detalle: boolean } | null)?.pos_click_abre_detalle ?? false;
 }

@@ -1,7 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { getProfile } from "@/lib/auth/profile";
 import { getNegocioInfo, getAsesoresRaw, getValorBase, getTiendaInfo } from "@/modules/config/lib";
-import { fiadoExigeCliente } from "@/modules/config/negocio";
+import { fiadoExigeCliente, posClickAbreDetalle } from "@/modules/config/negocio";
 import { ConfigView } from "@/modules/config/ConfigView";
 import { Card } from "@/components/ui/card";
 import { PushToggle } from "@/components/push-toggle";
@@ -27,12 +27,13 @@ export default async function ConfiguracionPage() {
   const verCostos = Boolean(
     perms && (perms.has("admin_total") || perms.has("costos_ver")),
   );
-  const [info, asesores, valorBase, tienda, fiadoExige, notifRoles, precioBasePos] = await Promise.all([
+  const [info, asesores, valorBase, tienda, fiadoExige, posDetalle, notifRoles, precioBasePos] = await Promise.all([
     getNegocioInfo(),
     getAsesoresRaw(),
     getValorBase(),
     getTiendaInfo(),
     fiadoExigeCliente(),
+    posClickAbreDetalle(),
     puedeGestionarUsuarios ? notificacionesPorRol() : null,
     getPrecioBasePos(),
   ]);
@@ -45,6 +46,7 @@ export default async function ConfiguracionPage() {
         valorBase={valorBase}
         tienda={tienda}
         fiadoExige={fiadoExige}
+        posDetalle={posDetalle}
         isAdmin={isAdmin}
       />
 

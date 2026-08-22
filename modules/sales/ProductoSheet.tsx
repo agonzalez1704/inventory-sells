@@ -45,44 +45,47 @@ export function ProductoSheet({
   ];
 
   return (
-    <Modal open onClose={onClose} title={p.name}>
-      <div className="flex gap-3">
-        <div className="h-24 w-24 shrink-0 overflow-hidden rounded-xl border border-border bg-background">
+    <Modal open onClose={onClose} title={p.name} className="max-w-2xl">
+      {/* Two columns from sm up: the photo owns the left, the answers and the
+          add button own the right — the seller reads part and price in one
+          glance without scrolling past a giant image. On a phone the drawer is
+          one column and the photo leads. */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="aspect-square overflow-hidden rounded-xl border border-border bg-background">
           <Thumb src={p.image_url} alt={p.name} />
         </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium leading-snug">{p.name}</p>
+
+        <div className="flex min-w-0 flex-col">
           {p.etiqueta && (
-            <Badge tone="warning" className="mt-1.5">
+            <Badge tone="warning" className="mb-2 self-start">
               {p.etiqueta}
             </Badge>
           )}
+          <dl className="divide-y divide-border rounded-xl border border-border">
+            {filas
+              .filter(([, v]) => v)
+              .map(([k, v]) => (
+                <div key={k} className="flex items-baseline justify-between gap-3 px-3 py-2">
+                  <dt className="text-xs text-muted-foreground">{k}</dt>
+                  <dd className="text-right font-mono text-sm tabular-nums">{v}</dd>
+                </div>
+              ))}
+          </dl>
+
+          {/* The click that opens this replaced the tap that added, so the
+              sheet must offer adding back — anchored to the column's foot. */}
+          <Button
+            className="mt-4 w-full sm:mt-auto"
+            disabled={p.quantity === 0}
+            onClick={() => {
+              onAgregar(p);
+              onClose();
+            }}
+          >
+            {p.quantity === 0 ? "Agotado" : "Agregar a la venta"}
+          </Button>
         </div>
       </div>
-
-      <dl className="mt-4 divide-y divide-border rounded-xl border border-border">
-        {filas
-          .filter(([, v]) => v)
-          .map(([k, v]) => (
-            <div key={k} className="flex items-baseline justify-between gap-3 px-3 py-2">
-              <dt className="text-xs text-muted-foreground">{k}</dt>
-              <dd className="text-right font-mono text-sm tabular-nums">{v}</dd>
-            </div>
-          ))}
-      </dl>
-
-      {/* The gesture that opens this replaced a tap that would have added the
-          product, so the sheet has to offer that back. */}
-      <Button
-        className="mt-4 w-full"
-        disabled={p.quantity === 0}
-        onClick={() => {
-          onAgregar(p);
-          onClose();
-        }}
-      >
-        {p.quantity === 0 ? "Agotado" : "Agregar a la venta"}
-      </Button>
     </Modal>
   );
 }
