@@ -27,7 +27,7 @@ export async function buscarVentas(q: string): Promise<SaleWithItems[]> {
   let ventasQ = insforge.database
     .from("sales")
     .select(
-      "id, total_cents, payment_method, customer_name, created_at, sold_by, sale_items(product_id, qty, unit_price_cents, products(name, sku))",
+      "id, total_cents, payment_method, customer_name, created_at, settled_at, sold_by, sale_items(product_id, qty, unit_price_cents, products(name, sku))",
     )
     .eq("status", "completed")
     .order("created_at", { ascending: false })

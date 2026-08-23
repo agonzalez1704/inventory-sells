@@ -54,29 +54,55 @@ export default async function VentasPage({
     is_system: boolean;
   }[];
 
-  let ventasQuery = insforge.database
+  const SELECT_VENTA =
+    "id, total_cents, payment_method, customer_name, canal, created_at, settled_at, sold_by, sale_items(product_id, qty, unit_price_cents, products(name, sku))";
+
+  // A sale belongs to the day its money landed. Direct sales land when they
+  // are created; a credit note lands when it settles — so the range filters
+  // created_at for one and settled_at for the other, and a note written last
+  // week but paid today shows up today, which is when it became a sale.
+  let directasQuery = insforge.database
     .from("sales")
-    .select(
-      "id, total_cents, payment_method, customer_name, canal, created_at, sold_by, sale_items(product_id, qty, unit_price_cents, products(name, sku))",
-    )
+    .select(SELECT_VENTA)
     .eq("status", "completed")
+    .is("settled_at", null)
     .gte("created_at", startISO)
     .lt("created_at", endISO)
     .order("created_at", { ascending: false })
     .limit(300);
-  if (!veTodas) ventasQuery = ventasQuery.eq("sold_by", userId);
-  if (metodo) ventasQuery = ventasQuery.eq("payment_method", metodo);
-  if (canal) ventasQuery = ventasQuery.eq("canal", canal);
+  let cobradasQuery = insforge.database
+    .from("sales")
+    .select(SELECT_VENTA)
+    .eq("status", "completed")
+    .gte("settled_at", startISO)
+    .lt("settled_at", endISO)
+    .order("settled_at", { ascending: false })
+    .limit(300);
+  if (!veTodas) {
+    directasQuery = directasQuery.eq("sold_by", userId);
+    cobradasQuery = cobradasQuery.eq("sold_by", userId);
+  }
+  if (metodo) {
+    directasQuery = directasQuery.eq("payment_method", metodo);
+    cobradasQuery = cobradasQuery.eq("payment_method", metodo);
+  }
+  if (canal) {
+    directasQuery = directasQuery.eq("canal", canal);
+    cobradasQuery = cobradasQuery.eq("canal", canal);
+  }
 
   const [
-    { data: salesData },
+    { data: directasData },
+    { data: cobradasData },
     { data: invData },
     { data: profileData },
   ] = await Promise.all([
-    ventasQuery,
+    directasQuery,
+    cobradasQuery,
     insforge.database.from("inventories").select("id, name"),
     insforge.database.from("profiles").select("id, full_name"),
   ]);
+  const salesData = [...(directasData ?? []), ...(cobradasData ?? [])];
 
   const sellerName = new Map(
     ((profileData ?? []) as { id: string; full_name: string | null }[]).map((p) => [
@@ -84,10 +110,14 @@ export default async function VentasPage({
       p.full_name,
     ]),
   );
-  const sales = ((salesData ?? []) as unknown as SaleWithItems[]).map((s) => ({
-    ...s,
-    vendedor: (s.sold_by ? sellerName.get(s.sold_by) : null) ?? null,
-  }));
+  const sales = (salesData as unknown as SaleWithItems[])
+    .map((s) => ({
+      ...s,
+      vendedor: (s.sold_by ? sellerName.get(s.sold_by) : null) ?? null,
+    }))
+    .sort((a, b) =>
+      (b.settled_at ?? b.created_at).localeCompare(a.settled_at ?? a.created_at),
+    );
 
   // Show items NET of returns; a fully-returned sale drops off the list.
   const saleIds = sales.map((s) => s.id);
@@ -131,9 +161,7 @@ export default async function VentasPage({
   if (abrirId && !netSales.some((s) => s.id === abrirId)) {
     const { data: one } = await insforge.database
       .from("sales")
-      .select(
-        "id, total_cents, payment_method, customer_name, canal, created_at, sold_by, sale_items(product_id, qty, unit_price_cents, products(name, sku))",
-      )
+      .select(SELECT_VENTA)
       .eq("id", abrirId)
       .eq("status", "completed")
       .maybeSingle();

@@ -49,6 +49,8 @@ export type SaleWithItems = Sale & {
   sale_items: SaleLine[];
   vendedor?: string | null;
   canal?: string | null;
+  /** When a credit note was paid off. The date the sale really happened. */
+  settled_at?: string | null;
 };
 
 const PAYMENT: [PaymentMethod, string][] = [
@@ -465,10 +467,15 @@ export function RecentSales({
                         />
                       </td>
                       <td className="px-2 py-2.5 text-muted-foreground">
-                        {new Date(s.created_at).toLocaleString("es-MX", {
+                        {new Date(s.settled_at ?? s.created_at).toLocaleString("es-MX", {
                           dateStyle: "short",
                           timeStyle: "short",
                         })}
+                        {s.settled_at && (
+                          <span className="ml-1.5 inline-flex items-center rounded-full bg-sky-50 px-1.5 py-0.5 text-[10px] font-medium text-sky-700 ring-1 ring-inset ring-sky-600/20 dark:bg-sky-950/40 dark:text-sky-300">
+                            Fiado cobrado
+                          </span>
+                        )}
                       </td>
                       <td className="px-2 py-2.5">{s.customer_name ?? "—"}</td>
                       <td className="hidden px-2 py-2.5 text-muted-foreground sm:table-cell">
