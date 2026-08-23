@@ -2,6 +2,7 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
+import { insforgeAdmin } from "@/lib/insforge/admin";
 
 export type CustomerTipo = "publico" | "mayoreo" | "tecnico";
 
@@ -19,6 +20,10 @@ export type Customer = {
   descuento_pct: number;
   tipo: CustomerTipo;
   notas: string | null;
+  /** Días de plazo de sus notas de crédito. Null = sin línea formal. */
+  credito_dias: number | null;
+  /** Tope de deuda en notas de crédito. Null = sin tope. */
+  credito_limite_cents: number | null;
   is_active: boolean;
   is_system: boolean;
   created_at: string;
@@ -46,6 +51,8 @@ export type CustomerInput = {
   descuento_pct: number;
   tipo: CustomerTipo;
   notas: string | null;
+  credito_dias: number | null;
+  credito_limite_cents: number | null;
 };
 
 // Normalize + validate the shared shape used by create/edit.
@@ -58,6 +65,12 @@ function clean(input: CustomerInput) {
   const pct = Number(input.descuento_pct);
   if (!Number.isFinite(pct) || pct < 0 || pct > 100)
     throw new Error("Descuento inválido (0–100)");
+  const dias = input.credito_dias;
+  if (dias != null && (!Number.isInteger(dias) || dias <= 0 || dias > 365))
+    throw new Error("Días de crédito inválidos (1–365)");
+  const limite = input.credito_limite_cents;
+  if (limite != null && (!Number.isInteger(limite) || limite <= 0))
+    throw new Error("Límite de crédito inválido");
   return {
     nombre,
     telefono,
@@ -65,6 +78,45 @@ function clean(input: CustomerInput) {
     descuento_pct: Math.round(pct * 100) / 100,
     tipo: input.tipo,
     notas: input.notas?.trim() || null,
+    credito_dias: dias,
+    credito_limite_cents: limite,
+  };
+}
+
+export type ResumenCliente = {
+  comprado_cents: number;
+  compras: number;
+  ultima_compra: string | null;
+  deuda_cents: number;
+  notas_pendientes: number;
+  credito_dias: number | null;
+  credito_limite_cents: number | null;
+};
+
+/** Everything one customer's numbers say: bought, owed, and how many notes. */
+export async function resumenCliente(customerId: string): Promise<ResumenCliente> {
+  const { userId } = await auth();
+  if (!userId) throw new Error("No autenticado");
+  const insforge = await createInsForgeServerClient();
+  const [{ data, error }, { data: cust }] = await Promise.all([
+    insforge.database.rpc("resumen_cliente", { p_customer_id: customerId }),
+    insforgeAdmin.database
+      .from("customers")
+      .select("credito_dias, credito_limite_cents")
+      .eq("id", customerId)
+      .single(),
+  ]);
+  if (error) throw new Error(error.message ?? "No se pudo leer el resumen");
+  const r = (Array.isArray(data) ? data[0] : data) as Partial<ResumenCliente> | undefined;
+  const c = cust as { credito_dias: number | null; credito_limite_cents: number | null } | null;
+  return {
+    comprado_cents: Number(r?.comprado_cents ?? 0),
+    compras: Number(r?.compras ?? 0),
+    ultima_compra: r?.ultima_compra ?? null,
+    deuda_cents: Number(r?.deuda_cents ?? 0),
+    notas_pendientes: Number(r?.notas_pendientes ?? 0),
+    credito_dias: c?.credito_dias ?? null,
+    credito_limite_cents: c?.credito_limite_cents != null ? Number(c.credito_limite_cents) : null,
   };
 }
 
@@ -169,7 +221,7 @@ export async function buscarClientes(q: string): Promise<Customer[]> {
   const { data } = await insforge.database
     .from("customers")
     .select(
-      "id, nombre, telefono, email, descuento_pct, tipo, notas, is_active, is_system, created_at, customer_phones(id, telefono, etiqueta)",
+      "id, nombre, telefono, email, descuento_pct, tipo, notas, credito_dias, credito_limite_cents, is_active, is_system, created_at, customer_phones(id, telefono, etiqueta)",
     )
     .eq("is_active", true)
     .order("nombre", { ascending: true })

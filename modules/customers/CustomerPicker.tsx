@@ -236,6 +236,8 @@ function NewCustomerForm({
           descuento_pct: 0,
           tipo: "publico",
           notas: null,
+          credito_dias: null,
+          credito_limite_cents: null,
         });
         toast.success("Cliente registrado");
         onCreated({ id, nombre: nombre.trim(), telefono, is_system: false });

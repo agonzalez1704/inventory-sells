@@ -18,7 +18,7 @@ export default async function FiadosPage({
     insforge.database
       .from("sales")
       .select(
-        "id, total_cents, note, created_at, sold_by, customer_id, customers(id, nombre, telefono, is_system), sale_items(product_id, qty, products(name, sku)), sale_pagos(monto_cents)",
+        "id, total_cents, note, created_at, sold_by, customer_id, customers(id, nombre, telefono, is_system, credito_dias), sale_items(product_id, qty, products(name, sku)), sale_pagos(monto_cents)",
       )
       .eq("status", "pending")
       .order("created_at", { ascending: true }),
@@ -42,7 +42,7 @@ export default async function FiadosPage({
   const loans = (
     (data ?? []) as unknown as (Loan & {
       sold_by: string | null;
-      customers?: PickerCustomer | null;
+      customers?: (PickerCustomer & { credito_dias?: number | null }) | null;
       sale_pagos?: { monto_cents: number }[];
     })[]
   ).map((l) => ({
@@ -50,6 +50,7 @@ export default async function FiadosPage({
     pagado_cents: (l.sale_pagos ?? []).reduce((s, p) => s + p.monto_cents, 0),
     vendedor: (l.sold_by ? sellerName.get(l.sold_by) : null) ?? null,
     cliente: l.customers ?? null,
+    credito_dias: l.customers?.credito_dias ?? null,
   })) as Loan[];
 
   const customers = (customerData ?? []) as PickerCustomer[];

@@ -14,6 +14,7 @@ import {
   Percent,
   X,
   Wallet,
+  CreditCard,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
@@ -24,6 +25,7 @@ import { Modal } from "@/components/ui/modal";
 import { Badge } from "@/components/ui/badge";
 import { formatMXN } from "@/lib/money";
 import { SaldoModal } from "./SaldoModal";
+import { ResumenClienteChip } from "./ResumenClienteChip";
 import { EmptyState } from "@/components/ui/empty-state";
 import {
   crearCliente,
@@ -178,6 +180,7 @@ function ClienteRow({
   const router = useRouter();
   const [pending, start] = useTransition();
   const [confirmar, dialogoConfirm] = useConfirm();
+  const [verResumen, setVerResumen] = useState(false);
   const descuento = pct(c.descuento_pct);
 
   async function archivar() {
@@ -233,6 +236,14 @@ function ClienteRow({
                 {descuento}% desc.
               </span>
             )}
+            {(c.credito_dias != null || c.credito_limite_cents != null) && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700 ring-1 ring-inset ring-sky-600/20 dark:bg-sky-950/40 dark:text-sky-300">
+                <CreditCard className="h-3 w-3" />
+                {c.credito_limite_cents != null && formatMXN(c.credito_limite_cents)}
+                {c.credito_dias != null &&
+                  `${c.credito_limite_cents != null ? " · " : ""}${c.credito_dias} días`}
+              </span>
+            )}
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
             {c.telefono && (
@@ -269,6 +280,16 @@ function ClienteRow({
           {c.notas && (
             <p className="mt-1.5 text-xs text-muted-foreground">{c.notas}</p>
           )}
+          {!c.is_system && (
+            <button
+              type="button"
+              onClick={() => setVerResumen((v) => !v)}
+              className="mt-1.5 cursor-pointer text-xs font-medium text-accent hover:underline"
+            >
+              {verResumen ? "Ocultar resumen" : "Ver compras y deuda"}
+            </button>
+          )}
+          {verResumen && <ResumenClienteChip customerId={c.id} className="mt-1.5" />}
         </div>
         {!c.is_system && (
           <div className="flex items-center gap-1">
@@ -308,6 +329,12 @@ function ClienteModal({
     cliente ? String(pct(cliente.descuento_pct)) : "0",
   );
   const [notas, setNotas] = useState(cliente?.notas ?? "");
+  const [creditoDias, setCreditoDias] = useState(
+    cliente?.credito_dias != null ? String(cliente.credito_dias) : "",
+  );
+  const [creditoLimite, setCreditoLimite] = useState(
+    cliente?.credito_limite_cents != null ? String(cliente.credito_limite_cents / 100) : "",
+  );
   const [pending, start] = useTransition();
   // Pending extra-phone input lives here so Guardar can flush it — typing a
   // number and hitting Guardar without pressing + must not silently drop it.
@@ -322,6 +349,11 @@ function ClienteModal({
       descuento_pct: Number(descuento.replace(",", ".")) || 0,
       tipo,
       notas: notas || null,
+      credito_dias: creditoDias.trim() === "" ? null : parseInt(creditoDias, 10),
+      credito_limite_cents:
+        creditoLimite.trim() === ""
+          ? null
+          : Math.round((parseFloat(creditoLimite.replace(",", ".")) || 0) * 100),
     };
     if (!payload.nombre.trim()) return toast.error("Falta el nombre");
     if ((payload.telefono ?? "").replace(/\D/g, "").length < 10)
@@ -415,6 +447,30 @@ function ClienteModal({
               onChange={(e) => setDescuento(e.target.value)}
               inputMode="decimal"
               placeholder="0"
+            />
+          </label>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-muted-foreground">
+              Días de crédito
+            </span>
+            <Input
+              value={creditoDias}
+              onChange={(e) => setCreditoDias(e.target.value)}
+              inputMode="numeric"
+              placeholder="Sin plazo"
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-muted-foreground">
+              Límite de crédito $
+            </span>
+            <Input
+              value={creditoLimite}
+              onChange={(e) => setCreditoLimite(e.target.value)}
+              inputMode="decimal"
+              placeholder="Sin límite"
             />
           </label>
         </div>

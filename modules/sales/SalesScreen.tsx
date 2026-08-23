@@ -26,6 +26,7 @@ import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { imprimirTicketNavegador, type TicketData } from "@/lib/ticket";
 import { CustomerPicker, type PickerCustomer } from "@/modules/customers/CustomerPicker";
+import { ResumenClienteChip } from "@/modules/customers/ResumenClienteChip";
 import { CompatPanel } from "@/modules/compat/CompatPanel";
 import { AnimatePresence, m } from "framer-motion";
 import NumberFlow from "@number-flow/react";
@@ -757,6 +758,9 @@ export function SalesScreen({
 
           <div className="space-y-3 border-t border-border p-4">
                 <CustomerPicker customers={customers} value={customer} onChange={setCustomer} />
+                {customer && !customer.is_system && (
+                  <ResumenClienteChip customerId={customer.id} />
+                )}
                 {mode === "prestamo" && (
                   <>
                     <Input

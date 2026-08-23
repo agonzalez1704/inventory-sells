@@ -42,6 +42,8 @@ export type Loan = {
   pagado_cents: number;
   vendedor: string | null; // who created the fiado
   cliente: PickerCustomer | null; // linked customer, if assigned
+  /** The customer's plazo at read time; null = no formal terms, no due date. */
+  credito_dias: number | null;
 };
 
 const PAYMENT_METHODS: [PaymentMethod, string][] = [
@@ -56,6 +58,39 @@ function ago(iso: string): string {
   if (days <= 0) return "hoy";
   if (days === 1) return "ayer";
   return `hace ${days} días`;
+}
+
+/**
+ * Days until the note's due date (created_at + the customer's plazo).
+ * Negative = overdue. Null when the customer has no formal terms.
+ */
+function diasParaVencer(loan: Loan): number | null {
+  if (loan.credito_dias == null) return null;
+  const vence = new Date(loan.created_at).getTime() + loan.credito_dias * 86_400_000;
+  return Math.ceil((vence - Date.now()) / 86_400_000);
+}
+
+function VenceBadge({ loan }: { loan: Loan }) {
+  const dias = diasParaVencer(loan);
+  if (dias == null) return null;
+  const vencida = dias < 0;
+  const texto = vencida
+    ? `Vencida hace ${Math.abs(dias)} ${Math.abs(dias) === 1 ? "día" : "días"}`
+    : dias === 0
+      ? "Vence hoy"
+      : `Vence en ${dias} ${dias === 1 ? "día" : "días"}`;
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset",
+        vencida || dias === 0
+          ? "bg-red-50 text-red-700 ring-red-600/20 dark:bg-red-950/40 dark:text-red-300"
+          : "bg-sky-50 text-sky-700 ring-sky-600/20 dark:bg-sky-950/40 dark:text-sky-300",
+      )}
+    >
+      {texto}
+    </span>
+  );
 }
 
 export function LoansView({
@@ -233,9 +268,10 @@ function LoanRow({
             {loan.note || "Sin nota"}
           </p>
           <p className="mt-1 text-sm text-muted-foreground">{items}</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
+          <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
             {ago(loan.created_at)}
             {loan.vendedor && <> · Creado por: {loan.vendedor}</>}
+            <VenceBadge loan={loan} />
           </p>
         </div>
         <div className="text-right">
