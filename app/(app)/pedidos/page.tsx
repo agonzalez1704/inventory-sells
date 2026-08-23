@@ -1,12 +1,11 @@
-import { auth } from "@clerk/nextjs/server";
-import { getProfile } from "@/lib/auth/profile";
+import { getProfile, requirePagePermiso } from "@/lib/auth/profile";
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { PedidosView, type PedidoWeb } from "@/modules/pedidos/PedidosView";
 
 
 export default async function PedidosPage() {
-  const { userId } = await auth();
-  const profile = userId ? await getProfile(userId) : null;
+  const userId = await requirePagePermiso("surtir");
+  const profile = await getProfile(userId);
   const isAdmin = profile?.role === "admin";
 
   // Pending first (that's what needs action), then the rest, newest within each.

@@ -1,4 +1,5 @@
 import { createInsForgeServerClient } from "@/lib/insforge/server";
+import { getPermisos, requirePagePermiso } from "@/lib/auth/profile";
 import { LoansView, type Loan } from "@/modules/loans/LoansView";
 import type { PickerCustomer } from "@/modules/customers/CustomerPicker";
 
@@ -8,20 +9,30 @@ export default async function FiadosPage({
   searchParams: Promise<{ fiado?: string }>;
 }) {
   const abrirId = (await searchParams).fiado ?? null;
+
+  // Same scope rule as /ventas: a seller sees only the notes they created;
+  // seeing everyone's rides ventas_ver (admin_total passes as always).
+  const userId = await requirePagePermiso("pos_vender");
+  const perms = await getPermisos(userId);
+  const veTodas = perms.has("admin_total") || perms.has("ventas_ver");
+
   const insforge = await createInsForgeServerClient();
+
+  let fiadosQuery = insforge.database
+    .from("sales")
+    .select(
+      "id, total_cents, note, created_at, sold_by, customer_id, customers(id, nombre, telefono, is_system, credito_dias), sale_items(product_id, qty, products(name, sku)), sale_pagos(monto_cents)",
+    )
+    .eq("status", "pending")
+    .order("created_at", { ascending: true });
+  if (!veTodas) fiadosQuery = fiadosQuery.eq("sold_by", userId);
 
   const [
     { data, error },
     { data: profileData },
     { data: customerData },
   ] = await Promise.all([
-    insforge.database
-      .from("sales")
-      .select(
-        "id, total_cents, note, created_at, sold_by, customer_id, customers(id, nombre, telefono, is_system, credito_dias), sale_items(product_id, qty, products(name, sku)), sale_pagos(monto_cents)",
-      )
-      .eq("status", "pending")
-      .order("created_at", { ascending: true }),
+    fiadosQuery,
     insforge.database.from("profiles").select("id, full_name"),
     insforge.database
       .from("customers")

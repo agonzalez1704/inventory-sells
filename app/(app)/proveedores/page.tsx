@@ -1,12 +1,12 @@
-import { getPermisos, requirePagePermiso } from "@/lib/auth/profile";
+import { requirePagePermiso } from "@/lib/auth/profile";
 import { ProveedoresView } from "@/modules/proveedores/ProveedoresView";
 import { listarProveedores, conteoPorProveedor } from "@/modules/proveedores/actions";
 
 
 export default async function ProveedoresPage() {
-  const userId = await requirePagePermiso("inventario_ver");
-  const perms = await getPermisos(userId);
-  const puedeGestionar = perms.has("admin_total") || perms.has("inventario_gestionar");
+  await requirePagePermiso("inventario_gestionar");
+  // Reaching this page already means gestionar; the view's flag stays true.
+  const puedeGestionar = true;
 
   const [proveedores, conteo] = await Promise.all([
     listarProveedores(true), // archived included; the view separates them
