@@ -4,7 +4,7 @@ import { ComprasView } from "@/modules/compras/ComprasView";
 
 
 export default async function ComprasPage() {
-  await requirePagePermiso("inventario_gestionar", "/inventario");
+  await requirePagePermiso("abastecer", "/inventario");
   const [compras, porPagar] = await Promise.all([listarCompras(), cuentasPorPagar()]);
   return <ComprasView compras={compras} porPagar={porPagar} />;
 }

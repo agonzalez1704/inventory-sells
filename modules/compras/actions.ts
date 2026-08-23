@@ -43,7 +43,7 @@ const COLS =
   "pronto_pago, pronto_pago_pct, pronto_pago_dias, total_factura_cents, estado, notas, created_at";
 
 export async function listarCompras(): Promise<Compra[]> {
-  await assertPermiso("inventario_gestionar");
+  await assertPermiso("abastecer");
   const { data } = await insforgeAdmin.database
     .from("compras")
     .select(`${COLS}, proveedores(nombre), compra_items(qty, line_total_cents)`)
@@ -54,7 +54,7 @@ export async function listarCompras(): Promise<Compra[]> {
 }
 
 export async function getCompra(id: string): Promise<Compra | null> {
-  await assertPermiso("inventario_gestionar");
+  await assertPermiso("abastecer");
   const { data } = await insforgeAdmin.database
     .from("compras")
     .select(
@@ -103,7 +103,7 @@ function clean(input: CompraInput) {
 }
 
 export async function crearCompra(input: CompraInput): Promise<{ id: string }> {
-  const userId = await assertPermiso("inventario_gestionar");
+  const userId = await assertPermiso("abastecer");
   const { data, error } = await insforgeAdmin.database
     .from("compras")
     .insert([{ ...clean(input), created_by: userId }])
@@ -130,7 +130,7 @@ async function assertBorrador(compraId: string) {
 }
 
 export async function editarCompra(id: string, input: CompraInput): Promise<void> {
-  await assertPermiso("inventario_gestionar");
+  await assertPermiso("abastecer");
   await assertBorrador(id);
   const { error } = await insforgeAdmin.database
     .from("compras")
@@ -150,7 +150,7 @@ export async function ponerItem(
   qty: number,
   costoPesos: number,
 ): Promise<void> {
-  await assertPermiso("inventario_gestionar");
+  await assertPermiso("abastecer");
   await assertBorrador(compraId);
   if (!Number.isInteger(qty) || qty <= 0) throw new Error("Cantidad inválida");
   const costo = Math.max(0, toCents(costoPesos || 0));
@@ -167,7 +167,7 @@ export async function ponerItem(
 }
 
 export async function quitarItem(compraId: string, itemId: string): Promise<void> {
-  await assertPermiso("inventario_gestionar");
+  await assertPermiso("abastecer");
   await assertBorrador(compraId);
   const { error } = await insforgeAdmin.database
     .from("compra_items")
@@ -180,7 +180,7 @@ export async function quitarItem(compraId: string, itemId: string): Promise<void
 // Receiving moves stock, so it goes through the RPC on the USER-scoped client:
 // the ledger records who received the goods.
 export async function recibirCompra(id: string): Promise<{ piezas: number; total_cents: number }> {
-  await assertPermiso("inventario_gestionar");
+  await assertPermiso("abastecer");
   const insforge = await createInsForgeServerClient();
   const { data, error } = await insforge.database.rpc("confirmar_compra", { p_id: id });
   if (error) throw new Error(error.message ?? "No se pudo recibir la compra");
@@ -191,7 +191,7 @@ export async function recibirCompra(id: string): Promise<{ piezas: number; total
 }
 
 export async function cancelarCompra(id: string): Promise<void> {
-  await assertPermiso("inventario_gestionar");
+  await assertPermiso("abastecer");
   const insforge = await createInsForgeServerClient();
   const { error } = await insforge.database.rpc("cancelar_compra", { p_id: id });
   if (error) {
@@ -241,7 +241,7 @@ export type Saldo = {
 };
 
 export async function getSaldo(compraId: string): Promise<Saldo> {
-  await assertPermiso("inventario_gestionar");
+  await assertPermiso("abastecer");
   const { data } = await insforgeAdmin.database
     .from("compras_saldo")
     .select("base_cents, notas_cents, pagado_cents, saldo_cents")
@@ -257,7 +257,7 @@ export async function getSaldo(compraId: string): Promise<Saldo> {
 }
 
 export async function listarNotas(compraId: string): Promise<NotaCredito[]> {
-  await assertPermiso("inventario_gestionar");
+  await assertPermiso("abastecer");
   const { data } = await insforgeAdmin.database
     .from("compra_notas_credito")
     .select(
@@ -270,7 +270,7 @@ export async function listarNotas(compraId: string): Promise<NotaCredito[]> {
 }
 
 export async function listarPagos(compraId: string): Promise<Pago[]> {
-  await assertPermiso("inventario_gestionar");
+  await assertPermiso("abastecer");
   const { data } = await insforgeAdmin.database
     .from("compra_pagos")
     .select("id, monto_cents, metodo, fecha, referencia, notas")
@@ -288,7 +288,7 @@ export async function registrarNota(input: {
   items: { product_id: string; qty: number; costo_unitario_cents: number }[];
   montoPesos: number | null;
 }): Promise<void> {
-  await assertPermiso("inventario_gestionar");
+  await assertPermiso("abastecer");
   const conItems = input.items.length > 0;
   if (!conItems && !(input.montoPesos && input.montoPesos > 0))
     throw new Error("Indica el importe de la nota");
@@ -318,7 +318,7 @@ export async function registrarPago(input: {
   referencia: string | null;
   notas: string | null;
 }): Promise<void> {
-  const userId = await assertPermiso("inventario_gestionar");
+  const userId = await assertPermiso("abastecer");
   const cents = Math.max(0, toCents(input.montoPesos || 0));
   if (cents <= 0) throw new Error("El pago debe ser mayor a cero");
 
@@ -337,7 +337,7 @@ export async function registrarPago(input: {
 }
 
 export async function borrarPago(id: string): Promise<void> {
-  await assertPermiso("inventario_gestionar");
+  await assertPermiso("abastecer");
   const { error } = await insforgeAdmin.database.from("compra_pagos").delete().eq("id", id);
   if (error) throw new Error(error.message ?? "No se pudo borrar el pago");
 }
@@ -355,7 +355,7 @@ export type CuentaPorPagar = {
 };
 
 export async function cuentasPorPagar(): Promise<CuentaPorPagar[]> {
-  await assertPermiso("inventario_gestionar");
+  await assertPermiso("abastecer");
   const [{ data: saldos }, { data: compras }, { data: provs }] = await Promise.all([
     insforgeAdmin.database
       .from("compras_saldo")
@@ -433,7 +433,7 @@ export async function crearProductoEnCompra(
   nombre: string,
   inventoryId: string,
 ): Promise<{ id: string; name: string; sku: string }> {
-  await assertPermiso("inventario_gestionar");
+  await assertPermiso("abastecer");
   // Draft or received: creating a product moves no stock, and the combined
   // case is real — the forgotten line is often a model the shop never carried.
   // Only a cancelled purchase refuses.
@@ -467,7 +467,7 @@ export async function crearProductoEnCompra(
     );
   }
 
-  const userId = await assertPermiso("inventario_gestionar");
+  const userId = await assertPermiso("abastecer");
   const { data, error } = await insforgeAdmin.database
     .from("products")
     .insert([
@@ -502,7 +502,7 @@ export async function agregarItemRecibida(
   qty: number,
   costoPesos: number,
 ): Promise<void> {
-  await assertPermiso("inventario_gestionar");
+  await assertPermiso("abastecer");
   if (!Number.isInteger(qty) || qty <= 0) throw new Error("Cantidad inválida");
   const { error } = await insforgeAdmin.database.rpc("agregar_item_compra_recibida", {
     p_compra_id: compraId,

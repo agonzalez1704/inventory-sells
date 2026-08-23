@@ -4,7 +4,7 @@ import { RequisicionesView } from "@/modules/requisiciones/RequisicionesView";
 
 
 export default async function RequisicionesPage() {
-  await requirePagePermiso("inventario_gestionar", "/inventario");
+  await requirePagePermiso("abastecer", "/inventario");
   const [inventarios, requisiciones] = await Promise.all([
     listarInventarios(),
     listarRequisiciones(),

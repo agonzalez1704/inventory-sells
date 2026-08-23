@@ -4,7 +4,7 @@ import { listarProveedores, conteoPorProveedor } from "@/modules/proveedores/act
 
 
 export default async function ProveedoresPage() {
-  await requirePagePermiso("inventario_gestionar");
+  await requirePagePermiso("abastecer");
   // Reaching this page already means gestionar; the view's flag stays true.
   const puedeGestionar = true;
 

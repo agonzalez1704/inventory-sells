@@ -27,7 +27,7 @@ export type FaltantesProveedor = {
  * last piece are two customers waiting, not one.
  */
 export async function faltantesPorProveedor(): Promise<FaltantesProveedor[]> {
-  await assertPermiso("inventario_gestionar");
+  await assertPermiso("surtir");
 
   const { data: cots } = await insforgeAdmin.database
     .from("cotizaciones")

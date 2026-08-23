@@ -180,7 +180,7 @@ export async function analizarFactura(
   compraId: string,
   fd: FormData,
 ): Promise<AnalisisFactura> {
-  await assertPermiso("inventario_gestionar");
+  await assertPermiso("abastecer");
   const file = fd.get("file");
   if (!(file instanceof File) || file.size === 0) throw new Error("Falta el archivo");
   if (file.size > MAX_BYTES) throw new Error("El archivo pesa más de 10 MB");
@@ -266,7 +266,7 @@ export async function subirFactura(
   compraId: string,
   fd: FormData,
 ): Promise<{ url: string }> {
-  await assertPermiso("inventario_gestionar");
+  await assertPermiso("abastecer");
   const file = fd.get("file");
   if (!(file instanceof File) || file.size === 0) throw new Error("Falta el archivo");
   if (file.size > MAX_BYTES) throw new Error("El archivo pesa más de 10 MB");
@@ -317,7 +317,7 @@ export async function aplicarLineas(
   compraId: string,
   lineas: LineaConfirmada[],
 ): Promise<{ agregadas: number; recordadas: number }> {
-  await assertPermiso("inventario_gestionar");
+  await assertPermiso("abastecer");
   if (!lineas.length) throw new Error("Sin líneas para agregar");
 
   const { data: compra } = await insforgeAdmin.database

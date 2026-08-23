@@ -15,6 +15,7 @@ export const PERMISOS = [
   "autorizar",
   "cotizaciones_convertir",
   "surtir",
+  "abastecer",
   "inventario_ver",
   "inventario_gestionar",
   "precios_gestionar",
@@ -49,6 +50,7 @@ export const CATALOGO_PERMISOS: {
     grupo: "Surtido e inventario",
     permisos: [
       { key: "surtir", label: "Surtir", desc: "Preparar y marcar pedidos surtidos, incluido parcial." },
+      { key: "abastecer", label: "Comprar y abastecer", desc: "Compras, proveedores y requisiciones." },
       { key: "inventario_ver", label: "Ver inventario", desc: "Consultar existencias." },
       { key: "inventario_gestionar", label: "Gestionar inventario", desc: "Importar, ajustar y editar el catálogo." },
     ],

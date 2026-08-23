@@ -23,7 +23,7 @@ export async function GET(request: Request) {
     return new Response("Forbidden", { status: 403 });
   }
   const perms = await getPermisos(userId);
-  if (!perms.has("admin_total") && !perms.has("inventario_gestionar")) {
+  if (!perms.has("admin_total") && !perms.has("abastecer")) {
     return new Response("Forbidden", { status: 403 });
   }
 

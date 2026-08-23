@@ -4,7 +4,7 @@ import { SurtidoView } from "@/modules/surtido/SurtidoView";
 
 
 export default async function SurtidoPage() {
-  await requirePagePermiso("inventario_gestionar", "/inventario");
+  await requirePagePermiso("surtir", "/inventario");
   const grupos = await faltantesPorProveedor();
   return <SurtidoView grupos={grupos} />;
 }

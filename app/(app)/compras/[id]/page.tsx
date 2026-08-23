@@ -9,7 +9,7 @@ import { CompraFinanzas } from "@/modules/compras/CompraFinanzas";
 
 
 export default async function CompraPage({ params }: { params: Promise<{ id: string }> }) {
-  await requirePagePermiso("inventario_gestionar", "/inventario");
+  await requirePagePermiso("abastecer", "/inventario");
   const { id } = await params;
   const { data: invData } = await insforgeAdmin.database
     .from("inventories")

@@ -52,7 +52,7 @@ export async function crearProveedor(
   input: ProveedorInput,
 ): Promise<ActionResult<{ id: string }>> {
   return attempt("crearProveedor", async () => {
-  const userId = await assertPermiso("inventario_gestionar");
+  const userId = await assertPermiso("abastecer");
   // created_by is NOT NULL and defaults to requesting_user_id(), which reads the
   // JWT — and insforgeAdmin carries none, so the default resolved to NULL and
   // every insert died on the not-null constraint. The user id has to come from
@@ -76,7 +76,7 @@ export async function editarProveedor(
   input: ProveedorInput,
 ): Promise<ActionResult<null>> {
   return attempt("editarProveedor", async () => {
-  await assertPermiso("inventario_gestionar");
+  await assertPermiso("abastecer");
   const { error } = await insforgeAdmin.database
     .from("proveedores")
     .update(clean(input))
@@ -96,7 +96,7 @@ export async function archivarProveedor(
   activo: boolean,
 ): Promise<ActionResult<null>> {
   return attempt("archivarProveedor", async () => {
-  await assertPermiso("inventario_gestionar");
+  await assertPermiso("abastecer");
   const { error } = await insforgeAdmin.database
     .from("proveedores")
     .update({ is_active: activo })

@@ -77,7 +77,7 @@ export async function generarRequisicion(
   coberturaSemanas: number,
 ): Promise<ActionResult<LineaRequisicion[]>> {
   return attempt("generarRequisicion", async () => {
-    await assertPermiso("inventario_gestionar");
+    await assertPermiso("abastecer");
     const insforge = await createInsForgeServerClient();
     const { data, error } = await insforge.database.rpc("requisicion_sugerida", {
       p_inventarios: inventarios,
@@ -114,7 +114,7 @@ export async function revisarConIA(
   lineas: LineaRequisicion[],
 ): Promise<ActionResult<RevisionIA>> {
   return attempt("revisarConIA", async () => {
-    await assertPermiso("inventario_gestionar");
+    await assertPermiso("abastecer");
     const { pedirCriterio } = await import("./criterio-ia");
 
     const criterio = await pedirCriterio(
@@ -170,7 +170,7 @@ export async function guardarRequisicion(
   notas: string | null,
 ): Promise<ActionResult<string>> {
   return attempt("guardarRequisicion", async () => {
-    await assertPermiso("inventario_gestionar");
+    await assertPermiso("abastecer");
     const insforge = await createInsForgeServerClient();
     const { data, error } = await insforge.database.rpc("crear_requisicion", {
       p_inventarios: inventarios,
@@ -200,7 +200,7 @@ export async function cambiarEstado(
   estado: "borrador" | "enviada" | "cerrada",
 ): Promise<ActionResult<null>> {
   return attempt("cambiarEstadoRequisicion", async () => {
-    await assertPermiso("inventario_gestionar");
+    await assertPermiso("abastecer");
     const insforge = await createInsForgeServerClient();
     const { error } = await insforge.database.rpc("cambiar_estado_requisicion", {
       p_id: id,
