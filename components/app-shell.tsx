@@ -174,7 +174,7 @@ export function AppShell({
       {(
         <>
           {/* Desktop sidebar — fixed, so main just pads left to clear it. */}
-          <aside className="fixed inset-y-0 left-0 z-30 hidden w-56 flex-col border-r border-border bg-background lg:flex">
+          <aside className="fixed inset-y-0 left-0 z-30 hidden w-56 flex-col border-r border-border bg-background xl:flex">
             <div className="brand-gradient h-[2px] w-full" />
             <div className="flex h-[52px] shrink-0 items-center border-b border-border px-4">
               <Link href="/" aria-label={`${MARCA.nombre} — inicio`}>
@@ -191,7 +191,7 @@ export function AppShell({
           </aside>
 
           {/* Mobile top bar */}
-          <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-border bg-background/80 px-3 backdrop-blur lg:hidden">
+          <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-border bg-background/80 px-3 backdrop-blur xl:hidden">
             <div className="brand-gradient absolute inset-x-0 top-0 h-[2px]" />
             <button
               onClick={() => setOpen(true)}
@@ -211,7 +211,7 @@ export function AppShell({
 
           {/* Mobile drawer */}
           {open && (
-            <div className="fixed inset-0 z-50 lg:hidden">
+            <div className="fixed inset-0 z-50 xl:hidden">
               <button
                 aria-label="Cerrar menú"
                 onClick={() => setOpen(false)}
@@ -235,7 +235,7 @@ export function AppShell({
             </div>
           )}
 
-          <main className="min-w-0 lg:pl-56">{children}</main>
+          <main className="min-w-0 xl:pl-56">{children}</main>
         </>
       )}
     </>

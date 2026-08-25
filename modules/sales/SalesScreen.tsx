@@ -636,7 +636,7 @@ export function SalesScreen({
               )}
             </div>
           ) : (
-            <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+            <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:grid-cols-4">
               {results.map((p) => (
                 <ProductCard
                   key={p.id}
