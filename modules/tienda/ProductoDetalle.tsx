@@ -7,6 +7,7 @@ import {
   MessageCircle,
 } from "lucide-react";
 import { foto } from "@/lib/foto";
+import { GaleriaFotos } from "./GaleriaFotos";
 import { formatMXN } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { calidadDe, marcoDe, CALIDAD_LABEL } from "@/lib/calidad";
@@ -24,6 +25,8 @@ export type DetalleProducto = {
   precio_cents: number;
   disponible: boolean;
   imagen: string | null;
+  /** Extra supplier views for the gallery; empty for a single-photo product. */
+  vistas?: string[];
   /** Extra business days: this piece's stock sits in another city. */
   entrega_dias?: number;
 };
@@ -79,21 +82,11 @@ export async function ProductoDetalle({
       </Link>
 
       <div className="mt-5 grid gap-8 md:grid-cols-2">
-        {/* Image */}
-        <div className="flex aspect-square items-center justify-center overflow-hidden rounded-3xl border border-tienda-100 dark:border-tienda-900 bg-background">
-          {p.imagen ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={foto(p.imagen, 828)}
-              alt={p.nombre}
-              className="h-full w-full object-contain p-4"
-            />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-tienda-50 to-slate-50 text-tienda-300">
-              <Smartphone className="h-24 w-24" />
-            </div>
-          )}
-        </div>
+        {/* Image(s) */}
+        <GaleriaFotos
+          imagenes={[p.imagen, ...(p.vistas ?? [])].filter(Boolean) as string[]}
+          alt={p.nombre}
+        />
 
         {/* Info */}
         <div>

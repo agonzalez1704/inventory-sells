@@ -227,3 +227,18 @@ export async function adjustStock(
   return Number(data);
   });
 }
+
+/**
+ * Extra views of one product (the _FRO/_BOT/… supplier shots), main photo not
+ * included — the caller already has image_url. Ordered front-first.
+ */
+export async function galeriaProducto(productId: string): Promise<string[]> {
+  const { userId } = await auth();
+  if (!userId) return [];
+  const { data } = await insforgeAdmin.database
+    .from("product_images")
+    .select("url, orden")
+    .eq("product_id", productId)
+    .order("orden", { ascending: true });
+  return ((data ?? []) as { url: string }[]).map((r) => r.url);
+}

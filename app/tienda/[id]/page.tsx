@@ -66,6 +66,13 @@ export default async function ProductoPage({
   const row = data as Row | null;
   if (!row || !row.is_active) notFound();
 
+  const { data: galData } = await insforgeAdmin.database
+    .from("product_images")
+    .select("url, orden")
+    .eq("product_id", row.id)
+    .order("orden", { ascending: true });
+  const vistas = ((galData ?? []) as { url: string }[]).map((g) => g.url);
+
   const producto: DetalleProducto = {
     id: row.id,
     nombre: row.name,
@@ -76,6 +83,7 @@ export default async function ProductoPage({
     precio_cents: row.price_cents,
     disponible: row.quantity > 0,
     imagen: row.image_url,
+    vistas,
     entrega_dias:
       (row as unknown as { inventories: { entrega_dias_habiles: number | null } | null })
         .inventories?.entrega_dias_habiles ?? 0,
