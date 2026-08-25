@@ -37,6 +37,7 @@ export function ProductoSheet({
   const [vistas, setVistas] = useState<string[]>([]);
   const [sel, setSel] = useState(0);
   const [tags, setTags] = useState<Tag[]>([]);
+  const [verTodasTags, setVerTodasTags] = useState(false);
   const [compatibles, setCompatibles] = useState<ProductoCompatible[]>([]);
   // The product changes while the sheet is open (tapping another card): a
   // stale fullscreen — or the previous part's gallery — must not survive it.
@@ -45,6 +46,7 @@ export function ProductoSheet({
     setSel(0);
     setVistas([]);
     setTags([]);
+    setVerTodasTags(false);
     setCompatibles([]);
     if (!p?.id) return;
     let on = true;
@@ -150,19 +152,6 @@ export function ProductoSheet({
               ))}
           </dl>
 
-          {tags.length > 0 && (
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {tags.map((t) => (
-                <span
-                  key={t.id}
-                  className="inline-flex items-center rounded-full bg-sky-50 px-2.5 py-0.5 text-xs font-medium text-sky-700 ring-1 ring-inset ring-sky-600/20 dark:bg-sky-950/40 dark:text-sky-300"
-                >
-                  {t.nombre}
-                </span>
-              ))}
-            </div>
-          )}
-
           {/* The click that opens this replaced the tap that added, so the
               sheet must offer adding back — anchored to the column's foot. */}
           <Button
@@ -177,6 +166,36 @@ export function ProductoSheet({
           </Button>
         </div>
       </div>
+
+      {tags.length > 0 && (
+        <div className="mt-4 border-t border-border pt-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Compatible con
+          </p>
+          {/* Full width so chips flow 3-4 per row instead of stacking one per
+              line in the half column. Capped at 8: a 20-vehicle part must not
+              bury the add button below the fold. */}
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {(verTodasTags ? tags : tags.slice(0, 8)).map((t) => (
+              <span
+                key={t.id}
+                className="inline-flex items-center rounded-full bg-sky-50 px-2.5 py-1 text-xs font-medium text-sky-700 ring-1 ring-inset ring-sky-600/20 dark:bg-sky-950/40 dark:text-sky-300"
+              >
+                {t.nombre}
+              </span>
+            ))}
+            {tags.length > 8 && (
+              <button
+                type="button"
+                onClick={() => setVerTodasTags((v) => !v)}
+                className="inline-flex cursor-pointer items-center rounded-full border border-dashed border-border px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-ring/40 hover:text-foreground active:scale-[0.97]"
+              >
+                {verTodasTags ? "Ver menos" : `+${tags.length - 8} más`}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {compatibles.length > 0 && (
         <div className="mt-4 border-t border-border pt-3">
