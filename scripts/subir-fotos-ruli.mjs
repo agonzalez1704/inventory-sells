@@ -16,6 +16,7 @@
 //   node scripts/subir-fotos-ruli.mjs --vistas  # gallery: extra views into product_images
 
 import { readFileSync, readdirSync, statSync, mkdirSync, existsSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { tmpdir } from "node:os";
@@ -28,6 +29,7 @@ const CARPETAS = [
   "/Users/antoniogonzalez/MEGA/Imágenes GROB",
   "/Users/antoniogonzalez/MEGA/APYMSA",
   "/Users/antoniogonzalez/MEGA/imágenes",
+  "/Users/antoniogonzalez/MEGA/BATTERY CENTER/FOTOS",
 ];
 // View-suffix priority: the front view is the card/detail photo when it exists.
 const VISTA = /_(FRO|BOT|OTH|RIT|LEF|BAC)$/i;
@@ -91,17 +93,28 @@ function escanear() {
   return porSku;
 }
 
+const md5 = (file) => createHash("md5").update(readFileSync(file)).digest("hex");
+
 /**
  * The gallery for one SKU: every view that is not the main photo, one file per
  * view code (suppliers ship duplicates across folders). Unnamed duplicates of
- * the main are noise, not a second angle — skipped.
+ * the main are noise, not a second angle — skipped. So is any candidate whose
+ * BYTES equal the principal's: BATTERY CENTER re-ships GROB's plain photo as
+ * SKU_FRO, byte-identical, and a gallery of two identical images is worse than
+ * none. Size check first — hashing only ever runs on same-size pairs.
  */
 function vistasExtra(list) {
   const [principal, ...resto] = list;
+  const pSize = statSync(principal.file).size;
+  let pHash = null;
   const porVista = new Map();
   for (const item of resto) {
     if (!item.vista) continue;
     if (item.vista === principal.vista) continue;
+    if (statSync(item.file).size === pSize) {
+      pHash ??= md5(principal.file);
+      if (md5(item.file) === pHash) continue;
+    }
     if (!porVista.has(item.vista)) porVista.set(item.vista, item);
   }
   return [...porVista.values()];
