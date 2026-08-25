@@ -9,6 +9,8 @@ import {
   adelantosPendientes,
   estadoInventario,
   buscarProducto,
+  etiquetasCompat,
+  compatiblesDeSku,
   listarInventarios,
   corteCaja,
   reporteVentas,
@@ -114,9 +116,23 @@ const handler = createMcpHandler(
 
     server.tool(
       "buscar_producto",
-      "Busca productos por SKU o nombre en todos los inventarios. Devuelve inventario, precio, costo, stock, categoría y estado.",
-      { q: z.string().describe("SKU o nombre a buscar") },
+      "Busca productos por SKU, nombre o vehículo compatible (etiquetas: 'tsuru', 'jetta 2010') en todos los inventarios. Devuelve inventario, precio, costo, stock, categoría y estado.",
+      { q: z.string().describe("SKU, nombre o vehículo a buscar") },
       async ({ q }) => json(await buscarProducto(q)),
+    );
+
+    server.tool(
+      "etiquetas_compatibilidad",
+      "Catálogo de etiquetas de compatibilidad (vehículo + años, ej. 'Nissan Tsuru 1988-1991') con cuántos productos tiene cada una. Filtra con q (ej. 'tsuru', 'volkswagen').",
+      { q: z.string().optional().describe("fragmento a buscar"), limite: z.number().optional() },
+      async ({ q, limite }) => json(await etiquetasCompat(q, limite ?? 30)),
+    );
+
+    server.tool(
+      "compatibles_de_producto",
+      "Dado un SKU, devuelve sus etiquetas de compatibilidad (a qué vehículos aplica) y los productos compatibles (los que comparten etiqueta), con precio y existencia.",
+      { sku: z.string().describe("SKU exacto del producto"), limite: z.number().optional() },
+      async ({ sku, limite }) => json(await compatiblesDeSku(sku, limite ?? 12)),
     );
   },
   {},

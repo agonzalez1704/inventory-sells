@@ -1,7 +1,7 @@
 import "server-only";
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { rangoUTC } from "@/lib/caja-range";
-import { searchProducts, tokensDeConsulta, expand } from "@/lib/search";
+import { searchProducts, tokensDeConsulta, expand, normalize } from "@/lib/search";
 
 // Analytics over InsForge for the MCP server. The bearer token already gates
 // access (owner = full access), so these run with the admin client and include
@@ -516,4 +516,53 @@ export async function masVendidosRango(desde: string, hasta: string, limite = 5)
   return [...map.values()]
     .sort((a, b) => b.ingreso_mxn - a.ingreso_mxn)
     .slice(0, Math.max(1, Math.min(20, Math.floor(limite))));
+}
+
+// --- Compatibilidad (tags) ---------------------------------------------------
+
+/** Tag catalog with product counts, optionally filtered by fragment. */
+export async function etiquetasCompat(q?: string, limite = 30) {
+  let query = DB.from("tags").select("nombre, product_tags(count)").order("nombre");
+  const frag = q ? normalize(q) : "";
+  if (frag) query = query.like("nombre_norm", `%${frag}%`);
+  const { data } = await query.limit(Math.max(1, Math.min(100, Math.floor(limite))));
+  return ((data ?? []) as unknown as {
+    nombre: string;
+    product_tags: { count: number }[];
+  }[]).map((t) => ({
+    etiqueta: t.nombre,
+    productos: Number(t.product_tags?.[0]?.count ?? 0),
+  }));
+}
+
+/** One product's compatibility: its vehicle tags and the parts sharing them. */
+export async function compatiblesDeSku(sku: string, limite = 12) {
+  const { data: prod } = await DB.from("products")
+    .select("id, sku, name")
+    .ilike("sku", sku.trim())
+    .maybeSingle();
+  const p = prod as { id: string; sku: string; name: string } | null;
+  if (!p) return { error: `No existe un producto con SKU "${sku}"` };
+
+  const [{ data: tagData }, { data: compatData }] = await Promise.all([
+    DB.from("product_tags").select("tags(nombre)").eq("product_id", p.id),
+    DB.rpc("productos_compatibles", { p_product_id: p.id, p_limit: limite }),
+  ]);
+  return {
+    producto: { sku: p.sku, nombre: p.name },
+    etiquetas: ((tagData ?? []) as unknown as { tags: { nombre: string } | null }[])
+      .map((r) => r.tags?.nombre)
+      .filter(Boolean)
+      .sort(),
+    compatibles: ((compatData ?? []) as {
+      sku: string; name: string; price_cents: number; quantity: number;
+      tags_compartidos: number;
+    }[]).map((c) => ({
+      sku: c.sku,
+      nombre: c.name,
+      precio_mxn: c.price_cents / 100,
+      existencia: c.quantity,
+      etiquetas_compartidas: Number(c.tags_compartidos),
+    })),
+  };
 }
