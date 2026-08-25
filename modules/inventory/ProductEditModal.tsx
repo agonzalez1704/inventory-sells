@@ -17,6 +17,7 @@ import {
   type EditableProduct,
 } from "./actions";
 import { listarProveedores, type Proveedor } from "@/modules/proveedores/actions";
+import { TagsEditor } from "@/modules/tags/TagsEditor";
 import { entregaTexto } from "@/modules/proveedores/ProveedoresView";
 
 type Form = {
@@ -218,6 +219,8 @@ export function ProductEditModal({
               caja bajo esta etiqueta.
             </span>
           </Field>
+
+          <TagsEditor productId={productId} />
 
           <Field label="Proveedor (opcional)">
             <Select

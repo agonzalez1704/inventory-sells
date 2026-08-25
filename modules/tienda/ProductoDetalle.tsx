@@ -55,10 +55,13 @@ function waHref(nombre: string, whatsapp: string | null) {
 export async function ProductoDetalle({
   producto: p,
   relacionados,
+  compatibles = [],
   whatsapp,
 }: {
   producto: DetalleProducto;
   relacionados: RelacionadoProducto[];
+  /** Products sharing a compatibility tag — the strongest recommendation. */
+  compatibles?: RelacionadoProducto[];
   whatsapp: string | null;
 }) {
   const tienda = await getTiendaInfo();
@@ -194,14 +197,28 @@ export async function ProductoDetalle({
         </div>
       </div>
 
+      {/* Compatible parts come first: they answer "does this fit MY car",
+          which outranks a same-category browse. */}
+      {compatibles.length > 0 && (
+        <RejaMini titulo="Compatibles con esta pieza" items={compatibles} />
+      )}
+
       {/* Related */}
       {relacionados.length > 0 && (
-        <section className="mt-14">
-          <h2 className="text-lg font-semibold tracking-tight text-foreground [font-family:var(--font-display)]">
-            También te puede interesar
-          </h2>
-          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {relacionados.map((r) => (
+        <RejaMini titulo="También te puede interesar" items={relacionados} />
+      )}
+    </div>
+  );
+}
+
+function RejaMini({ titulo, items }: { titulo: string; items: RelacionadoProducto[] }) {
+  return (
+    <section className="mt-14">
+      <h2 className="text-lg font-semibold tracking-tight text-foreground [font-family:var(--font-display)]">
+        {titulo}
+      </h2>
+      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {items.map((r) => (
               <Link
                 key={r.id}
                 href={`/tienda/${r.id}`}
@@ -232,10 +249,8 @@ export async function ProductoDetalle({
                   {r.precio_cents > 0 ? formatMXN(r.precio_cents) : "A cotizar"}
                 </span>
               </Link>
-            ))}
-          </div>
-        </section>
-      )}
-    </div>
+        ))}
+      </div>
+    </section>
   );
 }

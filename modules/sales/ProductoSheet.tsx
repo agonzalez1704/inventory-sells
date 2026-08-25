@@ -11,6 +11,12 @@ import { foto } from "@/lib/foto";
 import { cn } from "@/lib/utils";
 import { Thumb, type SalesProduct } from "./SalesScreen";
 import { galeriaProducto } from "@/modules/inventory/actions";
+import {
+  tagsDeProducto,
+  compatiblesDe,
+  type Tag,
+  type ProductoCompatible,
+} from "@/modules/tags/actions";
 
 // Everything the register knows about a product, for the seller who is holding
 // it and needs to answer a question at the counter. Reached by pressing and
@@ -30,16 +36,26 @@ export function ProductoSheet({
   const [fullscreen, setFullscreen] = useState(false);
   const [vistas, setVistas] = useState<string[]>([]);
   const [sel, setSel] = useState(0);
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [compatibles, setCompatibles] = useState<ProductoCompatible[]>([]);
   // The product changes while the sheet is open (tapping another card): a
   // stale fullscreen — or the previous part's gallery — must not survive it.
   useEffect(() => {
     setFullscreen(false);
     setSel(0);
     setVistas([]);
+    setTags([]);
+    setCompatibles([]);
     if (!p?.id) return;
     let on = true;
     galeriaProducto(p.id)
       .then((v) => on && setVistas(v))
+      .catch(() => {});
+    tagsDeProducto(p.id)
+      .then((t) => on && setTags(t))
+      .catch(() => {});
+    compatiblesDe(p.id, 6)
+      .then((c) => on && setCompatibles(c))
       .catch(() => {});
     return () => {
       on = false;
@@ -134,6 +150,19 @@ export function ProductoSheet({
               ))}
           </dl>
 
+          {tags.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {tags.map((t) => (
+                <span
+                  key={t.id}
+                  className="inline-flex items-center rounded-full bg-sky-50 px-2.5 py-0.5 text-xs font-medium text-sky-700 ring-1 ring-inset ring-sky-600/20 dark:bg-sky-950/40 dark:text-sky-300"
+                >
+                  {t.nombre}
+                </span>
+              ))}
+            </div>
+          )}
+
           {/* The click that opens this replaced the tap that added, so the
               sheet must offer adding back — anchored to the column's foot. */}
           <Button
@@ -148,6 +177,45 @@ export function ProductoSheet({
           </Button>
         </div>
       </div>
+
+      {compatibles.length > 0 && (
+        <div className="mt-4 border-t border-border pt-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Compatibles ({compatibles.length})
+          </p>
+          <ul className="mt-2 divide-y divide-border rounded-xl border border-border">
+            {compatibles.map((c) => (
+              <li key={c.id} className="flex items-center gap-3 px-3 py-2">
+                <span className="h-9 w-9 shrink-0 overflow-hidden rounded-lg border border-border bg-background">
+                  {c.image_url && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={foto(c.image_url, 64)} alt="" className="h-full w-full object-contain" />
+                  )}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm">{c.name}</span>
+                  <span className="block font-mono text-[11px] uppercase text-muted-foreground">
+                    {c.sku}
+                  </span>
+                </span>
+                <span className="shrink-0 text-right">
+                  <span className="block font-mono text-sm tabular-nums">
+                    {formatMXN(c.price_cents)}
+                  </span>
+                  <span
+                    className={cn(
+                      "block text-[11px]",
+                      c.quantity > 0 ? "text-muted-foreground" : "text-red-600 dark:text-red-400",
+                    )}
+                  >
+                    {c.quantity > 0 ? `${c.quantity} en stock` : "Agotado"}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Portal to body, not markup in place: on the phone this sheet is a
           vaul drawer, which is transformed — position:fixed inside a transform

@@ -8,6 +8,8 @@ export type Searchable = {
   sku?: string | null;
   brand?: string | null;
   category?: string | null;
+  /** Denormalized compatibility-tag text (products.tags_texto), pre-normalized. */
+  tags_texto?: string | null;
 };
 
 export function normalize(s: string): string {
@@ -102,7 +104,9 @@ function buildIndex(p: Searchable): Index {
   const sku = normalize(p.sku ?? "");
   const brand = normalize(p.brand ?? "");
   const category = normalize(p.category ?? "");
-  const all = `${name} ${brand} ${sku} ${category}`;
+  // tags_texto arrives already normalized (the DB builds it that way) and
+  // already carries its own compact form.
+  const all = `${name} ${brand} ${sku} ${category} ${p.tags_texto ?? ""}`;
   return {
     tokens: new Set(all.split(" ").filter(Boolean)),
     compact: all.replace(/ /g, ""),

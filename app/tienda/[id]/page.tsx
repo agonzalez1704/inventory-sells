@@ -66,6 +66,24 @@ export default async function ProductoPage({
   const row = data as Row | null;
   if (!row || !row.is_active) notFound();
 
+  const { data: compatData } = await insforgeAdmin.database.rpc(
+    "productos_compatibles",
+    { p_product_id: row.id, p_limit: 8 },
+  );
+  const compatibles: RelacionadoProducto[] = (
+    (compatData ?? []) as {
+      id: string; name: string; brand: string | null;
+      price_cents: number; quantity: number; image_url: string | null;
+    }[]
+  ).map((c) => ({
+    id: c.id,
+    nombre: c.name,
+    marca: c.brand,
+    precio_cents: c.price_cents,
+    disponible: c.quantity > 0,
+    imagen: c.image_url,
+  }));
+
   const { data: galData } = await insforgeAdmin.database
     .from("product_images")
     .select("url, orden")
@@ -120,6 +138,7 @@ export default async function ProductoPage({
     <ProductoDetalle
       producto={producto}
       relacionados={relacionados}
+      compatibles={compatibles}
       whatsapp={whatsapp}
     />
   );

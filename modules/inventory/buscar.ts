@@ -46,7 +46,7 @@ async function sinCostosSiNoPuede<T extends { cost_cents: number }>(
 // at 21k products the difference between this and the full row is what the
 // shop's connection has to carry.
 const COLS =
-  "id, inventory_id, sku, name, brand, size, category, price_cents, cost_cents, quantity, etiqueta, image_url, ventas_anuales";
+  "id, inventory_id, sku, name, brand, size, category, price_cents, cost_cents, quantity, etiqueta, image_url, ventas_anuales, tags_texto";
 
 export type ProductoBuscado = {
   id: string;
@@ -63,6 +63,8 @@ export type ProductoBuscado = {
   image_url: string | null;
   /** Units sold in the year, from the ERP import. Null when never imported. */
   ventas_anuales: number | null;
+  /** Normalized compatibility-tag text; feeds the search scorer. */
+  tags_texto?: string | null;
 };
 
 export type Filtro = {
