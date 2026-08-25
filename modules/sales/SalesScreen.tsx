@@ -576,9 +576,9 @@ export function SalesScreen({
   return (
     <Motion>
     <>
-      <div className="gap-5 pb-32 lg:grid lg:grid-cols-5 lg:pb-0">
+      <div className="gap-5 pb-32 lg:grid lg:grid-cols-7 lg:pb-0">
         {/* Product picker */}
-        <div className="lg:col-span-3">
+        <div className="lg:col-span-5">
           <div className="relative">
             <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -636,7 +636,7 @@ export function SalesScreen({
               )}
             </div>
           ) : (
-            <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:grid-cols-4">
+            <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
               {results.map((p) => (
                 <ProductCard
                   key={p.id}
