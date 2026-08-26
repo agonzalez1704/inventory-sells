@@ -232,6 +232,8 @@ export async function resolverGarantia(
   id: string,
   resolucion: ResolucionGarantia | null,
   motivo: string | null,
+  /** Put the part back on the shelf now (it stays linked to this warranty). */
+  reingresa = false,
 ): Promise<ActionResult<null>> {
   return attempt("resolverGarantia", async () => {
     const { userId } = await auth();
@@ -241,10 +243,55 @@ export async function resolverGarantia(
       p_id: id,
       p_resolucion: resolucion,
       p_motivo: motivo,
+      p_reingresa: reingresa,
     });
     if (error) throw new Error(error.message ?? "No se pudo resolver");
     return null;
   });
+}
+
+export type GarantiaEnStock = {
+  id: string;
+  cliente: string;
+  qty: number;
+  motivo: string | null;
+  estado: "pendiente" | "aceptada";
+  fecha: string;
+};
+
+/**
+ * Warranty units currently sitting in this product's stock: claims whose part
+ * re-entered the shelf and weren't rejected. The register shows these so
+ * "1 disponible" comes with "…y es la pieza de la garantía de X, por si la
+ * quieres volver a probar".
+ */
+export async function garantiasEnStock(productId: string): Promise<GarantiaEnStock[]> {
+  const { userId } = await auth();
+  if (!userId) return [];
+  // ponytail: 90-day window — without per-unit serials we cannot know when the
+  // returned piece was resold, so the link ages out instead of piling up.
+  const desde = new Date(Date.now() - 90 * 86_400_000).toISOString();
+  const { data } = await insforgeAdmin.database
+    .from("garantias_cliente")
+    .select("id, qty, motivo, estado, created_at, resuelta_at, customers(nombre)")
+    .eq("product_id", productId)
+    .eq("reingresa_stock", true)
+    .neq("estado", "rechazada")
+    .gte("created_at", desde)
+    .order("created_at", { ascending: false })
+    .limit(5);
+  return ((data ?? []) as unknown as {
+    id: string; qty: number; motivo: string | null;
+    estado: "pendiente" | "aceptada"; created_at: string;
+    resuelta_at: string | null; customers: { nombre: string } | null;
+  }[]).map((g) => ({
+    id: g.id,
+    cliente: g.customers?.nombre ?? "Cliente",
+    qty: Number(g.qty),
+    motivo: g.motivo,
+    estado: g.estado,
+    fecha: g.resuelta_at ?? g.created_at,
+  }));
 }
 
 /**

@@ -17,6 +17,7 @@ import {
   type Tag,
   type ProductoCompatible,
 } from "@/modules/tags/actions";
+import { garantiasEnStock, type GarantiaEnStock } from "@/modules/garantias/cliente-actions";
 
 // Everything the register knows about a product, for the seller who is holding
 // it and needs to answer a question at the counter. Reached by pressing and
@@ -39,6 +40,7 @@ export function ProductoSheet({
   const [tags, setTags] = useState<Tag[]>([]);
   const [verTodasTags, setVerTodasTags] = useState(false);
   const [compatibles, setCompatibles] = useState<ProductoCompatible[]>([]);
+  const [garantias, setGarantias] = useState<GarantiaEnStock[]>([]);
   // The product changes while the sheet is open (tapping another card): a
   // stale fullscreen — or the previous part's gallery — must not survive it.
   useEffect(() => {
@@ -48,6 +50,7 @@ export function ProductoSheet({
     setTags([]);
     setVerTodasTags(false);
     setCompatibles([]);
+    setGarantias([]);
     if (!p?.id) return;
     let on = true;
     galeriaProducto(p.id)
@@ -58,6 +61,9 @@ export function ProductoSheet({
       .catch(() => {});
     compatiblesDe(p.id, 6)
       .then((c) => on && setCompatibles(c))
+      .catch(() => {});
+    garantiasEnStock(p.id)
+      .then((g) => on && setGarantias(g))
       .catch(() => {});
     return () => {
       on = false;
@@ -166,6 +172,22 @@ export function ProductoSheet({
           </Button>
         </div>
       </div>
+
+      {garantias.length > 0 && (
+        <div className="mt-4 rounded-xl border border-amber-300/60 bg-amber-50 p-3 dark:border-amber-700/50 dark:bg-amber-950/30">
+          <p className="text-xs font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-300">
+            Pieza de garantía en el estante
+          </p>
+          {garantias.map((g) => (
+            <p key={g.id} className="mt-1 text-xs text-amber-800 dark:text-amber-200">
+              {g.qty} {g.qty === 1 ? "pza reingresada" : "pzas reingresadas"} por
+              garantía de <span className="font-medium">{g.cliente}</span> (
+              {new Date(g.fecha).toLocaleDateString("es-MX", { day: "numeric", month: "short" })})
+              {g.motivo ? ` · ${g.motivo}` : ""} — pruébala antes de revenderla.
+            </p>
+          ))}
+        </div>
+      )}
 
       {tags.length > 0 && (
         <div className="mt-4 border-t border-border pt-3">

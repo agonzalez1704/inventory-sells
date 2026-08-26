@@ -214,6 +214,7 @@ function ResolverModal({ g, onClose }: { g: GarantiaCliente; onClose: () => void
   const [pending, start] = useTransition();
   const [resolucion, setResolucion] = useState<ResolucionGarantia | "rechazar">("saldo");
   const [motivo, setMotivo] = useState(g.motivo ?? "");
+  const [reingresa, setReingresa] = useState(false);
 
   function guardar() {
     start(async () => {
@@ -223,6 +224,7 @@ function ResolverModal({ g, onClose }: { g: GarantiaCliente; onClose: () => void
             g.id,
             resolucion === "rechazar" ? null : resolucion,
             motivo || null,
+            resolucion !== "rechazar" && reingresa,
           ),
         );
         toast.success(
@@ -269,9 +271,9 @@ function ResolverModal({ g, onClose }: { g: GarantiaCliente; onClose: () => void
             </span>
           )}
           {resolucion === "efectivo" && (
-            <span className="mt-1.5 block text-xs text-amber-700 dark:text-amber-300">
-              Esto solo deja el registro. El dinero se entrega con una devolución
-              aparte, para que salga en el corte del día.
+            <span className="mt-1.5 block text-xs text-muted-foreground">
+              Salen {formatMXN(g.monto_cents)} de caja: quedan registrados como
+              gasto de garantía en el corte de hoy.
             </span>
           )}
           {resolucion === "rechazar" && (
@@ -281,6 +283,24 @@ function ResolverModal({ g, onClose }: { g: GarantiaCliente; onClose: () => void
             </span>
           )}
         </label>
+
+        {!g.reingresa_stock && resolucion !== "rechazar" && (
+          <label className="flex cursor-pointer items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={reingresa}
+              onChange={(e) => setReingresa(e.target.checked)}
+              className="mt-0.5 h-4 w-4 cursor-pointer accent-[hsl(var(--accent))]"
+            />
+            <span>
+              Reingresar la pieza a existencias
+              <span className="block text-xs text-muted-foreground">
+                Vuelve al inventario ligada a esta garantía, por si se quiere
+                volver a probar o revender.
+              </span>
+            </span>
+          </label>
+        )}
 
         <label className="block">
           <span className="mb-1 block text-xs font-medium text-muted-foreground">Nota</span>
