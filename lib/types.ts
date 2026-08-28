@@ -23,6 +23,8 @@ export interface Inventory {
   ciudad?: string | null;
   /** Extra business days for delivery from this warehouse. Null = local. */
   entrega_dias_habiles?: number | null;
+  /** Supplier ships straight to the customer: no own stock, no reserva. */
+  es_dropship?: boolean;
 }
 
 export interface Product {

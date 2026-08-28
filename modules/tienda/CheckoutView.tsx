@@ -137,7 +137,11 @@ export function CheckoutView() {
     };
   }, [cp]);
 
-  const piezas = resumen?.lineas.reduce((s, l) => s + l.qty, 0) ?? 0;
+  const piezasFisicas = resumen?.piezas_fisicas ?? 0;
+  const hayDropship = (resumen?.demora_dropship ?? 0) > 0 ||
+    (resumen?.lineas.some((l) => l.es_dropship) ?? false);
+  // Everything ships from the supplier: nothing for Skydropx to quote.
+  const soloDropship = hayDropship && piezasFisicas === 0;
   const subtotal = resumen?.subtotal_cents ?? 0;
   const total = subtotal + (recoger ? 0 : envio?.totalCents ?? 0);
 
@@ -160,8 +164,9 @@ export function CheckoutView() {
         municipio.trim().length > 1 &&
         direccion.trim().length > 5));
 
-  // A shipment can't proceed without a chosen rate; pickup has none.
-  const envioListo = recoger || envio !== null;
+  // A shipment can't proceed without a chosen rate; pickup has none, and an
+  // all-dropship order ships from the supplier with no rate of ours.
+  const envioListo = recoger || soloDropship || envio !== null;
 
   const tarjetaLista =
     metodo !== "card" ||
@@ -221,7 +226,7 @@ export function CheckoutView() {
   function cotizar() {
     setErrEnvio(null);
     start(async () => {
-      const r = await cotizarParaCP(cp, estado, municipio, piezas);
+      const r = await cotizarParaCP(cp, estado, municipio, piezasFisicas);
       if (!r.ok) {
         setErrEnvio(r.error);
         setOpciones(null);
@@ -275,9 +280,32 @@ export function CheckoutView() {
         Finalizar compra
       </h1>
 
-      {/* The slowest warehouse sets the whole order's pace. Said before the
-          form, not after the payment. */}
-      {resumen && resumen.demora_dias > 0 && (
+      {/* Delivery promises up front, before the form — never after payment.
+          A mixed cart is TWO shipments with two dates; collapsing them into
+          one number would either lie about the local parcel or the imported
+          one. */}
+      {resumen && hayDropship && !soloDropship && (
+        <div className="mt-3 space-y-1.5 rounded-xl border border-tienda-200 dark:border-tienda-800 bg-tienda-50/60 dark:bg-tienda-950/40 p-3 text-xs text-foreground">
+          <p className="flex items-start gap-2">
+            <Truck className="mt-0.5 h-4 w-4 shrink-0 text-tienda-600 dark:text-tienda-400" />
+            Tu pedido llega en <strong>2 entregas</strong>:
+          </p>
+          <p className="pl-6">
+            1 · De nuestra tienda{resumen.demora_dias > 0 ? ` (+${resumen.demora_dias} día${resumen.demora_dias > 1 ? "s" : ""} hábil${resumen.demora_dias > 1 ? "es" : ""})` : ""} — con la paquetería que elijas abajo.
+          </p>
+          <p className="pl-6">
+            2 · Directo del proveedor (~{resumen.demora_dropship} día{resumen.demora_dropship > 1 ? "s" : ""} hábil{resumen.demora_dropship > 1 ? "es" : ""}, envío incluido en el precio).
+          </p>
+        </div>
+      )}
+      {resumen && soloDropship && (
+        <p className="mt-3 flex items-start gap-2 rounded-xl border border-tienda-200 dark:border-tienda-800 bg-tienda-50/60 dark:bg-tienda-950/40 p-3 text-xs text-foreground">
+          <Truck className="mt-0.5 h-4 w-4 shrink-0 text-tienda-600 dark:text-tienda-400" />
+          Tu pedido viaja directo del proveedor a tu domicilio:{" "}
+          <strong>~{resumen.demora_dropship} día{resumen.demora_dropship > 1 ? "s" : ""} hábil{resumen.demora_dropship > 1 ? "es" : ""}</strong>, envío incluido.
+        </p>
+      )}
+      {resumen && !hayDropship && resumen.demora_dias > 0 && (
         <p className="mt-3 flex items-start gap-2 rounded-xl border border-tienda-200 dark:border-tienda-800 bg-tienda-50/60 dark:bg-tienda-950/40 p-3 text-xs text-foreground">
           <Truck className="mt-0.5 h-4 w-4 shrink-0 text-tienda-600 dark:text-tienda-400" />
           Parte de tu pedido sale de otra ciudad: agrega{" "}
@@ -370,7 +398,12 @@ export function CheckoutView() {
           </Card>
 
           <Card titulo="Envío">
-            {!opciones ? (
+            {soloDropship ? (
+              <p className="text-xs text-muted-foreground">
+                El proveedor entrega directo en tu domicilio — el envío ya está
+                incluido en el precio.
+              </p>
+            ) : !opciones ? (
               <>
                 <p className="text-xs text-muted-foreground">
                   Calculamos el costo real con tu código postal.
@@ -473,6 +506,8 @@ export function CheckoutView() {
                 <dd className="tabular-nums">
                   {recoger ? (
                     <span className="text-xs font-medium text-green-700 dark:text-green-300">Recoger · gratis</span>
+                  ) : soloDropship ? (
+                    <span className="text-xs font-medium text-green-700 dark:text-green-300">Incluido</span>
                   ) : envio ? (
                     formatMXN(envio.totalCents)
                   ) : (

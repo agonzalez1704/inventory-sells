@@ -27,6 +27,7 @@ export function EditarInventarioModal({
   const [dias, setDias] = useState(
     inventario.entrega_dias_habiles != null ? String(inventario.entrega_dias_habiles) : "",
   );
+  const [dropship, setDropship] = useState(inventario.es_dropship ?? false);
   const [pending, start] = useTransition();
 
   function guardar() {
@@ -36,6 +37,7 @@ export function EditarInventarioModal({
           nombre,
           ciudad: ciudad.trim() || null,
           entregaDias: dias.trim() === "" ? null : Number(dias),
+          esDropship: dropship,
         });
         toast.success("Inventario guardado");
         onClose();
@@ -83,6 +85,21 @@ export function EditarInventarioModal({
           Los días se suman a la entrega estimada de todo pedido que incluya
           piezas de este inventario, y la tienda lo dice en cada pieza.
         </p>
+        <label className="flex cursor-pointer items-start gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={dropship}
+            onChange={(e) => setDropship(e.target.checked)}
+            className="mt-0.5 h-4 w-4 cursor-pointer accent-[hsl(var(--accent))]"
+          />
+          <span>
+            Dropship
+            <span className="block text-xs text-muted-foreground">
+              El proveedor envía directo al cliente. Sus productos se venden sin
+              stock propio y no reservan inventario.
+            </span>
+          </span>
+        </label>
         <div className="flex justify-end gap-2 border-t border-border pt-3">
           <Button type="button" variant="ghost" onClick={onClose} disabled={pending}>
             Cancelar

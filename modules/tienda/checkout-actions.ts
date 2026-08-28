@@ -19,6 +19,8 @@ export type LineaValidada = {
   qty: number;
   /** Extra business days because this line's stock sits in another city. */
   entrega_dias: number;
+  /** The supplier ships this line straight to the customer. */
+  es_dropship: boolean;
 };
 
 export type Resumen = {
@@ -26,8 +28,12 @@ export type Resumen = {
   subtotal_cents: number;
   /** Dropped because they went out of stock / inactive while browsing. */
   removidos: string[];
-  /** The whole order's extra business days: the slowest warehouse wins. */
+  /** The PHYSICAL shipment's extra business days: the slowest warehouse wins. */
   demora_dias: number;
+  /** Pieces that ship from us — what the Skydropx parcel actually weighs. */
+  piezas_fisicas: number;
+  /** Slowest dropship line's business days. 0 = no dropship lines. */
+  demora_dropship: number;
 };
 
 type Row = {
@@ -37,7 +43,7 @@ type Row = {
   quantity: number;
   image_url: string | null;
   is_active: boolean;
-  inventories: { entrega_dias_habiles: number | null } | null;
+  inventories: { entrega_dias_habiles: number | null; es_dropship: boolean | null } | null;
 };
 
 // Re-price the cart from the catalog. Never trust client prices.
@@ -50,7 +56,7 @@ export async function validarCarrito(
 
     const { data } = await insforgeAdmin.database
       .from("products")
-      .select("id, name, price_cents, quantity, image_url, is_active, inventories(entrega_dias_habiles)")
+      .select("id, name, price_cents, quantity, image_url, is_active, inventories(entrega_dias_habiles, es_dropship)")
       .in("id", ids);
     const rows = (data ?? []) as unknown as Row[];
     const byId = new Map(rows.map((r) => [r.id, r]));
@@ -60,8 +66,10 @@ export async function validarCarrito(
     for (const l of lineas) {
       const p = byId.get(l.id);
       const qty = Math.max(1, Math.floor(l.qty));
-      // Must be active, priced and in stock, or it can't be sold online.
-      if (!p || !p.is_active || p.price_cents <= 0 || p.quantity <= 0) {
+      const dropship = p?.inventories?.es_dropship ?? false;
+      // Must be active and priced; stock only gates lines WE hold — a dropship
+      // line's stock is the supplier's problem, not a reason to drop it.
+      if (!p || !p.is_active || p.price_cents <= 0 || (!dropship && p.quantity <= 0)) {
         if (p) removidos.push(p.name);
         continue;
       }
@@ -71,22 +79,26 @@ export async function validarCarrito(
         precio_cents: p.price_cents,
         imagen: p.image_url,
         // Silently cap at what's really available — never reveal the number.
-        qty: Math.min(qty, p.quantity),
+        qty: dropship ? qty : Math.min(qty, p.quantity),
         entrega_dias: p.inventories?.entrega_dias_habiles ?? 0,
+        es_dropship: dropship,
       });
     }
     if (out.length === 0)
       throw new Error("Los productos de tu carrito ya no están disponibles");
 
+    const fisicas = out.filter((l) => !l.es_dropship);
+    const drop = out.filter((l) => l.es_dropship);
     return {
       lineas: out,
       subtotal_cents: out.reduce((s, l) => s + l.precio_cents * l.qty, 0),
       removidos,
-      // One shipment, one promise: the slowest warehouse in the cart sets the
-      // extra days for the whole order. 2 screens from the shop plus 5 flexes
-      // from Irapuato is an Irapuato-paced order — saying otherwise at
-      // checkout would be a promise the parcel cannot keep.
-      demora_dias: Math.max(0, ...out.map((l) => l.entrega_dias)),
+      // Two shipments, two promises. The physical parcel is paced by its
+      // slowest warehouse; the dropship block travels on its own from the
+      // supplier and must never drag the local parcel's date with it.
+      demora_dias: Math.max(0, ...fisicas.map((l) => l.entrega_dias)),
+      piezas_fisicas: fisicas.reduce((s, l) => s + l.qty, 0),
+      demora_dropship: Math.max(0, ...drop.map((l) => l.entrega_dias)),
     };
   });
 }

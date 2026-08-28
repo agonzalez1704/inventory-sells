@@ -4,6 +4,8 @@ import { getNegocioInfo, getAsesoresRaw, getValorBase, getTiendaInfo } from "@/m
 import { fiadoExigeCliente, posClickAbreDetalle } from "@/modules/config/negocio";
 import { ConfigView } from "@/modules/config/ConfigView";
 import { Card } from "@/components/ui/card";
+import { insforgeAdmin } from "@/lib/insforge/admin";
+import { Plane } from "lucide-react";
 import { PushToggle } from "@/components/push-toggle";
 import { NotifRoles } from "@/modules/notifications/NotifRoles";
 import { notificacionesPorRol } from "@/modules/notifications/rol-actions";
@@ -39,6 +41,25 @@ export default async function ConfiguracionPage() {
     getPrecioBasePos(),
   ]);
 
+  // AliExpress connection status + authorize link. Only offered when the app
+  // credentials exist in env (Fiable) and the viewer is an admin.
+  const aliKey = process.env.ALIEXPRESS_APP_KEY;
+  let aliConectado = false;
+  if (isAdmin && aliKey) {
+    const { data } = await insforgeAdmin.database
+      .from("config_negocio")
+      .select("aliexpress_token, aliexpress_expira")
+      .eq("id", 1)
+      .maybeSingle();
+    const c = data as { aliexpress_token: string | null; aliexpress_expira: string | null } | null;
+    aliConectado = Boolean(
+      c?.aliexpress_token && c.aliexpress_expira && new Date(c.aliexpress_expira) > new Date(),
+    );
+  }
+  const aliAuthUrl = aliKey
+    ? `https://api-sg.aliexpress.com/oauth/authorize?response_type=code&client_id=${aliKey}&redirect_uri=${encodeURIComponent("https://fiable.vercel.app/api/aliexpress/callback")}&force_auth=true`
+    : null;
+
   return (
     <div className="space-y-6">
       <ConfigView
@@ -49,6 +70,32 @@ export default async function ConfiguracionPage() {
         fiadoExige={fiadoExige}
         isAdmin={isAdmin}
       />
+
+      {isAdmin && aliAuthUrl && (
+        <Card className="p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-soft text-brand-foreground">
+                <Plane className="h-5 w-5" />
+              </span>
+              <div>
+                <h2 className="text-sm font-semibold">AliExpress (dropshipping)</h2>
+                <p className="text-xs text-muted-foreground">
+                  {aliConectado
+                    ? "Cuenta conectada — lista para la compra automática cuando AliExpress autorice el API."
+                    : "Autoriza la app para que el sistema pueda comprar por ti cuando el API esté aprobado."}
+                </p>
+              </div>
+            </div>
+            <a
+              href={aliAuthUrl}
+              className="inline-flex h-9 items-center rounded-lg border border-border px-3 text-sm font-medium transition-colors hover:border-ring/40"
+            >
+              {aliConectado ? "Reconectar" : "Conectar AliExpress"}
+            </a>
+          </div>
+        </Card>
+      )}
 
       {/* One POS card, two scopes, each labeled: the shop-wide behavior an
           admin sets for everyone, and the personal display preference. Two

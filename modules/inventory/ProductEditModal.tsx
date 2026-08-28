@@ -31,6 +31,7 @@ type Form = {
   is_active: boolean;
   etiqueta: string;
   proveedor_id: string;
+  enlace_proveedor: string;
 };
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -85,6 +86,7 @@ export function ProductEditModal({
           is_active: p.is_active,
           etiqueta: p.etiqueta ?? "",
           proveedor_id: p.proveedor_id ?? "",
+          enlace_proveedor: p.enlace_proveedor ?? "",
         });
       })
       .catch((e) => !cancelled && setLoadError(e.message));
@@ -116,6 +118,7 @@ export function ProductEditModal({
           is_active: form.is_active,
           etiqueta: form.etiqueta || null,
           proveedor_id: form.proveedor_id || null,
+          enlace_proveedor: form.enlace_proveedor || null,
         }));
         toast.success("Producto actualizado");
         router.refresh();
@@ -217,6 +220,19 @@ export function ProductEditModal({
             <span className="mt-1 block text-xs text-muted-foreground">
               Se vende normal, pero su efectivo se reporta aparte en el corte de
               caja bajo esta etiqueta.
+            </span>
+          </Field>
+
+          <Field label="Enlace del proveedor (opcional)">
+            <Input
+              value={form.enlace_proveedor}
+              onChange={(e) => set("enlace_proveedor", e.target.value)}
+              inputMode="url"
+              placeholder="https://aliexpress.com/item/…"
+            />
+            <span className="mt-1 block text-xs text-muted-foreground">
+              URL del listing (AliExpress u otro). En pedidos dropship es el
+              botón de compra en 1 clic.
             </span>
           </Field>
 

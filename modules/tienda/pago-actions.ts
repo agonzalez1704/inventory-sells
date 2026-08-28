@@ -73,14 +73,23 @@ async function crearOrden(
 }> {
   const val = await validarCarrito(lineas);
   if (!val.ok) throw new Error(val.error);
-  const { lineas: items, subtotal_cents } = val.data;
+  const { lineas: items, subtotal_cents, piezas_fisicas } = val.data;
 
-  const envioCents = tipoEntrega === "recoger" ? 0 : envio?.totalCents ?? 0;
+  // No rate is only legitimate when nothing ships from us: pickup, or a cart
+  // that is 100% dropship (the supplier's shipping rides in the price). A
+  // physical parcel with no chosen rate would ship free by client fiat.
+  const soloDropship = piezas_fisicas === 0;
+  if (tipoEntrega === "envio" && !soloDropship && !envio)
+    throw new Error("Falta elegir la paquetería");
+
+  const envioCents = tipoEntrega === "recoger" || soloDropship ? 0 : envio?.totalCents ?? 0;
   if (!Number.isInteger(envioCents) || envioCents < 0) throw new Error("Envío inválido");
   const envioDesc =
     tipoEntrega === "recoger"
       ? "Recoger en tienda"
-      : `${envio!.proveedor} · ${envio!.servicio}${envio!.dias ? ` · ${envio!.dias} día(s)` : ""}`;
+      : soloDropship
+        ? "Directo del proveedor"
+        : `${envio!.proveedor} · ${envio!.servicio}${envio!.dias ? ` · ${envio!.dias} día(s)` : ""}`;
 
   const { data, error } = await insforgeAdmin.database.rpc("crear_orden_web", {
     p_items: items.map((l) => ({ product_id: l.id, qty: l.qty })),

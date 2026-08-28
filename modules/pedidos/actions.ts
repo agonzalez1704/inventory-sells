@@ -53,3 +53,30 @@ export async function cancelarPedido(ordenId: string): Promise<ActionResult<null
     return null;
   });
 }
+
+/**
+ * The supplier order was placed by hand (AliExpress checkout, one click from
+ * the card). The ref is the supplier's order number — the only handle the shop
+ * will have when the customer asks where their package is.
+ */
+export async function marcarDropshipPedido(
+  ordenId: string,
+  ref: string,
+): Promise<ActionResult<null>> {
+  return attempt("marcarDropshipPedido", async () => {
+    await requireAdmin();
+    const limpio = ref.trim();
+    if (!limpio) throw new Error("Pega el número de orden del proveedor");
+    const { error } = await insforgeAdmin.database
+      .from("ordenes_web")
+      .update({
+        dropship_estado: "pedido",
+        dropship_ref: limpio,
+        dropship_pedido_at: new Date().toISOString(),
+      })
+      .eq("id", ordenId)
+      .eq("dropship_estado", "por_pedir");
+    if (error) throw new Error(error.message ?? "No se pudo marcar");
+    return null;
+  });
+}

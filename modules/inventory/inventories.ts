@@ -38,7 +38,7 @@ export async function createInventory(name: string): Promise<Inventory> {
  */
 export async function editarInventario(
   id: string,
-  campos: { nombre: string; ciudad: string | null; entregaDias: number | null },
+  campos: { nombre: string; ciudad: string | null; entregaDias: number | null; esDropship?: boolean },
 ): Promise<void> {
   await assertPermiso("inventario_gestionar");
 
@@ -54,6 +54,7 @@ export async function editarInventario(
       name: nombre,
       ciudad: campos.ciudad?.trim() || null,
       entrega_dias_habiles: campos.entregaDias,
+      es_dropship: campos.esDropship ?? false,
     })
     .eq("id", id);
   if (error) throw new Error(error.message ?? "No se pudo guardar el inventario");
