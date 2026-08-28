@@ -3,13 +3,13 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Camera, ImageUp, X } from "lucide-react";
+import { Camera, ImageUp, X, Link2, Loader2 } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { resizeImage } from "@/lib/image";
 import { slugify } from "@/lib/slug";
-import { subirImagenProducto } from "./actions";
+import { subirImagenProducto, importarDeProveedor, subirImagenDesdeUrl, setEnlaceProveedor } from "./actions";
 import { addProduct } from "./import/actions";
 import type { ExtractedRow } from "./import/schema";
 
@@ -66,6 +66,36 @@ export function ManualProductModal({
   // following the moment the seller edits it: a hand-typed sku is information,
   // and overwriting it because the name changed would throw that away.
   const [skuManual, setSkuManual] = useState(false);
+  const [enlace, setEnlace] = useState("");
+  const [imagenRemota, setImagenRemota] = useState<string | null>(null);
+  const [importando, setImportando] = useState(false);
+
+  // Paste the supplier URL, pull name/photo/cost. The price stays empty: the
+  // margin is the one number the shop must type on purpose.
+  async function importar() {
+    if (!enlace.trim() || importando) return;
+    setImportando(true);
+    try {
+      const r = await importarDeProveedor(enlace);
+      if (!r.ok) throw new Error(r.error);
+      setF((s) => ({
+        ...s,
+        name: r.data.nombre,
+        ...(skuManual ? {} : { sku: slugify(r.data.nombre) }),
+        ...(r.data.costoPesos != null ? { cost: String(r.data.costoPesos) } : {}),
+      }));
+      setImagenRemota(r.data.imagenUrl);
+      toast.success(
+        r.data.costoPesos != null
+          ? "Datos importados — ponle tu precio de venta"
+          : "Nombre y foto importados — el costo no se pudo leer, captúralo",
+      );
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo importar");
+    } finally {
+      setImportando(false);
+    }
+  }
   const set = (k: keyof typeof f, v: string) => setF((s) => ({ ...s, [k]: v }));
   const setNombre = (v: string) =>
     setF((s) => ({ ...s, name: v, ...(skuManual ? {} : { sku: slugify(v) }) }));
@@ -130,6 +160,14 @@ export function ManualProductModal({
           } catch {
             fotoOk = false;
           }
+        } else if (imagenRemota) {
+          // Imported listing photo: re-hosted server-side, never hotlinked.
+          const ri = await subirImagenDesdeUrl(id, imagenRemota);
+          fotoOk = ri.ok;
+        }
+        if (enlace.trim()) {
+          const rl = await setEnlaceProveedor(id, enlace);
+          if (!rl.ok) toast.error(`El enlace no se guardó: ${rl.error}`);
         }
         toast.success(
           fotoOk ? "Producto agregado" : "Producto agregado — la foto no se pudo subir",
@@ -140,6 +178,8 @@ export function ManualProductModal({
         setF((s) => ({ ...LIMPIOS, category: s.category, brand: s.brand }));
         setSkuManual(false);
         quitarFoto();
+        setEnlace("");
+        setImagenRemota(null);
         nombreRef.current?.focus();
         router.refresh();
       } catch (e) {
@@ -178,11 +218,43 @@ export function ManualProductModal({
           </Field>
         )}
 
+        <div className="flex gap-2">
+          <Input
+            value={enlace}
+            onChange={(e) => setEnlace(e.target.value)}
+            inputMode="url"
+            placeholder="Pega el enlace del proveedor (AliExpress)…"
+            className="flex-1"
+          />
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={importar}
+            disabled={!enlace.trim() || importando}
+          >
+            {importando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />}
+            Traer datos
+          </Button>
+        </div>
+
         {/* Photo + identity share the first row: what it looks like and what
             it is called are one glance for whoever is holding the part. */}
         <div className="flex gap-3">
           <div className="relative h-[104px] w-[104px] shrink-0 overflow-hidden rounded-xl border border-dashed border-border bg-muted/30">
-            {preview ? (
+            {!preview && imagenRemota ? (
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={imagenRemota} alt="Foto del proveedor" className="h-full w-full object-cover" />
+                <button
+                  type="button"
+                  onClick={() => setImagenRemota(null)}
+                  aria-label="Quitar foto importada"
+                  className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </>
+            ) : preview ? (
               <>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={preview} alt="Foto elegida" className="h-full w-full object-cover" />

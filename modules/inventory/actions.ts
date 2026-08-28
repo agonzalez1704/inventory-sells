@@ -245,3 +245,72 @@ export async function galeriaProducto(productId: string): Promise<string[]> {
     .order("orden", { ascending: true });
   return ((data ?? []) as { url: string }[]).map((r) => r.url);
 }
+
+/**
+ * Read a supplier listing (AliExpress URL) for the create-product form: name,
+ * image and the supplier's price as COST. Best route is the DS API when the
+ * shop has connected AliExpress; otherwise the page's own metadata.
+ */
+export async function importarDeProveedor(
+  url: string,
+): Promise<ActionResult<{ nombre: string; imagenUrl: string | null; costoPesos: number | null }>> {
+  return attempt("importarDeProveedor", async () => {
+    await assertPermiso("inventario_gestionar");
+    const { productoDeProveedor } = await import("@/lib/aliexpress");
+    const p = await productoDeProveedor(url);
+    return { nombre: p.nombre, imagenUrl: p.imagenUrl, costoPesos: p.costoPesos };
+  });
+}
+
+/** Re-host a remote product photo (no hotlinking) and point the product at it. */
+export async function subirImagenDesdeUrl(
+  productId: string,
+  url: string,
+): Promise<ActionResult<null>> {
+  return attempt("subirImagenDesdeUrl", async () => {
+    await assertPermiso("inventario_gestionar");
+    const res = await fetch(url, {
+      headers: { "user-agent": "Mozilla/5.0 (product image import)" },
+      signal: AbortSignal.timeout(20_000),
+    });
+    if (!res.ok) throw new Error(`No se pudo descargar la imagen (HTTP ${res.status})`);
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (buf.length < 512) throw new Error("Imagen inválida");
+    if (buf.length > MAX_BYTES) throw new Error("La imagen pesa más de 5 MB");
+
+    const tipo = res.headers.get("content-type")?.split(";")[0] ?? "image/jpeg";
+    const ext = MIME_EXT[tipo] ?? "jpg";
+    const key = `products/${productId}.${ext}`;
+    await insforgeAdmin.storage.from(BUCKET).remove(key).catch(() => {});
+    const { data, error } = await insforgeAdmin.storage
+      .from(BUCKET)
+      .upload(key, new File([buf], `${productId}.${ext}`, { type: tipo }));
+    if (error || !data) throw new Error(error?.message ?? "No se pudo subir");
+
+    const insforge = await createInsForgeServerClient();
+    const { error: upErr } = await insforge.database.rpc("set_product_image", {
+      p_product_id: productId,
+      p_url: data.url,
+      p_key: data.key,
+    });
+    if (upErr) throw new Error(upErr.message ?? "No se pudo guardar la imagen");
+    updateTag("tienda");
+    return null;
+  });
+}
+
+/** Attach the supplier link right after creating a product from an import. */
+export async function setEnlaceProveedor(
+  productId: string,
+  url: string,
+): Promise<ActionResult<null>> {
+  return attempt("setEnlaceProveedor", async () => {
+    await assertPermiso("inventario_gestionar");
+    const { error } = await insforgeAdmin.database
+      .from("products")
+      .update({ enlace_proveedor: url.trim() || null })
+      .eq("id", productId);
+    if (error) throw new Error(error.message ?? "No se pudo guardar el enlace");
+    return null;
+  });
+}
