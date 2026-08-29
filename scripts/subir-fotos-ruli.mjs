@@ -30,6 +30,7 @@ const CARPETAS = [
   "/Users/antoniogonzalez/MEGA/APYMSA",
   "/Users/antoniogonzalez/MEGA/imágenes",
   "/Users/antoniogonzalez/MEGA/BATTERY CENTER/FOTOS",
+  "/Users/antoniogonzalez/MEGA/Optimo cat01",
 ];
 // View-suffix priority: the front view is the card/detail photo when it exists.
 const VISTA = /_(FRO|BOT|OTH|RIT|LEF|BAC)$/i;
