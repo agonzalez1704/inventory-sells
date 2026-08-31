@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { HandCoins, User, Pencil } from "lucide-react";
+import { HandCoins, User, Pencil, Globe, Lock } from "lucide-react";
 import { formatMXN } from "@/lib/money";
 import type { PaymentMethod } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -85,6 +85,7 @@ function PublicoBadge({ loan, esAdmin }: { loan: Loan; esAdmin: boolean }) {
   if (!esAdmin) {
     return publica ? (
       <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/20 dark:bg-emerald-950/40 dark:text-emerald-300">
+        <Globe className="mr-1 h-3 w-3" />
         Pública
       </span>
     ) : null;
@@ -115,7 +116,8 @@ function PublicoBadge({ loan, esAdmin }: { loan: Loan; esAdmin: boolean }) {
           : "bg-muted text-muted-foreground ring-border hover:text-foreground",
       )}
     >
-      {publica ? "Pública" : "Privada"}
+      {publica ? <Globe className="mr-1 h-3 w-3" /> : <Lock className="mr-1 h-3 w-3" />}
+      {publica ? "Pública" : "Privada — hacer pública"}
     </button>
   );
 }
@@ -321,8 +323,13 @@ function LoanRow({
         <div className="min-w-0">
           <p className="flex items-center gap-1.5 font-medium">
             <User className="h-4 w-4 text-muted-foreground" />
-            {loan.note || "Sin nota"}
+            {loan.cliente && !loan.cliente.is_system
+              ? loan.cliente.nombre
+              : loan.note || "Sin cliente"}
           </p>
+          {loan.cliente && !loan.cliente.is_system && loan.note && (
+            <p className="mt-0.5 text-xs text-muted-foreground">Nota: {loan.note}</p>
+          )}
           <p className="mt-1 text-sm text-muted-foreground">{items}</p>
           <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
             {ago(loan.created_at)}
