@@ -19,6 +19,7 @@ import {
   type PickerCustomer,
 } from "@/modules/customers/CustomerPicker";
 import {
+  setFiadoPublico,
   settleLoan,
   cancelLoan,
   cambiarFiado,
@@ -44,6 +45,8 @@ export type Loan = {
   cliente: PickerCustomer | null; // linked customer, if assigned
   /** The customer's plazo at read time; null = no formal terms, no due date. */
   credito_dias: number | null;
+  /** Visible to every seller — anyone at the counter may collect it. */
+  fiado_publico?: boolean;
 };
 
 const PAYMENT_METHODS: [PaymentMethod, string][] = [
@@ -68,6 +71,53 @@ function diasParaVencer(loan: Loan): number | null {
   if (loan.credito_dias == null) return null;
   const vence = new Date(loan.created_at).getTime() + loan.credito_dias * 86_400_000;
   return Math.ceil((vence - Date.now()) / 86_400_000);
+}
+
+/**
+ * Who may collect this note. Public = every seller sees it; private = only its
+ * creator (and whoever reads all sales). The admin flips it here, per note.
+ */
+function PublicoBadge({ loan, esAdmin }: { loan: Loan; esAdmin: boolean }) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const publica = loan.fiado_publico ?? false;
+
+  if (!esAdmin) {
+    return publica ? (
+      <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/20 dark:bg-emerald-950/40 dark:text-emerald-300">
+        Pública
+      </span>
+    ) : null;
+  }
+
+  function alternar() {
+    start(async () => {
+      const r = await setFiadoPublico(loan.id, !publica);
+      if (!r.ok) {
+        toast.error(r.error);
+        return;
+      }
+      toast.success(!publica ? "Ahora cualquier vendedor puede cobrarla" : "Nota privada de nuevo");
+      router.refresh();
+    });
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={alternar}
+      disabled={pending}
+      title={publica ? "Todos los vendedores la ven. Clic para hacerla privada." : "Solo su creador la ve. Clic para que cualquier vendedor pueda cobrarla."}
+      className={cn(
+        "inline-flex cursor-pointer items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset transition-colors",
+        publica
+          ? "bg-emerald-50 text-emerald-700 ring-emerald-600/20 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300"
+          : "bg-muted text-muted-foreground ring-border hover:text-foreground",
+      )}
+    >
+      {publica ? "Pública" : "Privada"}
+    </button>
+  );
 }
 
 function VenceBadge({ loan }: { loan: Loan }) {
@@ -97,10 +147,13 @@ export function LoansView({
   loans,
   customers,
   abrirId,
+  esAdmin = false,
 }: {
   loans: Loan[];
   customers: PickerCustomer[];
   abrirId?: string | null;
+  /** admin_total: may flip a note between private and public. */
+  esAdmin?: boolean;
 }) {
   const total = loans.reduce(
     (s, l) => s + Math.max(0, l.total_cents - l.pagado_cents),
@@ -172,6 +225,7 @@ export function LoansView({
                   loan={l}
                   customers={customers}
                   resaltar={flash === l.id}
+                  esAdmin={esAdmin}
                 />
               ))}
             </div>
@@ -186,10 +240,12 @@ function LoanRow({
   loan,
   customers,
   resaltar = false,
+  esAdmin = false,
 }: {
   loan: Loan;
   customers: PickerCustomer[];
   resaltar?: boolean;
+  esAdmin?: boolean;
 }) {
   const router = useRouter();
   const [payment, setPayment] = useState<PaymentMethod>("efectivo");
@@ -272,6 +328,7 @@ function LoanRow({
             {ago(loan.created_at)}
             {loan.vendedor && <> · Creado por: {loan.vendedor}</>}
             <VenceBadge loan={loan} />
+            <PublicoBadge loan={loan} esAdmin={esAdmin} />
           </p>
         </div>
         <div className="text-right">

@@ -2,7 +2,9 @@
 
 import { after } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { getPermisos, getProfile } from "@/lib/auth/profile";
+import { getPermisos, getProfile, permisosDe } from "@/lib/auth/profile";
+import { insforgeAdmin } from "@/lib/insforge/admin";
+import { attempt, type ActionResult } from "@/lib/errors";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
 import { toCents } from "@/lib/money";
 import { notifyNuevaVenta, notifyAbono, notifyCancelacion } from "@/lib/push";
@@ -330,4 +332,27 @@ export async function cancelLoan(saleId: string): Promise<void> {
   });
   if (error) throw new Error(error.message ?? "Error al cancelar");
   after(() => notifyCancelacion(saleId, "fiado"));
+}
+
+/**
+ * Whether a pending credit note is visible to every seller — public means the
+ * customer can settle it with whoever is at the counter. The admin decides per
+ * note; visibility is a property of the debt, not of the viewer.
+ */
+export async function setFiadoPublico(
+  saleId: string,
+  publico: boolean,
+): Promise<ActionResult<null>> {
+  return attempt("setFiadoPublico", async () => {
+    const perms = await permisosDe();
+    if (!perms.has("admin_total"))
+      throw new Error("Solo un administrador decide qué notas son públicas");
+    const { error } = await insforgeAdmin.database
+      .from("sales")
+      .update({ fiado_publico: publico })
+      .eq("id", saleId)
+      .eq("status", "pending");
+    if (error) throw new Error(error.message ?? "No se pudo cambiar");
+    return null;
+  });
 }
