@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { requirePagePermiso } from "@/lib/auth/profile";
+import { getPermisos, requirePagePermiso } from "@/lib/auth/profile";
 import { getCompra, getSaldo, listarNotas, listarPagos } from "@/modules/compras/actions";
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { CompraDetalle } from "@/modules/compras/CompraDetalle";
@@ -9,7 +9,9 @@ import { CompraFinanzas } from "@/modules/compras/CompraFinanzas";
 
 
 export default async function CompraPage({ params }: { params: Promise<{ id: string }> }) {
-  await requirePagePermiso("abastecer", "/inventario");
+  const userId = await requirePagePermiso("abastecer", "/inventario");
+  const perms = await getPermisos(userId);
+  const puedePrecios = perms.has("admin_total") || perms.has("precios_gestionar");
   const { id } = await params;
   const { data: invData } = await insforgeAdmin.database
     .from("inventories")
@@ -38,7 +40,7 @@ export default async function CompraPage({ params }: { params: Promise<{ id: str
           Compras
         </Link>
       </div>
-      <CompraDetalle compra={compra} inventarios={inventarios} />
+      <CompraDetalle compra={compra} inventarios={inventarios} puedePrecios={puedePrecios} />
       {compra.estado !== "cancelada" && (
         <CompraFinanzas compra={compra} saldo={saldo} notas={notas} pagos={pagos} />
       )}

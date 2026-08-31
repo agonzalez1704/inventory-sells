@@ -4,8 +4,9 @@ import { slugify } from "@/lib/slug";
 
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
-import { assertPermiso } from "@/lib/auth/profile";
+import { assertPermiso, permisosDe } from "@/lib/auth/profile";
 import { toCents } from "@/lib/money";
+import { updateTag } from "next/cache";
 
 export type CompraEstado = "borrador" | "recibida" | "cancelada";
 export type Condicion = "contado" | "credito";
@@ -149,6 +150,8 @@ export async function ponerItem(
   productId: string,
   qty: number,
   costoPesos: number,
+  /** Sale price captured alongside the purchase. Null/undefined = don't touch. */
+  precioVentaPesos?: number | null,
 ): Promise<void> {
   await assertPermiso("abastecer");
   await assertBorrador(compraId);
@@ -164,6 +167,31 @@ export async function ponerItem(
     .from("compra_items")
     .insert([{ compra_id: compraId, product_id: productId, qty, costo_unitario_cents: costo }]);
   if (error) throw new Error(error.message ?? "Error al agregar el producto");
+  await ponerPrecioVenta(productId, precioVentaPesos);
+}
+
+/**
+ * The sale price, set at the moment of purchase capture — because that is the
+ * moment somebody is already thinking about this product's numbers, and
+ * skipping it here is exactly how the catalog fills with products nobody ever
+ * priced. Answers to the same permiso as every other price change; the form
+ * hides the field from whoever lacks it, this is the backstop.
+ */
+async function ponerPrecioVenta(
+  productId: string,
+  precioVentaPesos: number | null | undefined,
+): Promise<void> {
+  if (precioVentaPesos == null) return;
+  const perms = await permisosDe();
+  if (!perms.has("admin_total") && !perms.has("precios_gestionar"))
+    throw new Error("Sin permiso para cambiar precios");
+  const precio = Math.max(0, toCents(precioVentaPesos));
+  const { error } = await insforgeAdmin.database
+    .from("products")
+    .update({ price_cents: precio })
+    .eq("id", productId);
+  if (error) throw new Error(error.message ?? "No se pudo guardar el precio");
+  updateTag("tienda");
 }
 
 export async function quitarItem(compraId: string, itemId: string): Promise<void> {
@@ -501,6 +529,7 @@ export async function agregarItemRecibida(
   productId: string,
   qty: number,
   costoPesos: number,
+  precioVentaPesos?: number | null,
 ): Promise<void> {
   await assertPermiso("abastecer");
   if (!Number.isInteger(qty) || qty <= 0) throw new Error("Cantidad inválida");
@@ -511,4 +540,5 @@ export async function agregarItemRecibida(
     p_costo_cents: Math.max(0, toCents(costoPesos || 0)),
   });
   if (error) throw new Error(error.message ?? "No se pudo agregar");
+  await ponerPrecioVenta(productId, precioVentaPesos);
 }

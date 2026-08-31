@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Search, Trash2, PackageCheck, AlertTriangle, CheckCircle2, Ban, Clock, FileDown } from "lucide-react";
 import { formatMXN, fromCents } from "@/lib/money";
+import { cn } from "@/lib/utils";
 import { buscarProductos } from "@/modules/inventory/buscar";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,9 +22,12 @@ const fecha = (iso: string) =>
 export function CompraDetalle({
   compra,
   inventarios,
+  puedePrecios = false,
 }: {
   compra: Compra;
   inventarios: { id: string; name: string }[];
+  /** precios_gestionar: whether the sale-price field is offered at capture. */
+  puedePrecios?: boolean;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -31,6 +35,16 @@ export function CompraDetalle({
   const [elegido, setElegido] = useState<SalesProduct | null>(null);
   const [qty, setQty] = useState("1");
   const [costo, setCosto] = useState("");
+  const [precio, setPrecio] = useState("");
+
+  // Selecting an existing part loads its current numbers, editable: the cost
+  // as the starting point for what the invoice says, and the sale price so a
+  // purchase never leaves products unpriced by omission.
+  function elegir(p: SalesProduct) {
+    setElegido(p);
+    setCosto((p.cost_cents ?? 0) > 0 ? String((p.cost_cents ?? 0) / 100) : "");
+    setPrecio((p.price_cents ?? 0) > 0 ? String((p.price_cents ?? 0) / 100) : "");
+  }
 
   const items = compra.compra_items ?? [];
   const capturado = items.reduce((s, i) => s + Number(i.line_total_cents ?? 0), 0);
@@ -78,17 +92,22 @@ export function CompraDetalle({
     start(async () => {
       try {
         const costoNum = parseFloat(costo.replace(",", ".")) || 0;
+        const precioNum =
+          puedePrecios && precio.trim() !== ""
+            ? parseFloat(precio.replace(",", ".")) || 0
+            : null;
         if (recibida) {
-          await agregarItemRecibida(compra.id, elegido.id, q, costoNum);
+          await agregarItemRecibida(compra.id, elegido.id, q, costoNum, precioNum);
           toast.success(`${elegido.name} agregado — ya entró al inventario`);
         } else {
-          await ponerItem(compra.id, elegido.id, q, costoNum);
+          await ponerItem(compra.id, elegido.id, q, costoNum, precioNum);
           toast.success(`${elegido.name} agregado`);
         }
         setElegido(null);
         setQuery("");
         setQty("1");
         setCosto("");
+        setPrecio("");
         router.refresh();
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Error al agregar");
@@ -391,7 +410,7 @@ export function CompraDetalle({
                 <li key={p.id}>
                   <button
                     onClick={() => {
-                      setElegido(p);
+                      elegir(p);
                       setQuery("");
                     }}
                     className="flex w-full cursor-pointer items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-muted"
@@ -409,7 +428,7 @@ export function CompraDetalle({
             </ul>
           )}
           {elegido && (
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className={cn("grid gap-3", puedePrecios ? "sm:grid-cols-4" : "sm:grid-cols-3")}>
               <label className="block">
                 <span className="mb-1 block text-xs font-medium text-muted-foreground">
                   Cantidad
@@ -427,6 +446,19 @@ export function CompraDetalle({
                   placeholder="0.00"
                 />
               </label>
+              {puedePrecios && (
+                <label className="block">
+                  <span className="mb-1 block text-xs font-medium text-muted-foreground">
+                    Precio de venta (pesos)
+                  </span>
+                  <Input
+                    value={precio}
+                    onChange={(e) => setPrecio(e.target.value)}
+                    inputMode="decimal"
+                    placeholder="0.00"
+                  />
+                </label>
+              )}
               <div className="flex items-end">
                 <Button onClick={agregar} loading={pending} className="w-full">
                   Agregar
