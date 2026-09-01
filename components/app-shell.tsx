@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth, UserButton, SignInButton, SignUpButton } from "@clerk/nextjs";
 import {
+  ArrowLeftRight,
   Boxes,
   ShoppingCart,
   HandCoins,
@@ -60,6 +61,7 @@ const GRUPOS: {
     label: "Catálogo",
     links: [
       { href: "/inventario", label: "Inventario", icon: Boxes, permiso: "inventario_ver" },
+      { href: "/traspasos", label: "Traspasos", icon: ArrowLeftRight, permiso: "inventario_gestionar" },
       { href: "/proveedores", label: "Proveedores", icon: Truck, permiso: "abastecer" },
       { href: "/compras", label: "Compras", icon: ShoppingBag, permiso: "abastecer" },
       { href: "/garantias", label: "Garantías", icon: ShieldAlert, permiso: "inventario_gestionar" },
