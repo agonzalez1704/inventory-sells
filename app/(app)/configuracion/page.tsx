@@ -5,6 +5,8 @@ import { fiadoExigeCliente, posClickAbreDetalle } from "@/modules/config/negocio
 import { ConfigView } from "@/modules/config/ConfigView";
 import { Card } from "@/components/ui/card";
 import { insforgeAdmin } from "@/lib/insforge/admin";
+import { listarSucursales } from "@/modules/sucursales/actions";
+import { SucursalesConfig } from "@/modules/sucursales/SucursalesConfig";
 import { Plane } from "lucide-react";
 import { PushToggle } from "@/components/push-toggle";
 import { NotifRoles } from "@/modules/notifications/NotifRoles";
@@ -56,6 +58,7 @@ export default async function ConfiguracionPage() {
       c?.aliexpress_token && c.aliexpress_expira && new Date(c.aliexpress_expira) > new Date(),
     );
   }
+  const sucursales = isAdmin ? await listarSucursales() : [];
   const aliAuthUrl = aliKey
     ? `https://api-sg.aliexpress.com/oauth/authorize?response_type=code&client_id=${aliKey}&redirect_uri=${encodeURIComponent("https://fiable.vercel.app/api/aliexpress/callback")}&force_auth=true`
     : null;
@@ -70,6 +73,8 @@ export default async function ConfiguracionPage() {
         fiadoExige={fiadoExige}
         isAdmin={isAdmin}
       />
+
+      {isAdmin && <SucursalesConfig sucursales={sucursales} />}
 
       {isAdmin && aliAuthUrl && (
         <Card className="p-4">

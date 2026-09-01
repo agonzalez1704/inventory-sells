@@ -20,6 +20,7 @@ import {
   invitarUsuario,
   revocarInvitacion,
 } from "./actions";
+import { setSucursalesUsuario } from "@/modules/sucursales/actions";
 
 export type RolRow = {
   id: string;
@@ -46,10 +47,14 @@ export function UsuariosView({
   usuarios,
   roles,
   invitaciones,
+  sucursales = [],
+  asignaciones = {},
 }: {
   usuarios: UsuarioRow[];
   roles: RolRow[];
   invitaciones: InviteRow[];
+  sucursales?: { id: string; nombre: string }[];
+  asignaciones?: Record<string, string[]>;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -136,6 +141,9 @@ export function UsuariosView({
               <tr className="border-b border-border bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
                 <th className="px-4 py-2.5 font-medium">Usuario</th>
                 <th className="px-4 py-2.5 font-medium">Rol</th>
+                {sucursales.length > 0 && (
+                  <th className="px-4 py-2.5 font-medium">Sucursales</th>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -158,6 +166,15 @@ export function UsuariosView({
                       ))}
                     </select>
                   </td>
+                  {sucursales.length > 0 && (
+                    <td className="px-4 py-2.5">
+                      <SucursalesDeUsuario
+                        userId={u.id}
+                        sucursales={sucursales}
+                        asignadas={asignaciones[u.id] ?? []}
+                      />
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -445,5 +462,55 @@ function RolEditor({ rol, onClose }: { rol: RolRow | null; onClose: () => void }
         </div>
       </div>
     </Modal>
+  );
+}
+
+/**
+ * Which branches this employee may work from. Checking any turns the geo gate
+ * on for them; unchecked everywhere = works from anywhere, no gate. Saves on
+ * every toggle — assignment is its own act, not part of a form.
+ */
+function SucursalesDeUsuario({
+  userId,
+  sucursales,
+  asignadas,
+}: {
+  userId: string;
+  sucursales: { id: string; nombre: string }[];
+  asignadas: string[];
+}) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [sel, setSel] = useState<string[]>(asignadas);
+
+  function toggle(id: string) {
+    const next = sel.includes(id) ? sel.filter((x) => x !== id) : [...sel, id];
+    setSel(next);
+    start(async () => {
+      const r = await setSucursalesUsuario(userId, next);
+      if (!r.ok) {
+        setSel(sel); // roll back the optimistic flip
+        toast.error(r.error);
+        return;
+      }
+      router.refresh();
+    });
+  }
+
+  return (
+    <div className="flex flex-wrap gap-x-3 gap-y-1">
+      {sucursales.map((s) => (
+        <label key={s.id} className="flex cursor-pointer items-center gap-1.5 text-xs">
+          <input
+            type="checkbox"
+            checked={sel.includes(s.id)}
+            disabled={pending}
+            onChange={() => toggle(s.id)}
+            className="h-3.5 w-3.5 cursor-pointer accent-[hsl(var(--accent))]"
+          />
+          {s.nombre}
+        </label>
+      ))}
+    </div>
   );
 }

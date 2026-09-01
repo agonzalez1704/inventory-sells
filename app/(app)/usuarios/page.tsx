@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { tienePermiso } from "@/lib/auth/profile";
+import { listarSucursales, asignacionesSucursales } from "@/modules/sucursales/actions";
 import {
   UsuariosView,
   type RolRow,
@@ -82,5 +83,18 @@ export default async function UsuariosPage() {
     }),
   );
 
-  return <UsuariosView usuarios={usuarios} roles={roles} invitaciones={invitaciones} />;
+  const [sucursales, asignaciones] = await Promise.all([
+    listarSucursales(),
+    asignacionesSucursales(),
+  ]);
+
+  return (
+    <UsuariosView
+      usuarios={usuarios}
+      roles={roles}
+      invitaciones={invitaciones}
+      sucursales={sucursales}
+      asignaciones={asignaciones}
+    />
+  );
 }

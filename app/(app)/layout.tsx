@@ -8,6 +8,7 @@ import { emailTieneAcceso } from "@/lib/auth/allowlist";
 import { getNegocioInfo } from "@/modules/config/lib";
 import { ConfigPrompt } from "@/modules/config/ConfigPrompt";
 import { PushBanner } from "@/components/push-banner";
+import { SucursalGate } from "@/modules/sucursales/SucursalGate";
 import { VersionWatcher } from "@/components/version-watcher";
 
 /**
@@ -47,6 +48,9 @@ async function Gate({ children }: { children: React.ReactNode }) {
           unassigned broadcasts, not just admins. The banner self-hides once
           enabled/dismissed/unsupported. */}
       <PushBanner />
+      {/* Geo check-in for employees the admin tied to branches; renders
+          nothing for everyone else. */}
+      <SucursalGate />
       {children}
       {/* Every staff member, not just admins — anyone can hit a stale action. */}
       <VersionWatcher />
