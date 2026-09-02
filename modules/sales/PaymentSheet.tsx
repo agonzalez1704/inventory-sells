@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import type { PaymentMethodVenta } from "@/lib/types";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 const METODOS: {
   value: PaymentMethodVenta;
@@ -45,7 +46,11 @@ export function PaymentSheet({
   /** This customer's store credit, in cents. 0 hides the method entirely. */
   saldoDisponible: number;
   pending: boolean;
-  onConfirm: (metodo: PaymentMethodVenta, pagos?: { metodo: PaymentMethodVenta; monto_cents: number }[]) => void;
+  onConfirm: (
+    metodo: PaymentMethodVenta,
+    pagos?: { metodo: PaymentMethodVenta; monto_cents: number }[],
+    comprobante?: { referencia: string | null; foto: File | null },
+  ) => void;
 }) {
   // Modal is the drawer on phones now — no local switch needed.
   return (
@@ -72,9 +77,17 @@ function PaymentContent({
   saldoDisponible: number;
   pending: boolean;
   onCancel: () => void;
-  onConfirm: (metodo: PaymentMethodVenta, pagos?: { metodo: PaymentMethodVenta; monto_cents: number }[]) => void;
+  onConfirm: (
+    metodo: PaymentMethodVenta,
+    pagos?: { metodo: PaymentMethodVenta; monto_cents: number }[],
+    comprobante?: { referencia: string | null; foto: File | null },
+  ) => void;
 }) {
   const [metodo, setMetodo] = useState<PaymentMethodVenta>("efectivo");
+  // Transfer proof: the reference and/or screenshot the customer shows. It
+  // attaches AFTER the sale registers — a failed photo never loses the sale.
+  const [referencia, setReferencia] = useState("");
+  const [foto, setFoto] = useState<File | null>(null);
   const [recibido, setRecibido] = useState(""); // pesos, as typed
   // Split payment: an amount per method, as typed. Off by default — the common
   // sale is one method and shouldn't pay for this.
@@ -345,6 +358,28 @@ function PaymentContent({
       )}
 
       {/* Actions */}
+      {(dividir ? pagos.some((p) => p.metodo === "transferencia") : metodo === "transferencia") && (
+        <div className="space-y-2 rounded-xl border border-border p-3">
+          <p className="text-xs font-medium text-muted-foreground">
+            Comprobante de la transferencia (opcional)
+          </p>
+          <Input
+            value={referencia}
+            onChange={(e) => setReferencia(e.target.value)}
+            placeholder="Referencia / clave de rastreo"
+          />
+          <label className="flex cursor-pointer items-center gap-2 text-sm">
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFoto(e.target.files?.[0] ?? null)}
+              className="block w-full text-xs text-muted-foreground file:mr-2 file:cursor-pointer file:rounded-lg file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-xs file:font-medium"
+            />
+          </label>
+          {foto && <p className="text-[11px] text-muted-foreground">Captura lista: {foto.name}</p>}
+        </div>
+      )}
+
       <div className="flex gap-2 border-t border-border pt-4">
         <Button variant="ghost" className="flex-1" onClick={onCancel} disabled={pending}>
           Cancelar
@@ -352,7 +387,14 @@ function PaymentContent({
         <Button
           variant="accent"
           className="flex-1"
-          onClick={() => (dividir ? onConfirm("mixto" as PaymentMethodVenta, pagos) : onConfirm(metodo, metodo === "saldo" ? [{ metodo, monto_cents: total }] : undefined))}
+          onClick={() => {
+            const comp =
+              referencia.trim() || foto
+                ? { referencia: referencia.trim() || null, foto }
+                : undefined;
+            if (dividir) onConfirm("mixto" as PaymentMethodVenta, pagos, comp);
+            else onConfirm(metodo, metodo === "saldo" ? [{ metodo, monto_cents: total }] : undefined, comp);
+          }}
           loading={pending}
           disabled={!puedeCobrar}
         >

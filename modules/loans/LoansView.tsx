@@ -18,6 +18,7 @@ import {
   CustomerPicker,
   type PickerCustomer,
 } from "@/modules/customers/CustomerPicker";
+import { guardarComprobante } from "@/modules/sales/comprobantes";
 import {
   setFiadoPublico,
   settleLoan,
@@ -251,6 +252,8 @@ function LoanRow({
 }) {
   const router = useRouter();
   const [payment, setPayment] = useState<PaymentMethod>("efectivo");
+  const [refPago, setRefPago] = useState("");
+  const [fotoPago, setFotoPago] = useState<File | null>(null);
   const [swapOpen, setSwapOpen] = useState(false);
   const [abonar, setAbonar] = useState(false);
   const [cliente, setCliente] = useState<PickerCustomer | null>(loan.cliente);
@@ -284,6 +287,15 @@ function LoanRow({
     startTransition(async () => {
       try {
         await settleLoan(loan.id, payment);
+        if (payment === "transferencia" && (refPago.trim() || fotoPago)) {
+          let form: FormData | undefined;
+          if (fotoPago) {
+            form = new FormData();
+            form.append("file", fotoPago);
+          }
+          const rc = await guardarComprobante(loan.id, refPago.trim() || null, form);
+          if (!rc.ok) toast.error(`Cobro ok, pero el comprobante no se guardó: ${rc.error}`);
+        }
         toast.success(`Cobrado · ${formatMXN(resta)}`);
         router.refresh();
       } catch (err) {
@@ -404,6 +416,24 @@ function LoanRow({
         </Button>
       </div>
 
+      {payment === "transferencia" && (
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <Input
+            value={refPago}
+            onChange={(e) => setRefPago(e.target.value)}
+            placeholder="Referencia de la transferencia (opcional)"
+            className="h-9 max-w-72"
+          />
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => setFotoPago(e.target.files?.[0] ?? null)}
+            className="text-xs text-muted-foreground file:mr-2 file:cursor-pointer file:rounded-lg file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-xs file:font-medium"
+          />
+          {fotoPago && <span className="text-[11px] text-muted-foreground">✓ {fotoPago.name}</span>}
+        </div>
+      )}
+
       <ItemSwapModal
         open={swapOpen}
         onClose={() => setSwapOpen(false)}
@@ -446,6 +476,8 @@ function AbonarFiadoModal({
   const router = useRouter();
   const [monto, setMonto] = useState("");
   const [metodo, setMetodo] = useState<PaymentMethod>("efectivo");
+  const [referencia, setReferencia] = useState("");
+  const [foto, setFoto] = useState<File | null>(null);
   const [pending, start] = useTransition();
 
   function save() {
@@ -455,6 +487,15 @@ function AbonarFiadoModal({
     start(async () => {
       try {
         await abonarFiado(loan.id, pesos, metodo);
+        if (metodo === "transferencia" && (referencia.trim() || foto)) {
+          let form: FormData | undefined;
+          if (foto) {
+            form = new FormData();
+            form.append("file", foto);
+          }
+          const rc = await guardarComprobante(loan.id, referencia.trim() || null, form);
+          if (!rc.ok) toast.error(`Abono ok, pero el comprobante no se guardó: ${rc.error}`);
+        }
         toast.success(`Abono registrado · ${formatMXN(Math.round(pesos * 100))}`);
         onClose();
         router.refresh();
@@ -506,6 +547,25 @@ function AbonarFiadoModal({
             </Select>
           </label>
         </div>
+        {metodo === "transferencia" && (
+          <div className="space-y-2 rounded-xl border border-border p-3">
+            <p className="text-xs font-medium text-muted-foreground">
+              Comprobante de la transferencia (opcional)
+            </p>
+            <Input
+              value={referencia}
+              onChange={(e) => setReferencia(e.target.value)}
+              placeholder="Referencia / clave de rastreo"
+            />
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => setFoto(e.target.files?.[0] ?? null)}
+              className="block w-full text-xs text-muted-foreground file:mr-2 file:cursor-pointer file:rounded-lg file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-xs file:font-medium"
+            />
+            {foto && <p className="text-[11px] text-muted-foreground">Captura lista: {foto.name}</p>}
+          </div>
+        )}
         <div className="flex justify-end gap-2 border-t border-border pt-3">
           <Button variant="ghost" onClick={onClose} disabled={pending}>
             Cancelar

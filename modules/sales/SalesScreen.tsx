@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { formatMXN } from "@/lib/money";
 import { buscarProductos } from "@/modules/inventory/buscar";
+import { guardarComprobante } from "./comprobantes";
 import type { PaymentMethod, PaymentMethodVenta, Product } from "@/lib/types";
 import { foto } from "@/lib/foto";
 import { cn } from "@/lib/utils";
@@ -515,7 +516,11 @@ export function SalesScreen({
   }, [customer.id, customer.is_system]);
   const canSubmit = lines.length > 0 && !faltaCliente && !faltaNota;
 
-  function submit(metodo?: PaymentMethodVenta, pagos?: PagoSplit[]) {
+  function submit(
+    metodo?: PaymentMethodVenta,
+    pagos?: PagoSplit[],
+    comprobante?: { referencia: string | null; foto: File | null },
+  ) {
     if (!canSubmit) return;
     const items = lines.map((l) => ({ product_id: l.product.id, qty: l.qty }));
     // Snapshot ticket data now — the cart is cleared before the user taps
@@ -537,6 +542,18 @@ export function SalesScreen({
         const { saleId } = esFiado
           ? await registerLoan(items, customer.is_system ? null : customer.id, note)
           : await registerSale(items, pm, customer.id, pagos);
+
+        // Transfer proof rides AFTER the sale: its failure downgrades a toast,
+        // never the charge.
+        if (comprobante && !esFiado) {
+          let form: FormData | undefined;
+          if (comprobante.foto) {
+            form = new FormData();
+            form.append("file", comprobante.foto);
+          }
+          const rc = await guardarComprobante(saleId, comprobante.referencia, form);
+          if (!rc.ok) toast.error(`Venta ok, pero el comprobante no se guardó: ${rc.error}`);
+        }
         const ticket: TicketData = {
           folio: saleId,
           fecha: new Date().toISOString(),
@@ -871,7 +888,7 @@ export function SalesScreen({
         total={total}
         pending={pending}
         saldoDisponible={saldo}
-        onConfirm={(metodo, pagos) => submit(metodo, pagos)}
+        onConfirm={(metodo, pagos, comprobante) => submit(metodo, pagos, comprobante)}
       />
 
       {catsAbiertas && (

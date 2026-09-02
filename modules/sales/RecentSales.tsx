@@ -26,6 +26,7 @@ import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/use-confirm";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PrintTicketButtons } from "@/components/ticket/PrintTicketButtons";
+import { ComprobantesDeVenta } from "./ComprobantesDeVenta";
 import { ItemSwapModal, type SwapProduct } from "@/modules/sales/ItemSwapModal";
 import { ReturnModal } from "@/modules/sales/ReturnModal";
 import { GarantiaModal } from "@/modules/garantias/GarantiaModal";
@@ -549,6 +550,11 @@ export function RecentSales({
                                 </li>
                               ))}
                             </ul>
+                            {/* Transfer proofs: reference and/or the customer's
+                                screenshot, fetched only when this row expands. */}
+                            {(s.payment_method === "transferencia" || s.payment_method === "mixto") && (
+                              <ComprobantesDeVenta saleId={s.id} />
+                            )}
                             <div className="mt-2.5 flex flex-wrap items-center justify-end gap-2">
                               {isAdmin && (
                                 <Button
