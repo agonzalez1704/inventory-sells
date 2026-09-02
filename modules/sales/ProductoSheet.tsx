@@ -93,6 +93,7 @@ export function ProductoSheet({
           ["Margen", margen === null ? "—" : `${margen}%`],
         ] as [string, string | null][])
       : []),
+    ["Inventario", p.inventory_name ?? null],
     ["Existencia", `${p.quantity}`],
   ];
 

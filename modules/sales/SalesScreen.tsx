@@ -169,8 +169,13 @@ function ProductCard({
           721 and the 712 of the same family, and the code is the only thing
           that tells them apart — the names differ by a word buried mid-string,
           which is no use when you are scanning a grid. */}
-      <p className="font-mono text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-        {p.sku}
+      <p className="flex items-baseline justify-between gap-1 font-mono text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        <span className="truncate">{p.sku}</span>
+        {p.inventory_name && (
+          <span className="shrink-0 rounded bg-muted px-1 font-sans text-[10px] font-medium normal-case">
+            {p.inventory_name}
+          </span>
+        )}
       </p>
       <p className="line-clamp-2 min-h-[2.25rem] text-sm font-medium leading-tight">
         {p.name}
@@ -252,6 +257,7 @@ function ProductRow({
               {[p.brand, p.category].filter(Boolean).join(" · ")}
             </span>
           )}
+          {p.inventory_name && <span>{" · "}{p.inventory_name}</span>}
         </p>
       </div>
       <span className="shrink-0 font-mono text-sm font-semibold tabular-nums">

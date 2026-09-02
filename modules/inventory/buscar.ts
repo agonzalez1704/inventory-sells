@@ -42,6 +42,17 @@ async function sinCostosSiNoPuede<T extends { cost_cents: number }>(
   return rows.map((r) => ({ ...r, cost_cents: 0 }));
 }
 
+/** Attach each row's inventory name (7-row lookup — cheap, cached by PG). */
+async function conNombreDeInventario<T extends { inventory_id: string }>(
+  rows: T[],
+): Promise<(T & { inventory_name: string | null })[]> {
+  if (rows.length === 0) return [];
+  const insforge = await createInsForgeServerClient();
+  const { data } = await insforge.database.from("inventories").select("id, name");
+  const nombre = new Map(((data ?? []) as { id: string; name: string }[]).map((i) => [i.id, i.name]));
+  return rows.map((r) => ({ ...r, inventory_name: nombre.get(r.inventory_id) ?? null }));
+}
+
 // Columns the register and the inventory table need. Deliberately not `*`:
 // at 21k products the difference between this and the full row is what the
 // shop's connection has to carry.
@@ -51,6 +62,9 @@ const COLS =
 export type ProductoBuscado = {
   id: string;
   inventory_id: string;
+  /** Which shelf this row lives on — the POS shows it so a seller at a branch
+   *  picks the RIGHT card when the same SKU exists in several inventories. */
+  inventory_name?: string | null;
   sku: string;
   name: string;
   brand: string | null;
@@ -107,7 +121,7 @@ export async function buscarProductos(f: Filtro): Promise<ProductoBuscado[]> {
     if (f.inventoryId) q = q.eq("inventory_id", f.inventoryId);
     if (f.categoria) q = q.eq("category", f.categoria);
     const { data } = await q;
-    return sinCostosSiNoPuede((data ?? []) as ProductoBuscado[]);
+    return conNombreDeInventario(await sinCostosSiNoPuede((data ?? []) as ProductoBuscado[]));
   }
 
   const { data, error } = await insforge.database.rpc("buscar_productos_candidatos", {
@@ -118,7 +132,9 @@ export async function buscarProductos(f: Filtro): Promise<ProductoBuscado[]> {
   });
   if (error) throw new Error(error.message ?? "Error al buscar");
 
-  const candidatos = await sinCostosSiNoPuede((data ?? []) as ProductoBuscado[]);
+  const candidatos = await conNombreDeInventario(
+    await sinCostosSiNoPuede((data ?? []) as ProductoBuscado[]),
+  );
   return searchProducts(candidatos, f.query ?? "", {
     limit: limite,
     // Same tie-break the register used when it filtered in the browser:
@@ -144,7 +160,7 @@ export async function productosPorId(ids: string[]): Promise<ProductoBuscado[]> 
   if (limpios.length === 0) return [];
   const insforge = await createInsForgeServerClient();
   const { data } = await insforge.database.from("products").select(COLS).in("id", limpios);
-  return sinCostosSiNoPuede((data ?? []) as ProductoBuscado[]);
+  return conNombreDeInventario(await sinCostosSiNoPuede((data ?? []) as ProductoBuscado[]));
 }
 
 export type OrdenInventario = { key: string; dir: "asc" | "desc" } | null;
