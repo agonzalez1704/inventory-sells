@@ -74,10 +74,13 @@ const REGLAS_CELULARES = `- Si el cliente pregunta EN GENERAL (una marca o tipo 
 - Si aún no lo encuentras, usa buscar_compatibilidad: muchas pantallas sirven para VARIOS modelos. Si hay una pantalla compatible disponible, ofrécela y explica la compatibilidad.
 - EL MODELO EXACTO IMPORTA: "12", "12 Mini", "12 Pro" y "12 Pro Max" son productos DISTINTOS con precios distintos. PROHIBIDO dar el precio de una variante como si fuera otra. Cada precio va amarrado al nombre del producto tal como viene en "nombre".`;
 
-const REGLAS_AUTOPARTES = `- EL VEHÍCULO ES EL MODELO: una refacción se identifica por pieza + vehículo + AÑO ("amortiguador delantero de Tsuru 95"). Si el cliente da la pieza SIN vehículo o sin año y hay varias coincidencias, pregunta marca, modelo y año del carro ANTES de dar precios. Ej: "¡Sí manejamos! ¿Para qué carro y de qué año?".
-- Los resultados traen "compatible_con": los vehículos y años a los que aplica cada pieza según NUESTRO catálogo. Esa lista es LA ÚNICA fuente de compatibilidad: puedes citarla ("le queda al Tsuru 1988-1991 y al Hikari"), pero PROHIBIDO afirmar que una pieza le queda a un vehículo que no aparezca ahí. Si el año del cliente no cae en el rango, dilo y ofrece verificar con un asesor.
-- Abreviaturas comunes en nombres: DEL. = delantero · TRAS. = trasero · DER. = derecho · IZQ. = izquierda · SUSP. = suspensión · JGO = juego (par/kit completo). Al hablarle al cliente, dilas completas.
-- Muchas piezas van por LADO (derecha/izquierda) o por POSICIÓN (delantera/trasera). Si el cliente no lo dijo y las coincidencias difieren en eso, pregúntale cuál necesita.
+const REGLAS_AUTOPARTES = `- TU PÚBLICO SON MECÁNICOS: hablan coloquial, con modismos, y NO saben SKUs, códigos ni nombres técnicos. PROHIBIDO pedir "el SKU", "el código", "el modelo exacto" o "el nombre técnico" — lo único que puedes preguntar es: qué pieza, para qué carro y de qué año.
+- Modismos que debes entender: "pastillas" = balatas · "huesitos" = tornillos/bieletas del estabilizador · "bases" = bases de amortiguador · "terminales" = terminales de dirección · "rótulas" = rótulas/horquillas · "cebolla/soportes" = soportes de motor. Tradúcelos tú al buscar; nunca corrijas al cliente.
+- EL VEHÍCULO ES EL MODELO: pieza + carro + año ("amortiguador delantero de Tsuru 95"). Si falta el carro o el año y hay varias coincidencias, pregúntalos ANTES de dar precios. Ej: "¡Sí manejamos! ¿Para qué carro y de qué año?".
+- BÚSQUEDA EN CASCADA (obligatoria antes de decir que no hay): 1) busca pieza + vehículo; 2) si nada, busca SOLO la pieza (con sinónimos: "tornillo estabilizador" si dijo "huesito") y revisa en compatible_con si alguna le queda a su carro; 3) si nada, busca SOLO el vehículo para ver qué SÍ manejas para ese carro. Si el carro tiene piezas pero no LA que pidió: dile que esa no la manejas Y ofrécele lo que sí hay para su carro por categoría ("para tu Seltos manejo soportes de motor y transmisión"). Solo si las TRES búsquedas dan nada, di que esa pieza no la manejas por ahora.
+- Los resultados traen "compatible_con": los vehículos y años a los que aplica cada pieza según NUESTRO catálogo. Es LA ÚNICA fuente de compatibilidad: puedes citarla, pero PROHIBIDO afirmar que una pieza le queda a un vehículo que no aparezca ahí. El año del cliente debe caer DENTRO del rango; si cae fuera, dilo y ofrece verificar con un asesor.
+- Abreviaturas en nombres: DEL. = delantero · TRAS. = trasero · DER. = derecho · IZQ. = izquierda · SUSP. = suspensión · JGO = juego (par/kit completo). Al hablarle al cliente, dilas completas.
+- Muchas piezas van por LADO (derecha/izquierda) o POSICIÓN (delantera/trasera). Si el cliente no lo dijo y las coincidencias difieren en eso, pregúntale cuál necesita — en sus palabras ("¿del lado del chofer o del copiloto?").
 - "demasiados" resultados = falta el vehículo o el año: pregúntalos, no listes.`;
 
 const SYSTEM = `Eres el asistente de WhatsApp de ${MARCA.nombre}.
@@ -268,7 +271,26 @@ Este número no está en el registro de clientes.
         }),
         // Customer-facing: availability only — never the quantity or cost.
         execute: async ({ consulta }) => {
-          const rows = await buscarProducto(consulta);
+          // Auto parts: tags carry year RANGES ("Kia Seltos 2020-2024"), so a
+          // point year ("2022") matches nothing textually and zeroes searches
+          // for parts we DO stock. Strip years from the query; the model
+          // checks the year against each result's compatible_con range.
+          let anioPedido: string | null = null;
+          let q = consulta;
+          if (ES_AUTOPARTES) {
+            const anios = consulta.match(/\b(?:19|20)\d{2}\b/g);
+            if (anios?.length) {
+              anioPedido = anios[anios.length - 1];
+              q = consulta.replace(/\b(?:19|20)\d{2}\b/g, " ").replace(/\s+/g, " ").trim();
+            }
+            // Two-digit years mechanics actually type ("tsuru 95"): same deal.
+            const corto = q.match(/\b\d{2}\b(?!\S)/);
+            if (!anioPedido && corto && Number(corto[0]) > 50) {
+              anioPedido = `19${corto[0]}`;
+              q = q.replace(/\b\d{2}\b(?!\S)/, " ").replace(/\s+/g, " ").trim();
+            }
+          }
+          const rows = await buscarProducto(q || consulta);
           // Too broad (brand/category, not a specific model): don't dump a list —
           // tell the agent to ask the customer for the exact model. A CONCRETE
           // model easily has ~10 rows (12/12 Pro/Mini/Pro Max × qualities), so the
@@ -323,13 +345,19 @@ Este número no está en el registro de clientes.
           // the in-stock alternatives, never a bare "no disponible".
           const hayAgotados = items.some((i) => !i.disponible);
           const hayDisponibles = items.some((i) => i.disponible);
+          const notaAnio = anioPedido
+            ? `El cliente busca año ${anioPedido}: verifica que caiga dentro del rango de "compatible_con" de cada pieza antes de afirmar que le queda. Si cae fuera, dilo y ofrece que un asesor lo verifique.`
+            : null;
           if (hayAgotados && hayDisponibles) {
             return {
               items,
-              nota: "Hay resultados agotados y otros disponibles. Si lo que pidió el cliente está agotado, dilo Y en la misma respuesta ofrécele las opciones disponibles con su nombre y precio.",
+              nota: [
+                "Hay resultados agotados y otros disponibles. Si lo que pidió el cliente está agotado, dilo Y en la misma respuesta ofrécele las opciones disponibles con su nombre y precio.",
+                notaAnio,
+              ].filter(Boolean).join(" "),
             };
           }
-          return items;
+          return notaAnio ? { items, nota: notaAnio } : items;
         },
       }),
       agregar_al_pedido: tool({
