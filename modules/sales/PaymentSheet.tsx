@@ -17,6 +17,7 @@ import type { PaymentMethodVenta } from "@/lib/types";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { AdjuntarImagen } from "@/components/ui/adjuntar-imagen";
 
 const METODOS: {
   value: PaymentMethodVenta;
@@ -38,6 +39,7 @@ export function PaymentSheet({
   total,
   saldoDisponible,
   pending,
+  comprobanteObligatorio = false,
   onConfirm,
 }: {
   open: boolean;
@@ -46,6 +48,8 @@ export function PaymentSheet({
   /** This customer's store credit, in cents. 0 hides the method entirely. */
   saldoDisponible: number;
   pending: boolean;
+  /** Shop rule: a transfer without its proof is not a payment. */
+  comprobanteObligatorio?: boolean;
   onConfirm: (
     metodo: PaymentMethodVenta,
     pagos?: { metodo: PaymentMethodVenta; monto_cents: number }[],
@@ -59,6 +63,7 @@ export function PaymentSheet({
         total={total}
         saldoDisponible={saldoDisponible}
         pending={pending}
+        comprobanteObligatorio={comprobanteObligatorio}
         onCancel={onClose}
         onConfirm={onConfirm}
       />
@@ -70,12 +75,14 @@ function PaymentContent({
   total,
   saldoDisponible,
   pending,
+  comprobanteObligatorio = false,
   onCancel,
   onConfirm,
 }: {
   total: number;
   saldoDisponible: number;
   pending: boolean;
+  comprobanteObligatorio?: boolean;
   onCancel: () => void;
   onConfirm: (
     metodo: PaymentMethodVenta,
@@ -123,7 +130,12 @@ function PaymentContent({
   const alcanzaSaldo = metodo !== "saldo" || saldoDisponible >= total;
   const puedeCobrarSimple =
     (!esEfectivo || !hayRecibido || recibidoCents >= total) && alcanzaSaldo;
-  const puedeCobrar = dividir ? splitCuadra : puedeCobrarSimple;
+  const hayTransferencia = dividir
+    ? pagos.some((p) => p.metodo === "transferencia")
+    : metodo === "transferencia";
+  const faltaComprobante =
+    comprobanteObligatorio && hayTransferencia && !referencia.trim() && !foto;
+  const puedeCobrar = (dividir ? splitCuadra : puedeCobrarSimple) && !faltaComprobante;
 
   const sugerencias = useMemo(() => {
     const opts = new Set<number>([
@@ -358,25 +370,17 @@ function PaymentContent({
       )}
 
       {/* Actions */}
-      {(dividir ? pagos.some((p) => p.metodo === "transferencia") : metodo === "transferencia") && (
+      {hayTransferencia && (
         <div className="space-y-2 rounded-xl border border-border p-3">
           <p className="text-xs font-medium text-muted-foreground">
-            Comprobante de la transferencia (opcional)
+            Comprobante de la transferencia {comprobanteObligatorio ? "(obligatorio)" : "(opcional)"}
           </p>
           <Input
             value={referencia}
             onChange={(e) => setReferencia(e.target.value)}
             placeholder="Referencia / clave de rastreo"
           />
-          <label className="flex cursor-pointer items-center gap-2 text-sm">
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFoto(e.target.files?.[0] ?? null)}
-              className="block w-full text-xs text-muted-foreground file:mr-2 file:cursor-pointer file:rounded-lg file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-xs file:font-medium"
-            />
-          </label>
-          {foto && <p className="text-[11px] text-muted-foreground">Captura lista: {foto.name}</p>}
+          <AdjuntarImagen value={foto} onChange={setFoto} />
         </div>
       )}
 

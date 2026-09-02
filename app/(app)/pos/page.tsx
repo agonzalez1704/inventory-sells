@@ -3,7 +3,7 @@ import { requirePagePermiso, getPermisos } from "@/lib/auth/profile";
 import { getPrecioBasePos } from "@/modules/sales/pos-prefs";
 import { SalesScreen, type SalesProduct } from "@/modules/sales/SalesScreen";
 import { listarCategorias } from "@/modules/inventory/buscar";
-import { fiadoExigeCliente, posClickAbreDetalle } from "@/modules/config/negocio";
+import { fiadoExigeCliente, posClickAbreDetalle, comprobanteObligatorio } from "@/modules/config/negocio";
 
 
 // The register: search products, build the cart, cobrar. The sales history lives
@@ -38,10 +38,11 @@ export default async function PosPage() {
       listarCategorias(),
     ]);
 
-  const [precioBase, exigeCliente, clickDetalle] = await Promise.all([
+  const [precioBase, exigeCliente, clickDetalle, comprobanteOblig] = await Promise.all([
     getPrecioBasePos(),
     fiadoExigeCliente(),
     posClickAbreDetalle(),
+    comprobanteObligatorio(),
   ]);
 
   const invName = new Map(
@@ -88,6 +89,7 @@ export default async function PosPage() {
         precioBase={precioBase}
         fiadoExigeCliente={exigeCliente}
         clickAbreDetalle={clickDetalle}
+        comprobanteObligatorio={comprobanteOblig}
       />
     </section>
   );

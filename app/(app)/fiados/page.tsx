@@ -1,5 +1,6 @@
 import { createInsForgeServerClient } from "@/lib/insforge/server";
 import { getPermisos, requirePagePermiso } from "@/lib/auth/profile";
+import { comprobanteObligatorio } from "@/modules/config/negocio";
 import { LoansView, type Loan } from "@/modules/loans/LoansView";
 import type { PickerCustomer } from "@/modules/customers/CustomerPicker";
 
@@ -17,6 +18,8 @@ export default async function FiadosPage({
   const perms = await getPermisos(userId);
   const esAdmin = perms.has("admin_total");
   const veTodas = esAdmin || perms.has("ventas_ver");
+
+  const comprobanteOblig = await comprobanteObligatorio();
 
   const insforge = await createInsForgeServerClient();
 
@@ -78,7 +81,13 @@ export default async function FiadosPage({
           {error.message}
         </p>
       )}
-      <LoansView loans={loans} customers={customers} abrirId={abrirId} esAdmin={esAdmin} />
+      <LoansView
+        loans={loans}
+        customers={customers}
+        abrirId={abrirId}
+        esAdmin={esAdmin}
+        comprobanteObligatorio={comprobanteOblig}
+      />
     </>
   );
 }

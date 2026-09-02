@@ -19,6 +19,7 @@ import {
   type PickerCustomer,
 } from "@/modules/customers/CustomerPicker";
 import { guardarComprobante } from "@/modules/sales/comprobantes";
+import { AdjuntarImagen } from "@/components/ui/adjuntar-imagen";
 import {
   setFiadoPublico,
   settleLoan,
@@ -151,12 +152,15 @@ export function LoansView({
   customers,
   abrirId,
   esAdmin = false,
+  comprobanteObligatorio = false,
 }: {
   loans: Loan[];
   customers: PickerCustomer[];
   abrirId?: string | null;
   /** admin_total: may flip a note between private and public. */
   esAdmin?: boolean;
+  /** Shop rule: a transfer needs its proof before the charge completes. */
+  comprobanteObligatorio?: boolean;
 }) {
   const total = loans.reduce(
     (s, l) => s + Math.max(0, l.total_cents - l.pagado_cents),
@@ -229,6 +233,7 @@ export function LoansView({
                   customers={customers}
                   resaltar={flash === l.id}
                   esAdmin={esAdmin}
+                  comprobanteObligatorio={comprobanteObligatorio}
                 />
               ))}
             </div>
@@ -244,11 +249,13 @@ function LoanRow({
   customers,
   resaltar = false,
   esAdmin = false,
+  comprobanteObligatorio = false,
 }: {
   loan: Loan;
   customers: PickerCustomer[];
   resaltar?: boolean;
   esAdmin?: boolean;
+  comprobanteObligatorio?: boolean;
 }) {
   const router = useRouter();
   const [payment, setPayment] = useState<PaymentMethod>("efectivo");
@@ -284,6 +291,8 @@ function LoanRow({
     .join(" · ");
 
   function collect() {
+    if (payment === "transferencia" && comprobanteObligatorio && !refPago.trim() && !fotoPago)
+      return toast.error("El comprobante es obligatorio: pega la captura o escribe la referencia");
     startTransition(async () => {
       try {
         await settleLoan(loan.id, payment);
@@ -424,13 +433,7 @@ function LoanRow({
             placeholder="Referencia de la transferencia (opcional)"
             className="h-9 max-w-72"
           />
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(e) => setFotoPago(e.target.files?.[0] ?? null)}
-            className="text-xs text-muted-foreground file:mr-2 file:cursor-pointer file:rounded-lg file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-xs file:font-medium"
-          />
-          {fotoPago && <span className="text-[11px] text-muted-foreground">✓ {fotoPago.name}</span>}
+          <AdjuntarImagen value={fotoPago} onChange={setFotoPago} />
         </div>
       )}
 
@@ -452,6 +455,7 @@ function LoanRow({
           customers={customers}
           onAsignarCliente={asignar}
           onClose={() => setAbonar(false)}
+          comprobanteObligatorio={comprobanteObligatorio}
         />
       )}
     </Card>
@@ -459,6 +463,7 @@ function LoanRow({
 }
 
 function AbonarFiadoModal({
+  comprobanteObligatorio = false,
   loan,
   resta,
   cliente,
@@ -472,6 +477,7 @@ function AbonarFiadoModal({
   customers: PickerCustomer[];
   onAsignarCliente: (c: PickerCustomer) => void;
   onClose: () => void;
+  comprobanteObligatorio?: boolean;
 }) {
   const router = useRouter();
   const [monto, setMonto] = useState("");
@@ -484,6 +490,8 @@ function AbonarFiadoModal({
     const pesos = Number(monto.replace(",", "."));
     if (!Number.isFinite(pesos) || pesos <= 0) return toast.error("Monto inválido");
     if (Math.round(pesos * 100) > resta) return toast.error("El abono excede lo que falta");
+    if (metodo === "transferencia" && comprobanteObligatorio && !referencia.trim() && !foto)
+      return toast.error("El comprobante es obligatorio: pega la captura o escribe la referencia");
     start(async () => {
       try {
         await abonarFiado(loan.id, pesos, metodo);
@@ -557,13 +565,7 @@ function AbonarFiadoModal({
               onChange={(e) => setReferencia(e.target.value)}
               placeholder="Referencia / clave de rastreo"
             />
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(e) => setFoto(e.target.files?.[0] ?? null)}
-              className="block w-full text-xs text-muted-foreground file:mr-2 file:cursor-pointer file:rounded-lg file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-xs file:font-medium"
-            />
-            {foto && <p className="text-[11px] text-muted-foreground">Captura lista: {foto.name}</p>}
+            <AdjuntarImagen value={foto} onChange={setFoto} />
           </div>
         )}
         <div className="flex justify-end gap-2 border-t border-border pt-3">

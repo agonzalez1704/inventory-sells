@@ -1,7 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { getProfile } from "@/lib/auth/profile";
 import { getNegocioInfo, getAsesoresRaw, getValorBase, getTiendaInfo } from "@/modules/config/lib";
-import { fiadoExigeCliente, posClickAbreDetalle } from "@/modules/config/negocio";
+import { fiadoExigeCliente, posClickAbreDetalle, comprobanteObligatorio } from "@/modules/config/negocio";
 import { ConfigView } from "@/modules/config/ConfigView";
 import { Card } from "@/components/ui/card";
 import { insforgeAdmin } from "@/lib/insforge/admin";
@@ -17,6 +17,7 @@ import { getPermisos } from "@/lib/auth/profile";
 import { getPrecioBasePos } from "@/modules/sales/pos-prefs";
 import { PosPrefs } from "@/modules/sales/PosPrefs";
 import { PosModoClick } from "@/modules/config/PosModoClick";
+import { ComprobanteToggle } from "@/modules/config/ComprobanteToggle";
 
 export default async function ConfiguracionPage() {
   const { userId } = await auth();
@@ -32,13 +33,14 @@ export default async function ConfiguracionPage() {
   const verCostos = Boolean(
     perms && (perms.has("admin_total") || perms.has("costos_ver")),
   );
-  const [info, asesores, valorBase, tienda, fiadoExige, posDetalle, notifRoles, precioBasePos] = await Promise.all([
+  const [info, asesores, valorBase, tienda, fiadoExige, posDetalle, comprobanteOblig, notifRoles, precioBasePos] = await Promise.all([
     getNegocioInfo(),
     getAsesoresRaw(),
     getValorBase(),
     getTiendaInfo(),
     fiadoExigeCliente(),
     posClickAbreDetalle(),
+    comprobanteObligatorio(),
     puedeGestionarUsuarios ? notificacionesPorRol() : null,
     getPrecioBasePos(),
   ]);
@@ -124,6 +126,10 @@ export default async function ConfiguracionPage() {
                 Qué hace un clic sobre un producto. Se guarda al elegir.
               </p>
               <PosModoClick inicial={posDetalle} />
+              <p className="mb-2 mt-4 text-xs text-muted-foreground">
+                Comprobante en pagos por transferencia (referencia o captura).
+              </p>
+              <ComprobanteToggle inicial={comprobanteOblig} />
             </div>
           )}
           {verCostos && (

@@ -94,3 +94,34 @@ export async function setPosClickAbreDetalle(valor: boolean): Promise<void> {
     .eq("id", 1);
   if (error) throw new Error(error.message ?? "No se pudo guardar");
 }
+
+
+/**
+ * Does a transfer payment require its proof (reference or screenshot)? Off by
+ * default — requiring evidence is the shop's decision, not the code's.
+ */
+export async function comprobanteObligatorio(): Promise<boolean> {
+  const { userId } = await auth();
+  if (!userId) return false;
+  const insforge = await createInsForgeServerClient();
+  const { data } = await insforge.database
+    .from("config_negocio")
+    .select("comprobante_obligatorio")
+    .eq("id", 1)
+    .maybeSingle();
+  return (data as { comprobante_obligatorio: boolean } | null)?.comprobante_obligatorio ?? false;
+}
+
+/** Flip the transfer-proof requirement. Admin only; applies to everyone. */
+export async function setComprobanteObligatorio(valor: boolean): Promise<void> {
+  const { userId } = await auth();
+  if (!userId) throw new Error("No autenticado");
+  const profile = await getProfile(userId);
+  if (profile?.role !== "admin") throw new Error("Solo administradores");
+  const insforge = await createInsForgeServerClient();
+  const { error } = await insforge.database
+    .from("config_negocio")
+    .update({ comprobante_obligatorio: valor })
+    .eq("id", 1);
+  if (error) throw new Error(error.message ?? "No se pudo guardar");
+}

@@ -332,6 +332,7 @@ export function SalesScreen({
   precioBase,
   fiadoExigeCliente,
   clickAbreDetalle,
+  comprobanteObligatorio = false,
 }: {
   /** First page of the catalog, rendered before any search runs. */
   products: SalesProduct[];
@@ -349,6 +350,8 @@ export function SalesScreen({
   fiadoExigeCliente: boolean;
   /** Admin's shop-wide POS behavior: click opens detail instead of adding. */
   clickAbreDetalle: boolean;
+  /** Shop rule: a transfer needs its proof before the charge completes. */
+  comprobanteObligatorio?: boolean;
 }) {
   const router = useRouter();
   const mostrador = useMemo(
@@ -887,6 +890,7 @@ export function SalesScreen({
         onClose={() => setPaymentOpen(false)}
         total={total}
         pending={pending}
+        comprobanteObligatorio={comprobanteObligatorio}
         saldoDisponible={saldo}
         onConfirm={(metodo, pagos, comprobante) => submit(metodo, pagos, comprobante)}
       />
