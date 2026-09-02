@@ -22,6 +22,11 @@ import {
 // raced with itself and produced one quote per call.
 
 const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY! });
+
+// One agent, two shops. The product RULES differ — screens have qualities and
+// frames; auto parts have vehicles, years and sides — but security, quoting
+// and WhatsApp manners are shared.
+const ES_AUTOPARTES = MARCA.id === "ruli";
 const MODEL =
   process.env.OPENAI_AGENT_MODEL ??
   process.env.OPENAI_CHAT_MODEL ??
@@ -64,6 +69,17 @@ async function modelosCompatibles(modelo: string): Promise<string[]> {
   }
 }
 
+const REGLAS_CELULARES = `- Si el cliente pregunta EN GENERAL (una marca o tipo SIN modelo, p. ej. "¿manejas pantallas de Xiaomi?"), o si la herramienta responde "demasiados", NO listes productos: confirma corto que SÍ y pregunta el MODELO. Ej: "¡Sí! ¿Qué modelo de Xiaomi buscas?".
+- Solo da disponibilidad detallada cuando el cliente dé un MODELO concreto (pocas coincidencias). NUNCA mandes listas largas.
+- Si aún no lo encuentras, usa buscar_compatibilidad: muchas pantallas sirven para VARIOS modelos. Si hay una pantalla compatible disponible, ofrécela y explica la compatibilidad.
+- EL MODELO EXACTO IMPORTA: "12", "12 Mini", "12 Pro" y "12 Pro Max" son productos DISTINTOS con precios distintos. PROHIBIDO dar el precio de una variante como si fuera otra. Cada precio va amarrado al nombre del producto tal como viene en "nombre".`;
+
+const REGLAS_AUTOPARTES = `- EL VEHÍCULO ES EL MODELO: una refacción se identifica por pieza + vehículo + AÑO ("amortiguador delantero de Tsuru 95"). Si el cliente da la pieza SIN vehículo o sin año y hay varias coincidencias, pregunta marca, modelo y año del carro ANTES de dar precios. Ej: "¡Sí manejamos! ¿Para qué carro y de qué año?".
+- Los resultados traen "compatible_con": los vehículos y años a los que aplica cada pieza según NUESTRO catálogo. Esa lista es LA ÚNICA fuente de compatibilidad: puedes citarla ("le queda al Tsuru 1988-1991 y al Hikari"), pero PROHIBIDO afirmar que una pieza le queda a un vehículo que no aparezca ahí. Si el año del cliente no cae en el rango, dilo y ofrece verificar con un asesor.
+- Abreviaturas comunes en nombres: DEL. = delantero · TRAS. = trasero · DER. = derecho · IZQ. = izquierda · SUSP. = suspensión · JGO = juego (par/kit completo). Al hablarle al cliente, dilas completas.
+- Muchas piezas van por LADO (derecha/izquierda) o por POSICIÓN (delantera/trasera). Si el cliente no lo dijo y las coincidencias difieren en eso, pregúntale cuál necesita.
+- "demasiados" resultados = falta el vehículo o el año: pregúntalos, no listes.`;
+
 const SYSTEM = `Eres el asistente de WhatsApp de ${MARCA.nombre}.
 Atiendes a clientes que preguntan por PRECIO y DISPONIBILIDAD de productos, y por datos del negocio (envíos, pagos, ubicación, etc.).
 
@@ -78,17 +94,14 @@ Reglas de productos:
 - Usa la herramienta buscar_producto (por nombre o SKU) para precio y disponibilidad.
 - Para cualquier pregunta que mencione una refacción, marca o modelo, primero consulta buscar_producto. No respondas ni describas opciones de producto sin el resultado de esa herramienta.
 - Usa términos concisos como los dijo el cliente. NO agregues marcas que no mencionó.
-- Si el cliente pregunta EN GENERAL (una marca o tipo SIN modelo, p. ej. "¿manejas pantallas de Xiaomi?"), o si la herramienta responde "demasiados", NO listes productos: confirma corto que SÍ y pregunta el MODELO. Ej: "¡Sí! ¿Qué modelo de Xiaomi buscas?".
-- Solo da disponibilidad detallada cuando el cliente dé un MODELO concreto (pocas coincidencias). NUNCA mandes listas largas.
 - Si no hay resultados, intenta de nuevo con menos palabras antes de decir que no hay.
-- Si aún no lo encuentras, usa buscar_compatibilidad: muchas pantallas sirven para VARIOS modelos. Si hay una pantalla compatible disponible, ofrécela y explica la compatibilidad (ej: "La pantalla del Oppo A79 es la misma que la del Realme 11 5G, y esa sí la tenemos disponible").
 - NUNCA digas cantidades ni números de stock. Solo "Disponible" o "Agotado" (campo "disponible").
 - Da el precio en pesos de las versiones que SÍ tengan precio. Nunca inventes un precio.
-- EL MODELO EXACTO IMPORTA: "12", "12 Mini", "12 Pro" y "12 Pro Max" son productos DISTINTOS con precios distintos. PROHIBIDO dar el precio de una variante como si fuera otra (el error clásico: decir que la del 12 cuesta lo que la del 12 Mini). Cada precio que des va amarrado al nombre del producto tal como viene en "nombre": di "la del 12 Mini incell está en $540", no "la del iPhone 12 está en $540".
-- Si la versión EXACTA que pidió está agotada (disponible: false), DILO con la frase "la tengo agotada" ("la incell del 12 la tengo agotada") y ofrece las variantes que SÍ hay con su nombre completo y su precio. NUNCA sustituyas en silencio el precio de otra variante.
+- Si la versión EXACTA que pidió está agotada (disponible: false), DILO con la frase "la tengo agotada" y ofrece las variantes que SÍ hay con su nombre completo y su precio. NUNCA sustituyas en silencio el precio de otra variante.
 - Si una versión tiene precio 0 (no cargado): di que también la tenemos, pero que ESE precio te lo confirma un asesor. NO escales por esto solo.
-- MEZCLA (muy común): entre las coincidencias, unas traen precio y otras 0. Da primero el/los precios que SÍ tienes y menciona que la otra versión (p. ej. con marco, u otro modelo cercano) también la hay con el precio por confirmar; luego pregunta cuál quiere. Ej: "La Honor X7 sin marco la tenemos en $190. También la hay con marco, pero ese precio te lo confirma un asesor. ¿Cuál te interesa?".
+- MEZCLA (muy común): entre las coincidencias, unas traen precio y otras 0. Da primero el/los precios que SÍ tienes y menciona que la otra versión también la hay con el precio por confirmar; luego pregunta cuál quiere.
 - Si el cliente elige/pide la versión cuyo precio está en 0 (por confirmar), ENTONCES sí usa pasar_a_asesor. Antes no.
+{REGLAS_GIRO}
 
 Abreviaturas en los nombres de productos:
 - "C/M" = con marco · "S/M" = sin marco.
@@ -96,7 +109,7 @@ Abreviaturas en los nombres de productos:
 - Al mostrar un producto con "C/M" dilo como "con marco" (y "S/M" como "sin marco").
 - Si de un modelo existe la versión "C/M" y otra SIN marcar (sin C/M ni S/M en el nombre), la no marcada es la de SIN marco. El precio que ya citaste también te dice cuál es cuál.
 
-Calidades de pantalla (distinto del marco):
+{CALIDADES}Calidades de pantalla (distinto del marco):
 - Manejamos estas calidades: Original (ORG), OLED, Incell, AAA (genérica/económica) y JK (marca genérica). Cada resultado trae su calidad en el campo "calidad".
 - Entiende al cliente: "original/orig/oem"→Original; "oled/amoled"→OLED; "incell"→Incell; "aaa/genérica/económica/barata"→AAA; "jk"→JK.
 - Si pidió una calidad que NO existe o no está disponible para su modelo: PROHIBIDO responder solo "no está disponible". En la MISMA respuesta ofrece la(s) calidad(es) de ese modelo que SÍ están disponibles, con su nombre y precio. Ej: "No tengo iPhone 12 incell, pero tengo JK en $330." Decir que no hay sin ofrecer lo que sí hay = respuesta INCOMPLETA. NUNCA presentes una calidad como si fuera la que pidió.
@@ -151,9 +164,17 @@ export async function responderMensaje(
   cliente: ClienteDetectado | null = null,
 ): Promise<RespuestaAgente> {
   const info = await getNegocioInfo();
+  // The frame is shared; the product rules are the shop's. Auto parts drop the
+  // screen-quality and frame blocks entirely — noise that invites the model to
+  // ask a Tsuru owner which "calidad de pantalla" they want.
+  const base = SYSTEM.replace("{REGLAS_GIRO}", ES_AUTOPARTES ? REGLAS_AUTOPARTES : REGLAS_CELULARES);
+  const sistemaMarca = ES_AUTOPARTES
+    ? base
+        .replace(/Abreviaturas en los nombres de productos:[\s\S]*?\{CALIDADES\}Calidades de pantalla \(distinto del marco\):[\s\S]*?no preguntes\.\n/, "")
+    : base.replace("{CALIDADES}", "");
   let system = info
-    ? `${SYSTEM}\n\n=== Información del negocio ===\n${info}`
-    : `${SYSTEM}\n\n(No hay información del negocio configurada; para envíos/pagos/ubicación di que un asesor lo confirma.)`;
+    ? `${sistemaMarca}\n\n=== Información del negocio ===\n${info}`
+    : `${sistemaMarca}\n\n(No hay información del negocio configurada; para envíos/pagos/ubicación di que un asesor lo confirma.)`;
 
   // Registered customer: greet by name and quote THEIR price. The discounted
   // price arrives precomputed in buscar_producto (precio_cliente_mxn) and the
@@ -181,10 +202,10 @@ Este número no está en el registro de clientes.
   // todas") — the latter refers to a product from earlier turns whose tool
   // results are NOT in the text-only history, so the model must re-search
   // before it can answer with real prices.
-  const requiereBusquedaDeProducto =
-    /\b(display|pantalla|bateria|batería|cargador|mica|flex|camara|cámara|moto|motorola|iphone|samsung|xiaomi|redmi|huawei|honor|oppo|realme|zte|precios?|cu[aá]nto|cuestan?|valen?|vale)\b/i.test(
-      ultimoMensaje,
-    );
+  const requiereBusquedaDeProducto = (ES_AUTOPARTES
+    ? /\b(amortiguador|balata|suspensi[oó]n|ret[eé]n|buje|terminal|horquilla|clutch|bomba|birlo|maza|soporte|banda|radiador|cremallera|rodamiento|junta|tornillo|estabilizador|cubre ?polvo|mango|base|tsuru|jetta|aveo|versa|sentra|spark|march|vento|golf|pointer|chevy|nissan|volkswagen|chevrolet|toyota|honda|ford|renault|kia|hyundai|mazda|precios?|cu[aá]nto|cuestan?|valen?|vale)\b/i
+    : /\b(display|pantalla|bateria|batería|cargador|mica|flex|camara|cámara|moto|motorola|iphone|samsung|xiaomi|redmi|huawei|honor|oppo|realme|zte|precios?|cu[aá]nto|cuestan?|valen?|vale)\b/i
+  ).test(ultimoMensaje);
   // A goodbye triggers no tool on its own, so the model answers from the
   // text-only history — where the folio and link don't exist. A customer who
   // says "gracias" would walk away never knowing where their quote lives.
@@ -256,8 +277,28 @@ Este número no está en el registro de clientes.
             return {
               demasiados: true,
               total: rows.length,
-              nota: "Demasiadas coincidencias. NO listes productos: pregunta al cliente el modelo específico.",
+              nota: ES_AUTOPARTES
+                ? "Demasiadas coincidencias. NO listes productos: pregunta marca, modelo y AÑO del vehículo."
+                : "Demasiadas coincidencias. NO listes productos: pregunta al cliente el modelo específico.",
             };
+          }
+          // Auto parts: fitment travels with each result. Our tags are the ONLY
+          // compatibility truth the model may state.
+          let tagsPorSku = new Map<string, string[]>();
+          if (ES_AUTOPARTES && rows.length > 0) {
+            const { data: tagData } = await insforgeAdmin.database
+              .from("products")
+              .select("sku, product_tags(tags(nombre))")
+              .in("sku", rows.map((r) => r.sku));
+            tagsPorSku = new Map(
+              ((tagData ?? []) as unknown as {
+                sku: string;
+                product_tags: { tags: { nombre: string } | null }[];
+              }[]).map((p) => [
+                p.sku,
+                p.product_tags.map((t) => t.tags?.nombre).filter((n): n is string => !!n).slice(0, 6),
+              ]),
+            );
           }
           const pct = cliente?.descuento_pct ?? 0;
           const items = rows.map((r) => ({
@@ -267,7 +308,9 @@ Este número no está en el registro de clientes.
             marca: r.marca,
             color: r.color,
             talla: r.talla,
-            calidad: calidadDe(r.nombre) ?? calidadDe(r.sku),
+            ...(ES_AUTOPARTES
+              ? { compatible_con: tagsPorSku.get(r.sku) ?? [] }
+              : { calidad: calidadDe(r.nombre) ?? calidadDe(r.sku) }),
             precio_mxn: r.precio_mxn,
             // Registered-customer price, precomputed (same rounding as the
             // quote RPC) so the model never does money math.
@@ -515,6 +558,9 @@ Este número no está en el registro de clientes.
           };
         },
       }),
+      ...(ES_AUTOPARTES
+        ? {}
+        : {
       buscar_compatibilidad: tool({
         description:
           "Úsala SOLO cuando buscar_producto no encontró el modelo exacto. Busca en internet con qué otros modelos comparte pantalla y revisa cuáles de esos tenemos en inventario.",
@@ -550,6 +596,7 @@ Este número no está en el registro de clientes.
           return { modelo, modelos_compatibles: compatibles, encontrados };
         },
       }),
+        }),
     },
   });
 
