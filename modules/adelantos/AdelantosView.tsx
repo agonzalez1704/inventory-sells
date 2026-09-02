@@ -23,6 +23,8 @@ import { useConfirm } from "@/components/ui/use-confirm";
 import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
+import { guardarComprobanteAdelanto } from "@/modules/sales/comprobantes";
+import { AdjuntarImagen } from "@/components/ui/adjuntar-imagen";
 import {
   crearAdelanto,
   abonarAdelanto,
@@ -244,6 +246,8 @@ function AbonarModal({
   const router = useRouter();
   const [monto, setMonto] = useState("");
   const [metodo, setMetodo] = useState<PaymentMethod>("efectivo");
+  const [referencia, setReferencia] = useState("");
+  const [foto, setFoto] = useState<File | null>(null);
   const [pending, start] = useTransition();
 
   function save() {
@@ -253,6 +257,15 @@ function AbonarModal({
     start(async () => {
       try {
         await abonarAdelanto(a.id, pesos, metodo);
+        if (metodo === "transferencia" && (referencia.trim() || foto)) {
+          let form: FormData | undefined;
+          if (foto) {
+            form = new FormData();
+            form.append("file", foto);
+          }
+          const rc = await guardarComprobanteAdelanto(a.id, referencia.trim() || null, form);
+          if (!rc.ok) toast.error(`Abono ok, pero el comprobante no se guardó: ${rc.error}`);
+        }
         toast.success(`Abono registrado · ${formatMXN(Math.round(pesos * 100))}`);
         onClose();
         router.refresh();
@@ -298,6 +311,19 @@ function AbonarModal({
         >
           Abonar el resto ({formatMXN(resta)})
         </button>
+        {metodo === "transferencia" && (
+          <div className="space-y-2 rounded-xl border border-border p-3">
+            <p className="text-xs font-medium text-muted-foreground">
+              Comprobante de la transferencia (opcional)
+            </p>
+            <Input
+              value={referencia}
+              onChange={(e) => setReferencia(e.target.value)}
+              placeholder="Referencia / clave de rastreo"
+            />
+            <AdjuntarImagen value={foto} onChange={setFoto} />
+          </div>
+        )}
         <div className="flex justify-end gap-2 border-t border-border pt-3">
           <Button variant="ghost" onClick={onClose} disabled={pending}>
             Cancelar
@@ -326,6 +352,8 @@ function CrearModal({
   const [cliente, setCliente] = useState("");
   const [abono, setAbono] = useState("");
   const [metodo, setMetodo] = useState<PaymentMethod>("efectivo");
+  const [refPago, setRefPago] = useState("");
+  const [fotoPago, setFotoPago] = useState<File | null>(null);
   const [pending, start] = useTransition();
 
   // Searched in the database — the whole catalog used to be loaded just to
@@ -375,7 +403,7 @@ function CrearModal({
     if (!valido) return toast.error("Revisa producto, precio y abono");
     start(async () => {
       try {
-        await crearAdelanto({
+        const { id } = await crearAdelanto({
           tipo,
           productId: prod?.id ?? null,
           descripcion: prod ? null : descripcion,
@@ -385,6 +413,15 @@ function CrearModal({
           abono: abonoNum,
           abonoMetodo: metodo,
         });
+        if (abonoNum > 0 && metodo === "transferencia" && (refPago.trim() || fotoPago)) {
+          let form: FormData | undefined;
+          if (fotoPago) {
+            form = new FormData();
+            form.append("file", fotoPago);
+          }
+          const rc = await guardarComprobanteAdelanto(id, refPago.trim() || null, form);
+          if (!rc.ok) toast.error(`Adelanto ok, pero el comprobante no se guardó: ${rc.error}`);
+        }
         toast.success("Adelanto creado");
         onClose();
         router.refresh();
@@ -534,6 +571,20 @@ function CrearModal({
             </Select>
           </div>
         </div>
+
+        {Number(abono.replace(",", ".")) > 0 && metodo === "transferencia" && (
+          <div className="space-y-2 rounded-xl border border-border p-3">
+            <p className="text-xs font-medium text-muted-foreground">
+              Comprobante de la transferencia (opcional)
+            </p>
+            <Input
+              value={refPago}
+              onChange={(e) => setRefPago(e.target.value)}
+              placeholder="Referencia / clave de rastreo"
+            />
+            <AdjuntarImagen value={fotoPago} onChange={setFotoPago} />
+          </div>
+        )}
 
         <div className="flex justify-end gap-2 border-t border-border pt-3">
           <Button variant="ghost" onClick={onClose} disabled={pending}>
