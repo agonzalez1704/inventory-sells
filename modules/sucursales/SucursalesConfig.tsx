@@ -22,6 +22,42 @@ export function SucursalesConfig({ sucursales }: { sucursales: Sucursal[] }) {
   const [radio, setRadio] = useState("300");
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [leyendo, setLeyendo] = useState(false);
+  const [remoto, setRemoto] = useState("");
+
+  // Registering without standing there: paste "lat, lng" or a full Google Maps
+  // URL. Precedence mirrors how exact each form is: the dropped pin
+  // (!3d…!4d…), then the q= search target, then the @viewport center, then a
+  // bare decimal pair. Short share links (maps.app.goo.gl) carry no
+  // coordinates — the hint says to open them first.
+  function parseCoords(texto: string): { lat: number; lng: number } | null {
+    const t = texto.trim();
+    if (!t) return null;
+    const patrones = [
+      /!3d(-?\d{1,2}\.\d+)!4d(-?\d{1,3}\.\d+)/,
+      /[?&]q=(-?\d{1,2}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)/,
+      /@(-?\d{1,2}\.\d+),(-?\d{1,3}\.\d+)/,
+      /(-?\d{1,2}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)/,
+    ];
+    for (const re of patrones) {
+      const m = t.match(re);
+      if (!m) continue;
+      const lat = Number(m[1]);
+      const lng = Number(m[2]);
+      if (Math.abs(lat) <= 90 && Math.abs(lng) <= 180) return { lat, lng };
+    }
+    return null;
+  }
+
+  function onRemoto(v: string) {
+    setRemoto(v);
+    const c = parseCoords(v);
+    if (c) {
+      setCoords(c);
+      toast.success(`Coordenadas capturadas: ${c.lat.toFixed(5)}, ${c.lng.toFixed(5)}`);
+    } else if (v.trim() && /goo\.gl|maps\.app/.test(v)) {
+      toast.error("Ese link corto no trae coordenadas: ábrelo en el navegador y copia la URL completa");
+    }
+  }
 
   function ubicarme() {
     if (!navigator.geolocation) return toast.error("Este navegador no da ubicación");
@@ -41,7 +77,7 @@ export function SucursalesConfig({ sucursales }: { sucursales: Sucursal[] }) {
   }
 
   function crear() {
-    if (!coords) return toast.error("Captura la ubicación parado en la sucursal");
+    if (!coords) return toast.error("Falta la ubicación: usa el botón o pega un link de Maps");
     start(async () => {
       try {
         unwrap(
@@ -131,9 +167,21 @@ export function SucursalesConfig({ sucursales }: { sucursales: Sucursal[] }) {
           Agregar
         </Button>
       </div>
+      <label className="mt-3 block">
+        <span className="mb-1 block text-xs font-medium text-muted-foreground">
+          Sin estar ahí: pega un link de Google Maps o coordenadas
+        </span>
+        <Input
+          value={remoto}
+          onChange={(e) => onRemoto(e.target.value)}
+          placeholder="https://www.google.com/maps/place/… o 21.12184, -101.68213"
+        />
+      </label>
       <p className="mt-2 text-[11px] text-muted-foreground">
-        Captúrala parado en el mostrador de la sucursal — las coordenadas se
-        toman de este dispositivo.
+        Parado en el mostrador usa &quot;Usar mi ubicación&quot;. A distancia:
+        busca la sucursal en Google Maps, ponle el pin y copia la URL del
+        navegador (un link corto compartido no trae coordenadas — ábrelo
+        primero).
       </p>
     </Card>
   );
