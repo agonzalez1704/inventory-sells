@@ -246,3 +246,50 @@ export async function refrescarTokenAliExpress(): Promise<
   if (errGuardar) return { resultado: "error", detalle: errGuardar };
   return { resultado: "refrescado" };
 }
+
+/**
+ * Probe whether AliExpress has authorized the DS endpoints for this app:
+ * call ds.product.get with a throwaway id and hand back the gateway's error
+ * code. Only useful as a diagnostic — the code IS the answer.
+ */
+export async function estadoEndpointsDS(): Promise<Record<string, unknown>> {
+  const appKey = process.env.ALIEXPRESS_APP_KEY;
+  const appSecret = process.env.ALIEXPRESS_APP_SECRET;
+  if (!appKey || !appSecret) return { estado: "app no configurada" };
+  const session = await (async () => {
+    const { data } = await insforgeAdmin.database
+      .from("config_negocio")
+      .select("aliexpress_token")
+      .eq("id", 1)
+      .maybeSingle();
+    return (data as { aliexpress_token: string | null } | null)?.aliexpress_token;
+  })();
+  if (!session) return { estado: "sin token — Conectar AliExpress" };
+
+  const params: Record<string, string> = {
+    method: "aliexpress.ds.product.get",
+    app_key: appKey,
+    session,
+    timestamp: String(Date.now()),
+    sign_method: "sha256",
+    product_id: "1005005953000000",
+    ship_to_country: "MX",
+    target_currency: "MXN",
+    target_language: "es",
+  };
+  params.sign = firmar(params, appSecret);
+  const res = await fetch("https://api-sg.aliexpress.com/sync", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
+    body: new URLSearchParams(params),
+    signal: AbortSignal.timeout(15_000),
+  });
+  const body = (await res.json().catch(() => null)) as Record<string, unknown> | null;
+  const err = (body?.error_response ?? body) as Record<string, unknown> | null;
+  return {
+    http: res.status,
+    code: err?.code ?? null,
+    msg: err?.msg ?? err?.message ?? null,
+    respondio_producto: !!body?.aliexpress_ds_product_get_response,
+  };
+}
