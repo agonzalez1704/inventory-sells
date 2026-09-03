@@ -4,6 +4,7 @@ import Link from "next/link";
 import { CheckCircle2, Clock, Store, ArrowLeftRight, XCircle, Landmark } from "lucide-react";
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { getConektaOrder } from "@/lib/conekta";
+import { ComprobanteOrden } from "@/modules/tienda/ComprobanteOrden";
 import { formatMXN } from "@/lib/money";
 import { getTiendaInfo } from "@/modules/config/lib";
 import { VOUCHER_HORAS_UI } from "@/modules/tienda/pago-const";
@@ -174,10 +175,10 @@ export default async function OrdenPage({
               </p>
             )}
             <p className="mt-3 text-xs leading-relaxed text-tienda-800 dark:text-tienda-300">
-              Monto exacto: <strong>{formatMXN(o.total_cents)}</strong>. Manda tu
-              comprobante por WhatsApp y apartamos tu pedido; lo preparamos en
-              cuanto confirmemos el depósito. Referencia: <strong>{o.folio}</strong>.
+              Monto exacto: <strong>{formatMXN(o.total_cents)}</strong> ·
+              Referencia: <strong>{o.folio}</strong>. Tu pieza ya está apartada.
             </p>
+            <ComprobanteOrden ordenId={o.id} />
           </div>
         )}
 

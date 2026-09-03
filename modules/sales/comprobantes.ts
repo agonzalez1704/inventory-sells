@@ -79,7 +79,7 @@ export type Comprobante = {
   created_at: string;
 };
 
-async function listar(campo: "sale_id" | "adelanto_id", id: string): Promise<Comprobante[]> {
+async function listar(campo: "sale_id" | "adelanto_id" | "orden_id", id: string): Promise<Comprobante[]> {
   await assertPermiso("pos_vender");
   const { data } = await insforgeAdmin.database
     .from("comprobantes_pago")
@@ -110,4 +110,9 @@ export async function comprobantesDeVenta(saleId: string): Promise<Comprobante[]
 /** An adelanto's proofs. */
 export async function comprobantesDeAdelanto(adelantoId: string): Promise<Comprobante[]> {
   return listar("adelanto_id", adelantoId);
+}
+
+/** A pending web order's proofs — what the admin checks before confirming. */
+export async function comprobantesDeOrden(ordenId: string): Promise<Comprobante[]> {
+  return listar("orden_id", ordenId);
 }

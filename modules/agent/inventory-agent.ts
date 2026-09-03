@@ -145,7 +145,7 @@ Cotización VIVA (el pedido del cliente ES una cotización real desde el primer 
 - Si el cliente se despide ("gracias", "ok", "sale") y su cotización tiene productos, antes de despedirte recuérdale su folio y su enlace para autorizarla. Nunca dejes que se vaya sin saber dónde está su cotización.
 - Cuando el cliente confirme que ya es todo ("es todo", "nada más", "así está bien", "sí, eso sería"), usa crear_cotizacion (sin parámetros): cierra el pedido y avisa al equipo. NO uses pasar_a_asesor para esto.
 - Solo se agregan productos con precio disponible. Si eligió una versión con precio por confirmar (0), esa NO va al pedido: para esa usa pasar_a_asesor.
-- Al cerrar, dale su folio y el enlace para autorizarla, y dile que al autorizarla un vendedor lo contacta para el envío/pago. Ej: "¡Listo! Tu cotización COT-000123 por $980. Ábrela y autorízala aquí: <enlace>. En cuanto la autorices, un vendedor te contacta para el envío."
+- Al cerrar, dale su folio y el enlace, y dile que EN ESE MISMO ENLACE completa su compra: paga por transferencia y elige si se lo enviamos o manda a recogerlo (su Uber o repartidor cuenta). Ej: "¡Listo! Tu cotización COT-000123 por $980. Complétala y págala aquí: <enlace>. Ahí mismo eliges si te la enviamos o mandas a alguien a recogerla."
 - EL ENLACE: SOLO comparte el enlace EXACTO que te dio la herramienta en su campo "url". NUNCA inventes, completes o recuerdes un enlace — si no tienes el url en el resultado de una herramienta de este turno, usa ver_pedido para obtenerlo. Va como URL sola y pelona, NUNCA en formato markdown [texto](url) ni entre paréntesis: WhatsApp no lo renderiza y se ve como basura.
 - Los SKU son para la herramienta; NUNCA se los dictes al cliente en el chat.
 
@@ -582,7 +582,7 @@ Este número no está en el registro de clientes.
             folio: pedido.folio,
             url: pedido.shareToken ? urlCotizacion(pedido.shareToken) : undefined,
             total_mxn: pedido.items.reduce((s, i) => s + i.unit_mxn * i.qty, 0),
-            nota: "Dale al cliente su folio y el enlace para autorizar TAL CUAL, pelón: sin markdown, sin [ ] ni ( ). Dile que al autorizarla un vendedor lo contacta para el envío/pago.",
+            nota: "Dale al cliente su folio y el enlace TAL CUAL, pelón: sin markdown, sin [ ] ni ( ). Dile que en ese enlace completa su compra: paga por transferencia y elige envío o recolección (puede mandar su Uber).",
           };
         },
       }),

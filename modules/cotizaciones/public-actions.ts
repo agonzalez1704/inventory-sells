@@ -108,3 +108,59 @@ export async function aceptarCotizacionPublica(token: string): Promise<ActionRes
     return null;
   });
 }
+
+// --- Pago desde la cotización -----------------------------------------------
+
+export type DatosEntrega = {
+  nombre: string;
+  email: string;
+  telefono: string;
+  tipoEntrega: "recoger" | "envio";
+  cp?: string;
+  estado?: string;
+  municipio?: string;
+  direccion?: string;
+  referencias?: string;
+  envio?: { totalCents: number; proveedor: string; servicio: string; dias: number | null } | null;
+};
+
+/**
+ * The quote becomes a payable web order — same reservation rules as the
+ * storefront, but at the QUOTED prices (the deal the agent made, discount
+ * included). Public: the share token is the capability. Idempotent per quote.
+ */
+export async function pagarCotizacion(
+  token: string,
+  datos: DatosEntrega,
+): Promise<ActionResult<{ ordenId: string; folio: string }>> {
+  return attempt("pagarCotizacion", async () => {
+    const recoger = datos.tipoEntrega === "recoger";
+    if (!recoger && !datos.envio) throw new Error("Falta elegir la paquetería");
+    const { data, error } = await insforgeAdmin.database.rpc("crear_orden_desde_cotizacion", {
+      p_token: token,
+      p_nombre: datos.nombre,
+      p_email: datos.email,
+      p_telefono: datos.telefono,
+      p_cp: recoger ? null : datos.cp ?? null,
+      p_estado: recoger ? null : datos.estado ?? null,
+      p_municipio: recoger ? null : datos.municipio ?? null,
+      p_direccion: recoger ? null : datos.direccion ?? null,
+      p_referencias: datos.referencias ?? null,
+      p_envio_cents: recoger ? 0 : datos.envio!.totalCents,
+      p_envio_desc: recoger
+        ? "Recoger en tienda"
+        : `${datos.envio!.proveedor} · ${datos.envio!.servicio}${datos.envio!.dias ? ` · ${datos.envio!.dias} día(s)` : ""}`,
+      p_tipo_entrega: datos.tipoEntrega,
+    });
+    if (error) throw new Error(error.message ?? "No se pudo generar la orden");
+    const row = (Array.isArray(data) ? data[0] : data) as { orden_id: string; folio: string };
+    // The order is set to pay by transfer — the confirmation page carries the
+    // bank data, exactly like the storefront's transferencia path.
+    await insforgeAdmin.database
+      .from("ordenes_web")
+      .update({ metodo: "transferencia" })
+      .eq("id", row.orden_id)
+      .is("metodo", null);
+    return { ordenId: row.orden_id, folio: row.folio };
+  });
+}

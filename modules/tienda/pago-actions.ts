@@ -1,6 +1,9 @@
 "use server";
 
 import { headers } from "next/headers";
+import { after } from "next/server";
+import { notifyAdmins } from "@/lib/push";
+import { MARCA } from "@/lib/marca";
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { createConektaOrder, type ConektaMethod } from "@/lib/conekta";
 import { attempt, type ActionResult } from "@/lib/errors";
@@ -215,5 +218,62 @@ export async function crearOrdenTransferencia(
       .update({ metodo: "transferencia" })
       .eq("id", ordenId);
     return { ordenId, folio, totalCents };
+  });
+}
+
+/**
+ * The customer's own transfer proof, uploaded from the public order page. No
+ * session — the order id is the capability, and it only works while the order
+ * is a pending transfer. Admins get pinged: this is the moment somebody can
+ * confirm the deposit with one click instead of hunting for it.
+ */
+export async function subirComprobanteOrden(
+  ordenId: string,
+  referencia: string | null,
+  form?: FormData,
+): Promise<ActionResult<null>> {
+  return attempt("subirComprobanteOrden", async () => {
+    const { data } = await insforgeAdmin.database
+      .from("ordenes_web")
+      .select("id, folio, status, metodo")
+      .eq("id", ordenId)
+      .maybeSingle();
+    const o = data as { id: string; folio: string; status: string; metodo: string | null } | null;
+    if (!o || o.status !== "pendiente" || o.metodo !== "transferencia")
+      throw new Error("Esta orden no está esperando una transferencia");
+
+    const ref = referencia?.trim() || null;
+    const file = form?.get("file");
+    const conImagen = file instanceof File && file.size > 0;
+    if (!ref && !conImagen) throw new Error("Escribe la referencia o adjunta tu captura");
+
+    let key: string | null = null;
+    if (conImagen) {
+      if (file.size > 8 * 1024 * 1024) throw new Error("La imagen pesa más de 8 MB");
+      const ext = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" }[file.type];
+      if (!ext) throw new Error("Formato no válido (usa JPG o PNG)");
+      key = `orden-${ordenId}/${crypto.randomUUID()}.${ext}`;
+      const { data: up, error } = await insforgeAdmin.storage.from("comprobantes").upload(key, file);
+      if (error || !up) throw new Error(error?.message ?? "No se pudo subir la captura");
+      key = up.key;
+    }
+
+    const { error } = await insforgeAdmin.database.from("comprobantes_pago").insert([
+      { orden_id: ordenId, referencia: ref, imagen_key: key, created_by: "cliente-web" },
+    ]);
+    if (error) throw new Error(error.message ?? "No se pudo guardar");
+
+    // "venta" recipients are whoever cares about money landing — the right
+    // audience for a deposit waiting on a one-click confirmation.
+    after(() =>
+      notifyAdmins("venta", {
+        title: "Transferencia por confirmar",
+        body: `${o.folio}: el cliente envió su comprobante. Confírmala en Pedidos.`,
+        url: "/pedidos",
+        tag: `comprobante-${o.id}`,
+        icon: MARCA.icono,
+      }),
+    );
+    return null;
   });
 }

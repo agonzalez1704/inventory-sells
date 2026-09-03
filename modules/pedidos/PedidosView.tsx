@@ -20,6 +20,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
+import { comprobantesDeOrden, type Comprobante } from "@/modules/sales/comprobantes";
+import { useEffect } from "react";
 import { confirmarTransferencia, cancelarPedido, marcarDropshipPedido } from "./actions";
 
 export type ItemPedido = {
@@ -195,6 +197,8 @@ function PedidoRow({
         <BloqueDropship p={p} isAdmin={isAdmin} dirTienda={dirTienda} />
       )}
 
+      {pendiente && esTransferencia && <ComprobantesOrden ordenId={p.id} />}
+
       {isAdmin && pendiente && (
         <div className="mt-3 flex flex-wrap gap-2 border-t border-border pt-3">
           {esTransferencia && (
@@ -335,6 +339,48 @@ function BloqueDropship({
           </Button>
         </div>
       )}
+    </div>
+  );
+}
+
+/** The customer's uploaded transfer proof, right where the admin confirms it. */
+function ComprobantesOrden({ ordenId }: { ordenId: string }) {
+  const [rows, setRows] = useState<Comprobante[]>([]);
+  useEffect(() => {
+    let on = true;
+    comprobantesDeOrden(ordenId)
+      .then((r) => on && setRows(r))
+      .catch(() => {});
+    return () => {
+      on = false;
+    };
+  }, [ordenId]);
+  if (rows.length === 0) return null;
+  return (
+    <div className="mt-3 rounded-lg border border-green-300/60 bg-green-50 px-3 py-2 dark:border-green-800/60 dark:bg-green-950/30">
+      <p className="text-xs font-semibold text-green-800 dark:text-green-300">
+        El cliente ya envió su comprobante:
+      </p>
+      <ul className="mt-1 space-y-0.5">
+        {rows.map((c) => (
+          <li key={c.id} className="flex flex-wrap items-center gap-2 text-xs text-green-900 dark:text-green-200">
+            {c.referencia && <span className="font-mono">{c.referencia}</span>}
+            {c.imagen_url && (
+              <a
+                href={c.imagen_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium underline underline-offset-2"
+              >
+                Ver captura
+              </a>
+            )}
+            <span className="opacity-70">
+              {new Date(c.created_at).toLocaleString("es-MX", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+            </span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
