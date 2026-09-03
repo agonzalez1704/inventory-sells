@@ -1,5 +1,19 @@
+import { createHmac } from "node:crypto";
 import { NextResponse } from "next/server";
 import { insforgeAdmin } from "@/lib/insforge/admin";
+
+// AliExpress "rest" endpoints use the GOP signature: concatenate the API path
+// with every param as key+value in ascii key order, HMAC-SHA256 it with the
+// app secret, uppercase hex. The secret itself never travels.
+function firmar(path: string, params: Record<string, string>, secret: string): string {
+  const base =
+    path +
+    Object.keys(params)
+      .sort()
+      .map((k) => k + params[k])
+      .join("");
+  return createHmac("sha256", secret).update(base).digest("hex").toUpperCase();
+}
 
 // AliExpress OAuth callback — the URL registered on the app ("Fiable",
 // Drop Shipping category). AliExpress redirects here with ?code= after the
@@ -17,27 +31,32 @@ export async function GET(req: Request) {
   if (!appKey || !appSecret)
     return NextResponse.json({ error: "app no configurada" }, { status: 500 });
 
+  const params: Record<string, string> = {
+    app_key: appKey,
+    code,
+    sign_method: "sha256",
+    timestamp: String(Date.now()),
+  };
+  params.sign = firmar("/auth/token/create", params, appSecret);
+
   const res = await fetch("https://api-sg.aliexpress.com/rest/auth/token/create", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      app_key: appKey,
-      app_secret: appSecret,
-      code,
-      grant_type: "authorization_code",
-    }),
+    body: new URLSearchParams(params),
   });
   const data = (await res.json().catch(() => null)) as {
     access_token?: string;
     refresh_token?: string;
     expires_in?: number | string;
     error_msg?: string;
+    message?: string;
+    code?: string;
   } | null;
 
   if (!res.ok || !data?.access_token) {
     console.error("[aliexpress] token exchange falló:", res.status, data);
     return NextResponse.json(
-      { error: data?.error_msg ?? "no se pudo obtener el token" },
+      { error: data?.error_msg ?? data?.message ?? "no se pudo obtener el token" },
       { status: 502 },
     );
   }
