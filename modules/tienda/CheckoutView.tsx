@@ -16,6 +16,7 @@ import {
 import { foto } from "@/lib/foto";
 import { formatMXN } from "@/lib/money";
 import { cn } from "@/lib/utils";
+import { puntosRecoger } from "@/lib/tienda-info";
 import { useTiendaInfo } from "./TiendaInfoProvider";
 import { useRouter } from "next/navigation";
 import { tokenizarTarjeta, type DatosTarjeta } from "@/lib/conekta-client";
@@ -42,6 +43,7 @@ const ESTADOS = [
 
 export function CheckoutView() {
   const tienda = useTiendaInfo();
+  const puntos = puntosRecoger(tienda);
   const { items, setQty, ready, clear } = useCart();
   const [resumen, setResumen] = useState<Resumen | null>(null);
   const [cargando, setCargando] = useState(true);
@@ -329,7 +331,7 @@ export function CheckoutView() {
             {/* Pickup is only offered when there is somewhere to pick up from.
                 Without an address the customer chooses it, pays, and then the
                 confirmation has no counter to send them to. */}
-            <div className={cn("grid gap-2", tienda.direccion ? "grid-cols-2" : "grid-cols-1")}>
+            <div className={cn("grid gap-2", puntos.length > 0 ? "grid-cols-2" : "grid-cols-1")}>
               <EntregaTile
                 activo={!recoger}
                 onClick={() => setTipoEntrega("envio")}
@@ -337,7 +339,7 @@ export function CheckoutView() {
                 titulo="Envío a domicilio"
                 desc="Te lo mandamos por paquetería"
               />
-              {tienda.direccion && (
+              {puntos.length > 0 && (
                 <EntregaTile
                   activo={recoger}
                   onClick={() => setTipoEntrega("recoger")}
@@ -359,18 +361,32 @@ export function CheckoutView() {
 
           {recoger ? (
             <Card titulo="Recoger en tienda">
-              <div className="flex items-start gap-3 rounded-xl bg-tienda-50/60 dark:bg-tienda-950/40 p-3">
-                <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-tienda-600 dark:text-tienda-400" />
-                <div className="text-sm text-foreground">
-                  <p className="font-medium text-foreground">{tienda.direccion}</p>
-                  {tienda.horario && (
-                    <p className="mt-0.5 text-xs text-muted-foreground">{tienda.horario}</p>
-                  )}
-                  <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-                    Prepara tu pedido en cuanto se confirme el pago. Puedes venir tú
-                    o mandar un mensajero/Uber — solo dan tu folio al recoger.
-                  </p>
-                </div>
+              <div className="space-y-2">
+                {puntos.map((p) => (
+                  <div
+                    key={p.direccion}
+                    className="flex items-start gap-3 rounded-xl bg-tienda-50/60 dark:bg-tienda-950/40 p-3"
+                  >
+                    <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-tienda-600 dark:text-tienda-400" />
+                    <div className="text-sm text-foreground">
+                      {p.nombre && (
+                        <p className="text-xs font-semibold uppercase tracking-wide text-tienda-700 dark:text-tienda-300">
+                          {p.nombre}
+                        </p>
+                      )}
+                      <p className="font-medium text-foreground">{p.direccion}</p>
+                      {p.horario && (
+                        <p className="mt-0.5 text-xs text-muted-foreground">{p.horario}</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                <p className="px-1 text-xs leading-relaxed text-muted-foreground">
+                  Prepara tu pedido en cuanto se confirme el pago. Puedes venir tú
+                  o mandar un mensajero/Uber
+                  {puntos.length > 1 ? " a cualquiera de nuestras sucursales" : ""} —
+                  solo dan tu folio al recoger.
+                </p>
               </div>
             </Card>
           ) : (

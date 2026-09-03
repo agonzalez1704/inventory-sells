@@ -54,6 +54,19 @@ export function ConfigView({
   });
   const campo = (k: keyof typeof t) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setT((prev) => ({ ...prev, [k]: e.target.value }));
+  // Pickup branches: shown INSTEAD of the single address wherever a customer
+  // chooses "recoger". Rows without an address are dropped on save.
+  const [sucs, setSucs] = useState(
+    tienda.sucursales.map((s) => ({
+      nombre: s.nombre ?? "",
+      direccion: s.direccion,
+      horario: s.horario ?? "",
+    })),
+  );
+  const sucCampo =
+    (i: number, k: "nombre" | "direccion" | "horario") =>
+    (e: React.ChangeEvent<HTMLInputElement>) =>
+      setSucs((prev) => prev.map((s, j) => (j === i ? { ...s, [k]: e.target.value } : s)));
   const tiendaEnviada: TiendaInfo = {
     entregaDias: t.entregaDias,
     garantiaDias: t.garantiaDias === "" ? null : Number(t.garantiaDias),
@@ -61,9 +74,22 @@ export function ConfigView({
     direccion: t.direccion,
     ciudad: t.ciudad,
     horario: t.horario,
+    sucursales: sucs
+      .filter((s) => s.direccion.trim())
+      .map((s) => ({ nombre: s.nombre, direccion: s.direccion, horario: s.horario })),
     origen: { cp: t.cp, estado: t.estado, municipio: t.municipio, colonia: t.colonia },
   };
+  const sucsSucias =
+    JSON.stringify(sucs) !==
+    JSON.stringify(
+      tienda.sucursales.map((s) => ({
+        nombre: s.nombre ?? "",
+        direccion: s.direccion,
+        horario: s.horario ?? "",
+      })),
+    );
   const tiendaSucia =
+    sucsSucias ||
     JSON.stringify(t) !==
     JSON.stringify({
       entregaDias: tienda.entregaDias ?? "",
@@ -240,6 +266,44 @@ export function ConfigView({
           <Campo label="Días de garantía" value={t.garantiaDias} onChange={campo("garantiaDias")} placeholder="30" />
           <Campo label="Condición de la garantía" value={t.garantiaCondicion}
             onChange={campo("garantiaCondicion")} placeholder="devolviendo la pieza con sus sellos intactos" />
+        </fieldset>
+
+        <fieldset className="mt-5" disabled={!isAdmin || pending}>
+          <legend className="text-sm font-medium">Sucursales para recoger</legend>
+          <p className="mb-2 mt-1 text-xs text-muted-foreground">
+            Si llenas sucursales, la tienda muestra estas direcciones (todas) en
+            lugar de la de arriba cuando el cliente elige recoger. Una fila sin
+            dirección se descarta al guardar.
+          </p>
+          <div className="space-y-2">
+            {sucs.map((s, i) => (
+              <div key={i} className="grid gap-2 sm:grid-cols-[1fr_2fr_1fr_auto]">
+                <Campo label={i === 0 ? "Nombre" : ""} value={s.nombre}
+                  onChange={sucCampo(i, "nombre")} placeholder="Centro" />
+                <Campo label={i === 0 ? "Dirección" : ""} value={s.direccion}
+                  onChange={sucCampo(i, "direccion")}
+                  placeholder="5 de Mayo #216, Col. Centro, León, Gto." />
+                <Campo label={i === 0 ? "Horario" : ""} value={s.horario}
+                  onChange={sucCampo(i, "horario")} placeholder="Lun–Sáb · 10:00–19:00" />
+                <button
+                  type="button"
+                  onClick={() => setSucs((prev) => prev.filter((_, j) => j !== i))}
+                  className="cursor-pointer self-end pb-2 text-xs text-muted-foreground hover:text-destructive"
+                >
+                  Quitar
+                </button>
+              </div>
+            ))}
+          </div>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="mt-2"
+            onClick={() => setSucs((prev) => [...prev, { nombre: "", direccion: "", horario: "" }])}
+          >
+            Agregar sucursal
+          </Button>
         </fieldset>
 
         <fieldset className="mt-5" disabled={!isAdmin || pending}>

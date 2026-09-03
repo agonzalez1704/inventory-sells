@@ -14,6 +14,13 @@
 // average ticket (max ever: $1,680), giving away a ~$150 guía costs ~3x the
 // margin of a typical order. Shipping is quoted per destination instead.
 
+/** One place a customer (or their Uber) can pick an order up at. */
+export type PuntoRecoger = {
+  nombre: string | null;
+  direccion: string;
+  horario: string | null;
+};
+
 export type TiendaInfo = {
   entregaDias: string | null;
   garantiaDias: number | null;
@@ -21,6 +28,8 @@ export type TiendaInfo = {
   direccion: string | null;
   ciudad: string | null;
   horario: string | null;
+  /** Pickup branches. Empty = single-location shop (use direccion/horario). */
+  sucursales: PuntoRecoger[];
   /** Shipping origin. Without it the courier cannot quote. */
   origen: {
     cp: string;
@@ -37,6 +46,7 @@ export const TIENDA_VACIA: TiendaInfo = {
   direccion: null,
   ciudad: null,
   horario: null,
+  sucursales: [],
   origen: null,
 };
 
@@ -68,6 +78,16 @@ export function normalizarTienda(raw: unknown): TiendaInfo {
     direccion: texto(o.direccion),
     ciudad: texto(o.ciudad),
     horario: texto(o.horario),
+    // A branch without an address is not somewhere to send an Uber — drop it.
+    sucursales: (Array.isArray(o.sucursales) ? o.sucursales : [])
+      .map((s) => {
+        const b = (s ?? {}) as Record<string, unknown>;
+        const direccion = texto(b.direccion);
+        return direccion
+          ? { nombre: texto(b.nombre), direccion, horario: texto(b.horario) }
+          : null;
+      })
+      .filter((s): s is PuntoRecoger => s !== null),
     // All four or nothing: a partial origin produces a wrong quote rather than
     // no quote, and a wrong shipping price is charged to a real customer.
     origen: cp && estado && municipio && colonia ? { cp, estado, municipio, colonia } : null,
@@ -80,10 +100,21 @@ export function normalizarTienda(raw: unknown): TiendaInfo {
  * Derived rather than stored: it is the address again, and two fields that must
  * agree eventually stop agreeing.
  */
-export function mapsUrl(t: TiendaInfo): string | null {
-  if (!t.direccion) return null;
+export function mapsUrlDireccion(direccion: string): string {
   return (
     "https://www.google.com/maps/search/?api=1&query=" +
-    encodeURIComponent(t.direccion)
+    encodeURIComponent(direccion)
   );
+}
+
+/**
+ * Everywhere the customer picks up: the branch list when there is one, else
+ * the shop's single address — so a single-location shop keeps working with the
+ * fields it already filled in.
+ */
+export function puntosRecoger(t: TiendaInfo): PuntoRecoger[] {
+  if (t.sucursales.length > 0) return t.sucursales;
+  return t.direccion
+    ? [{ nombre: null, direccion: t.direccion, horario: t.horario }]
+    : [];
 }
