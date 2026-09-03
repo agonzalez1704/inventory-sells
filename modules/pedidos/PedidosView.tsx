@@ -46,7 +46,7 @@ export type PedidoWeb = {
   tipo_entrega: string;
   total_cents: number;
   created_at: string;
-  dropship_estado: "por_pedir" | "pedido" | null;
+  dropship_estado: "por_pedir" | "pidiendo" | "pedido" | null;
   dropship_ref: string | null;
   orden_web_items: ItemPedido[];
 };
@@ -287,6 +287,15 @@ function BloqueDropship({
 
   return (
     <div className="mt-3 space-y-2 rounded-xl border border-amber-300/60 bg-amber-50 p-3 dark:border-amber-700/50 dark:bg-amber-950/30">
+      {p.dropship_estado === "pidiendo" && (
+        // In-flight (or crashed mid-flight): the manual block stays visible as
+        // the escape hatch — the auto-purchase claim makes doubles impossible
+        // from our side, and a human is slower than the 30s call anyway.
+        <p className="text-xs text-muted-foreground">
+          Pidiendo a AliExpress automáticamente… si esto no cambia en un minuto,
+          pídelo a mano aquí abajo.
+        </p>
+      )}
       <p className="text-xs font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-300">
         Pedir al proveedor — con el dinero ya cobrado
       </p>

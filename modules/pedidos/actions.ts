@@ -1,8 +1,10 @@
 "use server";
 
 import { auth } from "@clerk/nextjs/server";
+import { after } from "next/server";
 import { getProfile } from "@/lib/auth/profile";
 import { insforgeAdmin } from "@/lib/insforge/admin";
+import { pedirDropshipAutomatico } from "@/lib/aliexpress";
 import { attempt, type ActionResult } from "@/lib/errors";
 
 async function requireAdmin(): Promise<void> {
@@ -38,6 +40,8 @@ export async function confirmarTransferencia(
       p_metodo: "transferencia",
     });
     if (error) throw new Error(error.message ?? "No se pudo confirmar el pago");
+    // Fire-and-forget: the supplier purchase must never fail the confirmation.
+    after(() => pedirDropshipAutomatico(ordenId));
     return { saleId: String(data) };
   });
 }
@@ -75,7 +79,7 @@ export async function marcarDropshipPedido(
         dropship_pedido_at: new Date().toISOString(),
       })
       .eq("id", ordenId)
-      .eq("dropship_estado", "por_pedir");
+      .in("dropship_estado", ["por_pedir", "pidiendo"]);
     if (error) throw new Error(error.message ?? "No se pudo marcar");
     return null;
   });

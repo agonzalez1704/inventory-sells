@@ -1,6 +1,8 @@
 import "server-only";
 import { createHmac } from "node:crypto";
 import { insforgeAdmin } from "@/lib/insforge/admin";
+import { notifyAdmins } from "@/lib/push";
+import { MARCA } from "@/lib/marca";
 
 // AliExpress product lookup for the dropship import: paste a listing URL, get
 // name, image and the supplier's price (our COST — the sale price is ours to
@@ -245,6 +247,163 @@ export async function refrescarTokenAliExpress(): Promise<
   const errGuardar = await guardarTokens(tokens!);
   if (errGuardar) return { resultado: "error", detalle: errGuardar };
   return { resultado: "refrescado" };
+}
+
+// ---------------------------------------------------------------------------
+// Automatic purchase: a paid order's dropship items get bought on AliExpress
+// with the customer's address, no human in the loop. This SPENDS MONEY, so:
+// atomic claim first (reclamar_dropship — webhook retries and double clicks
+// lose), and every failure path reverts to 'por_pedir' so the manual block in
+// /pedidos reappears and an admin gets pinged with the reason.
+
+type OrdenDrop = {
+  id: string;
+  folio: string;
+  nombre: string;
+  telefono: string;
+  cp: string | null;
+  estado: string | null;
+  municipio: string | null;
+  direccion: string | null;
+  referencias: string | null;
+};
+
+async function abortar(orden: OrdenDrop, razon: string): Promise<void> {
+  await insforgeAdmin.database
+    .from("ordenes_web")
+    .update({ dropship_estado: "por_pedir" })
+    .eq("id", orden.id)
+    .eq("dropship_estado", "pidiendo");
+  console.error("[aliexpress] compra automática falló:", orden.folio, razon);
+  await notifyAdmins("venta", {
+    title: "AliExpress: pídelo a mano",
+    body: `${orden.folio}: la compra automática falló (${razon}). El bloque manual sigue en Pedidos.`,
+    url: "/pedidos",
+    tag: `dropship-${orden.id}`,
+    icon: MARCA.icono,
+  }).catch(() => undefined);
+}
+
+/**
+ * Place the supplier order for a JUST-PAID web order. Call it fire-and-forget
+ * (inside after()) from every path that commits a payment — it claims the
+ * order atomically, so calling it twice or on a non-dropship order is a no-op.
+ */
+export async function pedirDropshipAutomatico(ordenId: string): Promise<void> {
+  const { data: gano } = await insforgeAdmin.database.rpc("reclamar_dropship", {
+    p_orden_id: ordenId,
+  });
+  if (!gano) return;
+
+  const { data } = await insforgeAdmin.database
+    .from("ordenes_web")
+    .select("id, folio, nombre, telefono, cp, estado, municipio, direccion, referencias")
+    .eq("id", ordenId)
+    .maybeSingle();
+  const orden = data as OrdenDrop | null;
+  if (!orden) return;
+
+  try {
+    const appKey = process.env.ALIEXPRESS_APP_KEY;
+    const appSecret = process.env.ALIEXPRESS_APP_SECRET;
+    if (!appKey || !appSecret) return abortar(orden, "app sin configurar");
+    const { data: tok } = await insforgeAdmin.database
+      .from("config_negocio")
+      .select("aliexpress_token")
+      .eq("id", 1)
+      .maybeSingle();
+    const session = (tok as { aliexpress_token: string | null } | null)?.aliexpress_token;
+    if (!session) return abortar(orden, "sin conexión AliExpress");
+
+    // A pickup+dropship mix has no customer address — nowhere to ship.
+    if (!orden.direccion || !orden.cp || !orden.municipio || !orden.estado)
+      return abortar(orden, "el pedido no trae dirección de envío");
+
+    const { data: itemsData } = await insforgeAdmin.database
+      .from("orden_web_items")
+      .select("qty, nombre, products(enlace_proveedor, inventories(es_dropship))")
+      .eq("orden_id", ordenId);
+    const items = ((itemsData ?? []) as unknown as {
+      qty: number;
+      nombre: string;
+      products: {
+        enlace_proveedor: string | null;
+        inventories: { es_dropship: boolean | null } | null;
+      } | null;
+    }[]).filter((i) => i.products?.inventories?.es_dropship);
+    if (items.length === 0) return abortar(orden, "sin items dropship");
+
+    const productItems = [];
+    for (const i of items) {
+      const pid = i.products?.enlace_proveedor ? idDeEnlace(i.products.enlace_proveedor) : null;
+      if (!pid) return abortar(orden, `"${i.nombre}" no tiene enlace de proveedor legible`);
+      productItems.push({ product_count: i.qty, product_id: Number(pid) });
+    }
+
+    const params: Record<string, string> = {
+      method: "aliexpress.ds.order.create",
+      app_key: appKey,
+      session,
+      timestamp: String(Date.now()),
+      sign_method: "sha256",
+      param_place_order_request4_open_api_d_t_o: JSON.stringify({
+        logistics_address: {
+          address: [orden.direccion, orden.referencias].filter(Boolean).join(", "),
+          city: orden.municipio,
+          province: orden.estado,
+          country: "MX",
+          full_name: orden.nombre,
+          contact_person: orden.nombre,
+          mobile_no: orden.telefono,
+          phone_country: "+52",
+          zip: orden.cp,
+          locale: "es_MX",
+        },
+        product_items: productItems,
+      }),
+    };
+    params.sign = firmar(params, appSecret);
+
+    const res = await fetch("https://api-sg.aliexpress.com/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
+      body: new URLSearchParams(params),
+      signal: AbortSignal.timeout(30_000),
+    });
+    const body = (await res.json().catch(() => null)) as Record<string, unknown> | null;
+    const result = (body?.aliexpress_ds_order_create_response as Record<string, unknown> | undefined)
+      ?.result as
+      | { is_success?: boolean; order_list?: { number?: (number | string)[] }; error_msg?: string; error_code?: string }
+      | undefined;
+    const numeros = result?.order_list?.number ?? [];
+    if (!result?.is_success || numeros.length === 0) {
+      const err = (body?.error_response ?? {}) as { msg?: string; code?: string };
+      return abortar(
+        orden,
+        result?.error_msg ?? err.msg ?? err.code ?? "AliExpress no aceptó la orden",
+      );
+    }
+
+    const ref = numeros.map(String).join(", ");
+    await insforgeAdmin.database
+      .from("ordenes_web")
+      .update({
+        dropship_estado: "pedido",
+        dropship_ref: ref,
+        dropship_pedido_at: new Date().toISOString(),
+      })
+      .eq("id", ordenId)
+      .eq("dropship_estado", "pidiendo");
+    await notifyAdmins("venta", {
+      title: "Pedido a AliExpress",
+      body: `${orden.folio}: orden del proveedor ${ref} creada automáticamente. Verifica el pago en tu cuenta AliExpress.`,
+      url: "/pedidos",
+      tag: `dropship-${orden.id}`,
+      icon: MARCA.icono,
+    }).catch(() => undefined);
+  } catch (e) {
+    await abortar(orden, e instanceof Error ? e.message : "error inesperado");
+  }
 }
 
 /**

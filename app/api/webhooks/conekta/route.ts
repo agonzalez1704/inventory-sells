@@ -1,6 +1,8 @@
 import { timingSafeEqual } from "node:crypto";
+import { after } from "next/server";
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { getConektaOrder } from "@/lib/conekta";
+import { pedirDropshipAutomatico } from "@/lib/aliexpress";
 import { notifyNuevaVenta } from "@/lib/push";
 
 
@@ -121,6 +123,9 @@ export async function POST(req: Request) {
       if (orden.status === "pendiente" && saleId) {
         await notifyNuevaVenta(String(saleId), "venta");
       }
+      // Supplier purchase rides after the response; the atomic claim inside
+      // makes webhook re-deliveries harmless.
+      after(() => pedirDropshipAutomatico(orden.id));
       return Response.json({ ok: true, folio: orden.folio, saleId });
     }
 
