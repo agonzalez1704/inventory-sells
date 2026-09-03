@@ -495,7 +495,11 @@ export function CajaView({ data }: { data: CajaData }) {
                       className="flex items-center justify-between gap-3 text-xs text-muted-foreground"
                     >
                       <span className="min-w-0 flex-1 truncate">
-                        <span className="font-medium tabular-nums">{p.qty}×</span>{" "}
+                        {Number.isInteger(p.qty) ? (
+                          <span className="font-medium tabular-nums">{p.qty}×</span>
+                        ) : (
+                          <span className="font-medium">abono parcial ·</span>
+                        )}{" "}
                         {p.nombre}
                       </span>
                       <span className="shrink-0 font-mono tabular-nums">

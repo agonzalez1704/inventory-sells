@@ -244,7 +244,9 @@ export default async function CajaPage({
         tag,
         monto: a.monto,
         productos: [...a.productos.values()]
-          .map((p) => ({ ...p, qty: Math.round(p.qty) }))
+          // Keep prorated fractions visible (2 decimals kills float noise):
+          // the UI renders a fractional qty as "abono parcial", not "0×".
+          .map((p) => ({ ...p, qty: Math.round(p.qty * 100) / 100 }))
           .sort((x, y) => y.monto - x.monto),
       }))
       .sort((a, b) => b.monto - a.monto);
