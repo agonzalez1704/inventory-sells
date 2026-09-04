@@ -27,6 +27,7 @@ import { useConfirm } from "@/components/ui/use-confirm";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PrintTicketButtons } from "@/components/ticket/PrintTicketButtons";
 import { ComprobantesDeVenta } from "./ComprobantesDeVenta";
+import { CuentaChip } from "@/components/ui/cuenta";
 import { ItemSwapModal, type SwapProduct } from "@/modules/sales/ItemSwapModal";
 import { ReturnModal } from "@/modules/sales/ReturnModal";
 import { GarantiaModal } from "@/modules/garantias/GarantiaModal";
@@ -52,6 +53,8 @@ export type SaleWithItems = Sale & {
   canal?: string | null;
   /** When a credit note was paid off. The date the sale really happened. */
   settled_at?: string | null;
+  /** Business account the transfer landed in, per the tagged proof. */
+  cuenta?: { id: string; banco: string; alias: string } | null;
 };
 
 const PAYMENT: [PaymentMethod, string][] = [
@@ -488,6 +491,9 @@ export function RecentSales({
                             ? (LABEL[s.payment_method] ?? s.payment_method)
                             : "—"}
                         </Badge>
+                        {s.cuenta && (
+                          <CuentaChip cuenta={s.cuenta} className="mt-1 block" />
+                        )}
                       </td>
                       <td className="px-4 py-2.5 text-right font-mono tabular-nums">
                         {formatMXN(s.total_cents)}

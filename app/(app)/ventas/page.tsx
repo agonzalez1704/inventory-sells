@@ -1,4 +1,5 @@
 import { createInsForgeServerClient } from "@/lib/insforge/server";
+import { insforgeAdmin } from "@/lib/insforge/admin";
 import { getPermisos, getProfile, requirePagePermiso } from "@/lib/auth/profile";
 import { mxHoy, rangoUTC } from "@/lib/caja-range";
 import { RecentSales, type SaleWithItems } from "@/modules/sales/RecentSales";
@@ -177,6 +178,47 @@ export default async function VentasPage({
         ...netSales,
       ];
     }
+  }
+
+  // Which business account each transfer landed in, via the tagged proofs
+  // (admin client: proofs aren't in the viewer's RLS surface). Web-order sales
+  // carry their proof on the orden, so those map back through sale_id.
+  const transferIds = lista
+    .filter((s) => s.payment_method === "transferencia" || s.payment_method === "mixto")
+    .map((s) => s.id);
+  if (transferIds.length) {
+    const [{ data: compData }, { data: ordData }] = await Promise.all([
+      insforgeAdmin.database
+        .from("comprobantes_pago")
+        .select("sale_id, orden_id, cuentas_negocio(id, banco, alias)")
+        .not("cuenta_id", "is", null),
+      insforgeAdmin.database
+        .from("ordenes_web")
+        .select("id, sale_id")
+        .in("sale_id", transferIds),
+    ]);
+    type CuentaRow = { id: string; banco: string; alias: string };
+    const porSale = new Map<string, CuentaRow>();
+    const porOrden = new Map<string, CuentaRow>();
+    for (const c of (compData ?? []) as unknown as {
+      sale_id: string | null;
+      orden_id: string | null;
+      cuentas_negocio: CuentaRow | CuentaRow[] | null;
+    }[]) {
+      const cuenta = Array.isArray(c.cuentas_negocio)
+        ? c.cuentas_negocio[0] ?? null
+        : c.cuentas_negocio;
+      if (!cuenta) continue;
+      if (c.sale_id) porSale.set(c.sale_id, cuenta);
+      if (c.orden_id) porOrden.set(c.orden_id, cuenta);
+    }
+    for (const o of (ordData ?? []) as { id: string; sale_id: string | null }[]) {
+      if (o.sale_id && !porSale.has(o.sale_id)) {
+        const cuenta = porOrden.get(o.id);
+        if (cuenta) porSale.set(o.sale_id, cuenta);
+      }
+    }
+    lista = lista.map((s) => ({ ...s, cuenta: porSale.get(s.id) ?? null }));
   }
 
   const totalPeriodo = netSales.reduce((a, s) => a + s.total_cents, 0);
