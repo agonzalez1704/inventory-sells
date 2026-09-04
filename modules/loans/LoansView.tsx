@@ -20,6 +20,7 @@ import {
 } from "@/modules/customers/CustomerPicker";
 import { guardarComprobante } from "@/modules/sales/comprobantes";
 import { AdjuntarImagen } from "@/components/ui/adjuntar-imagen";
+import { CuentaPicker, useCuentas } from "@/components/ui/cuenta";
 import {
   setFiadoPublico,
   settleLoan,
@@ -261,6 +262,8 @@ function LoanRow({
   const [payment, setPayment] = useState<PaymentMethod>("efectivo");
   const [refPago, setRefPago] = useState("");
   const [fotoPago, setFotoPago] = useState<File | null>(null);
+  const [cuentaPago, setCuentaPago] = useState<string | null>(null);
+  const cuentas = useCuentas();
   const [swapOpen, setSwapOpen] = useState(false);
   const [abonar, setAbonar] = useState(false);
   const [cliente, setCliente] = useState<PickerCustomer | null>(loan.cliente);
@@ -296,13 +299,13 @@ function LoanRow({
     startTransition(async () => {
       try {
         await settleLoan(loan.id, payment);
-        if (payment === "transferencia" && (refPago.trim() || fotoPago)) {
+        if (payment === "transferencia" && (refPago.trim() || fotoPago || cuentaPago)) {
           let form: FormData | undefined;
           if (fotoPago) {
             form = new FormData();
             form.append("file", fotoPago);
           }
-          const rc = await guardarComprobante(loan.id, refPago.trim() || null, form);
+          const rc = await guardarComprobante(loan.id, refPago.trim() || null, form, cuentaPago);
           if (!rc.ok) toast.error(`Cobro ok, pero el comprobante no se guardó: ${rc.error}`);
         }
         toast.success(`Cobrado · ${formatMXN(resta)}`);
@@ -434,6 +437,7 @@ function LoanRow({
             className="h-9 max-w-72"
           />
           <AdjuntarImagen value={fotoPago} onChange={setFotoPago} />
+          <CuentaPicker cuentas={cuentas} value={cuentaPago} onChange={setCuentaPago} label="" />
         </div>
       )}
 
@@ -483,6 +487,8 @@ function AbonarFiadoModal({
   const [monto, setMonto] = useState("");
   const [metodo, setMetodo] = useState<PaymentMethod>("efectivo");
   const [referencia, setReferencia] = useState("");
+  const [cuentaAbono, setCuentaAbono] = useState<string | null>(null);
+  const cuentasAbono = useCuentas();
   const [foto, setFoto] = useState<File | null>(null);
   const [pending, start] = useTransition();
 
@@ -495,13 +501,13 @@ function AbonarFiadoModal({
     start(async () => {
       try {
         await abonarFiado(loan.id, pesos, metodo);
-        if (metodo === "transferencia" && (referencia.trim() || foto)) {
+        if (metodo === "transferencia" && (referencia.trim() || foto || cuentaAbono)) {
           let form: FormData | undefined;
           if (foto) {
             form = new FormData();
             form.append("file", foto);
           }
-          const rc = await guardarComprobante(loan.id, referencia.trim() || null, form);
+          const rc = await guardarComprobante(loan.id, referencia.trim() || null, form, cuentaAbono);
           if (!rc.ok) toast.error(`Abono ok, pero el comprobante no se guardó: ${rc.error}`);
         }
         toast.success(`Abono registrado · ${formatMXN(Math.round(pesos * 100))}`);
@@ -566,6 +572,7 @@ function AbonarFiadoModal({
               placeholder="Referencia / clave de rastreo"
             />
             <AdjuntarImagen value={foto} onChange={setFoto} />
+            <CuentaPicker cuentas={cuentasAbono} value={cuentaAbono} onChange={setCuentaAbono} />
           </div>
         )}
         <div className="flex justify-end gap-2 border-t border-border pt-3">

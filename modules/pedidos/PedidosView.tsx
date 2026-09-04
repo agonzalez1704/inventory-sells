@@ -21,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { comprobantesDeOrden, type Comprobante } from "@/modules/sales/comprobantes";
+import { CuentaChip } from "@/components/ui/cuenta";
 import { useEffect } from "react";
 import { confirmarTransferencia, cancelarPedido, marcarDropshipPedido } from "./actions";
 
@@ -373,6 +374,7 @@ function ComprobantesOrden({ ordenId }: { ordenId: string }) {
       <ul className="mt-1 space-y-0.5">
         {rows.map((c) => (
           <li key={c.id} className="flex flex-wrap items-center gap-2 text-xs text-green-900 dark:text-green-200">
+            {c.cuenta && <CuentaChip cuenta={c.cuenta} />}
             {c.referencia && <span className="font-mono">{c.referencia}</span>}
             {c.imagen_url && (
               <a

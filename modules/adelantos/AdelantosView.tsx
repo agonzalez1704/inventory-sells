@@ -25,6 +25,7 @@ import { Modal } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { guardarComprobanteAdelanto } from "@/modules/sales/comprobantes";
 import { AdjuntarImagen } from "@/components/ui/adjuntar-imagen";
+import { CuentaPicker, useCuentas } from "@/components/ui/cuenta";
 import {
   crearAdelanto,
   abonarAdelanto,
@@ -248,6 +249,8 @@ function AbonarModal({
   const [metodo, setMetodo] = useState<PaymentMethod>("efectivo");
   const [referencia, setReferencia] = useState("");
   const [foto, setFoto] = useState<File | null>(null);
+  const [cuentaAbono, setCuentaAbono] = useState<string | null>(null);
+  const cuentasAbono = useCuentas();
   const [pending, start] = useTransition();
 
   function save() {
@@ -257,13 +260,13 @@ function AbonarModal({
     start(async () => {
       try {
         await abonarAdelanto(a.id, pesos, metodo);
-        if (metodo === "transferencia" && (referencia.trim() || foto)) {
+        if (metodo === "transferencia" && (referencia.trim() || foto || cuentaAbono)) {
           let form: FormData | undefined;
           if (foto) {
             form = new FormData();
             form.append("file", foto);
           }
-          const rc = await guardarComprobanteAdelanto(a.id, referencia.trim() || null, form);
+          const rc = await guardarComprobanteAdelanto(a.id, referencia.trim() || null, form, cuentaAbono);
           if (!rc.ok) toast.error(`Abono ok, pero el comprobante no se guardó: ${rc.error}`);
         }
         toast.success(`Abono registrado · ${formatMXN(Math.round(pesos * 100))}`);
@@ -322,6 +325,7 @@ function AbonarModal({
               placeholder="Referencia / clave de rastreo"
             />
             <AdjuntarImagen value={foto} onChange={setFoto} />
+            <CuentaPicker cuentas={cuentasAbono} value={cuentaAbono} onChange={setCuentaAbono} />
           </div>
         )}
         <div className="flex justify-end gap-2 border-t border-border pt-3">
@@ -354,6 +358,8 @@ function CrearModal({
   const [metodo, setMetodo] = useState<PaymentMethod>("efectivo");
   const [refPago, setRefPago] = useState("");
   const [fotoPago, setFotoPago] = useState<File | null>(null);
+  const [cuentaPago, setCuentaPago] = useState<string | null>(null);
+  const cuentasPago = useCuentas();
   const [pending, start] = useTransition();
 
   // Searched in the database — the whole catalog used to be loaded just to
@@ -413,13 +419,13 @@ function CrearModal({
           abono: abonoNum,
           abonoMetodo: metodo,
         });
-        if (abonoNum > 0 && metodo === "transferencia" && (refPago.trim() || fotoPago)) {
+        if (abonoNum > 0 && metodo === "transferencia" && (refPago.trim() || fotoPago || cuentaPago)) {
           let form: FormData | undefined;
           if (fotoPago) {
             form = new FormData();
             form.append("file", fotoPago);
           }
-          const rc = await guardarComprobanteAdelanto(id, refPago.trim() || null, form);
+          const rc = await guardarComprobanteAdelanto(id, refPago.trim() || null, form, cuentaPago);
           if (!rc.ok) toast.error(`Adelanto ok, pero el comprobante no se guardó: ${rc.error}`);
         }
         toast.success("Adelanto creado");
@@ -583,6 +589,7 @@ function CrearModal({
               placeholder="Referencia / clave de rastreo"
             />
             <AdjuntarImagen value={fotoPago} onChange={setFotoPago} />
+            <CuentaPicker cuentas={cuentasPago} value={cuentaPago} onChange={setCuentaPago} />
           </div>
         )}
 

@@ -231,6 +231,7 @@ export async function subirComprobanteOrden(
   ordenId: string,
   referencia: string | null,
   form?: FormData,
+  cuentaId?: string | null,
 ): Promise<ActionResult<null>> {
   return attempt("subirComprobanteOrden", async () => {
     const { data } = await insforgeAdmin.database
@@ -259,7 +260,13 @@ export async function subirComprobanteOrden(
     }
 
     const { error } = await insforgeAdmin.database.from("comprobantes_pago").insert([
-      { orden_id: ordenId, referencia: ref, imagen_key: key, created_by: "cliente-web" },
+      {
+        orden_id: ordenId,
+        referencia: ref,
+        imagen_key: key,
+        cuenta_id: cuentaId ?? null,
+        created_by: "cliente-web",
+      },
     ]);
     if (error) throw new Error(error.message ?? "No se pudo guardar");
 

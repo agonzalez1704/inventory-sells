@@ -18,6 +18,7 @@ import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AdjuntarImagen } from "@/components/ui/adjuntar-imagen";
+import { CuentaPicker, useCuentas } from "@/components/ui/cuenta";
 
 const METODOS: {
   value: PaymentMethodVenta;
@@ -53,7 +54,7 @@ export function PaymentSheet({
   onConfirm: (
     metodo: PaymentMethodVenta,
     pagos?: { metodo: PaymentMethodVenta; monto_cents: number }[],
-    comprobante?: { referencia: string | null; foto: File | null },
+    comprobante?: { referencia: string | null; foto: File | null; cuentaId: string | null },
   ) => void;
 }) {
   // Modal is the drawer on phones now — no local switch needed.
@@ -87,7 +88,7 @@ function PaymentContent({
   onConfirm: (
     metodo: PaymentMethodVenta,
     pagos?: { metodo: PaymentMethodVenta; monto_cents: number }[],
-    comprobante?: { referencia: string | null; foto: File | null },
+    comprobante?: { referencia: string | null; foto: File | null; cuentaId: string | null },
   ) => void;
 }) {
   const [metodo, setMetodo] = useState<PaymentMethodVenta>("efectivo");
@@ -95,6 +96,8 @@ function PaymentContent({
   // attaches AFTER the sale registers — a failed photo never loses the sale.
   const [referencia, setReferencia] = useState("");
   const [foto, setFoto] = useState<File | null>(null);
+  const [cuentaId, setCuentaId] = useState<string | null>(null);
+  const cuentas = useCuentas();
   const [recibido, setRecibido] = useState(""); // pesos, as typed
   // Split payment: an amount per method, as typed. Off by default — the common
   // sale is one method and shouldn't pay for this.
@@ -381,6 +384,7 @@ function PaymentContent({
             placeholder="Referencia / clave de rastreo"
           />
           <AdjuntarImagen value={foto} onChange={setFoto} />
+          <CuentaPicker cuentas={cuentas} value={cuentaId} onChange={setCuentaId} />
         </div>
       )}
 
@@ -393,8 +397,8 @@ function PaymentContent({
           className="flex-1"
           onClick={() => {
             const comp =
-              referencia.trim() || foto
-                ? { referencia: referencia.trim() || null, foto }
+              referencia.trim() || foto || cuentaId
+                ? { referencia: referencia.trim() || null, foto, cuentaId }
                 : undefined;
             if (dividir) onConfirm("mixto" as PaymentMethodVenta, pagos, comp);
             else onConfirm(metodo, metodo === "saldo" ? [{ metodo, monto_cents: total }] : undefined, comp);

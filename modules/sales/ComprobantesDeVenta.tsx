@@ -6,6 +6,7 @@ import { Receipt, ExternalLink, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { AdjuntarImagen } from "@/components/ui/adjuntar-imagen";
+import { CuentaChip, CuentaPicker, useCuentas } from "@/components/ui/cuenta";
 import { comprobantesDeVenta, guardarComprobante, type Comprobante } from "./comprobantes";
 
 /**
@@ -18,6 +19,8 @@ export function ComprobantesDeVenta({ saleId }: { saleId: string }) {
   const [agregando, setAgregando] = useState(false);
   const [referencia, setReferencia] = useState("");
   const [foto, setFoto] = useState<File | null>(null);
+  const [cuentaId, setCuentaId] = useState<string | null>(null);
+  const cuentas = useCuentas();
   const [pending, start] = useTransition();
 
   function cargar() {
@@ -34,15 +37,15 @@ export function ComprobantesDeVenta({ saleId }: { saleId: string }) {
   }, [saleId]);
 
   function guardar() {
-    if (!referencia.trim() && !foto)
-      return toast.error("Pega la captura o escribe la referencia");
+    if (!referencia.trim() && !foto && !cuentaId)
+      return toast.error("Pega la captura, escribe la referencia o elige la cuenta");
     start(async () => {
       let form: FormData | undefined;
       if (foto) {
         form = new FormData();
         form.append("file", foto);
       }
-      const r = await guardarComprobante(saleId, referencia.trim() || null, form);
+      const r = await guardarComprobante(saleId, referencia.trim() || null, form, cuentaId);
       if (!r.ok) {
         toast.error(r.error);
         return;
@@ -50,6 +53,7 @@ export function ComprobantesDeVenta({ saleId }: { saleId: string }) {
       toast.success("Comprobante guardado");
       setReferencia("");
       setFoto(null);
+      setCuentaId(null);
       setAgregando(false);
       cargar();
     });
@@ -81,6 +85,7 @@ export function ComprobantesDeVenta({ saleId }: { saleId: string }) {
         <ul className="mt-1 space-y-0.5">
           {rows.map((c) => (
             <li key={c.id} className="flex flex-wrap items-center gap-2 text-xs">
+              {c.cuenta && <CuentaChip cuenta={c.cuenta} />}
               {c.referencia && <span className="font-mono">{c.referencia}</span>}
               {c.imagen_url && (
                 <a
@@ -112,6 +117,7 @@ export function ComprobantesDeVenta({ saleId }: { saleId: string }) {
             className="h-9"
           />
           <AdjuntarImagen value={foto} onChange={setFoto} />
+          <CuentaPicker cuentas={cuentas} value={cuentaId} onChange={setCuentaId} />
           <div className="flex gap-2">
             <Button size="sm" onClick={guardar} loading={pending}>
               Guardar comprobante

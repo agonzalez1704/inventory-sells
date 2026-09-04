@@ -522,7 +522,7 @@ export function SalesScreen({
   function submit(
     metodo?: PaymentMethodVenta,
     pagos?: PagoSplit[],
-    comprobante?: { referencia: string | null; foto: File | null },
+    comprobante?: { referencia: string | null; foto: File | null; cuentaId: string | null },
   ) {
     if (!canSubmit) return;
     const items = lines.map((l) => ({ product_id: l.product.id, qty: l.qty }));
@@ -554,7 +554,7 @@ export function SalesScreen({
             form = new FormData();
             form.append("file", comprobante.foto);
           }
-          const rc = await guardarComprobante(saleId, comprobante.referencia, form);
+          const rc = await guardarComprobante(saleId, comprobante.referencia, form, comprobante.cuentaId);
           if (!rc.ok) toast.error(`Venta ok, pero el comprobante no se guardó: ${rc.error}`);
         }
         const ticket: TicketData = {

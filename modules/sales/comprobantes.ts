@@ -22,12 +22,15 @@ async function guardar(
   dueno: { sale_id: string } | { adelanto_id: string },
   referencia: string | null,
   form?: FormData,
+  cuentaId?: string | null,
 ): Promise<null> {
   const userId = await assertPermiso("pos_vender");
   const ref = referencia?.trim() || null;
   const file = form?.get("file");
   const conImagen = file instanceof File && file.size > 0;
-  if (!ref && !conImagen) throw new Error("Escribe la referencia o adjunta la captura");
+  // Naming the receiving account alone is a valid record of the transfer.
+  if (!ref && !conImagen && !cuentaId)
+    throw new Error("Escribe la referencia o adjunta la captura");
 
   let key: string | null = null;
   if (conImagen) {
@@ -42,7 +45,7 @@ async function guardar(
   }
 
   const { error } = await insforgeAdmin.database.from("comprobantes_pago").insert([
-    { ...dueno, referencia: ref, imagen_key: key, created_by: userId },
+    { ...dueno, referencia: ref, imagen_key: key, cuenta_id: cuentaId ?? null, created_by: userId },
   ]);
   if (error) throw new Error(error.message ?? "No se pudo guardar el comprobante");
   return null;
@@ -56,8 +59,11 @@ export async function guardarComprobante(
   saleId: string,
   referencia: string | null,
   form?: FormData,
+  cuentaId?: string | null,
 ): Promise<ActionResult<null>> {
-  return attempt("guardarComprobante", () => guardar({ sale_id: saleId }, referencia, form));
+  return attempt("guardarComprobante", () =>
+    guardar({ sale_id: saleId }, referencia, form, cuentaId),
+  );
 }
 
 /** Same, for an adelanto's abono. */
@@ -65,9 +71,10 @@ export async function guardarComprobanteAdelanto(
   adelantoId: string,
   referencia: string | null,
   form?: FormData,
+  cuentaId?: string | null,
 ): Promise<ActionResult<null>> {
   return attempt("guardarComprobanteAdelanto", () =>
-    guardar({ adelanto_id: adelantoId }, referencia, form),
+    guardar({ adelanto_id: adelantoId }, referencia, form, cuentaId),
   );
 }
 
@@ -76,6 +83,8 @@ export type Comprobante = {
   referencia: string | null;
   /** Signed, short-lived. Null when the row is text-only. */
   imagen_url: string | null;
+  /** Which business account received the transfer, when it was tagged. */
+  cuenta: { id: string; banco: string; alias: string } | null;
   created_at: string;
 };
 
@@ -83,17 +92,22 @@ async function listar(campo: "sale_id" | "adelanto_id" | "orden_id", id: string)
   await assertPermiso("pos_vender");
   const { data } = await insforgeAdmin.database
     .from("comprobantes_pago")
-    .select("id, referencia, imagen_key, created_at")
+    .select("id, referencia, imagen_key, created_at, cuentas_negocio(id, banco, alias)")
     .eq(campo, id)
     .order("created_at", { ascending: true });
-  const rows = (data ?? []) as {
+  const rows = (data ?? []) as unknown as {
     id: string; referencia: string | null; imagen_key: string | null; created_at: string;
+    // The SDK types nested rows as arrays; a to-one join arrives as an object.
+    cuentas_negocio: { id: string; banco: string; alias: string } | { id: string; banco: string; alias: string }[] | null;
   }[];
   return Promise.all(
     rows.map(async (r) => ({
       id: r.id,
       referencia: r.referencia,
       created_at: r.created_at,
+      cuenta: Array.isArray(r.cuentas_negocio)
+        ? r.cuentas_negocio[0] ?? null
+        : r.cuentas_negocio,
       imagen_url: r.imagen_key
         ? (await insforgeAdmin.storage.from(BUCKET).createSignedUrl(r.imagen_key, 3600)).data
             ?.signedUrl ?? null

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { CheckCircle2, Loader2, Receipt } from "lucide-react";
+import { CuentaPicker, useCuentas } from "@/components/ui/cuenta";
 import { subirComprobanteOrden } from "./pago-actions";
 
 /**
@@ -12,6 +13,8 @@ import { subirComprobanteOrden } from "./pago-actions";
 export function ComprobanteOrden({ ordenId }: { ordenId: string }) {
   const [referencia, setReferencia] = useState("");
   const [foto, setFoto] = useState<File | null>(null);
+  const [cuentaId, setCuentaId] = useState<string | null>(null);
+  const cuentas = useCuentas();
   const [enviando, setEnviando] = useState(false);
   const [listo, setListo] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -45,7 +48,7 @@ export function ComprobanteOrden({ ordenId }: { ordenId: string }) {
       form = new FormData();
       form.append("file", foto);
     }
-    const r = await subirComprobanteOrden(ordenId, referencia.trim() || null, form);
+    const r = await subirComprobanteOrden(ordenId, referencia.trim() || null, form, cuentaId);
     setEnviando(false);
     if (!r.ok) {
       setErr(r.error);
@@ -93,6 +96,12 @@ export function ComprobanteOrden({ ordenId }: { ordenId: string }) {
         </label>
         {foto && <span className="text-xs text-muted-foreground">✓ {foto.name}</span>}
       </div>
+      <CuentaPicker
+        cuentas={cuentas}
+        value={cuentaId}
+        onChange={setCuentaId}
+        label="¿A cuál cuenta transferiste?"
+      />
       <button
         type="button"
         onClick={enviar}
