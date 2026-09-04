@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { getProfile, requirePagePermiso } from "@/lib/auth/profile";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
+import { insforgeAdmin } from "@/lib/insforge/admin";
 import { mxHoy, rangoUTC } from "@/lib/caja-range";
 import {
   CajaView,
@@ -8,6 +9,7 @@ import {
   type Ingreso,
   type Devolucion,
   type IngresoLinea,
+  type PorCuenta,
 } from "@/modules/caja/CajaView";
 import type { PaymentMethodStored, PaymentMethod, PaymentMethodVenta } from "@/lib/types";
 
@@ -124,14 +126,14 @@ export default async function CajaPage({
     insforge.database
       .from("sale_pagos")
       .select(
-        "monto_cents, metodo, created_at, sales(customer_name, total_cents, sale_items(qty, unit_price_cents, costo_total_cents, products(etiqueta, cost_cents, name, sku, inventory_id)))",
+        "sale_id, monto_cents, metodo, created_at, sales(customer_name, total_cents, sale_items(qty, unit_price_cents, costo_total_cents, products(etiqueta, cost_cents, name, sku, inventory_id)))",
       )
       .gte("created_at", startISO)
       .lt("created_at", endISO),
     insforge.database
       .from("adelanto_pagos")
       .select(
-        "monto_cents, metodo, tipo, created_at, adelantos(cliente, descripcion, qty, products(name))",
+        "adelanto_id, monto_cents, metodo, tipo, created_at, adelantos(cliente, descripcion, qty, products(name))",
       )
       .gte("created_at", startISO)
       .lt("created_at", endISO),
@@ -155,6 +157,7 @@ export default async function CajaPage({
   const ingresos = (ingresosData ?? []) as Ingreso[];
   const devoluciones = (devolucionesData ?? []) as Devolucion[];
   const salePagos = (salePagosData ?? []) as unknown as {
+    sale_id: string;
     monto_cents: number;
     // A split sale can settle part of itself with store credit.
     metodo: PaymentMethodVenta;
@@ -166,6 +169,7 @@ export default async function CajaPage({
     } | null;
   }[];
   const adelantoPagos = (adelantoPagosData ?? []) as unknown as {
+    adelanto_id: string;
     monto_cents: number;
     metodo: PaymentMethod;
     tipo: "abono" | "devolucion";
@@ -443,6 +447,86 @@ export default async function CajaPage({
     })),
   ].sort((a, b) => (a.fecha < b.fecha ? 1 : -1));
 
+  // --- Transfers split per business account, via the comprobantes ---
+  // The account was captured on the proof, not on the payment row, so this is
+  // an attribution: each transfer event looks up its owner's tagged proof
+  // (sale, adelanto, or the web order that produced the sale). Events whose
+  // owner has no tagged proof land in "sin cuenta" — the split always sums to
+  // the Transferencia income line.
+  const transDirectas = directasV.filter((v) => v.payment_method === "transferencia");
+  const transAbonos = salePagos.filter((p) => p.metodo === "transferencia");
+  const transAdel = adelantoPagos.filter(
+    (p) => p.tipo === "abono" && p.metodo === "transferencia",
+  );
+  const transExtra = ingresos.filter((i) => i.metodo === "transferencia");
+  let porCuenta: PorCuenta[] = [];
+  const hayTransfers =
+    transDirectas.length + transAbonos.length + transAdel.length + transExtra.length > 0;
+  if (hayTransfers) {
+    const saleIds = [
+      ...new Set([...transDirectas.map((v) => v.id), ...transAbonos.map((p) => p.sale_id)]),
+    ].filter(Boolean) as string[];
+    const adelIds = [...new Set(transAdel.map((p) => p.adelanto_id))];
+
+    const [{ data: ordenesData }, { data: compData }] = await Promise.all([
+      saleIds.length
+        ? insforgeAdmin.database.from("ordenes_web").select("id, sale_id").in("sale_id", saleIds)
+        : Promise.resolve({ data: [] }),
+      insforgeAdmin.database
+        .from("comprobantes_pago")
+        .select("sale_id, adelanto_id, orden_id, cuenta_id, cuentas_negocio(id, banco, alias)")
+        .not("cuenta_id", "is", null),
+    ]);
+    const ordenDeSale = new Map(
+      ((ordenesData ?? []) as { id: string; sale_id: string | null }[])
+        .filter((o) => o.sale_id)
+        .map((o) => [o.sale_id as string, o.id]),
+    );
+    type CuentaRow = { id: string; banco: string; alias: string };
+    const comps = ((compData ?? []) as unknown as {
+      sale_id: string | null;
+      adelanto_id: string | null;
+      orden_id: string | null;
+      cuentas_negocio: CuentaRow | CuentaRow[] | null;
+    }[]).map((c) => ({
+      ...c,
+      cuenta: Array.isArray(c.cuentas_negocio) ? c.cuentas_negocio[0] ?? null : c.cuentas_negocio,
+    }));
+    const cuentaDe = new Map<string, CuentaRow>();
+    for (const c of comps) {
+      if (!c.cuenta) continue;
+      if (c.sale_id) cuentaDe.set(`s:${c.sale_id}`, c.cuenta);
+      if (c.adelanto_id) cuentaDe.set(`a:${c.adelanto_id}`, c.cuenta);
+      if (c.orden_id) cuentaDe.set(`o:${c.orden_id}`, c.cuenta);
+    }
+    const buscarVenta = (saleId: string | undefined | null): CuentaRow | null => {
+      if (!saleId) return null;
+      const directa = cuentaDe.get(`s:${saleId}`);
+      if (directa) return directa;
+      const ordenId = ordenDeSale.get(saleId);
+      return ordenId ? cuentaDe.get(`o:${ordenId}`) ?? null : null;
+    };
+
+    const agg = new Map<string, PorCuenta>();
+    const sumar = (cuenta: CuentaRow | null, monto: number) => {
+      const key = cuenta?.id ?? "—";
+      const a = agg.get(key) ?? { cuenta, monto: 0 };
+      a.monto += monto;
+      agg.set(key, a);
+    };
+    for (const v of transDirectas) sumar(buscarVenta(v.id), v.total_cents);
+    for (const p of transAbonos) sumar(buscarVenta(p.sale_id), p.monto_cents);
+    for (const p of transAdel) sumar(cuentaDe.get(`a:${p.adelanto_id}`) ?? null, p.monto_cents);
+    for (const i of transExtra) sumar(null, i.monto_cents);
+    // "Sin cuenta" always last; accounts by amount.
+    porCuenta = [...agg.values()].sort((x, y) =>
+      !x.cuenta ? 1 : !y.cuenta ? -1 : y.monto - x.monto,
+    );
+    // A split with ONLY "sin cuenta" says nothing — hide it until the shop
+    // starts tagging (or has accounts at all).
+    if (porCuenta.length === 1 && !porCuenta[0].cuenta) porCuenta = [];
+  }
+
   return (
     <CajaView
       data={{
@@ -464,6 +548,7 @@ export default async function CajaPage({
         ganancia,
         ingresosDetalle,
         porInventario,
+        porCuenta,
       }}
     />
   );

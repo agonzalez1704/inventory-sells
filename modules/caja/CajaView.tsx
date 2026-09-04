@@ -21,6 +21,7 @@ import type { PaymentMethod, PaymentMethodStored } from "@/lib/types";
 import { imprimirCorteNavegador, type CorteData } from "@/lib/corte";
 import { imprimirCorteUSB, webUsbDisponible } from "@/lib/escpos-usb";
 import { Card } from "@/components/ui/card";
+import { BancoIcon } from "@/components/ui/cuenta";
 import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/use-confirm";
 import { Input, Select } from "@/components/ui/input";
@@ -94,6 +95,13 @@ export type CajaData = {
   ganancia: number | null; // net sales profit; null for non-admins
   ingresosDetalle: IngresoLinea[]; // every cash-in event; sums to ingresosTotal
   porInventario: InvAgg[];
+  /** Transfer income split by receiving business account (via comprobantes). */
+  porCuenta: PorCuenta[];
+};
+
+export type PorCuenta = {
+  cuenta: { id: string; banco: string; alias: string } | null;
+  monto: number;
 };
 
 export type InvMov = {
@@ -468,6 +476,40 @@ export function CajaView({ data }: { data: CajaData }) {
           )}
         </table>
       </Card>
+
+      {/* Transferencias por cuenta (subset of the Transferencia income line) */}
+      {data.porCuenta.length > 0 && (
+        <Card className="overflow-hidden">
+          <div className="border-b border-border px-4 py-3">
+            <h2 className="text-sm font-semibold">Transferencias por cuenta</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              A dónde llegó el dinero, según los comprobantes capturados. Es el
+              desglose del renglón Transferencia de arriba.
+            </p>
+          </div>
+          <ul className="divide-y divide-border">
+            {data.porCuenta.map((c) => (
+              <li key={c.cuenta?.id ?? "sin"} className="flex items-center gap-3 px-4 py-2.5">
+                {c.cuenta ? (
+                  <>
+                    <BancoIcon banco={c.cuenta.banco} />
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                      {c.cuenta.alias}
+                    </span>
+                  </>
+                ) : (
+                  <span className="min-w-0 flex-1 text-sm text-muted-foreground">
+                    Sin cuenta asignada
+                  </span>
+                )}
+                <span className="shrink-0 font-mono text-sm font-semibold tabular-nums">
+                  {formatMXN(c.monto)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
 
       {/* Efectivo etiquetado (subset of income, split per tag) */}
       {data.etiquetado.length > 0 && (
