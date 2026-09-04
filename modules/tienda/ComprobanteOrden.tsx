@@ -14,7 +14,7 @@ export function ComprobanteOrden({ ordenId }: { ordenId: string }) {
   const [referencia, setReferencia] = useState("");
   const [foto, setFoto] = useState<File | null>(null);
   const [cuentaId, setCuentaId] = useState<string | null>(null);
-  const cuentas = useCuentas();
+  const cuentas = useCuentas() ?? [];
   const [enviando, setEnviando] = useState(false);
   const [listo, setListo] = useState(false);
   const [err, setErr] = useState<string | null>(null);

@@ -20,7 +20,7 @@ export function ComprobantesDeVenta({ saleId }: { saleId: string }) {
   const [referencia, setReferencia] = useState("");
   const [foto, setFoto] = useState<File | null>(null);
   const [cuentaId, setCuentaId] = useState<string | null>(null);
-  const cuentas = useCuentas();
+  const cuentas = useCuentas() ?? [];
   const [pending, start] = useTransition();
 
   function cargar() {

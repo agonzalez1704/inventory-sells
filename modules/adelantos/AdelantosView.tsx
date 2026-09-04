@@ -25,7 +25,7 @@ import { Modal } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { guardarComprobanteAdelanto } from "@/modules/sales/comprobantes";
 import { AdjuntarImagen } from "@/components/ui/adjuntar-imagen";
-import { CuentaPicker, useCuentas } from "@/components/ui/cuenta";
+import { CuentaPicker, useCuentas, SIN_CUENTAS_MSG } from "@/components/ui/cuenta";
 import {
   crearAdelanto,
   abonarAdelanto,
@@ -250,14 +250,16 @@ function AbonarModal({
   const [referencia, setReferencia] = useState("");
   const [foto, setFoto] = useState<File | null>(null);
   const [cuentaAbono, setCuentaAbono] = useState<string | null>(null);
-  const cuentasAbono = useCuentas();
+  const cuentasAbono = useCuentas() ?? [];
   const [pending, start] = useTransition();
 
   function save() {
     const pesos = Number(monto.replace(",", "."));
     if (!Number.isFinite(pesos) || pesos <= 0) return toast.error("Monto inválido");
     if (Math.round(pesos * 100) > resta) return toast.error("El abono excede lo que falta");
-    if (metodo === "transferencia" && cuentasAbono.length > 0 && !cuentaAbono)
+    if (metodo === "transferencia" && cuentasAbono.length === 0)
+      return toast.error(SIN_CUENTAS_MSG);
+    if (metodo === "transferencia" && !cuentaAbono)
       return toast.error("Elige a cuál cuenta llegó la transferencia");
     start(async () => {
       try {
@@ -361,7 +363,7 @@ function CrearModal({
   const [refPago, setRefPago] = useState("");
   const [fotoPago, setFotoPago] = useState<File | null>(null);
   const [cuentaPago, setCuentaPago] = useState<string | null>(null);
-  const cuentasPago = useCuentas();
+  const cuentasPago = useCuentas() ?? [];
   const [pending, start] = useTransition();
 
   // Searched in the database — the whole catalog used to be loaded just to
@@ -409,7 +411,9 @@ function CrearModal({
 
   function save() {
     if (!valido) return toast.error("Revisa producto, precio y abono");
-    if (abonoNum > 0 && metodo === "transferencia" && cuentasPago.length > 0 && !cuentaPago)
+    if (abonoNum > 0 && metodo === "transferencia" && cuentasPago.length === 0)
+      return toast.error(SIN_CUENTAS_MSG);
+    if (abonoNum > 0 && metodo === "transferencia" && !cuentaPago)
       return toast.error("Elige a cuál cuenta llegó la transferencia");
     start(async () => {
       try {

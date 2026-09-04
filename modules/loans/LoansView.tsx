@@ -20,7 +20,7 @@ import {
 } from "@/modules/customers/CustomerPicker";
 import { guardarComprobante } from "@/modules/sales/comprobantes";
 import { AdjuntarImagen } from "@/components/ui/adjuntar-imagen";
-import { CuentaPicker, useCuentas } from "@/components/ui/cuenta";
+import { CuentaPicker, useCuentas, SIN_CUENTAS_MSG } from "@/components/ui/cuenta";
 import {
   setFiadoPublico,
   settleLoan,
@@ -263,7 +263,7 @@ function LoanRow({
   const [refPago, setRefPago] = useState("");
   const [fotoPago, setFotoPago] = useState<File | null>(null);
   const [cuentaPago, setCuentaPago] = useState<string | null>(null);
-  const cuentas = useCuentas();
+  const cuentas = useCuentas() ?? [];
   const [swapOpen, setSwapOpen] = useState(false);
   const [abonar, setAbonar] = useState(false);
   const [cliente, setCliente] = useState<PickerCustomer | null>(loan.cliente);
@@ -296,7 +296,9 @@ function LoanRow({
   function collect() {
     if (payment === "transferencia" && comprobanteObligatorio && !refPago.trim() && !fotoPago)
       return toast.error("El comprobante es obligatorio: pega la captura o escribe la referencia");
-    if (payment === "transferencia" && cuentas.length > 0 && !cuentaPago)
+    if (payment === "transferencia" && cuentas.length === 0)
+      return toast.error(SIN_CUENTAS_MSG);
+    if (payment === "transferencia" && !cuentaPago)
       return toast.error("Elige a cuál cuenta llegó la transferencia");
     startTransition(async () => {
       try {
@@ -490,7 +492,7 @@ function AbonarFiadoModal({
   const [metodo, setMetodo] = useState<PaymentMethod>("efectivo");
   const [referencia, setReferencia] = useState("");
   const [cuentaAbono, setCuentaAbono] = useState<string | null>(null);
-  const cuentasAbono = useCuentas();
+  const cuentasAbono = useCuentas() ?? [];
   const [foto, setFoto] = useState<File | null>(null);
   const [pending, start] = useTransition();
 
@@ -500,7 +502,9 @@ function AbonarFiadoModal({
     if (Math.round(pesos * 100) > resta) return toast.error("El abono excede lo que falta");
     if (metodo === "transferencia" && comprobanteObligatorio && !referencia.trim() && !foto)
       return toast.error("El comprobante es obligatorio: pega la captura o escribe la referencia");
-    if (metodo === "transferencia" && cuentasAbono.length > 0 && !cuentaAbono)
+    if (metodo === "transferencia" && cuentasAbono.length === 0)
+      return toast.error(SIN_CUENTAS_MSG);
+    if (metodo === "transferencia" && !cuentaAbono)
       return toast.error("Elige a cuál cuenta llegó la transferencia");
     start(async () => {
       try {

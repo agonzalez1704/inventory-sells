@@ -18,7 +18,7 @@ import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AdjuntarImagen } from "@/components/ui/adjuntar-imagen";
-import { CuentaPicker, useCuentas } from "@/components/ui/cuenta";
+import { CuentaPicker, useCuentas, SIN_CUENTAS_MSG } from "@/components/ui/cuenta";
 
 const METODOS: {
   value: PaymentMethodVenta;
@@ -98,6 +98,8 @@ function PaymentContent({
   const [foto, setFoto] = useState<File | null>(null);
   const [cuentaId, setCuentaId] = useState<string | null>(null);
   const cuentas = useCuentas();
+  const listaCuentas = cuentas ?? [];
+  const sinCuentas = cuentas !== null && cuentas.length === 0;
   const [recibido, setRecibido] = useState(""); // pesos, as typed
   // Split payment: an amount per method, as typed. Off by default — the common
   // sale is one method and shouldn't pay for this.
@@ -138,8 +140,9 @@ function PaymentContent({
     : metodo === "transferencia";
   const faltaComprobante =
     comprobanteObligatorio && hayTransferencia && !referencia.trim() && !foto;
-  // With business accounts registered, a transfer MUST say where it landed.
-  const faltaCuenta = hayTransferencia && cuentas.length > 0 && !cuentaId;
+  // A transfer MUST say where it landed — and with no accounts registered at
+  // all there is nowhere for it to land, so the method is blocked outright.
+  const faltaCuenta = hayTransferencia && (listaCuentas.length > 0 ? !cuentaId : sinCuentas);
   const puedeCobrar =
     (dividir ? splitCuadra : puedeCobrarSimple) && !faltaComprobante && !faltaCuenta;
 
@@ -388,11 +391,14 @@ function PaymentContent({
           />
           <AdjuntarImagen value={foto} onChange={setFoto} />
           <CuentaPicker
-            cuentas={cuentas}
+            cuentas={listaCuentas}
             value={cuentaId}
             onChange={setCuentaId}
             label="¿A cuál cuenta llegó? (obligatorio)"
           />
+          {hayTransferencia && sinCuentas && (
+            <p className="text-xs text-amber-700 dark:text-amber-400">{SIN_CUENTAS_MSG}</p>
+          )}
         </div>
       )}
 

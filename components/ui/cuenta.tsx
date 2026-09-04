@@ -86,11 +86,16 @@ export function CuentaPicker({
   );
 }
 
-/** Fetch-on-mount variant for spots where threading the list down is noise. */
-export function useCuentas(): Cuenta[] {
-  const [cuentas, setCuentas] = useState<Cuenta[]>([]);
+/** Fetch-on-mount variant for spots where threading the list down is noise.
+ *  Null while loading — "none registered" ([]) now BLOCKS transfers, so the
+ *  two states must be distinguishable. */
+export function useCuentas(): Cuenta[] | null {
+  const [cuentas, setCuentas] = useState<Cuenta[] | null>(null);
   useEffect(() => {
     listarCuentas().then(setCuentas).catch(() => undefined);
   }, []);
   return cuentas;
 }
+
+export const SIN_CUENTAS_MSG =
+  "No hay cuentas del negocio registradas: da de alta la CLABE en Configuración para cobrar por transferencia.";
