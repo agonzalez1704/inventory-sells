@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BANCOS, type Cuenta } from "@/lib/bancos";
@@ -99,3 +100,19 @@ export function useCuentas(): Cuenta[] | null {
 
 export const SIN_CUENTAS_MSG =
   "No hay cuentas del negocio registradas: da de alta la CLABE en Configuración para cobrar por transferencia.";
+
+/** The amber "register an account first" notice, with the shortcut to do it. */
+export function SinCuentasAviso() {
+  return (
+    <p className="text-xs text-amber-700 dark:text-amber-400">
+      No hay cuentas del negocio registradas.{" "}
+      <Link
+        href="/configuracion"
+        className="font-semibold underline underline-offset-2 hover:text-amber-900 dark:hover:text-amber-300"
+      >
+        Dar de alta la cuenta
+      </Link>{" "}
+      para poder cobrar por transferencia.
+    </p>
+  );
+}

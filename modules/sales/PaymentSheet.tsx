@@ -18,7 +18,7 @@ import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AdjuntarImagen } from "@/components/ui/adjuntar-imagen";
-import { CuentaPicker, useCuentas, SIN_CUENTAS_MSG } from "@/components/ui/cuenta";
+import { CuentaPicker, useCuentas, SinCuentasAviso } from "@/components/ui/cuenta";
 
 const METODOS: {
   value: PaymentMethodVenta;
@@ -396,9 +396,7 @@ function PaymentContent({
             onChange={setCuentaId}
             label="¿A cuál cuenta llegó? (obligatorio)"
           />
-          {hayTransferencia && sinCuentas && (
-            <p className="text-xs text-amber-700 dark:text-amber-400">{SIN_CUENTAS_MSG}</p>
-          )}
+          {hayTransferencia && sinCuentas && <SinCuentasAviso />}
         </div>
       )}
 
