@@ -4,7 +4,7 @@ import { auth } from "@clerk/nextjs/server";
 import { getProfile } from "@/lib/auth/profile";
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { attempt, type ActionResult } from "@/lib/errors";
-import type { Cuenta } from "@/components/ui/cuenta";
+import { bancoDeClabe, validarClabe, type Cuenta } from "@/lib/bancos";
 
 // The shop's bank accounts, so a transfer can be tagged with WHERE it landed.
 // Managed by admins in Configuración; read by every transfer-proof picker —
@@ -27,18 +27,35 @@ async function requireAdmin(): Promise<void> {
   if (profile?.role !== "admin") throw new Error("Solo administradores");
 }
 
-export async function crearCuenta(banco: string, alias: string): Promise<ActionResult<null>> {
+/** Register by CLABE: the bank comes from its first 3 digits, the alias
+ *  defaults to "<Banco> ·<últimos 4>". */
+export async function crearCuenta(clabe: string, alias: string): Promise<ActionResult<null>> {
   return attempt("crearCuenta", async () => {
     await requireAdmin();
-    const a = alias.trim();
-    if (!banco) throw new Error("Elige el banco");
-    if (!a) throw new Error("Ponle un alias (ej. BBVA Antonio)");
+    const digitos = clabe.replace(/\D/g, "");
+    if (!validarClabe(digitos))
+      throw new Error("CLABE inválida: revisa los 18 dígitos");
+    const b = bancoDeClabe(digitos)!;
+    const a = alias.trim() || `${b.nombre} ·${digitos.slice(-4)}`;
     const { error } = await insforgeAdmin.database
       .from("cuentas_negocio")
-      .insert([{ banco, alias: a }]);
+      .insert([{ banco: b.banco, alias: a, clabe: digitos }]);
     if (error) throw new Error(error.message ?? "No se pudo crear");
     return null;
   });
+}
+
+export type CuentaAdmin = Cuenta & { clabe: string | null };
+
+/** Config list — includes the CLABE, so admin-only. */
+export async function listarCuentasAdmin(): Promise<CuentaAdmin[]> {
+  await requireAdmin();
+  const { data } = await insforgeAdmin.database
+    .from("cuentas_negocio")
+    .select("id, banco, alias, clabe")
+    .eq("is_active", true)
+    .order("created_at", { ascending: true });
+  return (data ?? []) as CuentaAdmin[];
 }
 
 export async function archivarCuenta(id: string): Promise<ActionResult<null>> {

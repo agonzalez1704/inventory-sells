@@ -3,32 +3,44 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Landmark, Plus, Archive } from "lucide-react";
+import { Landmark, Plus, Archive, Copy, Check, AlertCircle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { unwrap } from "@/lib/errors";
-import { BANCOS, BancoIcon, type Cuenta } from "@/components/ui/cuenta";
-import { crearCuenta, archivarCuenta } from "./cuentas";
+import { BancoIcon } from "@/components/ui/cuenta";
+import { bancoDeClabe, validarClabe } from "@/lib/bancos";
+import { crearCuenta, archivarCuenta, type CuentaAdmin } from "./cuentas";
+
+// CLABE blocks: bank(3) plaza(3) cuenta(11) control(1) — spacing them makes an
+// 18-digit paste readable at a glance.
+const agrupar = (d: string) =>
+  [d.slice(0, 3), d.slice(3, 6), d.slice(6, 17), d.slice(17, 18)].filter(Boolean).join(" ");
 
 /**
- * "Cuentas del negocio": register each account transfers can land in. The bank
- * grid is the whole form — tap the bank, name the account, done. Once at least
- * one exists, every transfer flow grows a "¿a cuál cuenta llegó?" picker.
+ * "Cuentas del negocio": paste the CLABE and the bank names itself — the first
+ * 3 digits ARE the bank, and the check digit rejects typos before saving.
  */
-export function CuentasNegocio({ cuentas, isAdmin }: { cuentas: Cuenta[]; isAdmin: boolean }) {
+export function CuentasNegocio({ cuentas, isAdmin }: { cuentas: CuentaAdmin[]; isAdmin: boolean }) {
   const router = useRouter();
   const [pending, start] = useTransition();
-  const [banco, setBanco] = useState<string | null>(null);
+  const [clabe, setClabe] = useState("");
   const [alias, setAlias] = useState("");
+  const [copiada, setCopiada] = useState<string | null>(null);
+
+  const digitos = clabe.replace(/\D/g, "");
+  const banco = bancoDeClabe(digitos);
+  const completa = digitos.length === 18;
+  const valida = completa && validarClabe(digitos);
+  const aliasSugerido = banco && valida ? `${banco.nombre} ·${digitos.slice(-4)}` : "";
 
   function crear() {
     start(async () => {
       try {
-        unwrap(await crearCuenta(banco ?? "", alias));
-        toast.success(`Cuenta "${alias.trim()}" registrada`);
-        setBanco(null);
+        unwrap(await crearCuenta(digitos, alias));
+        toast.success(`Cuenta "${alias.trim() || aliasSugerido}" registrada`);
+        setClabe("");
         setAlias("");
         router.refresh();
       } catch (e) {
@@ -37,7 +49,7 @@ export function CuentasNegocio({ cuentas, isAdmin }: { cuentas: Cuenta[]; isAdmi
     });
   }
 
-  function archivar(c: Cuenta) {
+  function archivar(c: CuentaAdmin) {
     start(async () => {
       try {
         unwrap(await archivarCuenta(c.id));
@@ -47,6 +59,13 @@ export function CuentasNegocio({ cuentas, isAdmin }: { cuentas: Cuenta[]; isAdmi
         toast.error(e instanceof Error ? e.message : "No se pudo archivar");
       }
     });
+  }
+
+  async function copiar(c: CuentaAdmin) {
+    if (!c.clabe) return;
+    await navigator.clipboard.writeText(c.clabe).catch(() => undefined);
+    setCopiada(c.id);
+    setTimeout(() => setCopiada(null), 1500);
   }
 
   return (
@@ -67,14 +86,30 @@ export function CuentasNegocio({ cuentas, isAdmin }: { cuentas: Cuenta[]; isAdmi
       {cuentas.length > 0 && (
         <ul className="mt-3 divide-y divide-border rounded-xl border border-border">
           {cuentas.map((c) => (
-            <li key={c.id} className="flex items-center gap-3 px-3 py-2">
-              <BancoIcon banco={c.banco} />
+            <li key={c.id} className="flex items-center gap-3 px-3 py-2.5">
+              <BancoIcon banco={c.banco} size="lg" />
               <span className="min-w-0 flex-1">
-                <span className="block text-sm font-medium">{c.alias}</span>
-                <span className="block text-xs text-muted-foreground">
-                  {BANCOS[c.banco]?.nombre ?? c.banco}
-                </span>
+                <span className="block truncate text-sm font-medium">{c.alias}</span>
+                {c.clabe && (
+                  <span className="block font-mono text-xs tabular-nums text-muted-foreground">
+                    {agrupar(c.clabe)}
+                  </span>
+                )}
               </span>
+              {c.clabe && (
+                <button
+                  type="button"
+                  onClick={() => copiar(c)}
+                  aria-label={`Copiar CLABE de ${c.alias}`}
+                  className="cursor-pointer rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                >
+                  {copiada === c.id ? (
+                    <Check className="h-4 w-4 text-green-600 dark:text-green-400" />
+                  ) : (
+                    <Copy className="h-4 w-4" />
+                  )}
+                </button>
+              )}
               {isAdmin && (
                 <button
                   type="button"
@@ -92,35 +127,64 @@ export function CuentasNegocio({ cuentas, isAdmin }: { cuentas: Cuenta[]; isAdmi
       )}
 
       {isAdmin && (
-        <fieldset className="mt-3" disabled={pending}>
-          <span className="mb-1.5 block text-xs font-medium text-muted-foreground">Banco</span>
-          <div className="flex flex-wrap gap-1.5">
-            {Object.entries(BANCOS).map(([key, b]) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setBanco(banco === key ? null : key)}
-                aria-pressed={banco === key}
-                title={b.nombre}
-                className={cn(
-                  "cursor-pointer rounded-xl border p-1 transition-colors",
-                  banco === key ? "border-ring bg-muted" : "border-border hover:border-ring/40",
-                )}
-              >
-                <BancoIcon banco={key} size="lg" />
-              </button>
-            ))}
-          </div>
-          <div className="mt-2 flex flex-wrap items-end gap-2">
+        <fieldset className="mt-4 space-y-2" disabled={pending}>
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-muted-foreground">
+              CLABE (18 dígitos) — el banco se detecta solo
+            </span>
+            <Input
+              value={agrupar(digitos)}
+              onChange={(e) => setClabe(e.target.value.replace(/\D/g, "").slice(0, 18))}
+              inputMode="numeric"
+              placeholder="012 180 01234567890 1"
+              className="font-mono tabular-nums"
+            />
+          </label>
+
+          {digitos.length >= 3 && (
+            <div
+              className={cn(
+                "flex items-center gap-2.5 rounded-xl border p-2.5",
+                valida
+                  ? "border-green-300/60 bg-green-50 dark:border-green-800/60 dark:bg-green-950/30"
+                  : completa
+                    ? "border-red-300/60 bg-red-50 dark:border-red-800/60 dark:bg-red-950/30"
+                    : "border-border bg-muted/40",
+              )}
+            >
+              {completa && !valida ? (
+                <>
+                  <AlertCircle className="h-5 w-5 shrink-0 text-red-600 dark:text-red-400" />
+                  <span className="text-sm text-red-700 dark:text-red-300">
+                    La CLABE no cuadra — revisa los dígitos.
+                  </span>
+                </>
+              ) : (
+                <>
+                  <BancoIcon banco={banco!.banco} size="lg" />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium">{banco!.nombre}</span>
+                    <span className="block text-xs text-muted-foreground">
+                      {valida ? "CLABE verificada ✓" : `${digitos.length}/18 dígitos`}
+                    </span>
+                  </span>
+                </>
+              )}
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-end gap-2">
             <label className="block min-w-48 flex-1">
-              <span className="mb-1 block text-xs font-medium text-muted-foreground">Alias</span>
+              <span className="mb-1 block text-xs font-medium text-muted-foreground">
+                Alias (opcional)
+              </span>
               <Input
                 value={alias}
                 onChange={(e) => setAlias(e.target.value)}
-                placeholder={banco ? `${BANCOS[banco].nombre} Antonio` : "BBVA Antonio"}
+                placeholder={aliasSugerido || "BBVA Antonio"}
               />
             </label>
-            <Button type="button" onClick={crear} loading={pending} disabled={!banco || !alias.trim()}>
+            <Button type="button" onClick={crear} loading={pending} disabled={!valida}>
               <Plus className="h-4 w-4" />
               Agregar
             </Button>

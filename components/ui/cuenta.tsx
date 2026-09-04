@@ -3,31 +3,13 @@
 import { useEffect, useState } from "react";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { BANCOS, type Cuenta } from "@/lib/bancos";
+
+export { BANCOS, CLABE_CODIGOS, validarClabe, bancoDeClabe, type Cuenta } from "@/lib/bancos";
 
 // Mexican banks the shop may hold accounts at. No hotlinked logos: each bank
 // renders as a rounded tile in its brand color with its short mark — instantly
 // recognizable at the counter, zero external assets, works offline.
-export const BANCOS: Record<string, { nombre: string; marca: string; bg: string; fg: string }> = {
-  bbva:        { nombre: "BBVA",         marca: "BBVA", bg: "#072146", fg: "#ffffff" },
-  banorte:     { nombre: "Banorte",      marca: "Bnte", bg: "#eb0029", fg: "#ffffff" },
-  santander:   { nombre: "Santander",    marca: "San",  bg: "#ec0000", fg: "#ffffff" },
-  banamex:     { nombre: "Banamex",      marca: "Bmx",  bg: "#056dae", fg: "#ffffff" },
-  hsbc:        { nombre: "HSBC",         marca: "HSBC", bg: "#db0011", fg: "#ffffff" },
-  scotiabank:  { nombre: "Scotiabank",   marca: "Scot", bg: "#ec111a", fg: "#ffffff" },
-  banregio:    { nombre: "Banregio",     marca: "Breg", bg: "#f47920", fg: "#ffffff" },
-  azteca:      { nombre: "Banco Azteca", marca: "Azt",  bg: "#00693c", fg: "#ffffff" },
-  bancoppel:   { nombre: "BanCoppel",    marca: "Cop",  bg: "#0055b8", fg: "#ffd500" },
-  nu:          { nombre: "Nu",           marca: "Nu",   bg: "#820ad1", fg: "#ffffff" },
-  klar:        { nombre: "Klar",         marca: "Klar", bg: "#101010", fg: "#ffffff" },
-  hey:         { nombre: "Hey Banco",    marca: "Hey",  bg: "#0e1e2e", fg: "#3ddc97" },
-  spin:        { nombre: "Spin by OXXO", marca: "Spin", bg: "#e10a17", fg: "#ffffff" },
-  mercadopago: { nombre: "Mercado Pago", marca: "MP",   bg: "#009ee3", fg: "#ffffff" },
-  stp:         { nombre: "STP",          marca: "STP",  bg: "#20315f", fg: "#ffffff" },
-  otro:        { nombre: "Otro",         marca: "$",    bg: "#6b7280", fg: "#ffffff" },
-};
-
-export type Cuenta = { id: string; banco: string; alias: string };
-
 export function BancoIcon({ banco, size = "md" }: { banco: string; size?: "sm" | "md" | "lg" }) {
   const b = BANCOS[banco] ?? BANCOS.otro;
   const px = size === "lg" ? "h-10 w-10 text-sm" : size === "sm" ? "h-6 w-6 text-[9px]" : "h-8 w-8 text-[11px]";

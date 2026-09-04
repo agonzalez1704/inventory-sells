@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { listarSucursales } from "@/modules/sucursales/actions";
 import { SucursalesConfig } from "@/modules/sucursales/SucursalesConfig";
-import { listarCuentas } from "@/modules/config/cuentas";
+import { listarCuentasAdmin } from "@/modules/config/cuentas";
 import { CuentasNegocio } from "@/modules/config/CuentasNegocio";
 import { Plane } from "lucide-react";
 import { PushToggle } from "@/components/push-toggle";
@@ -63,7 +63,7 @@ export default async function ConfiguracionPage() {
     );
   }
   const sucursales = isAdmin ? await listarSucursales() : [];
-  const cuentas = await listarCuentas();
+  const cuentas = isAdmin ? await listarCuentasAdmin() : [];
   const aliAuthUrl = aliKey
     ? `https://api-sg.aliexpress.com/oauth/authorize?response_type=code&client_id=${aliKey}&redirect_uri=${encodeURIComponent("https://fiable.vercel.app/api/aliexpress/callback")}&force_auth=true`
     : null;
