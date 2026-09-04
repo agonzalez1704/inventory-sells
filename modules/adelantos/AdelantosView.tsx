@@ -257,6 +257,8 @@ function AbonarModal({
     const pesos = Number(monto.replace(",", "."));
     if (!Number.isFinite(pesos) || pesos <= 0) return toast.error("Monto inválido");
     if (Math.round(pesos * 100) > resta) return toast.error("El abono excede lo que falta");
+    if (metodo === "transferencia" && cuentasAbono.length > 0 && !cuentaAbono)
+      return toast.error("Elige a cuál cuenta llegó la transferencia");
     start(async () => {
       try {
         await abonarAdelanto(a.id, pesos, metodo);
@@ -407,6 +409,8 @@ function CrearModal({
 
   function save() {
     if (!valido) return toast.error("Revisa producto, precio y abono");
+    if (abonoNum > 0 && metodo === "transferencia" && cuentasPago.length > 0 && !cuentaPago)
+      return toast.error("Elige a cuál cuenta llegó la transferencia");
     start(async () => {
       try {
         const { id } = await crearAdelanto({

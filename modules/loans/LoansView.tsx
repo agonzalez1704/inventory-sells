@@ -296,6 +296,8 @@ function LoanRow({
   function collect() {
     if (payment === "transferencia" && comprobanteObligatorio && !refPago.trim() && !fotoPago)
       return toast.error("El comprobante es obligatorio: pega la captura o escribe la referencia");
+    if (payment === "transferencia" && cuentas.length > 0 && !cuentaPago)
+      return toast.error("Elige a cuál cuenta llegó la transferencia");
     startTransition(async () => {
       try {
         await settleLoan(loan.id, payment);
@@ -498,6 +500,8 @@ function AbonarFiadoModal({
     if (Math.round(pesos * 100) > resta) return toast.error("El abono excede lo que falta");
     if (metodo === "transferencia" && comprobanteObligatorio && !referencia.trim() && !foto)
       return toast.error("El comprobante es obligatorio: pega la captura o escribe la referencia");
+    if (metodo === "transferencia" && cuentasAbono.length > 0 && !cuentaAbono)
+      return toast.error("Elige a cuál cuenta llegó la transferencia");
     start(async () => {
       try {
         await abonarFiado(loan.id, pesos, metodo);

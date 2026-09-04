@@ -138,7 +138,10 @@ function PaymentContent({
     : metodo === "transferencia";
   const faltaComprobante =
     comprobanteObligatorio && hayTransferencia && !referencia.trim() && !foto;
-  const puedeCobrar = (dividir ? splitCuadra : puedeCobrarSimple) && !faltaComprobante;
+  // With business accounts registered, a transfer MUST say where it landed.
+  const faltaCuenta = hayTransferencia && cuentas.length > 0 && !cuentaId;
+  const puedeCobrar =
+    (dividir ? splitCuadra : puedeCobrarSimple) && !faltaComprobante && !faltaCuenta;
 
   const sugerencias = useMemo(() => {
     const opts = new Set<number>([
@@ -384,7 +387,12 @@ function PaymentContent({
             placeholder="Referencia / clave de rastreo"
           />
           <AdjuntarImagen value={foto} onChange={setFoto} />
-          <CuentaPicker cuentas={cuentas} value={cuentaId} onChange={setCuentaId} />
+          <CuentaPicker
+            cuentas={cuentas}
+            value={cuentaId}
+            onChange={setCuentaId}
+            label="¿A cuál cuenta llegó? (obligatorio)"
+          />
         </div>
       )}
 
