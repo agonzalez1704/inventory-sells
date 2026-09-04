@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BANCOS, type Cuenta } from "@/lib/bancos";
+import { listarCuentas } from "@/modules/config/cuentas";
 
 export { BANCOS, CLABE_CODIGOS, validarClabe, bancoDeClabe, type Cuenta } from "@/lib/bancos";
 
@@ -89,9 +90,7 @@ export function CuentaPicker({
 export function useCuentas(): Cuenta[] {
   const [cuentas, setCuentas] = useState<Cuenta[]>([]);
   useEffect(() => {
-    import("@/modules/config/cuentas").then(({ listarCuentas }) =>
-      listarCuentas().then(setCuentas).catch(() => undefined),
-    );
+    listarCuentas().then(setCuentas).catch(() => undefined);
   }, []);
   return cuentas;
 }
