@@ -416,11 +416,13 @@ export function SalesScreen({
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [pending, startTransition] = useTransition();
 
+  // Re-created when the server hands down a fresh map (e.g. right after the
+  // seller's check-in refreshes the page) — memoizing it once froze the
+  // pre-check-in blocks and refused the seller's own branch.
   const marcarAjenos = useCallback(
     (ps: SalesProduct[]) =>
       ps.map((p) => ({ ...p, sucursal_ajena: inventariosAjenos[p.inventory_id ?? ""] ?? null })),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- stable per page load
-    [],
+    [inventariosAjenos],
   );
   const [results, setResults] = useState<SalesProduct[]>(() => marcarAjenos(products));
   const [buscando, setBuscando] = useState(false);
@@ -485,7 +487,9 @@ export function SalesScreen({
   const count = lines.reduce((s, l) => s + l.qty, 0);
 
   function add(p: SalesProduct) {
-    const ajena = p.sucursal_ajena ?? inventariosAjenos[p.inventory_id ?? ""];
+    // The LIVE prop map decides, never the row decoration — a stale card
+    // must not refuse stock the seller can sell since checking in.
+    const ajena = inventariosAjenos[p.inventory_id ?? ""];
     if (ajena) {
       toast.error(
         `${p.name} está en la sucursal ${ajena}. Ofrécelo y mándalo traer — se cobra desde allá.`,

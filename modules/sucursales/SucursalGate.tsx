@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,7 @@ import { estadoCheckin, registrarCheckin } from "./actions";
  * browser's location and registers where the employee actually is.
  */
 export function SucursalGate() {
+  const router = useRouter();
   const [abierto, setAbierto] = useState(false);
   const [permitidas, setPermitidas] = useState<string[]>([]);
   const [pidiendo, setPidiendo] = useState(false);
@@ -58,6 +60,10 @@ export function SucursalGate() {
           );
           toast.success(`Día iniciado en ${r.sucursal}`);
           setAbierto(false);
+          // The pages behind the overlay were server-rendered BEFORE the
+          // check-in, so their branch-lock props say "not here yet" — the POS
+          // would keep refusing the seller's own stock. Recompute everything.
+          router.refresh();
         } catch (e) {
           setError(e instanceof Error ? e.message : "No se pudo registrar");
         } finally {
