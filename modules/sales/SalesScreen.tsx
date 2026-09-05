@@ -45,7 +45,10 @@ export type SalesProduct = Pick<
   Product,
   "id" | "sku" | "name" | "brand" | "size" | "category" | "price_cents" | "quantity"
 > & {
+  inventory_id?: string;
   inventory_name?: string | null;
+  /** Set when this stock sits at another sucursal: shown, not sellable here. */
+  sucursal_ajena?: string | null;
   image_url?: string | null;
   /** Absent, or 0, for a reader who may not see costs — the server strips it. */
   cost_cents?: number;
@@ -172,10 +175,16 @@ function ProductCard({
           which is no use when you are scanning a grid. */}
       <p className="flex items-baseline justify-between gap-1 font-mono text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
         <span className="truncate">{p.sku}</span>
-        {p.inventory_name && (
-          <span className="shrink-0 rounded bg-muted px-1 font-sans text-[10px] font-medium normal-case">
-            {p.inventory_name}
+        {p.sucursal_ajena ? (
+          <span className="shrink-0 rounded bg-amber-100 px-1 font-sans text-[10px] font-semibold normal-case text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">
+            En {p.sucursal_ajena}
           </span>
+        ) : (
+          p.inventory_name && (
+            <span className="shrink-0 rounded bg-muted px-1 font-sans text-[10px] font-medium normal-case">
+              {p.inventory_name}
+            </span>
+          )
         )}
       </p>
       <p className="line-clamp-2 min-h-[2.25rem] text-sm font-medium leading-tight">
@@ -258,7 +267,11 @@ function ProductRow({
               {[p.brand, p.category].filter(Boolean).join(" · ")}
             </span>
           )}
-          {p.inventory_name && <span>{" · "}{p.inventory_name}</span>}
+          {p.sucursal_ajena ? (
+            <span className="font-semibold text-amber-700 dark:text-amber-400">{" · "}En {p.sucursal_ajena}</span>
+          ) : (
+            p.inventory_name && <span>{" · "}{p.inventory_name}</span>
+          )}
         </p>
       </div>
       <span className="shrink-0 font-mono text-sm font-semibold tabular-nums">
@@ -333,6 +346,7 @@ export function SalesScreen({
   fiadoExigeCliente,
   clickAbreDetalle,
   comprobanteObligatorio = false,
+  inventariosAjenos = {},
 }: {
   /** First page of the catalog, rendered before any search runs. */
   products: SalesProduct[];
@@ -352,6 +366,9 @@ export function SalesScreen({
   clickAbreDetalle: boolean;
   /** Shop rule: a transfer needs its proof before the charge completes. */
   comprobanteObligatorio?: boolean;
+  /** inventory_id -> sucursal where that stock physically sits. Visible on the
+   *  grid ("se lo mando traer" is a sale) but not addable to the cart. */
+  inventariosAjenos?: Record<string, string>;
 }) {
   const router = useRouter();
   const mostrador = useMemo(
@@ -399,7 +416,13 @@ export function SalesScreen({
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [pending, startTransition] = useTransition();
 
-  const [results, setResults] = useState<SalesProduct[]>(products);
+  const marcarAjenos = useCallback(
+    (ps: SalesProduct[]) =>
+      ps.map((p) => ({ ...p, sucursal_ajena: inventariosAjenos[p.inventory_id ?? ""] ?? null })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- stable per page load
+    [],
+  );
+  const [results, setResults] = useState<SalesProduct[]>(() => marcarAjenos(products));
   const [buscando, setBuscando] = useState(false);
 
   // Every product the register has ever shown this session. The cart holds ids,
@@ -426,13 +449,12 @@ export function SalesScreen({
     const t = setTimeout(async () => {
       try {
         const rows = (await buscarProductos({
-          soloVendibles: true,
           query,
           categoria,
           limit: GRID_LIMIT,
         })) as SalesProduct[];
         if (cancelado) return;
-        setResults(rows);
+        setResults(marcarAjenos(rows));
         recordar(rows);
       } catch {
         if (!cancelado) setResults([]);
@@ -451,7 +473,7 @@ export function SalesScreen({
   }, [query, categoria, recordar, products]);
 
   const buscarCompat = useCallback(async (modelo: string) => {
-    const rows = (await buscarProductos({ query: modelo, limit: 4, soloVendibles: true })) as SalesProduct[];
+    const rows = (await buscarProductos({ query: modelo, limit: 4 })) as SalesProduct[];
     recordar(rows);
     return rows;
   }, [recordar]);
@@ -463,6 +485,13 @@ export function SalesScreen({
   const count = lines.reduce((s, l) => s + l.qty, 0);
 
   function add(p: SalesProduct) {
+    const ajena = p.sucursal_ajena ?? inventariosAjenos[p.inventory_id ?? ""];
+    if (ajena) {
+      toast.error(
+        `${p.name} está en la sucursal ${ajena}. Ofrécelo y mándalo traer — se cobra desde allá.`,
+      );
+      return;
+    }
     // Imported catalogs carry products their ERP never priced. They have to be
     // visible — staff need to see the part exists — but the database rejects a
     // sale line at zero, so stop it here with an answer instead of an error.

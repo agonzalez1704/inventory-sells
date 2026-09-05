@@ -9,17 +9,27 @@ import { mxHoy, rangoUTC } from "@/lib/caja-range";
 // anything — so the two features can't disagree about who is gated.
 
 /**
- * Inventory ids this user may NOT sell from right now. Empty for exempt
- * users and for shops that never linked an inventory to a branch.
+ * Inventory ids this user may NOT sell from right now, each mapped to the
+ * branch it physically lives at (for the "está en Panorama" copy). Empty for
+ * exempt users and for shops that never linked an inventory to a branch.
  */
-export async function inventariosBloqueados(userId: string): Promise<Set<string>> {
-  const vacio = new Set<string>();
+export async function inventariosAjenos(userId: string): Promise<Map<string, string>> {
+  const vacio = new Map<string, string>();
 
   const { data: invData } = await insforgeAdmin.database
     .from("inventories")
-    .select("id, sucursal_id")
+    .select("id, sucursal_id, sucursales(nombre)")
     .not("sucursal_id", "is", null);
-  const ligados = (invData ?? []) as { id: string; sucursal_id: string }[];
+  const ligados = ((invData ?? []) as unknown as {
+    id: string;
+    sucursal_id: string;
+    sucursales: { nombre: string } | { nombre: string }[] | null;
+  }[]).map((i) => ({
+    ...i,
+    nombreSucursal:
+      (Array.isArray(i.sucursales) ? i.sucursales[0]?.nombre : i.sucursales?.nombre) ??
+      "otra sucursal",
+  }));
   if (ligados.length === 0) return vacio;
 
   const perms = await getPermisos(userId);
@@ -43,7 +53,14 @@ export async function inventariosBloqueados(userId: string): Promise<Set<string>
     .limit(1);
   const aqui = ((hoy ?? []) as { sucursal_id: string }[])[0]?.sucursal_id ?? null;
 
-  return new Set(ligados.filter((i) => i.sucursal_id !== aqui).map((i) => i.id));
+  return new Map(
+    ligados.filter((i) => i.sucursal_id !== aqui).map((i) => [i.id, i.nombreSucursal]),
+  );
+}
+
+/** Set view of inventariosAjenos, for callers that only need membership. */
+export async function inventariosBloqueados(userId: string): Promise<Set<string>> {
+  return new Set((await inventariosAjenos(userId)).keys());
 }
 
 /** Throw (naming product and branch) if any item lives at another sucursal. */
