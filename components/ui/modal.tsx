@@ -72,14 +72,18 @@ function DesktopModal({
       aria-modal="true"
       aria-label={title}
     >
+      {/* Capped to the viewport with the body scrolling INSIDE: a tall modal
+          (the register's numpad) must never push its own confirm button off
+          screen. The header stays put; children may pin their action row with
+          sticky bottom-0. */}
       <div
         className={cn(
-          "relative mt-2 w-full max-w-3xl animate-fade-in rounded-2xl border border-border bg-background shadow-pop",
+          "relative mt-2 flex max-h-[calc(100dvh-3rem)] w-full max-w-3xl animate-fade-in flex-col rounded-2xl border border-border bg-background shadow-pop",
           className,
         )}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
+        <div className="flex shrink-0 items-center justify-between border-b border-border px-5 py-3.5">
           <h2 className="text-sm font-semibold">{title}</h2>
           <button
             onClick={onClose}
@@ -89,7 +93,7 @@ function DesktopModal({
             <X className="h-4 w-4" />
           </button>
         </div>
-        <div className="p-5">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto p-5">{children}</div>
       </div>
     </div>
   );

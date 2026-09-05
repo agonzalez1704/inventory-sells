@@ -400,7 +400,10 @@ function PaymentContent({
         </div>
       )}
 
-      <div className="flex gap-2 border-t border-border pt-4">
+      {/* Pinned inside the modal's scroll area: the numpad can be as tall as
+          it likes, "Completar cobro" never leaves the screen. Negative margins
+          cancel the container's p-5 so the bar sits flush. */}
+      <div className="sticky -bottom-5 -mx-5 flex gap-2 border-t border-border bg-background px-5 py-3">
         <Button variant="ghost" className="flex-1" onClick={onCancel} disabled={pending}>
           Cancelar
         </Button>
