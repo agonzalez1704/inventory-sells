@@ -1,6 +1,8 @@
 "use server";
 
+import { auth } from "@clerk/nextjs/server";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
+import { inventariosBloqueados } from "@/modules/sucursales/guard";
 import { assertPermiso, permisosDe } from "@/lib/auth/profile";
 import type { Permiso } from "@/lib/permissions";
 import { searchProducts, tokensDeConsulta, expand } from "@/lib/search";
@@ -86,6 +88,8 @@ export type Filtro = {
   inventoryId?: string | null;
   categoria?: string | null;
   limit?: number;
+  /** POS only: hide stock the seller can't sell from their sucursal. */
+  soloVendibles?: boolean;
 };
 
 /** How many rows the database may hand back for the scorer to rank. */
@@ -132,9 +136,17 @@ export async function buscarProductos(f: Filtro): Promise<ProductoBuscado[]> {
   });
   if (error) throw new Error(error.message ?? "Error al buscar");
 
-  const candidatos = await conNombreDeInventario(
+  let candidatos = await conNombreDeInventario(
     await sinCostosSiNoPuede((data ?? []) as ProductoBuscado[]),
   );
+  if (f.soloVendibles) {
+    const { userId } = await auth();
+    if (userId) {
+      const bloqueados = await inventariosBloqueados(userId);
+      if (bloqueados.size > 0)
+        candidatos = candidatos.filter((c) => !bloqueados.has(c.inventory_id));
+    }
+  }
   return searchProducts(candidatos, f.query ?? "", {
     limit: limite,
     // Same tie-break the register used when it filtered in the browser:

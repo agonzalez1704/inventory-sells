@@ -6,6 +6,7 @@ import { getPermisos, getProfile, permisosDe } from "@/lib/auth/profile";
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { attempt, type ActionResult } from "@/lib/errors";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
+import { assertVentaPermitida } from "@/modules/sucursales/guard";
 import { toCents } from "@/lib/money";
 import { notifyNuevaVenta, notifyAbono, notifyCancelacion } from "@/lib/push";
 import type { CartLine, PaymentMethod, PaymentMethodVenta } from "@/lib/types";
@@ -90,6 +91,8 @@ export async function registerSale(
   const { userId } = await auth();
   if (!userId) throw new Error("No autenticado");
   if (items.length === 0) throw new Error("Carrito vacío");
+  // Branch-linked stock only sells from its own counter.
+  await assertVentaPermitida(userId, items.map((i) => i.product_id));
 
   const insforge = await createInsForgeServerClient();
   // register_sale copies the customer's name into customer_name from the id,
@@ -126,6 +129,8 @@ export async function registerLoan(
   const { userId } = await auth();
   if (!userId) throw new Error("No autenticado");
   if (items.length === 0) throw new Error("Carrito vacío");
+  // Same physical rule as a sale: a fiado moves the stock out now.
+  await assertVentaPermitida(userId, items.map((i) => i.product_id));
   // Whether a debt can be anonymous is the shop's rule, so the check is not
   // repeated here — the RPC reads the shop's config and its message is the one
   // worth showing. A copy here could only drift out of step with it.

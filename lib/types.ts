@@ -25,6 +25,8 @@ export interface Inventory {
   entrega_dias_habiles?: number | null;
   /** Supplier ships straight to the customer: no own stock, no reserva. */
   es_dropship?: boolean;
+  /** Physical branch: only sellers checked in there can sell this stock. */
+  sucursal_id?: string | null;
 }
 
 export interface Product {

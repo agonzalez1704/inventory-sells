@@ -426,6 +426,7 @@ export function SalesScreen({
     const t = setTimeout(async () => {
       try {
         const rows = (await buscarProductos({
+          soloVendibles: true,
           query,
           categoria,
           limit: GRID_LIMIT,
@@ -450,7 +451,7 @@ export function SalesScreen({
   }, [query, categoria, recordar, products]);
 
   const buscarCompat = useCallback(async (modelo: string) => {
-    const rows = (await buscarProductos({ query: modelo, limit: 4 })) as SalesProduct[];
+    const rows = (await buscarProductos({ query: modelo, limit: 4, soloVendibles: true })) as SalesProduct[];
     recordar(rows);
     return rows;
   }, [recordar]);

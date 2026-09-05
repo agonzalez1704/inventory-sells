@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Modal } from "@/components/ui/modal";
@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import type { Inventory } from "@/lib/types";
 import { editarInventario } from "./inventories";
+import { listarSucursales, type Sucursal } from "@/modules/sucursales/actions";
 
 /**
  * The inventory itself: name, city, delivery lead. Three fields — creating
@@ -28,6 +29,11 @@ export function EditarInventarioModal({
     inventario.entrega_dias_habiles != null ? String(inventario.entrega_dias_habiles) : "",
   );
   const [dropship, setDropship] = useState(inventario.es_dropship ?? false);
+  const [sucursalId, setSucursalId] = useState<string>(inventario.sucursal_id ?? "");
+  const [sucursales, setSucursales] = useState<Sucursal[]>([]);
+  useEffect(() => {
+    listarSucursales().then(setSucursales).catch(() => undefined);
+  }, []);
   const [pending, start] = useTransition();
 
   function guardar() {
@@ -38,6 +44,7 @@ export function EditarInventarioModal({
           ciudad: ciudad.trim() || null,
           entregaDias: dias.trim() === "" ? null : Number(dias),
           esDropship: dropship,
+          sucursalId: sucursalId || null,
         });
         toast.success("Inventario guardado");
         onClose();
@@ -85,6 +92,27 @@ export function EditarInventarioModal({
           Los días se suman a la entrega estimada de todo pedido que incluya
           piezas de este inventario, y la tienda lo dice en cada pieza.
         </p>
+        {sucursales.length > 0 && (
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-muted-foreground">
+              Sucursal física
+            </span>
+            <select
+              value={sucursalId}
+              onChange={(e) => setSucursalId(e.target.value)}
+              className="h-10 w-full cursor-pointer rounded-lg border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring/20"
+            >
+              <option value="">Sin sucursal — se vende desde cualquiera</option>
+              {sucursales.map((su) => (
+                <option key={su.id} value={su.id}>{su.nombre}</option>
+              ))}
+            </select>
+            <span className="mt-1 block text-xs text-muted-foreground">
+              Con sucursal, solo quien registró su entrada ahí puede vender este
+              inventario.
+            </span>
+          </label>
+        )}
         <label className="flex cursor-pointer items-start gap-2 text-sm">
           <input
             type="checkbox"

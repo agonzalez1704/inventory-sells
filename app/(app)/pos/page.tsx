@@ -4,6 +4,7 @@ import { getPrecioBasePos } from "@/modules/sales/pos-prefs";
 import { SalesScreen, type SalesProduct } from "@/modules/sales/SalesScreen";
 import { listarCategorias } from "@/modules/inventory/buscar";
 import { fiadoExigeCliente, posClickAbreDetalle, comprobanteObligatorio } from "@/modules/config/negocio";
+import { inventariosBloqueados } from "@/modules/sucursales/guard";
 
 
 // The register: search products, build the cart, cobrar. The sales history lives
@@ -53,9 +54,14 @@ export default async function PosPage() {
   // in would hand the cost of thirty products to every seller who opens the
   // till, whether or not the card draws it. (The select stays one literal: the
   // SDK types it at compile time and cannot parse a ternary.)
+  // Branch-linked stock a seller elsewhere can't ring up doesn't belong on
+  // their first screenful either; searches apply the same filter server-side.
+  const bloqueados = await inventariosBloqueados(userId);
   const products = (
     (productData ?? []) as (SalesProduct & { inventory_id: string })[]
-  ).map((p) => ({
+  )
+    .filter((p) => !bloqueados.has(p.inventory_id))
+    .map((p) => ({
     ...p,
     cost_cents: verCostos ? p.cost_cents : undefined,
     inventory_name: invName.get(p.inventory_id) ?? null,
