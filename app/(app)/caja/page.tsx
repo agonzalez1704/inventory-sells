@@ -25,6 +25,7 @@ const cero = () =>
 
 type VentaRow = {
   id?: string;
+  sold_by?: string | null;
   total_cents: number;
   payment_method: PaymentMethodStored | null;
   created_at?: string;
@@ -56,7 +57,7 @@ type DevolRow = {
 export default async function CajaPage({
   searchParams,
 }: {
-  searchParams: Promise<{ from?: string; to?: string }>;
+  searchParams: Promise<{ from?: string; to?: string; sucursal?: string }>;
 }) {
   const sp = await searchParams;
   const from = sp.from ?? mxHoy();
@@ -88,7 +89,7 @@ export default async function CajaPage({
     insforge.database
       .from("sales")
       .select(
-        "id, total_cents, payment_method, created_at, sale_items(qty, unit_price_cents, costo_total_cents, products(etiqueta, cost_cents, name, sku, inventory_id))",
+        "id, total_cents, payment_method, created_at, sold_by, sale_items(qty, unit_price_cents, costo_total_cents, products(etiqueta, cost_cents, name, sku, inventory_id))",
       )
       .eq("status", "completed")
       .is("settled_at", null)
@@ -99,26 +100,26 @@ export default async function CajaPage({
     // prorated per abono.
     insforge.database
       .from("sales")
-      .select("id")
+      .select("id, sold_by, settled_at")
       .eq("status", "completed")
       .gte("settled_at", startISO)
       .lt("settled_at", endISO),
     insforge.database
       .from("gastos")
-      .select("id, concepto, monto_cents, metodo, categoria, created_at")
+      .select("id, concepto, monto_cents, metodo, categoria, created_at, created_by")
       .gte("created_at", startISO)
       .lt("created_at", endISO)
       .order("created_at", { ascending: false }),
     insforge.database
       .from("ingresos")
-      .select("id, concepto, monto_cents, metodo, categoria, created_at")
+      .select("id, concepto, monto_cents, metodo, categoria, created_at, created_by")
       .gte("created_at", startISO)
       .lt("created_at", endISO)
       .order("created_at", { ascending: false }),
     insforge.database
       .from("devoluciones")
       .select(
-        "id, monto_cents, metodo, motivo, created_at, devolucion_items(qty, unit_price_cents, products(cost_cents))",
+        "id, monto_cents, metodo, motivo, created_at, created_by, devolucion_items(qty, unit_price_cents, products(cost_cents))",
       )
       .gte("created_at", startISO)
       .lt("created_at", endISO)
@@ -126,14 +127,14 @@ export default async function CajaPage({
     insforge.database
       .from("sale_pagos")
       .select(
-        "sale_id, monto_cents, metodo, created_at, sales(customer_name, total_cents, sale_items(qty, unit_price_cents, costo_total_cents, products(etiqueta, cost_cents, name, sku, inventory_id)))",
+        "sale_id, monto_cents, metodo, created_at, created_by, sales(customer_name, total_cents, sale_items(qty, unit_price_cents, costo_total_cents, products(etiqueta, cost_cents, name, sku, inventory_id)))",
       )
       .gte("created_at", startISO)
       .lt("created_at", endISO),
     insforge.database
       .from("adelanto_pagos")
       .select(
-        "adelanto_id, monto_cents, metodo, tipo, created_at, adelantos(cliente, descripcion, qty, products(name))",
+        "adelanto_id, monto_cents, metodo, tipo, created_at, created_by, adelantos(cliente, descripcion, qty, products(name))",
       )
       .gte("created_at", startISO)
       .lt("created_at", endISO),
@@ -151,13 +152,14 @@ export default async function CajaPage({
     ((inventoriesData ?? []) as { id: string; name: string }[]).map((i) => [i.id, i.name]),
   );
 
-  const directasV = (directas ?? []) as unknown as VentaRow[];
-  const fiadosCount = (fiadosComp ?? []).length;
-  const gastos = (gastosData ?? []) as Gasto[];
-  const ingresos = (ingresosData ?? []) as Ingreso[];
-  const devoluciones = (devolucionesData ?? []) as Devolucion[];
-  const salePagos = (salePagosData ?? []) as unknown as {
+  let directasV = (directas ?? []) as unknown as VentaRow[];
+  let fiadosComp2 = (fiadosComp ?? []) as { id: string; sold_by: string | null; settled_at: string }[];
+  let gastos = (gastosData ?? []) as Gasto[];
+  let ingresos = (ingresosData ?? []) as Ingreso[];
+  let devoluciones = (devolucionesData ?? []) as Devolucion[];
+  let salePagos = (salePagosData ?? []) as unknown as {
     sale_id: string;
+    created_by: string | null;
     monto_cents: number;
     // A split sale can settle part of itself with store credit.
     metodo: PaymentMethodVenta;
@@ -168,8 +170,9 @@ export default async function CajaPage({
       sale_items: VentaRow["sale_items"];
     } | null;
   }[];
-  const adelantoPagos = (adelantoPagosData ?? []) as unknown as {
+  let adelantoPagos = (adelantoPagosData ?? []) as unknown as {
     adelanto_id: string;
+    created_by: string | null;
     monto_cents: number;
     metodo: PaymentMethod;
     tipo: "abono" | "devolucion";
@@ -181,11 +184,77 @@ export default async function CajaPage({
       products: { name: string } | null;
     } | null;
   }[];
-  const adelantosEnt = (adelantosEntData ?? []) as unknown as {
+  let adelantosEnt = (adelantosEntData ?? []) as unknown as {
     precio_cents: number;
     qty: number;
     products: { cost_cents: number } | null;
   }[];
+
+  // --- Sucursal attribution: every cash event belongs to the branch where
+  // its REGISTRAR checked in that day. Derived, not stored — the check-in is
+  // already the audit of where each person physically was. Events by people
+  // with no check-in that day (admins, unassigned) fall into "Sin sucursal".
+  const { data: sucsData } = await insforgeAdmin.database
+    .from("sucursales")
+    .select("id, nombre")
+    .eq("is_active", true)
+    .order("nombre");
+  const sucursalesActivas = (sucsData ?? []) as { id: string; nombre: string }[];
+  const sucursalSel = sucursalesActivas.length > 0 ? (sp.sucursal ?? null) : null;
+
+  const mxDia = (iso: string) =>
+    new Intl.DateTimeFormat("en-CA", { timeZone: "America/Mexico_City" }).format(new Date(iso));
+  const { data: chkData } = await insforgeAdmin.database
+    .from("checkins")
+    .select("profile_id, sucursal_id, created_at")
+    .gte("created_at", startISO)
+    .lt("created_at", endISO);
+  const checkinDe = new Map<string, string>();
+  for (const c of (chkData ?? []) as { profile_id: string; sucursal_id: string; created_at: string }[]) {
+    const key = `${c.profile_id}|${mxDia(c.created_at)}`;
+    if (!checkinDe.has(key)) checkinDe.set(key, c.sucursal_id);
+  }
+  const sucursalDe = (quien: string | null | undefined, cuandoISO: string | null | undefined) =>
+    quien && cuandoISO ? checkinDe.get(`${quien}|${mxDia(cuandoISO)}`) ?? null : null;
+  const enSucursal = (quien: string | null | undefined, cuandoISO: string | null | undefined) =>
+    sucursalSel === null ||
+    (sucursalSel === "sin" ? sucursalDe(quien, cuandoISO) === null : sucursalDe(quien, cuandoISO) === sucursalSel);
+
+  // Global summary (computed BEFORE filtering): income per branch.
+  const porSucursalMapa = new Map<string, number>();
+  const sumarSucursal = (quien: string | null | undefined, cuandoISO: string | null | undefined, cents: number) => {
+    const key = sucursalDe(quien, cuandoISO) ?? "sin";
+    porSucursalMapa.set(key, (porSucursalMapa.get(key) ?? 0) + cents);
+  };
+  if (sucursalesActivas.length > 0) {
+    for (const v of directasV) if (v.payment_method !== "mixto") sumarSucursal(v.sold_by, v.created_at, v.total_cents);
+    for (const pg of salePagos) sumarSucursal(pg.created_by, pg.created_at, pg.monto_cents);
+    for (const pg of adelantoPagos) if (pg.tipo === "abono") sumarSucursal(pg.created_by, pg.created_at, pg.monto_cents);
+    for (const ing of ingresos) sumarSucursal((ing as { created_by?: string | null }).created_by, ing.created_at, ing.monto_cents);
+  }
+  const porSucursal = sucursalesActivas
+    .map((su) => ({ id: su.id, nombre: su.nombre, ingresos: porSucursalMapa.get(su.id) ?? 0 }))
+    .concat(
+      porSucursalMapa.has("sin")
+        ? [{ id: "sin", nombre: "Sin sucursal", ingresos: porSucursalMapa.get("sin")! }]
+        : [],
+    );
+
+  // Branch view: drop every event that didn't happen at the selected counter.
+  // All the aggregation below (methods, tags, profit, inventories, detail)
+  // then reads as that branch's own corte.
+  if (sucursalSel) {
+    directasV = directasV.filter((v) => enSucursal(v.sold_by, v.created_at));
+    salePagos = salePagos.filter((pg) => enSucursal(pg.created_by, pg.created_at));
+    adelantoPagos = adelantoPagos.filter((pg) => enSucursal(pg.created_by, pg.created_at));
+    gastos = gastos.filter((g) => enSucursal((g as { created_by?: string | null }).created_by, g.created_at));
+    ingresos = ingresos.filter((g) => enSucursal((g as { created_by?: string | null }).created_by, g.created_at));
+    devoluciones = devoluciones.filter((d) => enSucursal((d as { created_by?: string | null }).created_by, d.created_at));
+    fiadosComp2 = fiadosComp2.filter((f) => enSucursal(f.sold_by, f.settled_at));
+    // Adelantos delivered (profit-on-delivery) carry no per-branch registrar;
+    // they count only in the global corte.
+    adelantosEnt = [];
+  }
 
   // --- Income (cash in by day/method) ---
   const ingresosPorMetodo = cero();
@@ -392,7 +461,7 @@ export default async function CajaPage({
       devolucionesTotal += p.monto_cents;
     }
 
-  const ventasCount = directasV.length + fiadosCount;
+  const ventasCount = directasV.length + fiadosComp2.length;
 
   // Breakdown of the Ingresos KPI: every cash-in event, so the lines sum to
   // ingresosTotal exactly. Same four sources as the KPI — direct sales, abonos a
@@ -549,6 +618,9 @@ export default async function CajaPage({
         ingresosDetalle,
         porInventario,
         porCuenta,
+        sucursales: sucursalesActivas,
+        sucursalSel,
+        porSucursal,
       }}
     />
   );

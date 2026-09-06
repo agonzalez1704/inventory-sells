@@ -97,6 +97,12 @@ export type CajaData = {
   porInventario: InvAgg[];
   /** Transfer income split by receiving business account (via comprobantes). */
   porCuenta: PorCuenta[];
+  /** Active branches; empty for shops without sucursales (UI stays as-is). */
+  sucursales: { id: string; nombre: string }[];
+  /** Branch this corte is scoped to; null = global; "sin" = unattributed. */
+  sucursalSel: string | null;
+  /** Global-view summary: income attributed to each branch. */
+  porSucursal: { id: string; nombre: string; ingresos: number }[];
 };
 
 export type PorCuenta = {
@@ -191,8 +197,8 @@ export function CajaView({ data }: { data: CajaData }) {
     setUsbOk(webUsbDisponible());
   }, []);
 
-  function go(f: string, t: string) {
-    router.push(`/caja?from=${f}&to=${t}`);
+  function go(f: string, t: string, sucursal: string | null = data.sucursalSel) {
+    router.push(`/caja?from=${f}&to=${t}${sucursal ? `&sucursal=${sucursal}` : ""}`);
   }
   function quick(kind: "hoy" | "ayer" | "7d" | "mes") {
     const now = new Date();
@@ -227,7 +233,13 @@ export function CajaView({ data }: { data: CajaData }) {
     (data.ingresosPorMetodo.efectivo ?? 0) -
     (data.gastosPorMetodo.efectivo ?? 0) -
     (data.devolucionesPorMetodo.efectivo ?? 0);
-  const rangoLabel = data.from === data.to ? data.from : `${data.from} → ${data.to}`;
+  const sucursalNombre =
+    data.sucursalSel === "sin"
+      ? "Sin sucursal"
+      : data.sucursales.find((su) => su.id === data.sucursalSel)?.nombre ?? null;
+  const rangoLabel =
+    (data.from === data.to ? data.from : `${data.from} → ${data.to}`) +
+    (sucursalNombre ? ` · ${sucursalNombre}` : " · Global");
 
   function buildCorte(): CorteData {
     const lineas = METODOS.map(([m, label]) => ({
@@ -329,6 +341,28 @@ export function CajaView({ data }: { data: CajaData }) {
             </button>
           ))}
         </div>
+        {data.sucursales.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-xs font-medium text-muted-foreground">Corte:</span>
+            {[{ id: null as string | null, nombre: "Global" }]
+              .concat(data.sucursales)
+              .concat([{ id: "sin", nombre: "Sin sucursal" }])
+              .map((su) => (
+                <button
+                  key={su.id ?? "global"}
+                  onClick={() => go(data.from, data.to, su.id)}
+                  className={cn(
+                    "cursor-pointer rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+                    data.sucursalSel === su.id
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {su.nombre}
+                </button>
+              ))}
+          </div>
+        )}
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
           <label className="block sm:flex-1">
             <span className="mb-1 block text-xs text-muted-foreground">Desde</span>
@@ -476,6 +510,36 @@ export function CajaView({ data }: { data: CajaData }) {
           )}
         </table>
       </Card>
+
+      {/* Ingresos por sucursal — only on the global corte, and only when the
+          shop has branches. Each row jumps to that branch's own corte. */}
+      {data.sucursalSel === null && data.porSucursal.some((su) => su.ingresos > 0) && (
+        <Card className="overflow-hidden">
+          <div className="border-b border-border px-4 py-3">
+            <h2 className="text-sm font-semibold">Ingresos por sucursal</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Según el check-in de quien registró cada movimiento. Toca una para
+              ver su corte completo.
+            </p>
+          </div>
+          <ul className="divide-y divide-border">
+            {data.porSucursal.map((su) => (
+              <li key={su.id}>
+                <button
+                  onClick={() => go(data.from, data.to, su.id)}
+                  className="flex w-full cursor-pointer items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-muted/40"
+                >
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium">{su.nombre}</span>
+                  <span className="shrink-0 font-mono text-sm font-semibold tabular-nums text-accent">
+                    {formatMXN(su.ingresos)}
+                  </span>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
 
       {/* Transferencias por cuenta (subset of the Transferencia income line) */}
       {data.porCuenta.length > 0 && (
