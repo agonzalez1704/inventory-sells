@@ -25,7 +25,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
-import { imprimirTicketNavegador, type TicketData } from "@/lib/ticket";
+import type { TicketData } from "@/lib/ticket";
 import { CustomerPicker, type PickerCustomer } from "@/modules/customers/CustomerPicker";
 import { ResumenClienteChip } from "@/modules/customers/ResumenClienteChip";
 import { CompatPanel } from "@/modules/compat/CompatPanel";
@@ -33,6 +33,7 @@ import { AnimatePresence, m } from "framer-motion";
 import NumberFlow from "@number-flow/react";
 import { Motion } from "@/components/ui/motion";
 import { PaymentSheet } from "./PaymentSheet";
+import { ReciboImpreso } from "./ReciboImpreso";
 import { ProductoSheet } from "./ProductoSheet";
 import { CategoriaSheet } from "./CategoriaSheet";
 import type { CategoriaConteo } from "@/modules/inventory/buscar";
@@ -414,6 +415,11 @@ export function SalesScreen({
     return top;
   }, [categorias, categoria]);
   const [paymentOpen, setPaymentOpen] = useState(false);
+  const [recibo, setRecibo] = useState<{
+    ticket: TicketData;
+    usoSaldo: number;
+    saldoRestante: number;
+  } | null>(null);
   const [pending, startTransition] = useTransition();
 
   // Re-created when the server hands down a fresh map (e.g. right after the
@@ -605,13 +611,9 @@ export function SalesScreen({
         // seller has to be able to tell them so before they walk out.
         const usoSaldo = (pagos ?? []).find((p) => p.metodo === "saldo")?.monto_cents ?? 0;
         const restante = Math.max(0, saldo - usoSaldo);
-        toast.success(
-          `${esFiado ? "Nota de crédito registrada" : "Venta registrada"} · ${formatMXN(ticketTotal)}` +
-            (usoSaldo > 0
-              ? ` · ${formatMXN(usoSaldo)} de saldo${restante > 0 ? `, le quedan ${formatMXN(restante)}` : ""}`
-              : ""),
-          { action: { label: "Imprimir", onClick: () => imprimirTicketNavegador(ticket) } },
-        );
+        // The printed-receipt overlay IS the success feedback now — it carries
+        // the same TicketData the toast's Imprimir button used to.
+        setRecibo({ ticket, usoSaldo, saldoRestante: restante });
         setCart({});
         setCustomer(mostrador);
         setNote("");
@@ -928,6 +930,15 @@ export function SalesScreen({
         saldoDisponible={saldo}
         onConfirm={(metodo, pagos, comprobante) => submit(metodo, pagos, comprobante)}
       />
+
+      {recibo && (
+        <ReciboImpreso
+          ticket={recibo.ticket}
+          usoSaldo={recibo.usoSaldo}
+          saldoRestante={recibo.saldoRestante}
+          onClose={() => setRecibo(null)}
+        />
+      )}
 
       {catsAbiertas && (
         <CategoriaSheet

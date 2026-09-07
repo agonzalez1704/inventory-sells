@@ -78,7 +78,7 @@ function DesktopModal({
           sticky bottom-0. */}
       <div
         className={cn(
-          "relative mt-2 flex max-h-[calc(100dvh-3rem)] w-full max-w-3xl animate-fade-in flex-col rounded-2xl border border-border bg-background shadow-pop",
+          "relative flex max-h-full w-full max-w-3xl animate-fade-in flex-col rounded-2xl border border-border bg-background shadow-pop",
           className,
         )}
         onClick={(e) => e.stopPropagation()}
