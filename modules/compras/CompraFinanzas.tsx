@@ -9,6 +9,8 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/use-confirm";
 import { Input, Select } from "@/components/ui/input";
+import { AdjuntarImagen } from "@/components/ui/adjuntar-imagen";
+import { ExternalLink } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -16,6 +18,7 @@ import {
   registrarPago,
   borrarPago,
   type Compra,
+  type CompraItem,
   type NotaCredito,
   type Pago,
   type Saldo,
@@ -173,6 +176,7 @@ export function CompraFinanzas({
         <PagoModal
           compraId={compra.id}
           sugerido={fromCents(saldo.saldo_cents)}
+          items={compra.compra_items ?? []}
           onClose={() => setNuevoPago(false)}
         />
       )}
@@ -194,7 +198,22 @@ function PagoRow({ pago }: { pago: Pago }) {
             <span className="ml-2 text-xs text-muted-foreground">{pago.referencia}</span>
           )}
         </p>
-        <p className="text-xs text-muted-foreground">{fecha(pago.fecha)}</p>
+        <p className="text-xs text-muted-foreground">
+          {fecha(pago.fecha)}
+          {pago.detalle && pago.detalle.length > 0 && (
+            <span className="ml-2">· cubre {pago.detalle.length} partida{pago.detalle.length > 1 ? "s" : ""}</span>
+          )}
+          {pago.imagen_url && (
+            <a
+              href={pago.imagen_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="ml-2 inline-flex items-center gap-0.5 font-medium text-brand-foreground hover:underline"
+            >
+              Ver captura <ExternalLink className="h-3 w-3" />
+            </a>
+          )}
+        </p>
       </div>
       <p className="shrink-0 tabular-nums">{formatMXN(pago.monto_cents)}</p>
       <button
@@ -339,10 +358,12 @@ function NotaModal({ compra, onClose }: { compra: Compra; onClose: () => void })
 function PagoModal({
   compraId,
   sugerido,
+  items,
   onClose,
 }: {
   compraId: string;
   sugerido: number;
+  items: CompraItem[];
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -351,18 +372,37 @@ function PagoModal({
   const [metodo, setMetodo] = useState<MetodoPago>("transferencia");
   const [fechaPago, setFechaPago] = useState(new Date().toISOString().slice(0, 10));
   const [referencia, setReferencia] = useState("");
+  const [foto, setFoto] = useState<File | null>(null);
+  // Per-line amounts, as typed. When any is set, the payment amount IS their
+  // sum — that is the whole point of itemizing.
+  const [partidas, setPartidas] = useState<Record<string, string>>({});
+
+  const partidasActivas = Object.entries(partidas)
+    .map(([itemId, v]) => ({ itemId, montoPesos: parseFloat(v.replace(",", ".")) || 0 }))
+    .filter((pt) => pt.montoPesos > 0);
+  const sumaPartidas = partidasActivas.reduce((a, pt) => a + pt.montoPesos, 0);
+  const montoFinal = partidasActivas.length > 0 ? sumaPartidas : parseFloat(monto.replace(",", ".")) || 0;
 
   function guardar() {
     start(async () => {
       try {
-        await registrarPago({
-          compraId,
-          montoPesos: parseFloat(monto.replace(",", ".")) || 0,
-          metodo,
-          fecha: fechaPago,
-          referencia: referencia || null,
-          notas: null,
-        });
+        let form: FormData | undefined;
+        if (foto) {
+          form = new FormData();
+          form.append("file", foto);
+        }
+        await registrarPago(
+          {
+            compraId,
+            montoPesos: montoFinal,
+            metodo,
+            fecha: fechaPago,
+            referencia: referencia || null,
+            notas: null,
+            partidas: partidasActivas,
+          },
+          form,
+        );
         toast.success("Pago registrado");
         onClose();
         router.refresh();
@@ -377,7 +417,12 @@ function PagoModal({
       <div className="space-y-3">
         <div className="grid grid-cols-2 gap-2">
           <Field label="Monto (pesos)">
-            <Input value={monto} onChange={(e) => setMonto(e.target.value)} inputMode="decimal" />
+            <Input
+              value={partidasActivas.length > 0 ? sumaPartidas.toFixed(2) : monto}
+              onChange={(e) => setMonto(e.target.value)}
+              readOnly={partidasActivas.length > 0}
+              inputMode="decimal"
+            />
           </Field>
           <Field label="Método">
             <Select value={metodo} onChange={(e) => setMetodo(e.target.value as MetodoPago)}>
@@ -403,12 +448,98 @@ function PagoModal({
             />
           </Field>
         </div>
+        <Field label="Comprobante (opcional)">
+          <AdjuntarImagen value={foto} onChange={setFoto} />
+        </Field>
+
+        {items.length > 0 && (
+          <div className="rounded-xl border border-border p-3">
+            <p className="text-xs font-medium text-muted-foreground">
+              ¿Qué partidas cubre este pago? (opcional) — al llenar montos, el
+              pago se vuelve su suma exacta.
+            </p>
+            <ul className="mt-2 max-h-56 space-y-2 overflow-y-auto pr-1">
+              {items.map((it) => {
+                const costoLinea = it.costo_unitario_cents * it.qty;
+                const venta = it.products?.price_cents ?? 0;
+                const repartoLinea =
+                  venta > it.costo_unitario_cents
+                    ? (it.costo_unitario_cents + Math.round((venta - it.costo_unitario_cents) / 2)) * it.qty
+                    : costoLinea;
+                const pagado = it.pagado_cents ?? 0;
+                const liquidada = pagado >= repartoLinea && repartoLinea > 0;
+                return (
+                  <li key={it.id} className="flex items-center gap-2">
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm">
+                        {it.qty}× {it.products?.name ?? it.products?.sku ?? "—"}
+                      </span>
+                      <span className="block text-[11px] text-muted-foreground">
+                        {liquidada ? (
+                          <span className="font-medium text-green-600 dark:text-green-400">Pagada</span>
+                        ) : (
+                          <>
+                            {pagado > 0 && <>pagado {formatMXN(pagado)} · </>}
+                            <button
+                              type="button"
+                              className="cursor-pointer underline decoration-dotted underline-offset-2 hover:text-foreground"
+                              onClick={() =>
+                                setPartidas((prev) => ({
+                                  ...prev,
+                                  [it.id]: String(fromCents(Math.max(0, costoLinea - pagado))),
+                                }))
+                              }
+                            >
+                              costo {formatMXN(costoLinea)}
+                            </button>
+                            {repartoLinea !== costoLinea && (
+                              <>
+                                {" · "}
+                                <button
+                                  type="button"
+                                  className="cursor-pointer underline decoration-dotted underline-offset-2 hover:text-foreground"
+                                  onClick={() =>
+                                    setPartidas((prev) => ({
+                                      ...prev,
+                                      [it.id]: String(fromCents(Math.max(0, repartoLinea - pagado))),
+                                    }))
+                                  }
+                                >
+                                  con reparto 50% {formatMXN(repartoLinea)}
+                                </button>
+                              </>
+                            )}
+                          </>
+                        )}
+                      </span>
+                    </span>
+                    <Input
+                      value={partidas[it.id] ?? ""}
+                      onChange={(e) =>
+                        setPartidas((prev) => ({ ...prev, [it.id]: e.target.value }))
+                      }
+                      inputMode="decimal"
+                      placeholder="0"
+                      className="h-8 w-24 text-right"
+                    />
+                  </li>
+                );
+              })}
+            </ul>
+            {partidasActivas.length > 0 && (
+              <p className="mt-2 text-right text-xs font-medium">
+                Suma de partidas: <span className="tabular-nums">{formatMXN(Math.round(sumaPartidas * 100))}</span>
+              </p>
+            )}
+          </div>
+        )}
+
         <div className="flex justify-end gap-2 border-t border-border pt-3">
           <Button variant="ghost" onClick={onClose} disabled={pending}>
             Cancelar
           </Button>
-          <Button onClick={guardar} loading={pending}>
-            Registrar
+          <Button onClick={guardar} loading={pending} disabled={montoFinal <= 0}>
+            Registrar {montoFinal > 0 ? formatMXN(Math.round(montoFinal * 100)) : ""}
           </Button>
         </div>
       </div>

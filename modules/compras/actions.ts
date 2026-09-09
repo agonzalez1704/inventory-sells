@@ -17,7 +17,9 @@ export type CompraItem = {
   qty: number;
   costo_unitario_cents: number;
   line_total_cents: number;
-  products?: { sku: string; name: string } | null;
+  /** How much of this line has been covered by itemized payments. */
+  pagado_cents?: number;
+  products?: { sku: string; name: string; price_cents?: number } | null;
 };
 
 export type Compra = {
@@ -60,7 +62,7 @@ export async function getCompra(id: string): Promise<Compra | null> {
     .from("compras")
     .select(
       `${COLS}, proveedores(nombre), ` +
-        "compra_items(id, product_id, qty, costo_unitario_cents, line_total_cents, products(sku, name))",
+        "compra_items(id, product_id, qty, costo_unitario_cents, line_total_cents, pagado_cents, products(sku, name, price_cents))",
     )
     .eq("id", id)
     .maybeSingle();
@@ -259,6 +261,10 @@ export type Pago = {
   fecha: string;
   referencia: string | null;
   notas: string | null;
+  /** Signed URL of the transfer screenshot, when one was attached. */
+  imagen_url?: string | null;
+  /** Which line items this payment covered: [{item_id, monto_cents, nombre}]. */
+  detalle?: { item_id: string; monto_cents: number; nombre?: string }[] | null;
 };
 
 export type Saldo = {
@@ -301,10 +307,19 @@ export async function listarPagos(compraId: string): Promise<Pago[]> {
   await assertPermiso("abastecer");
   const { data } = await insforgeAdmin.database
     .from("compra_pagos")
-    .select("id, monto_cents, metodo, fecha, referencia, notas")
+    .select("id, monto_cents, metodo, fecha, referencia, notas, imagen_key, detalle")
     .eq("compra_id", compraId)
     .order("fecha", { ascending: false });
-  return (data ?? []) as unknown as Pago[];
+  const rows = (data ?? []) as unknown as (Pago & { imagen_key: string | null })[];
+  return Promise.all(
+    rows.map(async (r) => ({
+      ...r,
+      imagen_url: r.imagen_key
+        ? (await insforgeAdmin.storage.from("comprobantes").createSignedUrl(r.imagen_key, 3600))
+            .data?.signedUrl ?? null
+        : null,
+    })),
+  );
 }
 
 // A note that names products also returns that stock — the RPC does both in one
@@ -338,17 +353,49 @@ export async function registrarNota(input: {
   }
 }
 
-export async function registrarPago(input: {
-  compraId: string;
-  montoPesos: number;
-  metodo: MetodoPago;
-  fecha: string;
-  referencia: string | null;
-  notas: string | null;
-}): Promise<void> {
+export async function registrarPago(
+  input: {
+    compraId: string;
+    montoPesos: number;
+    metodo: MetodoPago;
+    fecha: string;
+    referencia: string | null;
+    notas: string | null;
+    /** Which line items this money covers. When present, amounts must sum to
+     *  the payment — a partial invoice must say exactly what it paid. */
+    partidas?: { itemId: string; montoPesos: number }[];
+  },
+  /** Optional "file": the transfer screenshot. */
+  form?: FormData,
+): Promise<void> {
   const userId = await assertPermiso("abastecer");
   const cents = Math.max(0, toCents(input.montoPesos || 0));
   if (cents <= 0) throw new Error("El pago debe ser mayor a cero");
+
+  const partidas = (input.partidas ?? [])
+    .map((pt) => ({ item_id: pt.itemId, monto_cents: Math.max(0, toCents(pt.montoPesos || 0)) }))
+    .filter((pt) => pt.monto_cents > 0);
+  if (partidas.length > 0) {
+    const suma = partidas.reduce((a, pt) => a + pt.monto_cents, 0);
+    if (suma !== cents)
+      throw new Error(
+        `Las partidas suman ${(suma / 100).toFixed(2)} y el pago es ${(cents / 100).toFixed(2)} — deben coincidir`,
+      );
+  }
+
+  let imagenKey: string | null = null;
+  const file = form?.get("file");
+  if (file instanceof File && file.size > 0) {
+    if (file.size > 8 * 1024 * 1024) throw new Error("La imagen pesa más de 8 MB");
+    const ext = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" }[file.type];
+    if (!ext) throw new Error("Formato no válido (usa JPG, PNG o WebP)");
+    const key = `compra-${input.compraId}/${crypto.randomUUID()}.${ext}`;
+    const { data: up, error: errUp } = await insforgeAdmin.storage
+      .from("comprobantes")
+      .upload(key, file);
+    if (errUp || !up) throw new Error(errUp?.message ?? "No se pudo subir la captura");
+    imagenKey = up.key;
+  }
 
   const { error } = await insforgeAdmin.database.from("compra_pagos").insert([
     {
@@ -358,14 +405,49 @@ export async function registrarPago(input: {
       fecha: input.fecha,
       referencia: input.referencia?.trim() || null,
       notas: input.notas?.trim() || null,
+      imagen_key: imagenKey,
+      detalle: partidas.length > 0 ? partidas : null,
       created_by: userId,
     },
   ]);
   if (error) throw new Error(error.message ?? "No se pudo registrar el pago");
+
+  // Mark each covered line. Read-then-write: a couple of rows, no contention.
+  for (const pt of partidas) {
+    const { data: it } = await insforgeAdmin.database
+      .from("compra_items")
+      .select("pagado_cents")
+      .eq("id", pt.item_id)
+      .maybeSingle();
+    await insforgeAdmin.database
+      .from("compra_items")
+      .update({ pagado_cents: ((it as { pagado_cents: number } | null)?.pagado_cents ?? 0) + pt.monto_cents })
+      .eq("id", pt.item_id);
+  }
 }
 
 export async function borrarPago(id: string): Promise<void> {
   await assertPermiso("abastecer");
+  // Un-mark the lines this payment had covered before dropping it.
+  const { data } = await insforgeAdmin.database
+    .from("compra_pagos")
+    .select("detalle")
+    .eq("id", id)
+    .maybeSingle();
+  const detalle = ((data as { detalle: { item_id: string; monto_cents: number }[] | null } | null)
+    ?.detalle) ?? [];
+  for (const pt of detalle) {
+    const { data: it } = await insforgeAdmin.database
+      .from("compra_items")
+      .select("pagado_cents")
+      .eq("id", pt.item_id)
+      .maybeSingle();
+    const actual = (it as { pagado_cents: number } | null)?.pagado_cents ?? 0;
+    await insforgeAdmin.database
+      .from("compra_items")
+      .update({ pagado_cents: Math.max(0, actual - pt.monto_cents) })
+      .eq("id", pt.item_id);
+  }
   const { error } = await insforgeAdmin.database.from("compra_pagos").delete().eq("id", id);
   if (error) throw new Error(error.message ?? "No se pudo borrar el pago");
 }
