@@ -213,3 +213,16 @@ export async function registrarCheckin(
     return { sucursal: dentro.s.nombre };
   });
 }
+
+/**
+ * The caller's OWN branch-block map, computed fresh — {inventory_id: sucursal}.
+ * The POS polls this on focus so a tab that lived overnight (the counter
+ * laptop never closes it) unblocks itself after the morning check-in without
+ * anyone knowing to press F5.
+ */
+export async function misInventariosAjenos(): Promise<Record<string, string>> {
+  const { userId } = await auth();
+  if (!userId) return {};
+  const { inventariosAjenos } = await import("./guard");
+  return Object.fromEntries(await inventariosAjenos(userId));
+}

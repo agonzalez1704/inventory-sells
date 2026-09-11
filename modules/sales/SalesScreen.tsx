@@ -41,6 +41,7 @@ import { useLongPress } from "./useLongPress";
 import type { PrecioBase } from "./pos-prefs";
 import { registerSale, registerLoan, type PagoSplit } from "./actions";
 import { saldoDeCliente } from "@/modules/garantias/cliente-actions";
+import { misInventariosAjenos } from "@/modules/sucursales/actions";
 
 export type SalesProduct = Pick<
   Product,
@@ -347,7 +348,7 @@ export function SalesScreen({
   fiadoExigeCliente,
   clickAbreDetalle,
   comprobanteObligatorio = false,
-  inventariosAjenos = {},
+  inventariosAjenos: inventariosAjenosProp = {},
 }: {
   /** First page of the catalog, rendered before any search runs. */
   products: SalesProduct[];
@@ -414,6 +415,26 @@ export function SalesScreen({
     }
     return top;
   }, [categorias, categoria]);
+  // LIVE branch-block map. Starts from the server prop but re-fetches on
+  // mount and whenever the tab regains focus: the counter laptop keeps this
+  // page open for days, and yesterday's map was refusing today's counter.
+  const [inventariosAjenos, setInventariosAjenos] = useState(inventariosAjenosProp);
+  useEffect(() => {
+    let on = true;
+    const refrescar = () =>
+      misInventariosAjenos().then((m) => on && setInventariosAjenos(m)).catch(() => undefined);
+    refrescar();
+    const onFocus = () => {
+      if (document.visibilityState === "visible") refrescar();
+    };
+    document.addEventListener("visibilitychange", onFocus);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      on = false;
+      document.removeEventListener("visibilitychange", onFocus);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, []);
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [recibo, setRecibo] = useState<{
     ticket: TicketData;
@@ -478,7 +499,7 @@ export function SalesScreen({
     // now, so the router.refresh() after a sale never reached it and the card
     // kept showing the stock the shelf had before the sale. A refresh re-runs the
     // server component and hands down a new `products` array — that is the cue.
-  }, [query, categoria, recordar, products]);
+  }, [query, categoria, recordar, products, marcarAjenos]);
 
   const buscarCompat = useCallback(async (modelo: string) => {
     const rows = (await buscarProductos({ query: modelo, limit: 4 })) as SalesProduct[];
