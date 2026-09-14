@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth, UserButton, SignInButton, SignUpButton } from "@clerk/nextjs";
 import {
+  Banknote,
   ArrowLeftRight,
   Boxes,
   ShoppingCart,
@@ -72,6 +73,7 @@ const GRUPOS: {
     label: "Finanzas",
     links: [
       { href: "/caja", label: "Caja", icon: Calculator, permiso: "corte_ver" },
+      { href: "/movimientos", label: "Movimientos", icon: Banknote, permiso: "caja_movimientos" },
       { href: "/reportes", label: "Reportes", icon: BarChart3, permiso: "corte_ver" },
     ],
   },

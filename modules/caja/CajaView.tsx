@@ -1040,7 +1040,7 @@ function MovRow({
   );
 }
 
-function MovModal({
+export function MovModal({
   open,
   onClose,
   tipo,

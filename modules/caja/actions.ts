@@ -1,7 +1,7 @@
 "use server";
 
 import { auth } from "@clerk/nextjs/server";
-import { getProfile } from "@/lib/auth/profile";
+import { getProfile, assertPermiso } from "@/lib/auth/profile";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
 import type { PaymentMethod } from "@/lib/types";
 
@@ -11,8 +11,7 @@ export async function registrarGasto(input: {
   metodo: PaymentMethod;
   categoria: string | null;
 }): Promise<void> {
-  const { userId } = await auth();
-  if (!userId) throw new Error("No autenticado");
+  await assertPermiso("caja_movimientos");
   if (!input.concepto.trim()) throw new Error("Falta el concepto");
   if (!Number.isFinite(input.monto_cents) || input.monto_cents <= 0) {
     throw new Error("Monto inválido");
@@ -49,8 +48,7 @@ export async function registrarIngreso(input: {
   metodo: PaymentMethod;
   categoria: string | null;
 }): Promise<void> {
-  const { userId } = await auth();
-  if (!userId) throw new Error("No autenticado");
+  await assertPermiso("caja_movimientos");
   if (!input.concepto.trim()) throw new Error("Falta el concepto");
   if (!Number.isFinite(input.monto_cents) || input.monto_cents <= 0) {
     throw new Error("Monto inválido");
