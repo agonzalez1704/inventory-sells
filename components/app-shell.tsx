@@ -28,6 +28,8 @@ import {
   ClipboardCheck,
   Menu,
   X,
+  Sparkles,
+  Presentation as PresentationIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Permiso } from "@/lib/permissions";
@@ -75,6 +77,8 @@ const GRUPOS: {
       { href: "/caja", label: "Caja", icon: Calculator, permiso: "corte_ver" },
       { href: "/movimientos", label: "Movimientos", icon: Banknote, permiso: "caja_movimientos" },
       { href: "/reportes", label: "Reportes", icon: BarChart3, permiso: "corte_ver" },
+      { href: "/asistente", label: "Asistente", icon: Sparkles, permiso: "ventas_ver" },
+      { href: "/dashboards", label: "Dashboards", icon: PresentationIcon, permiso: "ventas_ver" },
     ],
   },
   {

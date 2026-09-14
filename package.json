@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.89",
+    "@ai-sdk/react": "^4.0.102",
     "@clerk/nextjs": "^7.5.7",
     "@insforge/sdk": "latest",
     "@modelcontextprotocol/sdk": "^1.26.0",
@@ -33,6 +34,7 @@
     "react-credit-cards-2": "^1.2.0",
     "react-dom": "^19.0.0",
     "react-phone-input-2": "^2.15.1",
+    "recharts": "^3.10.1",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.6.0",
     "vaul": "^1.1.2",
