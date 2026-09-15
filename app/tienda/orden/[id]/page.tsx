@@ -9,6 +9,7 @@ import { formatMXN } from "@/lib/money";
 import { getTiendaInfo } from "@/modules/config/lib";
 import { VOUCHER_HORAS_UI } from "@/modules/tienda/pago-const";
 import { PasePickup } from "@/modules/tienda/PasePickup";
+import { ApartadoBanner } from "@/modules/tienda/ApartadoBanner";
 import { MARCA } from "@/lib/marca";
 
 export const metadata: Metadata = { title: `Tu pedido — ${MARCA.tienda.nombre}`, robots: { index: false } };
@@ -29,6 +30,10 @@ type Orden = {
   municipio: string | null;
   estado: string | null;
   cp: string | null;
+  /** Hold: when the reserved pieces go back on sale. */
+  apartada_hasta: string | null;
+  sucursal: string | null;
+  created_at: string;
 };
 
 // Store's receiving account for direct transfers. In env, not committed — it's
@@ -54,7 +59,7 @@ export default async function OrdenPage({
   const { data } = await insforgeAdmin.database
     .from("ordenes_web")
     .select(
-      "id, folio, nombre, status, metodo, conekta_order_id, subtotal_cents, envio_cents, total_cents, envio_desc, tipo_entrega, direccion, municipio, estado, cp",
+      "id, folio, nombre, status, metodo, conekta_order_id, subtotal_cents, envio_cents, total_cents, envio_desc, tipo_entrega, direccion, municipio, estado, cp, apartada_hasta, sucursal, created_at",
     )
     .eq("id", id)
     .maybeSingle();
@@ -84,9 +89,20 @@ export default async function OrdenPage({
   }
 
   const pagada = o.status === "pagada";
-  const cancelada = o.status === "cancelada";
+  // The clock ran out; the pieces are back on sale. Not a cancellation, but it
+  // ends the same way for this page.
+  const vencida = o.status === "expirada";
+  const cancelada = o.status === "cancelada" || vencida;
   const recoger = o.tipo_entrega === "recoger";
   const esTransferencia = o.metodo === "transferencia";
+  const apartado = o.metodo === "sucursal";
+  // The window the shop granted, so the bar can show how much of it is left.
+  const horasApartado = o.apartada_hasta
+    ? Math.max(
+        1,
+        (new Date(o.apartada_hasta).getTime() - new Date(o.created_at).getTime()) / 3_600_000,
+      )
+    : 1;
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
@@ -105,7 +121,13 @@ export default async function OrdenPage({
           </span>
           <div>
             <h1 className="text-lg font-semibold tracking-tight text-foreground [font-family:var(--font-display)]">
-              {pagada ? "¡Pago confirmado!" : cancelada ? "Pedido cancelado" : "Pedido apartado"}
+              {pagada
+                ? "¡Pago confirmado!"
+                : vencida
+                  ? "Apartado vencido"
+                  : cancelada
+                    ? "Pedido cancelado"
+                    : "Pedido apartado"}
             </h1>
             <p className="text-xs text-muted-foreground">Folio {o.folio}</p>
           </div>
@@ -118,14 +140,31 @@ export default async function OrdenPage({
             ) : (
               <>Gracias, {o.nombre.split(" ")[0]}. Preparamos tu envío y te contactamos por WhatsApp con tu guía.{tienda.entregaDias ? ` Entrega en ${tienda.entregaDias} hábiles.` : ""}</>
             )
+          ) : vencida ? (
+            <>Pasó la hora del apartado y las piezas volvieron al catálogo. Si todavía las quieres, apártalas otra vez o escríbenos por WhatsApp.</>
           ) : cancelada ? (
             <>Este pedido se canceló y los productos volvieron al catálogo. Si fue un error, vuelve a intentarlo o escríbenos.</>
+          ) : apartado ? (
+            <>
+              Listo, {o.nombre.split(" ")[0]}: te guardamos tus piezas
+              {o.sucursal ? ` en ${o.sucursal}` : ""}. Muestra el folio{" "}
+              <strong>{o.folio}</strong> en el mostrador — ahí pagas y te las entregamos.
+            </>
           ) : recoger ? (
             <>Apartamos tus piezas. En cuanto confirmemos tu pago queda listo para recoger — recibirás aviso por WhatsApp.</>
           ) : (
             <>Apartamos tus piezas. En cuanto confirmemos tu pago preparamos el envío — recibirás aviso por WhatsApp.</>
           )}
         </p>
+
+        {apartado && o.apartada_hasta && !pagada && (
+          <ApartadoBanner
+            hasta={o.apartada_hasta}
+            horas={horasApartado}
+            sucursal={o.sucursal}
+            vencida={vencida}
+          />
+        )}
 
         {/* Voucher */}
         {!pagada && !cancelada && referencia && (
@@ -215,7 +254,7 @@ export default async function OrdenPage({
         </dl>
 
         {recoger ? (
-          <PasePickup folio={o.folio} pagada={pagada} />
+          <PasePickup folio={o.folio} pagada={pagada} apartado={apartado && !cancelada} />
         ) : (
           <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
             Enviamos a: {o.direccion}, {o.municipio}, {o.estado}, CP {o.cp}

@@ -13,7 +13,7 @@ export default async function PedidosPage() {
   const { data } = await insforgeAdmin.database
     .from("ordenes_web")
     .select(
-      "id, folio, nombre, telefono, email, cp, estado, municipio, direccion, referencias, status, metodo, tipo_entrega, total_cents, created_at, dropship_estado, dropship_ref, orden_web_items(nombre, qty, products(enlace_proveedor, inventories(es_dropship)))",
+      "id, folio, nombre, telefono, email, cp, estado, municipio, direccion, referencias, status, metodo, tipo_entrega, total_cents, created_at, apartada_hasta, sucursal, dropship_estado, dropship_ref, orden_web_items(nombre, qty, products(enlace_proveedor, inventories(es_dropship)))",
     )
     .order("created_at", { ascending: false })
     .limit(100);

@@ -221,6 +221,77 @@ export async function crearOrdenTransferencia(
   });
 }
 
+/** A hold: pieces reserved, nothing charged. */
+export type ResultadoApartado = {
+  ordenId: string;
+  folio: string;
+  totalCents: number;
+  /** ISO — when the pieces go back on sale. */
+  apartadaHasta: string;
+  horas: number;
+};
+
+/**
+ * Hold for pickup, without paying.
+ *
+ * The user's rule: whoever comes in person pays at the counter, where staff
+ * registers the sale. Online payment is for a shipment, or for a pickup that
+ * somebody else collects — a driver carries only the folio, so that one must be
+ * prepaid. So this reserves stock and starts a clock; how long comes from the
+ * database (horas_apartado: coverage over the last 30 days of sales).
+ */
+export async function apartarEnSucursal(
+  lineas: CartLinea[],
+  cliente: { nombre: string; email: string; telefono: string },
+  sucursal: string | null,
+): Promise<ActionResult<ResultadoApartado>> {
+  return attempt("apartarEnSucursal", async () => {
+    const val = await validarCarrito(lineas);
+    if (!val.ok) throw new Error(val.error);
+    const items = val.data.lineas;
+    // A dropship line has no piece of ours to hold: it is bought when paid.
+    if (items.some((l) => l.es_dropship))
+      throw new Error(
+        "Hay piezas que pedimos al proveedor. Esas se pagan en línea para poder pedirlas.",
+      );
+
+    const { data, error } = await insforgeAdmin.database.rpc("apartar_orden_web", {
+      p_items: items.map((l) => ({ product_id: l.id, qty: l.qty })),
+      p_nombre: cliente.nombre,
+      p_email: cliente.email,
+      p_telefono: cliente.telefono,
+      p_sucursal: sucursal,
+    });
+    if (error) throw new Error(error.message ?? "No se pudo apartar tu pedido");
+    const row = (Array.isArray(data) ? data[0] : data) as
+      | { orden_id: string; folio: string; total_cents: number; apartada_hasta: string; horas: number }
+      | undefined;
+    if (!row?.orden_id) throw new Error("No se pudo apartar tu pedido");
+
+    // Staff needs to know a hold is ticking: the pieces are off the shelf and
+    // somebody is on their way to pay for them.
+    after(() =>
+      notifyAdmins("venta", {
+        title: "Apartado en sucursal",
+        body: `${row.folio}: ${cliente.nombre} apartó ${items.length} pieza(s)${
+          sucursal ? ` en ${sucursal}` : ""
+        }. Cobra en mostrador al entregar.`,
+        url: "/pedidos",
+        tag: `apartado-${row.orden_id}`,
+        icon: MARCA.icono,
+      }),
+    );
+
+    return {
+      ordenId: row.orden_id,
+      folio: row.folio,
+      totalCents: row.total_cents,
+      apartadaHasta: row.apartada_hasta,
+      horas: Number(row.horas),
+    };
+  });
+}
+
 /**
  * The customer's own transfer proof, uploaded from the public order page. No
  * session — the order id is the capability, and it only works while the order

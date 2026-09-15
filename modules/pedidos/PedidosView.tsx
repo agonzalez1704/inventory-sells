@@ -23,7 +23,12 @@ import { Input } from "@/components/ui/input";
 import { comprobantesDeOrden, type Comprobante } from "@/modules/sales/comprobantes";
 import { CuentaChip } from "@/components/ui/cuenta";
 import { useEffect } from "react";
-import { confirmarTransferencia, cancelarPedido, marcarDropshipPedido } from "./actions";
+import {
+  confirmarTransferencia,
+  cancelarPedido,
+  cobrarEnMostrador,
+  marcarDropshipPedido,
+} from "./actions";
 
 export type ItemPedido = {
   nombre: string;
@@ -49,6 +54,10 @@ export type PedidoWeb = {
   created_at: string;
   dropship_estado: "por_pedir" | "pidiendo" | "pedido" | null;
   dropship_ref: string | null;
+  /** Hold: when the reserved pieces go back on sale (metodo 'sucursal'). */
+  apartada_hasta: string | null;
+  /** Branch the customer chose to collect at. */
+  sucursal: string | null;
   orden_web_items: ItemPedido[];
 };
 
@@ -58,6 +67,9 @@ const METODO_LABEL: Record<string, string> = {
   spei: "SPEI",
   aplazo: "Aplazo",
   transferencia: "Transferencia directa",
+  sucursal: "Paga en mostrador",
+  efectivo: "Efectivo en mostrador",
+  tarjeta: "Tarjeta en mostrador",
 };
 
 export function PedidosView({
@@ -116,6 +128,7 @@ function PedidoRow({
 
   const recoger = p.tipo_entrega === "recoger";
   const esTransferencia = p.metodo === "transferencia";
+  const esApartado = p.metodo === "sucursal";
   const pendiente = p.status === "pendiente";
   const items = p.orden_web_items ?? [];
   const fecha = new Date(p.created_at).toLocaleDateString("es-MX", {
@@ -133,6 +146,20 @@ function PedidoRow({
         return;
       }
       toast.success(`Pago confirmado · ${p.folio}`);
+      router.refresh();
+    });
+  }
+
+  // The customer came for their hold and paid at the counter: this is what
+  // turns it into a sale, with the money where it really landed.
+  function cobrar(forma: "efectivo" | "tarjeta") {
+    start(async () => {
+      const r = await cobrarEnMostrador(p.id, forma);
+      if (!r.ok) {
+        toast.error(r.error);
+        return;
+      }
+      toast.success(`Cobrado · ${p.folio}`);
       router.refresh();
     });
   }
@@ -200,6 +227,26 @@ function PedidoRow({
 
       {pendiente && esTransferencia && <ComprobantesOrden ordenId={p.id} />}
 
+      {/* A hold: the pieces are off the shelf and the customer pays here. Not
+          admin-only — whoever hands the piece over is the one charging it. */}
+      {pendiente && esApartado && (
+        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
+          <span className="text-xs text-muted-foreground">
+            {p.apartada_hasta
+              ? `Apartado hasta ${new Date(p.apartada_hasta).toLocaleTimeString("es-MX", { hour: "numeric", minute: "2-digit" })}`
+              : "Apartado"}
+            {p.sucursal ? ` · ${p.sucursal}` : ""}
+          </span>
+          <Button size="sm" onClick={() => cobrar("efectivo")} loading={pending}>
+            <Check className="h-4 w-4" />
+            Cobré en efectivo
+          </Button>
+          <Button size="sm" variant="secondary" onClick={() => cobrar("tarjeta")} loading={pending}>
+            Cobré con tarjeta
+          </Button>
+        </div>
+      )}
+
       {isAdmin && pendiente && (
         <div className="mt-3 flex flex-wrap gap-2 border-t border-border pt-3">
           {esTransferencia && (
@@ -232,6 +279,8 @@ function PedidoRow({
 function StatusBadge({ status }: { status: string }) {
   if (status === "pagada") return <Badge tone="accent">Pagado</Badge>;
   if (status === "cancelada") return <Badge tone="neutral">Cancelado</Badge>;
+  // The clock ran out and the pieces went back on sale — nobody cancelled.
+  if (status === "expirada") return <Badge tone="neutral">Apartado vencido</Badge>;
   return <Badge tone="warning">Pendiente</Badge>;
 }
 

@@ -23,7 +23,12 @@ import { tokenizarTarjeta, type DatosTarjeta } from "@/lib/conekta-client";
 import { useCart } from "./CartProvider";
 import { PagoSection } from "./PagoSection";
 import { esConekta, type MetodoPago } from "./pago-const";
-import { crearOrdenYPagar, crearOrdenTransferencia, type TipoEntrega } from "./pago-actions";
+import {
+  apartarEnSucursal,
+  crearOrdenYPagar,
+  crearOrdenTransferencia,
+  type TipoEntrega,
+} from "./pago-actions";
 import {
   validarCarrito,
   cotizarParaCP,
@@ -53,6 +58,15 @@ export function CheckoutView() {
   // su propio Uber/mensajero — sin guía, sin costo de envío).
   const [tipoEntrega, setTipoEntrega] = useState<TipoEntrega>("envio");
   const recoger = tipoEntrega === "recoger";
+
+  // Quién recoge decide si hay pago en línea (regla del usuario):
+  //   "yo"   -> aparta sin pagar; el cobro se registra en mostrador.
+  //   "uber" -> alguien más pasa por él y solo lleva el folio, así que tiene
+  //             que ir pagado antes de que salga de la tienda.
+  const [quienRecoge, setQuienRecoge] = useState<"yo" | "uber">("yo");
+  const apartar = recoger && quienRecoge === "yo";
+  const [sucursalSel, setSucursalSel] = useState<string | null>(null);
+  const [apartando, setApartando] = useState(false);
 
   // Datos del cliente
   const [nombre, setNombre] = useState("");
@@ -189,6 +203,19 @@ export function CheckoutView() {
         recoger || !envio
           ? null
           : { proveedor: envio.proveedor, servicio: envio.servicio, totalCents: envio.totalCents, dias: envio.dias };
+
+      // Coming in person: nothing is charged here. The pieces are held for a
+      // while and the counter registers the sale when they arrive.
+      if (apartar) {
+        const r = await apartarEnSucursal(lineas, { nombre, email, telefono }, sucursalSel);
+        if (!r.ok) {
+          setErrPago(r.error);
+          return;
+        }
+        clear();
+        router.push(`/tienda/orden/${r.data.ordenId}`);
+        return;
+      }
 
       // Direct transfer: no Conekta. Reserve the order and send them to the
       // confirmation page with the bank data; an admin confirms the deposit.
@@ -362,30 +389,68 @@ export function CheckoutView() {
           {recoger ? (
             <Card titulo="Recoger en tienda">
               <div className="space-y-2">
-                {puntos.map((p) => (
-                  <div
-                    key={p.direccion}
-                    className="flex items-start gap-3 rounded-xl bg-tienda-50/60 dark:bg-tienda-950/40 p-3"
-                  >
-                    <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-tienda-600 dark:text-tienda-400" />
-                    <div className="text-sm text-foreground">
-                      {p.nombre && (
-                        <p className="text-xs font-semibold uppercase tracking-wide text-tienda-700 dark:text-tienda-300">
-                          {p.nombre}
-                        </p>
+                {puntos.map((p) => {
+                  // With several branches the customer picks one: the hold has
+                  // to name the counter their pieces are waiting at.
+                  const elegible = puntos.length > 1;
+                  const nombre = p.nombre ?? p.direccion;
+                  const sel = elegible ? sucursalSel === nombre : true;
+                  return (
+                    <button
+                      key={p.direccion}
+                      type="button"
+                      onClick={() => elegible && setSucursalSel(nombre)}
+                      aria-pressed={elegible ? sel : undefined}
+                      className={cn(
+                        "flex w-full items-start gap-3 rounded-xl p-3 text-left transition-colors",
+                        elegible && "cursor-pointer",
+                        sel && elegible
+                          ? "bg-tienda-50 ring-2 ring-tienda-500 dark:bg-tienda-950/40"
+                          : "bg-tienda-50/60 dark:bg-tienda-950/40",
                       )}
-                      <p className="font-medium text-foreground">{p.direccion}</p>
-                      {p.horario && (
-                        <p className="mt-0.5 text-xs text-muted-foreground">{p.horario}</p>
-                      )}
-                    </div>
+                    >
+                      <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-tienda-600 dark:text-tienda-400" />
+                      <span className="text-sm text-foreground">
+                        {p.nombre && (
+                          <span className="block text-xs font-semibold uppercase tracking-wide text-tienda-700 dark:text-tienda-300">
+                            {p.nombre}
+                          </span>
+                        )}
+                        <span className="block font-medium text-foreground">{p.direccion}</span>
+                        {p.horario && (
+                          <span className="mt-0.5 block text-xs text-muted-foreground">{p.horario}</span>
+                        )}
+                      </span>
+                    </button>
+                  );
+                })}
+
+                {/* Who collects decides whether anything is paid here: a driver
+                    only carries the folio, so that order must leave paid. */}
+                <div className="pt-1">
+                  <p className="mb-1.5 px-1 text-xs font-medium text-muted-foreground">¿Quién recoge?</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <EntregaTile
+                      activo={quienRecoge === "yo"}
+                      onClick={() => setQuienRecoge("yo")}
+                      icon={StoreIcon}
+                      titulo="Voy yo"
+                      desc="Apartamos y pagas al recoger"
+                    />
+                    <EntregaTile
+                      activo={quienRecoge === "uber"}
+                      onClick={() => setQuienRecoge("uber")}
+                      icon={Truck}
+                      titulo="Mando a alguien"
+                      desc="Se paga ahora; solo da el folio"
+                    />
                   </div>
-                ))}
+                </div>
+
                 <p className="px-1 text-xs leading-relaxed text-muted-foreground">
-                  Prepara tu pedido en cuanto se confirme el pago. Puedes venir tú
-                  o mandar un mensajero/Uber
-                  {puntos.length > 1 ? " a cualquiera de nuestras sucursales" : ""} —
-                  solo dan tu folio al recoger.
+                  {apartar
+                    ? "Te guardamos las piezas unas horas y pagas en el mostrador al recogerlas. Si no llegas a tiempo, se liberan para otros clientes."
+                    : "Quien recoja solo da tu folio en el mostrador, así que el pedido tiene que ir pagado desde aquí."}
                 </p>
               </div>
             </Card>
@@ -476,12 +541,15 @@ export function CheckoutView() {
             </>
           )}
 
-          <PagoSection
-            metodo={metodo}
-            setMetodo={setMetodo}
-            tarjeta={tarjeta}
-            setTarjeta={setTarjeta}
-          />
+          {/* No payment section for a hold: the counter charges it. */}
+          {!apartar && (
+            <PagoSection
+              metodo={metodo}
+              setMetodo={setMetodo}
+              tarjeta={tarjeta}
+              setTarjeta={setTarjeta}
+            />
+          )}
         </div>
 
         {/* Summary */}
@@ -539,17 +607,19 @@ export function CheckoutView() {
 
             <button
               onClick={pagar}
-              disabled={!datosListos || !envioListo || !tarjetaLista || pagando}
+              disabled={!datosListos || (!apartar && (!envioListo || !tarjetaLista)) || pagando}
               className="mt-4 flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-tienda-600 text-sm font-semibold text-white shadow-sm shadow-tienda-600/30 transition-colors hover:bg-tienda-700 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none"
             >
               {pagando && <Loader2 className="h-4 w-4 animate-spin" />}
               {pagando
                 ? "Procesando…"
-                : !envioListo
-                  ? "Cotiza el envío para continuar"
-                  : !datosListos
-                    ? "Completa tus datos"
-                    : metodo === "transferencia"
+                : !datosListos
+                  ? "Completa tus datos"
+                  : apartar
+                    ? "Apartar mis piezas"
+                    : !envioListo
+                      ? "Cotiza el envío para continuar"
+                      : metodo === "transferencia"
                       ? "Apartar con transferencia"
                       : metodo === "card"
                         ? `Pagar ${formatMXN(total)}`
@@ -559,6 +629,12 @@ export function CheckoutView() {
                             ? "Generar CLABE"
                             : "Continuar con Aplazo"}
             </button>
+
+            {apartar && !errPago && (
+              <p className="mt-2 text-center text-[11px] leading-relaxed text-muted-foreground">
+                No pagas nada ahora · te decimos hasta qué hora te las guardamos
+              </p>
+            )}
 
             {errPago && (
               <p className="mt-2 rounded-lg bg-red-50 dark:bg-red-950/40 px-3 py-2 text-xs text-red-700 dark:text-red-300">

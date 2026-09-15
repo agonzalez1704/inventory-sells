@@ -11,7 +11,16 @@ import { MARCA } from "@/lib/marca";
 // things that person needs: how to get there (a maps link) and how to identify
 // the order (the folio). With several branches every one is listed, each with
 // its own maps link — any of them hands the order over against the folio.
-export function PasePickup({ folio, pagada }: { folio: string; pagada: boolean }) {
+export function PasePickup({
+  folio,
+  pagada,
+  apartado = false,
+}: {
+  folio: string;
+  pagada: boolean;
+  /** Held for pickup: it is not "awaiting payment", it is paid at the counter. */
+  apartado?: boolean;
+}) {
   const [copiado, setCopiado] = useState(false);
 
   const tienda = useTiendaInfo();
@@ -57,7 +66,11 @@ export function PasePickup({ folio, pagada }: { folio: string; pagada: boolean }
               : "rounded-full bg-amber-100 dark:bg-amber-900/40 px-2.5 py-1 text-[11px] font-semibold text-amber-700 dark:text-amber-300"
           }
         >
-          {pagada ? "Pagado · listo para recoger" : "Pendiente de pago"}
+          {pagada
+            ? "Pagado · listo para recoger"
+            : apartado
+              ? "Apartado · pagas al recoger"
+              : "Pendiente de pago"}
         </span>
       </div>
 

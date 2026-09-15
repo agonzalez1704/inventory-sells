@@ -2,7 +2,7 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { after } from "next/server";
-import { getProfile } from "@/lib/auth/profile";
+import { assertPermiso, getProfile } from "@/lib/auth/profile";
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { pedirDropshipAutomatico } from "@/lib/aliexpress";
 import { attempt, type ActionResult } from "@/lib/errors";
@@ -42,6 +42,46 @@ export async function confirmarTransferencia(
     if (error) throw new Error(error.message ?? "No se pudo confirmar el pago");
     // Fire-and-forget: the supplier purchase must never fail the confirmation.
     after(() => pedirDropshipAutomatico(ordenId));
+    return { saleId: String(data) };
+  });
+}
+
+/**
+ * A hold was collected and paid at the counter: commit the sale with whatever
+ * the customer actually paid with, so the corte shows cash as cash.
+ *
+ * Not admin-only: this is the counter, and whoever hands the piece over is the
+ * one charging it — the same people who may already sell in the POS.
+ */
+export async function cobrarEnMostrador(
+  ordenId: string,
+  forma: "efectivo" | "tarjeta",
+): Promise<ActionResult<{ saleId: string }>> {
+  return attempt("cobrarEnMostrador", async () => {
+    await assertPermiso("surtir");
+    if (forma !== "efectivo" && forma !== "tarjeta") throw new Error("Forma de pago inválida");
+
+    const { data: orden } = await insforgeAdmin.database
+      .from("ordenes_web")
+      .select("status, metodo")
+      .eq("id", ordenId)
+      .maybeSingle();
+    const o = orden as { status: string; metodo: string | null } | null;
+    if (!o) throw new Error("Pedido no encontrado");
+    if (o.status !== "pendiente")
+      throw new Error(
+        o.status === "expirada"
+          ? "El apartado venció y las piezas volvieron al catálogo"
+          : "El pedido ya no está pendiente",
+      );
+    if (o.metodo !== "sucursal") throw new Error("Este pedido no es un apartado de sucursal");
+
+    const { data, error } = await insforgeAdmin.database.rpc("pagar_orden_web", {
+      p_orden_id: ordenId,
+      p_conekta_id: null,
+      p_metodo: forma,
+    });
+    if (error) throw new Error(error.message ?? "No se pudo registrar el cobro");
     return { saleId: String(data) };
   });
 }
