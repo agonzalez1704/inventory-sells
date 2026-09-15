@@ -100,7 +100,10 @@ export function ModeloCompra({
 
           {varias ? (
             <>
-              <h2 className="mt-4 text-[15px] font-semibold text-foreground">Elige la calidad</h2>
+              {/* Only a shop whose variants ARE quality tiers says "calidad". */}
+              <h2 className="mt-4 text-[15px] font-semibold text-foreground">
+                {m.variantes.some((x) => x.calidad) ? "Elige la calidad" : "Elige la opción"}
+              </h2>
               <div role="radiogroup" aria-label="Calidad" className="mt-2 flex flex-col gap-2">
                 {m.variantes.map((x) => {
                   const on = x.id === v.id;

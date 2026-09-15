@@ -495,7 +495,11 @@ export function ModeloCard({ m }: { m: ModeloTienda }) {
           {m.modelo}
         </span>
         <span className="truncate text-[13px] text-muted-foreground">
-          {[tipo, n > 1 ? `${n} calidades` : null].filter(Boolean).join(" · ")}
+          {/* "Calidades" is phone-shop language: Ruli's grouped rows are
+              variants of one part, not quality tiers. */}
+          {[tipo, n > 1 ? `${n} ${ES_RULI ? "opciones" : "calidades"}` : null]
+            .filter(Boolean)
+            .join(" · ")}
         </span>
       </span>
 
