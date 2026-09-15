@@ -14,7 +14,7 @@ import {
   MapPin,
 } from "lucide-react";
 import { foto } from "@/lib/foto";
-import { formatMXN } from "@/lib/money";
+import { formatPrecio } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { puntosRecoger } from "@/lib/tienda-info";
 import { useTiendaInfo } from "./TiendaInfoProvider";
@@ -371,7 +371,7 @@ export function CheckoutView() {
                   activo={recoger}
                   onClick={() => setTipoEntrega("recoger")}
                   icon={StoreIcon}
-                  titulo="Recoger / mando por mi cuenta"
+                  titulo="Recoger en sucursal"
                   desc="Sin costo de envío"
                 />
               )}
@@ -527,7 +527,7 @@ export function CheckoutView() {
                         </span>
                       </span>
                       <span className="shrink-0 text-sm font-semibold tabular-nums text-foreground">
-                        {formatMXN(o.totalCents)}
+                        {formatPrecio(o.totalCents)}
                       </span>
                     </button>
                   );
@@ -571,10 +571,10 @@ export function CheckoutView() {
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-xs font-medium text-foreground">{l.nombre}</span>
-                    <span className="block text-xs text-muted-foreground">{l.qty} × {formatMXN(l.precio_cents)}</span>
+                    <span className="block text-xs text-muted-foreground">{l.qty} × {formatPrecio(l.precio_cents)}</span>
                   </span>
                   <span className="shrink-0 text-xs font-semibold tabular-nums text-foreground">
-                    {formatMXN(l.precio_cents * l.qty)}
+                    {formatPrecio(l.precio_cents * l.qty)}
                   </span>
                 </li>
               ))}
@@ -583,7 +583,7 @@ export function CheckoutView() {
             <dl className="mt-3 space-y-1.5 border-t border-border pt-3 text-sm">
               <div className="flex justify-between">
                 <dt className="text-muted-foreground">Subtotal</dt>
-                <dd className="tabular-nums">{formatMXN(subtotal)}</dd>
+                <dd className="tabular-nums">{formatPrecio(subtotal)}</dd>
               </div>
               <div className="flex justify-between">
                 <dt className="text-muted-foreground">{recoger ? "Entrega" : "Envío"}</dt>
@@ -593,7 +593,7 @@ export function CheckoutView() {
                   ) : soloDropship ? (
                     <span className="text-xs font-medium text-green-700 dark:text-green-300">Incluido</span>
                   ) : envio ? (
-                    formatMXN(envio.totalCents)
+                    formatPrecio(envio.totalCents)
                   ) : (
                     <span className="text-xs text-muted-foreground">Cotiza arriba</span>
                   )}
@@ -601,7 +601,7 @@ export function CheckoutView() {
               </div>
               <div className="flex items-baseline justify-between border-t border-border pt-2">
                 <dt className="font-semibold text-foreground">Total</dt>
-                <dd className="text-xl font-semibold tabular-nums text-tienda-800 dark:text-tienda-300">{formatMXN(total)}</dd>
+                <dd className="text-xl font-semibold tabular-nums text-tienda-800 dark:text-tienda-300">{formatPrecio(total)}</dd>
               </div>
             </dl>
 
@@ -622,7 +622,7 @@ export function CheckoutView() {
                       : metodo === "transferencia"
                       ? "Apartar con transferencia"
                       : metodo === "card"
-                        ? `Pagar ${formatMXN(total)}`
+                        ? `Pagar ${formatPrecio(total)}`
                         : metodo === "oxxo"
                           ? "Generar ficha OXXO"
                           : metodo === "spei"

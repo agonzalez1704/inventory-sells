@@ -5,7 +5,7 @@ import { CheckCircle2, Clock, Store, ArrowLeftRight, XCircle, Landmark } from "l
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { getConektaOrder } from "@/lib/conekta";
 import { ComprobanteOrden } from "@/modules/tienda/ComprobanteOrden";
-import { formatMXN } from "@/lib/money";
+import { formatPrecio } from "@/lib/money";
 import { getTiendaInfo } from "@/modules/config/lib";
 import { VOUCHER_HORAS_UI } from "@/modules/tienda/pago-const";
 import { PasePickup } from "@/modules/tienda/PasePickup";
@@ -177,7 +177,7 @@ export default async function OrdenPage({
               {referencia}
             </p>
             <p className="mt-2 text-xs text-amber-800 dark:text-amber-300">
-              Monto: <strong>{formatMXN(o.total_cents)}</strong> · vence en {VOUCHER_HORAS_UI} h
+              Monto: <strong>{formatPrecio(o.total_cents)}</strong> · vence en {VOUCHER_HORAS_UI} h
             </p>
           </div>
         )}
@@ -191,7 +191,7 @@ export default async function OrdenPage({
               {clabe}
             </p>
             <p className="mt-2 text-xs text-tienda-800 dark:text-tienda-300">
-              Monto exacto: <strong>{formatMXN(o.total_cents)}</strong> · vence en {VOUCHER_HORAS_UI} h
+              Monto exacto: <strong>{formatPrecio(o.total_cents)}</strong> · vence en {VOUCHER_HORAS_UI} h
             </p>
           </div>
         )}
@@ -214,7 +214,7 @@ export default async function OrdenPage({
               </p>
             )}
             <p className="mt-3 text-xs leading-relaxed text-tienda-800 dark:text-tienda-300">
-              Monto exacto: <strong>{formatMXN(o.total_cents)}</strong> ·
+              Monto exacto: <strong>{formatPrecio(o.total_cents)}</strong> ·
               Referencia: <strong>{o.folio}</strong>. Tu pieza ya está apartada.
             </p>
             <ComprobanteOrden ordenId={o.id} />
@@ -229,7 +229,7 @@ export default async function OrdenPage({
                 {i.qty} × {i.nombre}
               </span>
               <span className="shrink-0 tabular-nums text-foreground">
-                {formatMXN(i.unit_price_cents * i.qty)}
+                {formatPrecio(i.unit_price_cents * i.qty)}
               </span>
             </li>
           ))}
@@ -237,18 +237,18 @@ export default async function OrdenPage({
         <dl className="mt-2 space-y-1 border-t border-border pt-2 text-sm">
           <div className="flex justify-between">
             <dt className="text-muted-foreground">Subtotal</dt>
-            <dd className="tabular-nums">{formatMXN(o.subtotal_cents)}</dd>
+            <dd className="tabular-nums">{formatPrecio(o.subtotal_cents)}</dd>
           </div>
           <div className="flex justify-between">
             <dt className="text-muted-foreground">{recoger ? "Entrega" : `Envío${o.envio_desc ? ` · ${o.envio_desc}` : ""}`}</dt>
             <dd className="tabular-nums">
-              {recoger ? <span className="text-green-700 dark:text-green-300">Recoger · gratis</span> : formatMXN(o.envio_cents)}
+              {recoger ? <span className="text-green-700 dark:text-green-300">Recoger · gratis</span> : formatPrecio(o.envio_cents)}
             </dd>
           </div>
           <div className="flex items-baseline justify-between border-t border-border pt-1.5">
             <dt className="font-semibold text-foreground">Total</dt>
             <dd className="text-lg font-semibold tabular-nums text-tienda-800 dark:text-tienda-300">
-              {formatMXN(o.total_cents)}
+              {formatPrecio(o.total_cents)}
             </dd>
           </div>
         </dl>
