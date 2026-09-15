@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import {
   Search,
   Smartphone,
@@ -18,7 +18,6 @@ import {
   MapPin,
   Zap,
   SlidersHorizontal,
-  ChevronDown,
 } from "lucide-react";
 import { foto } from "@/lib/foto";
 import { formatMXN } from "@/lib/money";
@@ -29,6 +28,10 @@ import { AddToCart } from "./AddToCart";
 import { CompatibleBox } from "./CompatibleBox";
 import { logoDeMarca } from "./marca-logo";
 import { MARCA } from "@/lib/marca";
+import { ChipsActivos, HojaFiltros, PanelFiltros } from "./FiltrosTienda";
+import { cuantosFiltros, SIN_FILTROS, urlTienda, type Facetas, type Filtros } from "./filtros";
+
+export type { Facet } from "./filtros";
 
 export type PublicProduct = {
   id: string;
@@ -40,45 +43,40 @@ export type PublicProduct = {
   imagen: string | null;
 };
 
-export type Facet = { value: string; n: number };
-
 function waHref(nombre: string, whatsapp: string | null) {
   const text = encodeURIComponent(`Hola ${MARCA.tienda.nombre}, me interesa: ${nombre}`);
   return whatsapp ? `https://wa.me/${whatsapp}?text=${text}` : `https://wa.me/?text=${text}`;
 }
 
+// Ruli lists parts one by one; Lead Displays lists phone models.
+const unidad = (n: number) =>
+  MARCA.id === "ruli" ? (n === 1 ? "pieza" : "piezas") : n === 1 ? "modelo" : "modelos";
+
 export function TiendaView({
   modelos,
-  marcas,
-  categorias,
-  calidades,
+  facetas,
+  filtros,
   q,
-  marca,
-  cat,
-  cal,
   page,
   totalPages,
   total,
   whatsapp,
 }: {
   modelos: ModeloTienda[];
-  marcas: Facet[];
-  categorias: Facet[];
-  calidades: Facet[];
+  facetas: Facetas;
+  filtros: Filtros;
   q: string;
-  marca: string | null;
-  cat: string | null;
-  cal: string | null;
   page: number;
   totalPages: number;
   total: number;
   whatsapp: string | null;
 }) {
   const router = useRouter();
-  const params = useSearchParams();
   const tienda = useTiendaInfo();
   const [pending, start] = useTransition();
   const [texto, setTexto] = useState(q);
+  const [hoja, setHoja] = useState(false);
+  const cerrarHoja = useCallback(() => setHoja(false), []);
 
   // The last query we asked the server for.
   //
@@ -99,40 +97,45 @@ export function TiendaView({
     setTexto(q);
   }, [q]);
 
-  function go(next: Record<string, string | null>) {
-    const sp = new URLSearchParams(params.toString());
-    for (const [k, v] of Object.entries(next)) {
-      if (v === null || v === "") sp.delete(k);
-      else sp.set(k, v);
-    }
-    if (!("page" in next)) sp.delete("page");
-    if ("q" in next) pedido.current = next.q ?? "";
-    // replace, not push, when the query changed: a search-as-you-type that
-    // pushes leaves one history entry per pause, so Back from a product walks
-    // the customer through every half-typed word instead of leaving the shop.
-    const url = `/tienda?${sp.toString()}`;
+  function navegar(url: string, reemplazar: boolean) {
     start(() =>
-      "q" in next
-        ? router.replace(url, { scroll: false })
-        : router.push(url, { scroll: false }),
+      reemplazar ? router.replace(url, { scroll: false }) : router.push(url, { scroll: false }),
     );
+  }
+
+  // replace, not push, when the query changed: a search-as-you-type that
+  // pushes leaves one history entry per pause, so Back from a product walks
+  // the customer through every half-typed word instead of leaving the shop.
+  function buscar(nuevo: string) {
+    pedido.current = nuevo;
+    navegar(urlTienda(filtros, nuevo), true);
+  }
+
+  // Filters and pages push: Back undoes the last filter, which is what a
+  // customer expects after tapping one by mistake. Any filter change starts
+  // over at page 1.
+  function aplicar(f: Filtros) {
+    navegar(urlTienda(f, q), false);
+  }
+
+  function irAPagina(n: number) {
+    const url = urlTienda(filtros, q);
+    navegar(`${url}${url.includes("?") ? "&" : "?"}page=${n}`, false);
   }
 
   // Debounced search — typing navigates without a submit.
   useEffect(() => {
     if (texto === pedido.current) return;
-    const t = setTimeout(() => go({ q: texto || null }), 400);
+    const t = setTimeout(() => buscar(texto), 400);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [texto]);
 
-  const filtrando = Boolean(q || marca || cat || cal);
-  const sinResultados = modelos.length === 0;
   // The search box is not counted: the customer can read their own query in it.
-  const filtrosActivos = [marca, cat, cal].filter(Boolean).length;
-  // Open when a filter is already on, so arriving on a filtered link doesn't
-  // look like an unexplained short list.
-  const [verFiltros, setVerFiltros] = useState(filtrosActivos > 0);
+  const filtrosActivos = cuantosFiltros(filtros);
+  const filtrando = Boolean(q) || filtrosActivos > 0;
+  const sinResultados = modelos.length === 0;
+  const marcas = [...facetas.marca].sort((a, b) => b.n - a.n);
 
   return (
     <div className="mx-auto max-w-6xl px-4 pb-4 sm:px-6">
@@ -243,7 +246,7 @@ export function TiendaView({
               return (
                 <button
                   key={m.value}
-                  onClick={() => go({ marca: m.value })}
+                  onClick={() => aplicar({ ...SIN_FILTROS, marca: [m.value] })}
                   className="group flex w-24 shrink-0 flex-col items-center gap-2"
                 >
                   <span className="flex h-20 w-20 items-center justify-center rounded-2xl border border-tienda-100 dark:border-tienda-900 bg-background p-3.5 text-tienda-700 dark:text-tienda-300 shadow-sm transition-all group-hover:-translate-y-0.5 group-hover:border-tienda-300 dark:border-tienda-800 group-hover:shadow-md group-hover:shadow-tienda-900/5">
@@ -274,83 +277,81 @@ export function TiendaView({
           </h2>
           {filtrando && (
             <button
-              onClick={() => go({ q: null, marca: null, cat: null, cal: null })}
+              onClick={() => {
+                pedido.current = "";
+                setTexto("");
+                navegar("/tienda", false);
+              }}
               className="text-xs font-medium text-tienda-700 dark:text-tienda-300 hover:underline"
             >
-              Limpiar filtros
+              Limpiar búsqueda y filtros
             </button>
           )}
         </div>
 
-        {/* On a phone the filters used to stack ABOVE the grid, so searching
-            filled the screen with three rows of chips and pushed the products
-            the customer just asked for below the fold. They answer a question
-            nobody has yet at that moment — the search box was the question.
-            So below lg they collapse behind a button and the results start
-            immediately; from lg there is room for both and the aside is a
-            sticky rail, unchanged. */}
+        {/* Phone: filters live in a bottom sheet behind one button, so the
+            results start right under the search. A collapsed panel must never
+            hide that a filter is on — hence the badge, and the chips above the
+            list. From lg there is room for both and the panel is a sticky rail. */}
         <button
           type="button"
-          onClick={() => setVerFiltros((v) => !v)}
-          aria-expanded={verFiltros}
-          className="mt-3 inline-flex w-full cursor-pointer items-center justify-between gap-2 rounded-xl border border-border bg-background px-3.5 py-2.5 text-sm font-medium lg:hidden"
+          onClick={() => setHoja(true)}
+          aria-haspopup="dialog"
+          className="mt-3 inline-flex h-11 w-full cursor-pointer items-center justify-between gap-2 rounded-xl border border-border bg-background px-3.5 text-sm font-medium lg:hidden"
         >
           <span className="inline-flex items-center gap-2">
             <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
             Filtros
-            {/* A collapsed panel must never hide that a filter is on: without
-                this the customer sees a short result list and no reason why. */}
             {filtrosActivos > 0 && (
               <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-tienda-600 px-1.5 text-[11px] font-semibold text-white">
                 {filtrosActivos}
               </span>
             )}
           </span>
-          <ChevronDown
-            className={cn("h-4 w-4 text-muted-foreground transition-transform", verFiltros && "rotate-180")}
-          />
+          <ChevronRight className="h-4 w-4 text-muted-foreground" />
         </button>
 
-        <div className="mt-3 lg:grid lg:grid-cols-[220px_1fr] lg:gap-8">
-          <aside
-            className={cn(
-              "mb-4 space-y-4 lg:mb-0 lg:block lg:sticky lg:top-4 lg:self-start",
-              verFiltros ? "block" : "hidden",
-            )}
-          >
-            {calidades.length > 1 && (
-              <FacetRow
-                label="Calidad"
-                options={calidades}
-                active={cal}
-                onPick={(v) => go({ cal: v })}
-              />
-            )}
-            <FacetRow label="Marca" options={marcas} active={marca} onPick={(v) => go({ marca: v })} />
-            {categorias.length > 1 && (
-              <FacetRow label="Tipo" options={categorias} active={cat} onPick={(v) => go({ cat: v })} />
-            )}
+        <HojaFiltros
+          abierta={hoja}
+          onCerrar={cerrarHoja}
+          onLimpiar={() => aplicar(SIN_FILTROS)}
+          pending={pending}
+          pie={`Ver ${total} ${unidad(total)}`}
+        >
+          <PanelFiltros facetas={facetas} filtros={filtros} onCambio={aplicar} />
+        </HojaFiltros>
+
+        <div className="mt-3 lg:grid lg:grid-cols-[240px_1fr] lg:gap-8">
+          <aside className="hidden lg:sticky lg:top-20 lg:block lg:max-h-[calc(100vh-6rem)] lg:self-start lg:overflow-y-auto lg:pr-1">
+            <PanelFiltros facetas={facetas} filtros={filtros} onCambio={aplicar} />
           </aside>
 
           <div className="min-w-0">
+            {!sinResultados && (
+              <p className="text-xs text-muted-foreground">
+                {total} {unidad(total)}
+                {q ? ` para “${q}”` : ""}
+              </p>
+            )}
+            <ChipsActivos filtros={filtros} onCambio={aplicar} />
+
             {sinResultados ? (
-              <div className="mt-2">
+              <div className="mt-4">
                 <div className="flex flex-col items-center text-center text-muted-foreground">
                   <PackageSearch className="h-10 w-10 text-muted-foreground" />
                   <p className="mt-3 text-sm font-medium text-foreground">
                     Sin resultados{q ? ` para “${q}”` : ""}
                   </p>
-                  <p className="text-sm">Prueba con otra marca o modelo.</p>
+                  <p className="text-sm">
+                    {filtrosActivos > 0
+                      ? "Prueba quitando algún filtro."
+                      : "Prueba con otra marca o modelo."}
+                  </p>
                 </div>
                 {q && <CompatibleBox query={q} whatsapp={whatsapp} />}
               </div>
             ) : (
               <>
-                <p className="text-xs text-muted-foreground">
-                  {total} {total === 1 ? "producto" : "productos"}
-                  {q ? ` para “${q}”` : ""}
-                  {marca ? ` · ${marca}` : ""}
-                </p>
                 <div
                   className={cn(
                     "mt-3 grid grid-cols-1 gap-3 transition-opacity xl:grid-cols-2",
@@ -362,7 +363,7 @@ export function TiendaView({
                   ))}
                 </div>
 
-                <Pagination page={page} totalPages={totalPages} onGo={(n) => go({ page: String(n) })} />
+                <Pagination page={page} totalPages={totalPages} onGo={irAPagina} />
               </>
             )}
           </div>
@@ -418,40 +419,6 @@ function InfoCard({
         <h3 className="text-sm font-semibold text-foreground">{title}</h3>
       </div>
       <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{children}</p>
-    </div>
-  );
-}
-
-function FacetRow({
-  label,
-  options,
-  active,
-  onPick,
-}: {
-  label: string;
-  options: Facet[];
-  active: string | null;
-  onPick: (v: string | null) => void;
-}) {
-  if (options.length === 0) return null;
-  return (
-    <div>
-      <span className="mb-1.5 block text-xs font-semibold text-muted-foreground">{label}</span>
-      <div className="flex flex-wrap gap-1.5">
-        <Chip active={active === null} onClick={() => onPick(null)}>
-          Todas
-        </Chip>
-        {options.map((o) => (
-          <Chip
-            key={o.value}
-            active={active === o.value}
-            onClick={() => onPick(active === o.value ? null : o.value)}
-          >
-            {o.value}
-            <span className="ml-1 text-[10px] opacity-60">{o.n}</span>
-          </Chip>
-        ))}
-      </div>
     </div>
   );
 }
@@ -525,30 +492,6 @@ function PageBtn({
           ? "bg-tienda-600 text-white shadow-sm shadow-tienda-600/30"
           : "border border-border bg-background text-muted-foreground hover:border-tienda-200 dark:border-tienda-900 hover:text-tienda-700 dark:text-tienda-300",
         disabled && "cursor-not-allowed opacity-40 hover:border-border hover:text-muted-foreground",
-      )}
-    >
-      {children}
-    </button>
-  );
-}
-
-function Chip({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        "cursor-pointer rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
-        active
-          ? "bg-tienda-600 text-white shadow-sm shadow-tienda-600/30"
-          : "border border-tienda-100 dark:border-tienda-900 bg-background text-muted-foreground hover:border-tienda-200 dark:border-tienda-900 hover:text-tienda-700 dark:text-tienda-300",
       )}
     >
       {children}

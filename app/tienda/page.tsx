@@ -1,10 +1,9 @@
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { facetasTienda, modelosTienda } from "@/modules/tienda/lecturas";
 import { searchProducts, tokensDeConsulta, expand } from "@/lib/search";
-import { calidadDe } from "@/lib/calidad";
 import { TiendaView } from "@/modules/tienda/TiendaView";
-import { agruparPorModelo, type ModeloTienda } from "@/lib/calidades";
-
+import type { ModeloTienda } from "@/lib/calidades";
+import { filtrosSQL, leerFacetas, leerFiltros } from "@/modules/tienda/filtros";
 
 const PER_PAGE = 24;
 
@@ -23,102 +22,90 @@ type Row = {
 
 // Public storefront: read with the admin client (RLS is staff-only) but expose
 // ONLY customer-safe fields — never cost, stock numbers, SKU or inventory.
-// Search/filter/paginate happen here so the brand-prefixed sku can feed the
-// matcher without ever reaching the browser.
+// Filters combine (several values each); every count in the panel is computed
+// over the search and the other filters, in SQL (tienda_facetas_ctx).
 export default async function TiendaPage({
   searchParams,
 }: {
-  searchParams: Promise<{
-    q?: string;
-    marca?: string;
-    cat?: string;
-    cal?: string;
-    page?: string;
-  }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const sp = await searchParams;
-  const q = (sp.q ?? "").trim();
-  const marca = sp.marca ?? null;
-  const cat = sp.cat ?? null;
-  const cal = sp.cal ?? null;
-  const page = Math.max(1, Number(sp.page ?? 1) || 1);
-
-  // Facets are counted over the whole catalog so the chips never vanish
-  // mid-browse — in SQL, because doing it here meant reading 21k rows out of
-  // the database to show 24 of them.
-  const fData = await facetasTienda();
-  const facetas = (fData ?? []) as { tipo: string; valor: string; n: number }[];
-  const faceta = (tipo: string) =>
-    facetas
-      .filter((f) => f.tipo === tipo)
-      .map((f) => ({ value: f.valor, n: Number(f.n) }))
-      .sort((a, b) => b.n - a.n || a.value.localeCompare(b.value));
-  const marcas = faceta("brand");
-  const categorias = faceta("category");
-  const calidades = faceta("calidad");
+  const q = ([sp.q].flat()[0] ?? "").trim();
+  const filtros = leerFiltros(sp);
+  const f = filtrosSQL(filtros);
+  const page = Math.max(1, Number([sp.page].flat()[0] ?? 1) || 1);
 
   let modelos: ModeloTienda[];
   let total: number;
   let current: number;
-  let totalPages: number;
+  let facetas: unknown;
 
   if (q) {
     // Searching keeps the JS scorer: relevance ranking is shared with the rest
     // of the app and rewriting it in SQL would drift from it on the first
-    // change to either. The candidate set the database hands over is already
-    // capped, so this reads ~1k rows rather than the catalog.
-    const { data } = await insforgeAdmin.database.rpc("buscar_productos_candidatos", {
+    // change to either. The scorer only picks and ranks the candidates; the
+    // filters and the grouping run in SQL over exactly that set, so the counts
+    // and the list can never disagree.
+    const cand = await insforgeAdmin.database.rpc("buscar_productos_candidatos", {
       p_tokens: tokensDeConsulta(q).map(expand),
       p_inventory_id: null,
-      p_categoria: cat,
+      p_categoria: null,
       p_limit: 1000,
     });
-    const filtered = searchProducts((data ?? []) as Row[], q).filter(
-      (p) =>
-        (!marca || p.brand === marca) &&
-        (!cat || p.category === cat) &&
-        (!cal || calidadDe(p.name) === cal),
-    );
-    // Grouped after scoring, not before: relevance is per product, and a model
-    // is as relevant as its best-matching variant. Grouping first would average
-    // that away.
-    const agrupados = agruparPorModelo(filtered);
-    total = agrupados.length;
-    totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
-    current = Math.min(page, totalPages);
-    modelos = agrupados.slice((current - 1) * PER_PAGE, current * PER_PAGE);
+    if (cand.error) throw new Error(`buscar_productos_candidatos: ${cand.error.message}`);
+    // Never null here: null means "the whole catalog" to the SQL side. A search
+    // with no match passes [] and gets nothing, as it should.
+    const ranking = searchProducts((cand.data ?? []) as Row[], q).map((p) => p.id);
+    const rango = new Map(ranking.map((id, i) => [id, i]));
+
+    const [cat, fac] = await Promise.all([
+      insforgeAdmin.database.rpc("tienda_catalogo", {
+        p_f: f,
+        p_ids: ranking,
+        p_limit: 1000,
+        p_offset: 0,
+      }),
+      insforgeAdmin.database.rpc("tienda_facetas_ctx", { p_f: f, p_ids: ranking }),
+    ]);
+    if (cat.error) throw new Error(`tienda_catalogo: ${cat.error.message}`);
+    facetas = fac.data;
+
+    // A model is as relevant as its best-matching variant.
+    const mejor = (m: ModeloTienda) =>
+      Math.min(...m.variantes.map((v) => rango.get(v.id) ?? Infinity));
+    const todos = ((cat.data ?? []) as ModeloTienda[]).sort((a, b) => mejor(a) - mejor(b));
+    total = todos.length;
+    current = Math.min(page, Math.max(1, Math.ceil(total / PER_PAGE)));
+    modelos = todos.slice((current - 1) * PER_PAGE, current * PER_PAGE);
   } else {
     // Browsing has no relevance to preserve, so the database filters, orders,
-    // counts and slices, and only the 24 rows on screen travel.
-    const pagina = async (p: number) => {
-      return modelosTienda(marca, cat, cal, PER_PAGE, (p - 1) * PER_PAGE);
-    };
-
-    let rows = await pagina(page);
+    // counts and slices, and only the 24 rows on screen travel. Counts failing
+    // must not take the catalog down with them: the panel just shows no numbers.
+    const [rows, fac] = await Promise.all([
+      modelosTienda(f, PER_PAGE, (page - 1) * PER_PAGE),
+      facetasTienda(f).catch(() => null),
+    ]);
+    modelos = rows;
     current = page;
     // A hand-edited ?page= past the end comes back empty, which would render as
     // "no hay productos" on a catalog that has plenty. Fall back to the first.
     if (rows.length === 0 && page > 1) {
-      rows = await pagina(1);
+      modelos = await modelosTienda(f, PER_PAGE, 0);
       current = 1;
     }
-    total = Number(rows[0]?.total ?? 0);
-    totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
-    current = Math.min(current, totalPages);
-    modelos = rows;
+    facetas = fac;
+    total = Number((modelos[0] as { total?: number } | undefined)?.total ?? 0);
   }
+
+  const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
 
   return (
     <TiendaView
       modelos={modelos}
-      marcas={marcas}
-      categorias={categorias}
-      calidades={calidades}
+      facetas={leerFacetas(facetas)}
+      filtros={filtros}
       q={q}
-      marca={marca}
-      cat={cat}
-      cal={cal}
-      page={current}
+      page={Math.min(current, totalPages)}
       totalPages={totalPages}
       total={total}
       whatsapp={process.env.STORE_WHATSAPP ?? null}
