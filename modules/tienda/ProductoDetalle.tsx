@@ -1,35 +1,11 @@
 import Link from "next/link";
-import {
-  ArrowLeft,
-  Smartphone,
-  ShieldCheck,
-  Truck,
-  MessageCircle,
-} from "lucide-react";
+import { Smartphone } from "lucide-react";
 import { foto } from "@/lib/foto";
-import { GaleriaFotos } from "./GaleriaFotos";
-import { formatMXN } from "@/lib/money";
+import { formatPrecio } from "@/lib/money";
 import { cn } from "@/lib/utils";
-import { calidadDe, marcoDe, CALIDAD_LABEL } from "@/lib/calidad";
-import { getTiendaInfo } from "@/modules/config/lib";
-import { AddToCart } from "./AddToCart";
-import { MARCA } from "@/lib/marca";
+import type { ModeloTienda } from "@/lib/calidades";
+import { ModeloCompra } from "./ModeloCompra";
 
-export type DetalleProducto = {
-  id: string;
-  nombre: string;
-  marca: string | null;
-  categoria: string | null;
-  talla: string | null;
-  color: string | null;
-  precio_cents: number;
-  disponible: boolean;
-  imagen: string | null;
-  /** Extra supplier views for the gallery; empty for a single-photo product. */
-  vistas?: string[];
-  /** Extra business days: this piece's stock sits in another city. */
-  entrega_dias?: number;
-};
 export type RelacionadoProducto = {
   id: string;
   nombre: string;
@@ -39,216 +15,64 @@ export type RelacionadoProducto = {
   imagen: string | null;
 };
 
-// Quality/frame are derived from the product name — see lib/calidad.ts.
-function calidadLabel(n: string): string | null {
-  const c = calidadDe(n);
-  return c ? CALIDAD_LABEL[c] : null;
-}
-
-function waHref(nombre: string, whatsapp: string | null) {
-  const text = encodeURIComponent(`Hola ${MARCA.tienda.nombre}, me interesa: ${nombre}`);
-  return whatsapp
-    ? `https://wa.me/${whatsapp}?text=${text}`
-    : `https://wa.me/?text=${text}`;
-}
-
-export async function ProductoDetalle({
-  producto: p,
+export function ProductoDetalle({
+  modelo,
+  inicial,
+  vistas,
   relacionados,
   compatibles = [],
   whatsapp,
 }: {
-  producto: DetalleProducto;
+  modelo: ModeloTienda;
+  /** The variant the URL named: preselected. */
+  inicial: string;
+  /** Extra photos per variant id. */
+  vistas: Record<string, string[]>;
   relacionados: RelacionadoProducto[];
   /** Products sharing a compatibility tag — the strongest recommendation. */
   compatibles?: RelacionadoProducto[];
   whatsapp: string | null;
 }) {
-  const tienda = await getTiendaInfo();
-  const specs = [
-    ["Marca", p.marca],
-    ["Categoría", p.categoria],
-    ["Calidad", calidadLabel(p.nombre)],
-    ["Marco", marcoDe(p.nombre)],
-    ["Color", p.color],
-    ["Tamaño", p.talla],
-  ].filter(([, v]) => v) as [string, string][];
-
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
-      <Link
-        href="/tienda"
-        className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-tienda-700 dark:text-tienda-300"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Catálogo
-      </Link>
-
-      <div className="mt-5 grid gap-8 md:grid-cols-2">
-        {/* Image(s) */}
-        <GaleriaFotos
-          imagenes={[p.imagen, ...(p.vistas ?? [])].filter(Boolean) as string[]}
-          alt={p.nombre}
-        />
-
-        {/* Info */}
-        <div>
-          {p.categoria && (
-            <span className="text-xs font-medium uppercase tracking-wide text-tienda-600 dark:text-tienda-400">
-              {p.categoria}
-            </span>
-          )}
-          <h1 className="mt-1 text-balance text-2xl font-semibold leading-tight tracking-tight text-foreground [font-family:var(--font-display)] sm:text-3xl">
-            {p.nombre}
-          </h1>
-
-          <div className="mt-4 flex flex-wrap items-center gap-3">
-            <span className="text-3xl font-semibold tabular-nums text-tienda-800 dark:text-tienda-300 [font-family:var(--font-display)]">
-              {p.precio_cents > 0 ? formatMXN(p.precio_cents) : "A cotizar"}
-            </span>
-            <span
-              className={cn(
-                "rounded-full px-2.5 py-1 text-xs font-medium",
-                p.disponible
-                  ? "bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300"
-                  : "bg-muted text-muted-foreground",
-              )}
-            >
-              {p.disponible ? "Disponible" : "Agotado"}
-            </span>
-          </div>
-
-          {/* Specs */}
-          {specs.length > 0 && (
-            <dl className="mt-6 grid grid-cols-2 gap-x-4 gap-y-3 rounded-2xl border border-border bg-background p-4">
-              {specs.map(([k, v]) => (
-                <div key={k}>
-                  <dt className="text-xs text-muted-foreground">{k}</dt>
-                  <dd className="text-sm font-medium text-foreground">{v}</dd>
-                </div>
-              ))}
-            </dl>
-          )}
-
-          {/* CTA — buy online, or ask if you'd rather talk to someone */}
-          <div className="mt-6 flex flex-col gap-2 sm:flex-row">
-            {p.precio_cents > 0 && (
-              <AddToCart
-                size="lg"
-                className="sm:flex-1"
-                p={{
-                  id: p.id,
-                  nombre: p.nombre,
-                  precio_cents: p.precio_cents,
-                  imagen: p.imagen,
-                  disponible: p.disponible,
-                }}
-              />
-            )}
-            <a
-              href={waHref(p.nombre, whatsapp)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-950/40 px-5 text-sm font-semibold text-green-700 dark:text-green-300 transition-colors hover:bg-green-100 dark:bg-green-900/40 sm:flex-1"
-            >
-              <MessageCircle className="h-5 w-5" />
-              Preguntar por WhatsApp
-            </a>
-          </div>
-
-          <div className="mt-5 space-y-2 text-xs text-muted-foreground">
-            {tienda.garantiaDias != null && (
-              <p className="flex items-start gap-2">
-                <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-tienda-500" />
-                <span>
-                  <strong className="text-foreground">
-                    {tienda.garantiaDias} días de garantía
-                  </strong>{" "}
-                  por defecto de fábrica
-                  {tienda.garantiaCondicion ? `, ${tienda.garantiaCondicion}` : ""}.
-                </span>
-              </p>
-            )}
-            <p className="flex items-start gap-2">
-              <Truck className="mt-0.5 h-4 w-4 shrink-0 text-tienda-500" />
-              <span>
-                Envíos a todo México
-                {tienda.entregaDias ? (
-                  <>
-                    {" "}· entrega en{" "}
-                    <strong className="text-foreground">
-                      {tienda.entregaDias} hábiles
-                    </strong>
-                  </>
-                ) : null}
-                {(p.entrega_dias ?? 0) > 0 && (
-                  <>
-                    {" "}· esta pieza sale de otra ciudad:{" "}
-                    <strong className="text-foreground">
-                      +{p.entrega_dias} día{(p.entrega_dias ?? 0) > 1 ? "s" : ""} hábil{(p.entrega_dias ?? 0) > 1 ? "es" : ""}
-                    </strong>
-                  </>
-                )}
-                . El costo de envío se calcula según tu destino. Precio sujeto a
-                disponibilidad.
-              </span>
-            </p>
-          </div>
-        </div>
-      </div>
+    // Bottom padding: room for the fixed buy bar on phones.
+    <div className="mx-auto max-w-6xl px-4 pb-32 pt-1 sm:px-6 lg:pb-12 lg:pt-6">
+      <ModeloCompra modelo={modelo} inicial={inicial} vistas={vistas} whatsapp={whatsapp} />
 
       {/* Compatible parts come first: they answer "does this fit MY car",
           which outranks a same-category browse. */}
-      {compatibles.length > 0 && (
-        <RejaMini titulo="Compatibles con esta pieza" items={compatibles} />
-      )}
-
-      {/* Related */}
-      {relacionados.length > 0 && (
-        <RejaMini titulo="También te puede interesar" items={relacionados} />
-      )}
+      {compatibles.length > 0 && <RejaMini titulo="Compatibles con esta pieza" items={compatibles} />}
+      {relacionados.length > 0 && <RejaMini titulo="También buscan" items={relacionados} />}
     </div>
   );
 }
 
 function RejaMini({ titulo, items }: { titulo: string; items: RelacionadoProducto[] }) {
   return (
-    <section className="mt-14">
-      <h2 className="text-lg font-semibold tracking-tight text-foreground [font-family:var(--font-display)]">
-        {titulo}
-      </h2>
-      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+    <section className="mt-10">
+      <h2 className="text-base font-semibold tracking-tight text-foreground">{titulo}</h2>
+      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {items.map((r) => (
-              <Link
-                key={r.id}
-                href={`/tienda/${r.id}`}
-                className={cn(
-                  "group flex flex-col rounded-2xl border border-border bg-background p-3 transition-all hover:border-tienda-300 dark:border-tienda-800 hover:shadow-lg hover:shadow-tienda-900/5",
-                  !r.disponible && "opacity-75",
-                )}
-              >
-                <div className="mb-3 flex aspect-square items-center justify-center overflow-hidden rounded-xl bg-background">
-                  {r.imagen ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={foto(r.imagen, 256)}
-                      alt={r.nombre}
-                      loading="lazy"
-                      className="h-full w-full object-contain"
-                    />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-tienda-50 to-slate-50 text-tienda-400 transition-colors group-hover:text-tienda-500">
-                      <Smartphone className="h-8 w-8" />
-                    </div>
-                  )}
-                </div>
-                <p className="line-clamp-2 min-h-[2.5rem] text-sm font-medium leading-tight text-foreground">
-                  {r.nombre}
-                </p>
-                <span className="mt-1 font-semibold tabular-nums text-tienda-800 dark:text-tienda-300 [font-family:var(--font-display)]">
-                  {r.precio_cents > 0 ? formatMXN(r.precio_cents) : "A cotizar"}
-                </span>
-              </Link>
+          <Link
+            key={r.id}
+            href={`/tienda/${r.id}`}
+            className={cn(
+              "group flex flex-col rounded-2xl border border-border bg-background p-3 transition-colors hover:border-tienda-300",
+              !r.disponible && "opacity-75",
+            )}
+          >
+            <div className="mb-3 flex aspect-square items-center justify-center overflow-hidden rounded-xl bg-muted/40">
+              {r.imagen ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={foto(r.imagen, 256)} alt={r.nombre} loading="lazy" className="h-full w-full object-contain" />
+              ) : (
+                <Smartphone className="h-8 w-8 text-muted-foreground/40" />
+              )}
+            </div>
+            <p className="line-clamp-2 min-h-[2.5rem] text-sm font-medium leading-tight text-foreground">{r.nombre}</p>
+            <span className="mt-1 font-semibold tabular-nums text-foreground">
+              {r.precio_cents > 0 ? formatPrecio(r.precio_cents) : "A cotizar"}
+            </span>
+          </Link>
         ))}
       </div>
     </section>

@@ -1,10 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, Loader2, X } from "lucide-react";
+import { Check, Loader2, SlidersHorizontal, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CALIDADES } from "@/lib/calidad";
-import { alternar, LISTAS, SIN_FILTROS, type Facet, type Facetas, type Filtros } from "./filtros";
+import {
+  alternar,
+  cuantosFiltros,
+  LISTAS,
+  SIN_FILTROS,
+  type Facet,
+  type Facetas,
+  type Filtros,
+} from "./filtros";
 
 type Cambio = (f: Filtros) => void;
 
@@ -402,8 +410,8 @@ export function HojaFiltros({
   );
 }
 
-/** What is on, each removable on its own. */
-export function ChipsActivos({ filtros, onCambio }: { filtros: Filtros; onCambio: Cambio }) {
+/** Every active filter as a label plus the filters without it. */
+function chipsActivos(filtros: Filtros): { label: string; sin: Filtros }[] {
   const chips: { label: string; sin: Filtros }[] = [];
   for (const k of LISTAS) {
     for (const v of filtros[k]) {
@@ -417,6 +425,81 @@ export function ChipsActivos({ filtros, onCambio }: { filtros: Filtros; onCambio
     });
   }
   if (filtros.stock) chips.push({ label: "Con existencia", sin: { ...filtros, stock: false } });
+  return chips;
+}
+
+/**
+ * Phone: one scrollable row under the search — the button to the full sheet,
+ * what is on (tap to remove), then a few one-tap narrowings taken from the
+ * counts. A suggestion only appears if it actually narrows the list: an option
+ * covering every result would change nothing.
+ */
+export function BarraFiltros({
+  facetas,
+  filtros,
+  onCambio,
+  onAbrir,
+}: {
+  facetas: Facetas;
+  filtros: Filtros;
+  onCambio: Cambio;
+  onAbrir: () => void;
+}) {
+  const activos = cuantosFiltros(filtros);
+  const chips = chipsActivos(filtros);
+  const sugerencias = (["cat", "marca", "cal"] as const).flatMap((k) =>
+    facetas[k]
+      .filter((o) => o.n > 0 && o.n < facetas.total && !filtros[k].includes(o.value))
+      .sort((a, b) => b.n - a.n)
+      .slice(0, k === "cat" ? 1 : 2)
+      .map((o) => ({ k, o })),
+  );
+
+  return (
+    <div className="-mx-4 flex gap-2 overflow-x-auto px-4 py-1 [scrollbar-width:none] sm:-mx-6 sm:px-6 lg:hidden [&::-webkit-scrollbar]:hidden">
+      <button
+        type="button"
+        onClick={onAbrir}
+        aria-haspopup="dialog"
+        className="inline-flex h-11 shrink-0 cursor-pointer items-center gap-2 rounded-full bg-foreground px-4 text-sm font-medium text-background"
+      >
+        <SlidersHorizontal className="h-4 w-4" />
+        Filtros
+        {activos > 0 && (
+          <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-tienda-600 px-1.5 text-xs text-white">
+            {activos}
+          </span>
+        )}
+      </button>
+      {chips.map((c, i) => (
+        <button
+          key={`${i}-${c.label}`}
+          type="button"
+          onClick={() => onCambio(c.sin)}
+          aria-label={`Quitar ${c.label}`}
+          className="inline-flex h-11 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-tienda-200 bg-tienda-50 pl-4 pr-3 text-sm font-medium text-tienda-800"
+        >
+          {c.label}
+          <X className="h-4 w-4" aria-hidden />
+        </button>
+      ))}
+      {sugerencias.map(({ k, o }) => (
+        <button
+          key={`${k}-${o.value}`}
+          type="button"
+          onClick={() => onCambio({ ...filtros, [k]: alternar(filtros[k], o.value) })}
+          className="inline-flex h-11 shrink-0 cursor-pointer items-center rounded-full border border-border bg-background px-4 text-sm"
+        >
+          {o.value}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Desktop: what is on, each removable on its own. */
+export function ChipsActivos({ filtros, onCambio }: { filtros: Filtros; onCambio: Cambio }) {
+  const chips = chipsActivos(filtros);
   if (chips.length === 0) return null;
 
   return (

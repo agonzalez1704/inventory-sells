@@ -16,7 +16,9 @@ export function GaleriaFotos({ imagenes, alt }: { imagenes: string[]; alt: strin
 
   return (
     <div>
-      <div className="flex aspect-square items-center justify-center overflow-hidden rounded-3xl border border-tienda-100 dark:border-tienda-900 bg-background">
+      {/* Phone: edge to edge and shorter (4:3), so the quality choice is
+          still on the first screen. */}
+      <div className="flex aspect-[4/3] items-center justify-center overflow-hidden border-y border-border bg-background sm:aspect-square sm:rounded-3xl sm:border">
         {actual ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img

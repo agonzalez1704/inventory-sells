@@ -1,13 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { insforgeAdmin } from "@/lib/insforge/admin";
-
-import {
-  ProductoDetalle,
-  type DetalleProducto,
-  type RelacionadoProducto,
-} from "@/modules/tienda/ProductoDetalle";
-
+import type { ModeloTienda } from "@/lib/calidades";
+import { ProductoDetalle, type RelacionadoProducto } from "@/modules/tienda/ProductoDetalle";
 
 // Without this every product page carries the root title, which is indexed but
 // unfindable — nobody searches for the shop by name to reach one part.
@@ -40,109 +35,126 @@ export async function generateMetadata({
 type Row = {
   id: string;
   name: string;
+  modelo: string;
   brand: string | null;
   category: string | null;
-  size: string | null;
-  color: string | null;
   price_cents: number;
   quantity: number;
   is_active: boolean;
   image_url: string | null;
 };
 
+type Mini = {
+  id: string;
+  name: string;
+  brand: string | null;
+  price_cents: number;
+  quantity: number;
+  image_url: string | null;
+};
+
+const aRelacionado = (p: Mini): RelacionadoProducto => ({
+  id: p.id,
+  nombre: p.name,
+  marca: p.brand,
+  precio_cents: p.price_cents,
+  disponible: p.quantity > 0,
+  imagen: p.image_url,
+});
+
+/**
+ * The model page. The URL names one variant (the one the catalog row or a
+ * shared link pointed at), but the page sells the model: every quality of it,
+ * chosen here. The variants come from tienda_catalogo over the siblings' ids —
+ * the same function the catalog lists with — so badges, availability and the
+ * best-seller can never disagree between the row and the page.
+ */
 export default async function ProductoPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  // A malformed id makes the uuid comparison fail in the database: that is a
+  // missing page, not a server error.
+  if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
 
-  const { data } = await insforgeAdmin.database
+  const { data, error } = await insforgeAdmin.database
     .from("products")
-    .select("id, name, brand, category, size, color, price_cents, quantity, is_active, image_url, inventories(entrega_dias_habiles, es_dropship)")
+    .select("id, name, modelo, brand, category, price_cents, quantity, is_active, image_url")
     .eq("id", id)
     .maybeSingle();
-
+  if (error) throw new Error(`producto: ${error.message}`);
   const row = data as Row | null;
   if (!row || !row.is_active) notFound();
 
-  const { data: compatData } = await insforgeAdmin.database.rpc(
-    "productos_compatibles",
-    { p_product_id: row.id, p_limit: 8 },
-  );
-  const compatibles: RelacionadoProducto[] = (
-    (compatData ?? []) as {
-      id: string; name: string; brand: string | null;
-      price_cents: number; quantity: number; image_url: string | null;
-    }[]
-  ).map((c) => ({
-    id: c.id,
-    nombre: c.name,
-    marca: c.brand,
-    precio_cents: c.price_cents,
-    disponible: c.quantity > 0,
-    imagen: c.image_url,
-  }));
+  // Same key the catalog groups by: brand, type and model.
+  let hermanos = insforgeAdmin.database
+    .from("products")
+    .select("id")
+    .eq("is_active", true)
+    .eq("modelo", row.modelo)
+    .limit(20);
+  hermanos = row.brand ? hermanos.eq("brand", row.brand) : hermanos.is("brand", null);
+  hermanos = row.category ? hermanos.eq("category", row.category) : hermanos.is("category", null);
 
-  const { data: galData } = await insforgeAdmin.database
-    .from("product_images")
-    .select("url, orden")
-    .eq("product_id", row.id)
-    .order("orden", { ascending: true });
-  const vistas = ((galData ?? []) as { url: string }[]).map((g) => g.url);
-
-  const producto: DetalleProducto = {
-    id: row.id,
-    nombre: row.name,
-    marca: row.brand,
-    categoria: row.category,
-    talla: row.size,
-    color: row.color,
-    precio_cents: row.price_cents,
-    disponible:
-      row.quantity > 0 ||
-      ((row as unknown as { inventories: { es_dropship?: boolean } | null }).inventories
-        ?.es_dropship ?? false),
-    imagen: row.image_url,
-    vistas,
-    entrega_dias:
-      (row as unknown as { inventories: { entrega_dias_habiles: number | null } | null })
-        .inventories?.entrega_dias_habiles ?? 0,
-  };
-
-  // Related: same category (or brand), a few active products.
   const rel = insforgeAdmin.database
     .from("products")
-    .select("id, name, brand, category, price_cents, quantity, image_url")
+    .select("id, name, brand, price_cents, quantity, image_url")
     .eq("is_active", true)
-    .neq("id", row.id)
-    .limit(8);
-  const { data: relData } = row.category
-    ? await rel.eq("category", row.category)
-    : row.brand
-      ? await rel.eq("brand", row.brand)
-      : await rel.limit(0);
+    .neq("modelo", row.modelo)
+    .limit(12);
 
-  const relacionados: RelacionadoProducto[] = ((relData ?? []) as Row[])
-    .map((p) => ({
-      id: p.id,
-      nombre: p.name,
-      marca: p.brand,
-      precio_cents: p.price_cents,
-      disponible: p.quantity > 0,
-      imagen: p.image_url,
-    }))
+  const [herm, compat, relData] = await Promise.all([
+    hermanos,
+    insforgeAdmin.database.rpc("productos_compatibles", { p_product_id: row.id, p_limit: 12 }),
+    row.category
+      ? rel.eq("category", row.category)
+      : row.brand
+        ? rel.eq("brand", row.brand)
+        : Promise.resolve({ data: [] }),
+  ]);
+
+  const ids = [...new Set([row.id, ...((herm.data ?? []) as { id: string }[]).map((h) => h.id)])];
+
+  const [cat, gal] = await Promise.all([
+    insforgeAdmin.database.rpc("tienda_catalogo", { p_f: {}, p_ids: ids, p_limit: 5, p_offset: 0 }),
+    insforgeAdmin.database
+      .from("product_images")
+      .select("product_id, url, orden")
+      .in("product_id", ids)
+      .order("orden", { ascending: true }),
+  ]);
+  if (cat.error) throw new Error(`tienda_catalogo: ${cat.error.message}`);
+
+  const modelo = ((cat.data ?? []) as ModeloTienda[]).find((m) =>
+    m.variantes.some((v) => v.id === row.id),
+  );
+  if (!modelo) notFound();
+
+  const vistas: Record<string, string[]> = {};
+  for (const g of (gal.data ?? []) as { product_id: string; url: string }[]) {
+    (vistas[g.product_id] ??= []).push(g.url);
+  }
+
+  const propios = new Set(ids);
+  const compatibles = ((compat.data ?? []) as Mini[])
+    .filter((c) => !propios.has(c.id))
+    .slice(0, 8)
+    .map(aRelacionado);
+  const relacionados = ((relData.data ?? []) as Mini[])
+    .map(aRelacionado)
     .sort((a, b) => Number(b.disponible) - Number(a.disponible))
     .slice(0, 4);
 
-  const whatsapp = process.env.STORE_WHATSAPP ?? null;
-
   return (
     <ProductoDetalle
-      producto={producto}
+      modelo={modelo}
+      inicial={row.id}
+      vistas={vistas}
       relacionados={relacionados}
       compatibles={compatibles}
-      whatsapp={whatsapp}
+      whatsapp={process.env.STORE_WHATSAPP ?? null}
     />
   );
 }

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Drawer as Vaul } from "vaul";
 import { ShoppingCart, Trash2, Minus, Plus, Smartphone } from "lucide-react";
 import { foto } from "@/lib/foto";
-import { formatMXN } from "@/lib/money";
+import { formatPrecio } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/components/use-is-mobile";
 import { useCart } from "./CartProvider";
@@ -90,7 +90,7 @@ function CartBody({ mobile }: { mobile: boolean }) {
                 <div className="min-w-0 flex-1">
                   <p className="line-clamp-2 text-sm font-medium text-foreground">{i.nombre}</p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    {formatMXN(i.precio_cents)} c/u
+                    {formatPrecio(i.precio_cents)} c/u
                   </p>
                   <div className="mt-1.5 flex items-center gap-2">
                     <div className="flex items-center rounded-lg border border-border">
@@ -112,7 +112,7 @@ function CartBody({ mobile }: { mobile: boolean }) {
                       </button>
                     </div>
                     <span className="ml-auto text-sm font-semibold tabular-nums text-tienda-800 dark:text-tienda-300">
-                      {formatMXN(i.precio_cents * i.qty)}
+                      {formatPrecio(i.precio_cents * i.qty)}
                     </span>
                     <button
                       onClick={() => remove(i.id)}
@@ -134,7 +134,7 @@ function CartBody({ mobile }: { mobile: boolean }) {
             <div className="flex items-baseline justify-between">
               <span className="text-sm text-muted-foreground">Subtotal</span>
               <span className="text-xl font-semibold tabular-nums text-foreground">
-                {formatMXN(subtotal)}
+                {formatPrecio(subtotal)}
               </span>
             </div>
             <p className="mt-0.5 text-xs text-muted-foreground">
@@ -151,5 +151,27 @@ function CartBody({ mobile }: { mobile: boolean }) {
         </>
       )}
     </>
+  );
+}
+
+/** Phone: the order stays one thumb away on every catalog screen. Opens the
+ *  same drawer the header button does. */
+export function BarraPedido() {
+  const { count, subtotal, setOpen, ready } = useCart();
+  if (!ready || count === 0) return null;
+  return (
+    <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background px-3 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] lg:hidden">
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="flex h-14 w-full cursor-pointer items-center justify-between rounded-2xl bg-tienda-600 px-5 text-white shadow-sm shadow-tienda-600/30"
+      >
+        <span className="text-[15px] font-semibold">Ver pedido</span>
+        <span className="flex items-center gap-2.5 text-sm">
+          {count} {count === 1 ? "pieza" : "piezas"}
+          <span className="text-base font-semibold tabular-nums">{formatPrecio(subtotal)}</span>
+        </span>
+      </button>
+    </div>
   );
 }
