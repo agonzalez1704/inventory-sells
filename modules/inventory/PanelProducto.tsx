@@ -433,7 +433,8 @@ function TabInfo({
         </dl>
       </div>
 
-      <div className="space-y-3">
+      {/* On phones stock comes first: it is what people open the product for. */}
+      <div className="order-first space-y-3 md:order-none">
         <div className="rounded-xl border border-border bg-muted/30 p-4">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">En existencia</p>
           <p className="mt-1 flex items-baseline gap-1.5">
