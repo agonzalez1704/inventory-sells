@@ -1,24 +1,10 @@
-import { insforgeAdmin } from "@/lib/insforge/admin";
 import { facetasTienda, modelosTienda } from "@/modules/tienda/lecturas";
-import { searchProducts, tokensDeConsulta, expand } from "@/lib/search";
+import { buscarModelos } from "@/modules/tienda/busqueda";
 import { TiendaView } from "@/modules/tienda/TiendaView";
 import type { ModeloTienda } from "@/lib/calidades";
 import { filtrosSQL, leerFacetas, leerFiltros } from "@/modules/tienda/filtros";
 
 const PER_PAGE = 24;
-
-type Row = {
-  id: string;
-  name: string;
-  modelo: string | null;
-  calidad: string | null;
-  brand: string | null;
-  category: string | null;
-  sku: string;
-  price_cents: number;
-  quantity: number;
-  image_url: string | null;
-};
 
 // Public storefront: read with the admin client (RLS is staff-only) but expose
 // ONLY customer-safe fields — never cost, stock numbers, SKU or inventory.
@@ -46,34 +32,9 @@ export default async function TiendaPage({
     // change to either. The scorer only picks and ranks the candidates; the
     // filters and the grouping run in SQL over exactly that set, so the counts
     // and the list can never disagree.
-    const cand = await insforgeAdmin.database.rpc("buscar_productos_candidatos", {
-      p_tokens: tokensDeConsulta(q).map(expand),
-      p_inventory_id: null,
-      p_categoria: null,
-      p_limit: 1000,
-    });
-    if (cand.error) throw new Error(`buscar_productos_candidatos: ${cand.error.message}`);
-    // Never null here: null means "the whole catalog" to the SQL side. A search
-    // with no match passes [] and gets nothing, as it should.
-    const ranking = searchProducts((cand.data ?? []) as Row[], q).map((p) => p.id);
-    const rango = new Map(ranking.map((id, i) => [id, i]));
-
-    const [cat, fac] = await Promise.all([
-      insforgeAdmin.database.rpc("tienda_catalogo", {
-        p_f: f,
-        p_ids: ranking,
-        p_limit: 1000,
-        p_offset: 0,
-      }),
-      insforgeAdmin.database.rpc("tienda_facetas_ctx", { p_f: f, p_ids: ranking }),
-    ]);
-    if (cat.error) throw new Error(`tienda_catalogo: ${cat.error.message}`);
-    facetas = fac.data;
-
-    // A model is as relevant as its best-matching variant.
-    const mejor = (m: ModeloTienda) =>
-      Math.min(...m.variantes.map((v) => rango.get(v.id) ?? Infinity));
-    const todos = ((cat.data ?? []) as ModeloTienda[]).sort((a, b) => mejor(a) - mejor(b));
+    const r = await buscarModelos(q, f);
+    facetas = r.facetas;
+    const todos = r.modelos;
     total = todos.length;
     current = Math.min(page, Math.max(1, Math.ceil(total / PER_PAGE)));
     modelos = todos.slice((current - 1) * PER_PAGE, current * PER_PAGE);

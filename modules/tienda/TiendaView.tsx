@@ -27,6 +27,7 @@ import { BarraPedido } from "./CartDrawer";
 import { logoDeMarca } from "./marca-logo";
 import { MARCA } from "@/lib/marca";
 import { BarraFiltros, ChipsActivos, HojaFiltros, PanelFiltros } from "./FiltrosTienda";
+import { BuscadorTienda } from "./BuscadorTienda";
 import { cuantosFiltros, SIN_FILTROS, urlTienda, type Facetas, type Filtros } from "./filtros";
 
 export type { Facet } from "./filtros";
@@ -78,28 +79,11 @@ export function TiendaView({
   const router = useRouter();
   const tienda = useTiendaInfo();
   const [pending, start] = useTransition();
-  const [texto, setTexto] = useState(q);
   const [hoja, setHoja] = useState(false);
+  // The phone search overlay lives inside the sticky bar: lift the bar above
+  // the site header while it is open.
+  const [buscando, setBuscando] = useState(false);
   const cerrarHoja = useCallback(() => setHoja(false), []);
-
-  // The last query we asked the server for.
-  //
-  // The server echoes q back on every navigation, and adopting it
-  // unconditionally overwrites whatever the customer has typed since — the
-  // round trip takes long enough on a phone that they are always mid-word. The
-  // box then jumps back to an older value under their fingers and the next
-  // keystrokes land in the wrong place: typing "Note 10" produced "Note 1p0".
-  //
-  // So only adopt q when it did NOT come from our own navigation, which leaves
-  // exactly the cases where the URL is the authority: back/forward, or a
-  // filter chip clearing the search.
-  const pedido = useRef(q);
-
-  useEffect(() => {
-    if (q === pedido.current) return;
-    pedido.current = q;
-    setTexto(q);
-  }, [q]);
 
   function navegar(url: string, reemplazar: boolean) {
     start(() =>
@@ -107,12 +91,11 @@ export function TiendaView({
     );
   }
 
-  // replace, not push, when the query changed: a search-as-you-type that
-  // pushes leaves one history entry per pause, so Back from a product walks
-  // the customer through every half-typed word instead of leaving the shop.
-  function buscar(nuevo: string) {
-    pedido.current = nuevo;
-    navegar(urlTienda(filtros, nuevo), true);
+  // A committed search starts from a clean slate — the suggestion counts it
+  // was chosen from ("Ver los 3 modelos", "“a31” en Pantallas") ignore the
+  // filters that were on. Pushed: Back returns to the previous results.
+  function enviarBusqueda(nuevo: string, cat?: string) {
+    navegar(urlTienda(cat ? { ...SIN_FILTROS, cat: [cat] } : SIN_FILTROS, nuevo), false);
   }
 
   // Filters and pages push: Back undoes the last filter, which is what a
@@ -128,14 +111,6 @@ export function TiendaView({
     window.scrollTo({ top: 0 });
   }
 
-  // Debounced search — typing navigates without a submit.
-  useEffect(() => {
-    if (texto === pedido.current) return;
-    const t = setTimeout(() => buscar(texto), 400);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [texto]);
-
   const filtrosActivos = cuantosFiltros(filtros);
   const filtrando = Boolean(q) || filtrosActivos > 0;
   const sinResultados = modelos.length === 0;
@@ -150,38 +125,24 @@ export function TiendaView({
           first screen before a single product. Search and filters are the
           page's first question, so they stick under the header while the list
           scrolls. */}
-      <div className="sticky top-16 z-20 -mx-4 border-b border-border/60 bg-[#f5f8ff]/95 px-4 pb-2 pt-3 backdrop-blur sm:-mx-6 sm:px-6 lg:static lg:mx-0 lg:border-0 lg:bg-transparent lg:px-0 lg:pt-6 lg:backdrop-blur-none">
-        <div className="relative lg:max-w-2xl">
-          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-          <input
-            type="search"
-            enterKeyHint="search"
-            value={texto}
-            onChange={(e) => setTexto(e.target.value)}
-            placeholder={
-              ES_RULI
-                ? "Busca la pieza: amortiguador, balatas…"
-                : "Busca tu modelo: iPhone 11, Moto G31…"
-            }
-            aria-label="Buscar"
-            // 16px text: anything smaller makes iOS zoom the page on focus.
-            className="h-12 w-full rounded-xl border border-border bg-background pl-11 pr-12 text-base text-foreground outline-none placeholder:text-muted-foreground focus:border-tienda-500 focus:ring-4 focus:ring-tienda-100 [&::-webkit-search-cancel-button]:hidden"
-          />
-          {pending ? (
-            <Loader2 className="absolute right-3.5 top-1/2 h-5 w-5 -translate-y-1/2 animate-spin text-tienda-500" />
-          ) : (
-            texto && (
-              <button
-                type="button"
-                onClick={() => setTexto("")}
-                aria-label="Borrar búsqueda"
-                className="absolute right-0.5 top-1/2 flex h-11 w-11 -translate-y-1/2 cursor-pointer items-center justify-center text-muted-foreground"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            )
-          )}
-        </div>
+      {/* Solid background, no backdrop-blur: a backdrop filter would become
+          the containing block of the fixed search overlay inside and trap it
+          in this bar. */}
+      <div
+        className={cn(
+          "sticky top-16 -mx-4 border-b border-border/60 bg-[#f5f8ff] px-4 pb-2 pt-3 sm:-mx-6 sm:px-6 lg:static lg:mx-0 lg:border-0 lg:bg-transparent lg:px-0 lg:pt-6",
+          buscando ? "z-50" : "z-20",
+        )}
+      >
+        <BuscadorTienda
+          q={q}
+          pending={pending}
+          onEnviar={enviarBusqueda}
+          onAbierto={setBuscando}
+          placeholder={
+            ES_RULI ? "Busca la pieza: amortiguador, balatas…" : "Busca tu modelo: iPhone 11, Moto G31…"
+          }
+        />
         <div className="mt-2">
           <BarraFiltros
             facetas={facetas}
@@ -244,11 +205,7 @@ export function TiendaView({
             {filtrando && (
               <button
                 type="button"
-                onClick={() => {
-                  pedido.current = "";
-                  setTexto("");
-                  navegar("/tienda", false);
-                }}
+                onClick={() => navegar("/tienda", false)}
                 className="h-11 cursor-pointer text-sm font-medium text-tienda-700 hover:underline"
               >
                 Limpiar
