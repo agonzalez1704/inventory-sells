@@ -5,6 +5,7 @@ import { formatPrecio } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import type { ModeloTienda } from "@/lib/calidades";
 import { ModeloCompra } from "./ModeloCompra";
+import { RielPedido } from "./RielPedido";
 
 export type RelacionadoProducto = {
   id: string;
@@ -35,8 +36,15 @@ export function ProductoDetalle({
 }) {
   return (
     // Bottom padding: room for the fixed buy bar on phones.
-    <div className="mx-auto max-w-6xl px-4 pb-32 pt-1 sm:px-6 lg:pb-12 lg:pt-6">
-      <ModeloCompra modelo={modelo} inicial={inicial} vistas={vistas} whatsapp={whatsapp} />
+    <div className="mx-auto max-w-6xl px-4 pb-32 pt-1 sm:px-6 lg:pb-12 lg:pt-6 xl:max-w-7xl">
+      <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_280px] xl:gap-8">
+        <div className="min-w-0">
+          <ModeloCompra modelo={modelo} inicial={inicial} vistas={vistas} whatsapp={whatsapp} />
+        </div>
+        <aside className="hidden xl:sticky xl:top-20 xl:block xl:self-start">
+          <RielPedido />
+        </aside>
+      </div>
 
       {/* Compatible parts come first: they answer "does this fit MY car",
           which outranks a same-category browse. */}

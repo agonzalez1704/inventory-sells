@@ -2,7 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, MapPin, MessageCircle, ShieldCheck, Truck } from "lucide-react";
+import Link from "next/link";
+import { ArrowLeft, ChevronRight, MapPin, MessageCircle, ShieldCheck, Truck } from "lucide-react";
+import { foto } from "@/lib/foto";
+import { StepperPieza } from "./StepperPieza";
 import { formatPrecio } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { glosaDe, type ModeloTienda, type VarianteModelo } from "@/lib/calidades";
@@ -48,6 +51,8 @@ export function ModeloCompra({
   const tienda = useTiendaInfo();
   const { add, items } = useCart();
   const [selId, setSelId] = useState(inicial);
+  // Desktop only: phones add one at a time from the fixed bar, per the design.
+  const [cantidad, setCantidad] = useState(1);
 
   const v = m.variantes.find((x) => x.id === selId) ?? m.variantes[0];
   const varias = m.variantes.length > 1;
@@ -76,15 +81,66 @@ export function ModeloCompra({
       <button
         type="button"
         onClick={() => (window.history.length > 1 ? router.back() : router.push("/tienda"))}
-        className="inline-flex h-11 cursor-pointer items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-tienda-700"
+        className="inline-flex h-11 cursor-pointer items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-tienda-700 lg:hidden"
       >
         <ArrowLeft className="h-4 w-4" />
         Volver
       </button>
 
+      {/* Desktop: where this sits in the catalog, each step a way back into it. */}
+      <nav aria-label="Ubicación" className="mb-4 hidden h-11 items-center gap-1.5 text-sm text-muted-foreground lg:flex">
+        <Link href="/tienda" className="hover:text-tienda-700 hover:underline">
+          Catálogo
+        </Link>
+        {m.category && (
+          <>
+            <ChevronRight className="h-3.5 w-3.5" />
+            <Link href={`/tienda?cat=${encodeURIComponent(m.category)}`} className="hover:text-tienda-700 hover:underline">
+              {cap(m.category)}
+            </Link>
+          </>
+        )}
+        {m.brand && (
+          <>
+            <ChevronRight className="h-3.5 w-3.5" />
+            <Link href={`/tienda?marca=${encodeURIComponent(m.brand)}`} className="hover:text-tienda-700 hover:underline">
+              {m.brand}
+            </Link>
+          </>
+        )}
+        <ChevronRight className="h-3.5 w-3.5" />
+        <span className="truncate font-medium text-foreground">{m.modelo}</span>
+      </nav>
+
       <div className="lg:grid lg:grid-cols-2 lg:gap-10">
         <div className="-mx-4 sm:mx-0">
           <GaleriaFotos key={v.id} imagenes={imagenes} alt={v.nombre} />
+          {/* Desktop: one thumbnail per quality — seeing the part is a way to
+              choose it. Only when the qualities actually have their own photos. */}
+          {varias && m.variantes.some((x) => x.imagen) && (
+            <div className="mt-3 hidden gap-2 lg:flex">
+              {m.variantes.map((x) => (
+                <button
+                  key={x.id}
+                  type="button"
+                  onClick={() => elegir(x.id)}
+                  aria-label={`Ver ${x.calidad ?? x.nombre}`}
+                  className={cn(
+                    "flex w-20 cursor-pointer flex-col items-center gap-1 rounded-xl p-1 text-xs transition-colors",
+                    x.id === v.id ? "ring-2 ring-tienda-600" : "ring-1 ring-border hover:ring-tienda-300",
+                  )}
+                >
+                  <span className="flex aspect-square w-full items-center justify-center overflow-hidden rounded-lg bg-muted/50">
+                    {x.imagen || m.imagen ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={foto((x.imagen || m.imagen) as string, 128)} alt="" className="h-full w-full object-cover" />
+                    ) : null}
+                  </span>
+                  <span className="w-full truncate text-center text-muted-foreground">{x.calidad ?? x.nombre}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="pt-4 lg:pt-0">
@@ -198,6 +254,17 @@ export function ModeloCompra({
             >
               <MessageCircle className="h-6 w-6" />
             </a>
+            {v.precio_cents > 0 && v.disponible && !tope && (
+              <div className="hidden lg:block">
+                <StepperPieza
+                  qty={cantidad}
+                  max={MAX_POR_PRODUCTO}
+                  nombre={v.nombre}
+                  minimo={1}
+                  onChange={(n) => setCantidad(Math.max(1, Math.min(MAX_POR_PRODUCTO, n)))}
+                />
+              </div>
+            )}
             {v.precio_cents <= 0 ? (
               <a href={wa} target="_blank" rel="noopener noreferrer" className={cn(principal, "justify-center bg-green-600 text-white")}>
                 Preguntar precio
@@ -222,7 +289,7 @@ export function ModeloCompra({
                       imagen: v.imagen ?? m.imagen,
                       max: MAX_POR_PRODUCTO,
                     },
-                    1,
+                    cantidad,
                   )
                 }
                 className={cn(principal, "cursor-pointer bg-tienda-600 text-white shadow-sm shadow-tienda-600/30 hover:bg-tienda-700")}

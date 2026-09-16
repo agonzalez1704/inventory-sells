@@ -132,7 +132,7 @@ export default async function TiendaLayout({
 
       {/* Header */}
       <header className="sticky top-0 z-30 border-b border-tienda-100 dark:border-tienda-900 bg-white/85 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6 xl:max-w-7xl">
           <Wordmark />
           {/* Desktop search. Suspense: it reads the URL's query, and without a
               boundary that read would make the whole storefront shell dynamic. */}

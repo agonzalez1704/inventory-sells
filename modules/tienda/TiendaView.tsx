@@ -28,6 +28,7 @@ import { logoDeMarca } from "./marca-logo";
 import { MARCA } from "@/lib/marca";
 import { BarraFiltros, ChipsActivos, HojaFiltros, PanelFiltros } from "./FiltrosTienda";
 import { BuscadorTienda } from "./BuscadorTienda";
+import { RielPedido } from "./RielPedido";
 import { cuantosFiltros, SIN_FILTROS, urlTienda, type Facetas, type Filtros } from "./filtros";
 
 export type { Facet } from "./filtros";
@@ -149,7 +150,7 @@ export function TiendaView({
 
   return (
     // Bottom padding leaves room for the fixed order bar on phones.
-    <div className="mx-auto max-w-6xl px-4 pb-28 sm:px-6 lg:pb-8">
+    <div className="mx-auto max-w-6xl px-4 pb-28 sm:px-6 lg:pb-8 xl:max-w-7xl">
       <h1 className="sr-only">{MARCA.tienda.nombre} — {ES_RULI ? "refacciones" : "pantallas y refacciones"}</h1>
 
       {/* The approved redesign drops the hero: on a phone it cost the whole
@@ -243,7 +244,7 @@ export function TiendaView({
         <PanelFiltros facetas={facetas} filtros={filtros} onCambio={aplicar} />
       </HojaFiltros>
 
-      <div className="mt-4 lg:grid lg:grid-cols-[240px_1fr] lg:gap-8">
+      <div className="mt-4 lg:grid lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-8 xl:grid-cols-[240px_minmax(0,1fr)_280px]">
         <aside className="hidden lg:sticky lg:top-20 lg:block lg:max-h-[calc(100vh-6rem)] lg:self-start lg:overflow-y-auto lg:pr-1">
           <PanelFiltros facetas={facetas} filtros={filtros} onCambio={aplicar} />
         </aside>
@@ -288,7 +289,7 @@ export function TiendaView({
               {/* Phone: one grouped list, a row per model. Desktop: a grid. */}
               <ul
                 className={cn(
-                  "mt-1 divide-y divide-border overflow-hidden rounded-2xl border border-border bg-background transition-opacity lg:mt-3 lg:grid lg:grid-cols-3 lg:gap-3 lg:divide-y-0 lg:overflow-visible lg:rounded-none lg:border-0 lg:bg-transparent xl:grid-cols-4",
+                  "mt-1 divide-y divide-border overflow-hidden rounded-2xl border border-border bg-background transition-opacity lg:mt-3 lg:grid lg:grid-cols-3 lg:gap-3 lg:divide-y-0 lg:overflow-visible lg:rounded-none lg:border-0 lg:bg-transparent",
                   pending && "opacity-60",
                 )}
               >
@@ -305,6 +306,10 @@ export function TiendaView({
             </>
           )}
         </div>
+
+        <aside className="hidden xl:sticky xl:top-20 xl:block xl:self-start">
+          <RielPedido />
+        </aside>
       </div>
 
       {/* Objection killers — the exact terms matter more than the reassurance. */}
