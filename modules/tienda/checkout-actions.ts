@@ -139,3 +139,35 @@ export async function cotizarParaCP(
 export async function lugarDeCP(cp: string): Promise<LugarCP | null> {
   return buscarCP(cp);
 }
+
+export type PreviewApartado = {
+  /** Hours the shop would hold this cart. Null when it cannot be held. */
+  horas: number | null;
+  /** Why not, in the customer's words. */
+  motivo: string | null;
+};
+
+/**
+ * How long this cart would be held, before anything is reserved — so the
+ * button can say "Apartar por 2 horas" instead of promising a vague hold.
+ * Same function the hold itself uses (horas_apartado), so the promise and the
+ * reservation cannot disagree.
+ */
+export async function previewApartado(
+  lineas: CartLinea[],
+): Promise<ActionResult<PreviewApartado>> {
+  return attempt("previewApartado", async () => {
+    const val = await validarCarrito(lineas);
+    if (!val.ok) throw new Error(val.error);
+    if (val.data.lineas.some((l) => l.es_dropship))
+      return {
+        horas: null,
+        motivo: "Hay piezas que pedimos al proveedor: esas se pagan en línea para poder pedirlas.",
+      };
+    const { data, error } = await insforgeAdmin.database.rpc("horas_apartado", {
+      p_items: val.data.lineas.map((l) => ({ product_id: l.id, qty: l.qty })),
+    });
+    if (error) throw new Error(error.message ?? "No se pudo calcular el apartado");
+    return { horas: Number(data), motivo: null };
+  });
+}

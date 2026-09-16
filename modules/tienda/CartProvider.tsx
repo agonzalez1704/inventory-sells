@@ -23,7 +23,28 @@ export type CartItem = {
   max: number; // stock snapshot, to keep the stepper sane
 };
 
+/**
+ * How the order will be received. Chosen in the cart, finished in checkout —
+ * so it lives with the cart and survives a reload the same way.
+ */
+export type Entrega = {
+  tipo: "envio" | "recoger";
+  /** Pickup only: "yo" holds without paying; "uber" means someone else
+   *  collects with just the folio, so it must be paid online. */
+  quien: "yo" | "uber";
+  /** Branch name; null = not chosen yet (the first one is assumed). */
+  sucursal: string | null;
+};
+
+const KEY_ENTREGA = "ld_entrega_v1";
+
+// Most customers are local and come in person: the approved design opens on
+// pickup, held without paying.
+export const ENTREGA_INICIAL: Entrega = { tipo: "recoger", quien: "yo", sucursal: null };
+
 type CartCtx = {
+  entrega: Entrega;
+  setEntrega: (e: Entrega) => void;
   items: CartItem[];
   count: number;
   subtotal: number;
@@ -41,6 +62,7 @@ const Ctx = createContext<CartCtx | null>(null);
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [open, setOpen] = useState(false);
+  const [entrega, setEntrega] = useState<Entrega>(ENTREGA_INICIAL);
   // Avoid rendering a "0" badge during hydration before localStorage is read.
   const [ready, setReady] = useState(false);
 
@@ -54,6 +76,14 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // corrupt payload — start clean rather than crash the storefront
     }
+    try {
+      const e = JSON.parse(localStorage.getItem(KEY_ENTREGA) ?? "null") as Partial<Entrega> | null;
+      if (e && (e.tipo === "envio" || e.tipo === "recoger") && (e.quien === "yo" || e.quien === "uber")) {
+        setEntrega({ tipo: e.tipo, quien: e.quien, sucursal: typeof e.sucursal === "string" ? e.sucursal : null });
+      }
+    } catch {
+      // same: a bad stored choice just falls back to the default
+    }
     setReady(true);
   }, []);
 
@@ -65,6 +95,15 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       // quota/private mode — the cart just won't persist
     }
   }, [items, ready]);
+
+  useEffect(() => {
+    if (!ready) return;
+    try {
+      localStorage.setItem(KEY_ENTREGA, JSON.stringify(entrega));
+    } catch {
+      // quota/private mode — the choice just won't persist
+    }
+  }, [entrega, ready]);
 
   const add = useCallback((item: Omit<CartItem, "qty">, qty = 1) => {
     setItems((cur) => {
@@ -95,8 +134,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<CartCtx>(() => {
     const count = items.reduce((s, i) => s + i.qty, 0);
     const subtotal = items.reduce((s, i) => s + i.precio_cents * i.qty, 0);
-    return { items, count, subtotal, add, setQty, remove, clear, open, setOpen, ready };
-  }, [items, add, setQty, remove, clear, open, ready]);
+    return { entrega, setEntrega, items, count, subtotal, add, setQty, remove, clear, open, setOpen, ready };
+  }, [entrega, items, add, setQty, remove, clear, open, ready]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

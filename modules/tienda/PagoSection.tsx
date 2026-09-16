@@ -18,11 +18,12 @@ const METODOS: {
   icon: typeof CreditCard;
   logo?: string;
 }[] = [
+  // No OXXO: the user ruled it out as a payment method for this shop, and the
+  // approved checkout offers exactly these four.
   { value: "card", label: "Tarjeta", desc: "Débito o crédito", icon: CreditCard },
-  { value: "oxxo", label: "OXXO", desc: `Ficha válida ${VOUCHER_HORAS_UI} h`, icon: Store, logo: "/pay/oxxo.svg" },
-  { value: "spei", label: "SPEI", desc: "CLABE al instante", icon: ArrowLeftRight, logo: "/pay/spei.svg" },
+  { value: "spei", label: "SPEI", desc: "CLABE única · se confirma sola", icon: ArrowLeftRight, logo: "/pay/spei.svg" },
   { value: "aplazo", label: "A pagos", desc: "Paga después", icon: CalendarClock, logo: "/pay/aplazo.png" },
-  { value: "transferencia", label: "Transferencia", desc: "A nuestra cuenta", icon: Landmark },
+  { value: "transferencia", label: "Transferencia", desc: "A nuestra cuenta · subes comprobante", icon: Landmark },
 ];
 
 export function PagoSection({
@@ -42,7 +43,7 @@ export function PagoSection({
 
   return (
     <section className="rounded-2xl border border-border bg-background p-4">
-      <h2 className="mb-3 text-sm font-semibold text-foreground">Método de pago</h2>
+      <h2 className="mb-3 text-sm font-semibold text-foreground">¿Cómo pagas?</h2>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         {METODOS.map((m) => {
