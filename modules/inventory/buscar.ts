@@ -319,3 +319,126 @@ export async function listarCategorias(
     productos: Number(c.productos),
   }));
 }
+
+// ---------------------------------------------------------------------------
+// /inventario redesign (approved mockup): the list with its filter rail.
+
+export type OrdenLista = "vendidos" | "stock_asc" | "stock_desc" | "precio_asc" | "precio_desc";
+
+export type FiltrosInventario = {
+  inv?: string | null;
+  alerta?: "bajo" | "agotado" | null;
+  cat?: string | null;
+  /** Pesos, whole. */
+  pmin?: number | null;
+  pmax?: number | null;
+  orden?: OrdenLista | null;
+};
+
+export type FilaInventario = {
+  id: string;
+  inventory_id: string;
+  sku: string;
+  name: string;
+  brand: string | null;
+  size: string | null;
+  category: string | null;
+  price_cents: number;
+  cost_cents: number;
+  quantity: number;
+  etiqueta: string | null;
+  image_url: string | null;
+  ventas_anuales: number | null;
+  /** Reorder point; null = the default of 5. */
+  stock_minimo: number | null;
+  /** Pieces sold in the last 30 days. */
+  ventas_30d: number;
+};
+
+/**
+ * One page of the inventory list, every filter applied in SQL
+ * (inventario_lista).
+ *
+ * Search keeps the shared JS scorer: it picks and ranks the candidates, SQL
+ * filters exactly those, and — unless an explicit order was chosen — the rows
+ * keep the relevance order.
+ */
+export async function listaInventario(opts: {
+  query?: string;
+  filtros?: FiltrosInventario;
+  page?: number;
+  perPage?: number;
+}): Promise<{ rows: FilaInventario[]; total: number }> {
+  await assertPermiso("inventario_ver");
+  const insforge = await createInsForgeServerClient();
+  const perPage = Math.min(Math.max(opts.perPage ?? 50, 1), 200);
+  const page = Math.max(opts.page ?? 1, 1);
+  const desde = (page - 1) * perPage;
+  const fl = opts.filtros ?? {};
+
+  const f: Record<string, unknown> = {};
+  if (fl.inv) f.inv = fl.inv;
+  if (fl.cat) f.cat = fl.cat;
+  if (fl.alerta) f.alerta = fl.alerta;
+  if (fl.orden) f.orden = fl.orden;
+  if (fl.pmin != null && Number.isFinite(fl.pmin)) f.pmin = Math.round(fl.pmin * 100);
+  if (fl.pmax != null && Number.isFinite(fl.pmax)) f.pmax = Math.round(fl.pmax * 100);
+
+  const normalizar = (rows: unknown[]) =>
+    (rows as (FilaInventario & { total?: number | string })[]).map((r) => ({
+      ...r,
+      ventas_30d: Number(r.ventas_30d ?? 0),
+    }));
+
+  const tokens = tokensDeConsulta(opts.query ?? "");
+  if (tokens.length > 0) {
+    const cand = await insforge.database.rpc("buscar_productos_candidatos", {
+      p_tokens: tokens.map(expand),
+      p_inventory_id: fl.inv || null,
+      p_categoria: fl.cat || null,
+      p_limit: CANDIDATOS,
+    });
+    if (cand.error) throw new Error(cand.error.message ?? "Error al buscar");
+    const ranking = searchProducts((cand.data ?? []) as ProductoBuscado[], opts.query ?? "").map((p) => p.id);
+    const rango = new Map(ranking.map((id, i) => [id, i]));
+
+    const { data, error } = await insforge.database.rpc("inventario_lista", {
+      p_f: f,
+      p_ids: ranking,
+      p_limit: 1000,
+      p_offset: 0,
+    });
+    if (error) throw new Error(error.message ?? "No pude leer el inventario");
+    let rows = normalizar((data ?? []) as unknown[]);
+    if (!fl.orden) rows = rows.sort((a, b) => (rango.get(a.id) ?? 0) - (rango.get(b.id) ?? 0));
+    return { rows: await sinCostosSiNoPuede(rows.slice(desde, desde + perPage)), total: rows.length };
+  }
+
+  const { data, error } = await insforge.database.rpc("inventario_lista", {
+    p_f: f,
+    p_ids: null,
+    p_limit: perPage,
+    p_offset: desde,
+  });
+  // Surfaced rather than swallowed: an empty table that should be full is the
+  // hardest kind of failure to notice.
+  if (error) throw new Error(error.message ?? "No pude leer el inventario");
+  const crudas = (data ?? []) as { total?: number | string }[];
+  return {
+    rows: await sinCostosSiNoPuede(normalizar(crudas)),
+    total: Number(crudas[0]?.total ?? 0),
+  };
+}
+
+/** Active products per inventory, for the counts in the filter rail. */
+export async function conteosPorInventario(): Promise<Record<string, number>> {
+  await assertPermiso("inventario_ver");
+  const insforge = await createInsForgeServerClient();
+  const { data } = await insforge.database.rpc("inventario_conteos");
+  return Object.fromEntries(
+    ((data ?? []) as { inventory_id: string; productos: number | string }[]).map((r) => [
+      r.inventory_id,
+      Number(r.productos),
+    ]),
+  );
+}

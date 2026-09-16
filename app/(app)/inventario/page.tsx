@@ -1,11 +1,12 @@
 import { createInsForgeServerClient } from "@/lib/insforge/server";
 import { getPermisos, requirePagePermiso } from "@/lib/auth/profile";
 import type { Inventory } from "@/lib/types";
+import { InventoryView } from "@/modules/inventory/InventoryView";
 import {
-  InventoryView,
-  type InventoryRow,
-} from "@/modules/inventory/InventoryView";
-import { estadisticasInventario } from "@/modules/inventory/buscar";
+  conteosPorInventario,
+  estadisticasInventario,
+  listaInventario,
+} from "@/modules/inventory/buscar";
 
 export default async function InventarioPage() {
   const userId = await requirePagePermiso("inventario_ver");
@@ -17,41 +18,45 @@ export default async function InventarioPage() {
   const verVentas = admin || perms.has("ventas_ver");
 
   const insforge = await createInsForgeServerClient();
-  // First page + aggregates. The full catalog used to arrive here and be
-  // filtered in the browser; at 21k products that is ~3 MB per page load.
-  const [{ data: productData, error, count }, { data: invData }, statsIniciales] =
-    await Promise.all([
-    insforge.database
-      .from("products")
-      .select(
-        "id, inventory_id, sku, name, category, brand, size, price_cents, quantity, etiqueta, image_url, ventas_anuales",
-        { count: "exact" },
-      )
-      .eq("is_active", true)
-      .order("name", { ascending: true })
-      .range(0, 49),
+  // First page, the rail's counts and the header numbers, in parallel. The
+  // client re-reads with whatever filters the URL carries.
+  const [primera, { data: invData }, { data: sucData }, statsIniciales, conteos] = await Promise.all([
+    listaInventario({ page: 1, perPage: 50 }).catch((e: unknown) => ({
+      rows: [],
+      total: 0,
+      error: e instanceof Error ? e.message : "No pude leer el inventario",
+    })),
     insforge.database
       .from("inventories")
       .select("id, name, ciudad, entrega_dias_habiles, es_dropship, sucursal_id")
       .order("name", { ascending: true }),
+    insforge.database.from("sucursales").select("id, nombre"),
     estadisticasInventario(),
+    conteosPorInventario(),
   ]);
 
-  const products = (productData ?? []) as InventoryRow[];
   const inventories = (invData ?? []) as Inventory[];
+  const sucursales = Object.fromEntries(
+    ((sucData ?? []) as { id: string; nombre: string }[]).map((s) => [s.id, s.nombre]),
+  );
+  // Most-stocked inventories first: the rail reads top-down by what matters.
+  inventories.sort((a, b) => (conteos[b.id] ?? 0) - (conteos[a.id] ?? 0) || a.name.localeCompare(b.name));
+  const error = "error" in primera ? primera.error : null;
 
   return (
     <>
       {error && (
-        <p className="mb-4 rounded-lg bg-red-50 dark:bg-red-950/40 px-3 py-2 text-sm text-red-700 dark:text-red-300">
-          {error.message}
+        <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">
+          {error}
         </p>
       )}
       <InventoryView
-        products={products}
-        totalInicial={Number(count ?? products.length)}
+        products={primera.rows}
+        totalInicial={primera.total}
         statsIniciales={statsIniciales}
         inventories={inventories}
+        sucursales={sucursales}
+        conteos={conteos}
         puedeGestionar={puedeGestionar}
         verCostos={verCostos}
         puedePrecios={puedePrecios}
