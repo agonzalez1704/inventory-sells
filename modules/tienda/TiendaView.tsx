@@ -53,6 +53,8 @@ function waHref(nombre: string, whatsapp: string | null) {
   return waTexto(`Hola ${MARCA.tienda.nombre}, me interesa: ${nombre}`, whatsapp);
 }
 
+const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
+
 // Ruli lists parts one by one; Lead Displays lists phone models.
 const unidad = (n: number) =>
   ES_RULI ? (n === 1 ? "pieza" : "piezas") : n === 1 ? "modelo" : "modelos";
@@ -66,6 +68,7 @@ export function TiendaView({
   totalPages,
   total,
   whatsapp,
+  totalSinFiltros = null,
 }: {
   modelos: ModeloTienda[];
   facetas: Facetas;
@@ -75,6 +78,8 @@ export function TiendaView({
   totalPages: number;
   total: number;
   whatsapp: string | null;
+  /** Search only: how many models the query finds with no filters on. */
+  totalSinFiltros?: number | null;
 }) {
   const router = useRouter();
   const tienda = useTiendaInfo();
@@ -115,6 +120,32 @@ export function TiendaView({
   const filtrando = Boolean(q) || filtrosActivos > 0;
   const sinResultados = modelos.length === 0;
   const marcas = [...facetas.marca].sort((a, b) => b.n - a.n);
+  const tipos = facetas.cat
+    .filter((c) => c.n > 0 || filtros.cat.includes(c.value))
+    .sort((a, b) => b.n - a.n)
+    .slice(0, 6);
+
+  // The search found more than the filters let through: say so, with the way
+  // out, instead of a short list that looks like all there is.
+  const ocultos = totalSinFiltros != null ? totalSinFiltros - total : 0;
+  const avisoOcultos =
+    q && filtrosActivos > 0 && ocultos > 0 ? (
+      <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50/70 p-4 dark:border-amber-900 dark:bg-amber-950/30">
+        <p className="text-[15px] font-semibold text-foreground">
+          Tus filtros ocultan {ocultos} {unidad(ocultos)}
+        </p>
+        <p className="mt-1 text-pretty text-sm text-muted-foreground">
+          También coinciden con “{q}”, pero no pasan los filtros que tienes activos.
+        </p>
+        <button
+          type="button"
+          onClick={() => aplicar(SIN_FILTROS)}
+          className="mt-3 h-11 cursor-pointer rounded-xl bg-tienda-600 px-4 text-sm font-semibold text-white hover:bg-tienda-700"
+        >
+          Ver {totalSinFiltros === 1 ? `el ${unidad(1)}` : `los ${totalSinFiltros} ${unidad(totalSinFiltros ?? 0)}`}
+        </button>
+      </div>
+    ) : null;
 
   return (
     // Bottom padding leaves room for the fixed order bar on phones.
@@ -130,7 +161,8 @@ export function TiendaView({
           in this bar. */}
       <div
         className={cn(
-          "sticky top-16 -mx-4 border-b border-border/60 bg-[#f5f8ff] px-4 pb-2 pt-3 sm:-mx-6 sm:px-6 lg:static lg:mx-0 lg:border-0 lg:bg-transparent lg:px-0 lg:pt-6",
+          // Desktop searches from the site header (BuscadorEncabezado).
+          "sticky top-16 -mx-4 border-b border-border/60 bg-[#f5f8ff] px-4 pb-2 pt-3 sm:-mx-6 sm:px-6 lg:hidden",
           buscando ? "z-50" : "z-20",
         )}
       >
@@ -152,6 +184,26 @@ export function TiendaView({
           />
         </div>
       </div>
+
+      {/* Desktop: part types as tabs, the first cut most customers make. Not on
+          Ruli, whose 216 type codes are not tabs anyone can read yet. */}
+      {!ES_RULI && tipos.length > 1 && (
+        <nav aria-label="Tipo de pieza" className="mt-6 hidden gap-1 border-b border-border lg:flex">
+          <Pestana activa={filtros.cat.length === 0} onClick={() => aplicar({ ...filtros, cat: [] })}>
+            Todo
+          </Pestana>
+          {tipos.map((c) => (
+            <Pestana
+              key={c.value}
+              activa={filtros.cat.length === 1 && filtros.cat[0] === c.value}
+              onClick={() => aplicar({ ...filtros, cat: [c.value] })}
+            >
+              {cap(c.value)}
+              <span className="ml-1.5 text-xs tabular-nums text-muted-foreground">{c.n}</span>
+            </Pestana>
+          ))}
+        </nav>
+      )}
 
       {/* Brands as a way in — only on the untouched catalog. */}
       {!filtrando && marcas.length > 1 && (
@@ -227,7 +279,8 @@ export function TiendaView({
                   {filtrosActivos > 0 ? "Prueba quitando algún filtro." : "Prueba con otra marca o modelo."}
                 </p>
               </div>
-              {q && <CompatibleBox query={q} whatsapp={whatsapp} />}
+              {avisoOcultos}
+              {q && !avisoOcultos && <CompatibleBox query={q} whatsapp={whatsapp} />}
               <AyudaWhatsApp whatsapp={whatsapp} />
             </div>
           ) : (
@@ -246,6 +299,7 @@ export function TiendaView({
                 ))}
               </ul>
 
+              {avisoOcultos}
               <Pagination page={page} totalPages={totalPages} onGo={irAPagina} />
               <AyudaWhatsApp whatsapp={whatsapp} />
             </>
@@ -280,6 +334,32 @@ export function TiendaView({
 
       <BarraPedido />
     </div>
+  );
+}
+
+function Pestana({
+  activa,
+  onClick,
+  children,
+}: {
+  activa: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-current={activa ? "page" : undefined}
+      className={cn(
+        "-mb-px flex h-11 cursor-pointer items-center border-b-2 px-4 text-sm transition-colors",
+        activa
+          ? "border-tienda-600 font-medium text-foreground"
+          : "border-transparent text-muted-foreground hover:text-foreground",
+      )}
+    >
+      {children}
+    </button>
   );
 }
 

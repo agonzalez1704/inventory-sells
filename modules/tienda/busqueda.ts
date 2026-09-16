@@ -2,6 +2,7 @@ import "server-only";
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { searchProducts, tokensDeConsulta, expand } from "@/lib/search";
 import type { ModeloTienda } from "@/lib/calidades";
+import { leerFacetas } from "./filtros";
 
 type Row = {
   id: string;
@@ -29,7 +30,8 @@ type Row = {
 export async function buscarModelos(
   q: string,
   f: Record<string, unknown>,
-): Promise<{ modelos: ModeloTienda[]; facetas: unknown }> {
+  opciones: { totalSinFiltros?: boolean } = {},
+): Promise<{ modelos: ModeloTienda[]; facetas: unknown; totalSinFiltros: number | null }> {
   const cand = await insforgeAdmin.database.rpc("buscar_productos_candidatos", {
     p_tokens: tokensDeConsulta(q).map(expand),
     p_inventory_id: null,
@@ -42,14 +44,24 @@ export async function buscarModelos(
   const ranking = searchProducts((cand.data ?? []) as Row[], q).map((p) => p.id);
   const rango = new Map(ranking.map((id, i) => [id, i]));
 
-  const [cat, fac] = await Promise.all([
+  // With filters on, also count the search without them: the gap is what the
+  // results page tells the customer their filters are hiding.
+  const conFiltros = Object.keys(f).length > 0;
+  const [cat, fac, sin] = await Promise.all([
     insforgeAdmin.database.rpc("tienda_catalogo", { p_f: f, p_ids: ranking, p_limit: 1000, p_offset: 0 }),
     insforgeAdmin.database.rpc("tienda_facetas_ctx", { p_f: f, p_ids: ranking }),
+    opciones.totalSinFiltros && conFiltros
+      ? insforgeAdmin.database.rpc("tienda_facetas_ctx", { p_f: {}, p_ids: ranking })
+      : Promise.resolve(null),
   ]);
   if (cat.error) throw new Error(`tienda_catalogo: ${cat.error.message}`);
 
   // A model is as relevant as its best-matching variant.
   const mejor = (m: ModeloTienda) => Math.min(...m.variantes.map((v) => rango.get(v.id) ?? Infinity));
   const modelos = ((cat.data ?? []) as ModeloTienda[]).sort((a, b) => mejor(a) - mejor(b));
-  return { modelos, facetas: fac.data };
+  return {
+    modelos,
+    facetas: fac.data,
+    totalSinFiltros: sin && !sin.error ? leerFacetas(sin.data).total : null,
+  };
 }

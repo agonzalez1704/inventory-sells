@@ -25,6 +25,7 @@ export default async function TiendaPage({
   let total: number;
   let current: number;
   let facetas: unknown;
+  let totalSinFiltros: number | null = null;
 
   if (q) {
     // Searching keeps the JS scorer: relevance ranking is shared with the rest
@@ -32,8 +33,9 @@ export default async function TiendaPage({
     // change to either. The scorer only picks and ranks the candidates; the
     // filters and the grouping run in SQL over exactly that set, so the counts
     // and the list can never disagree.
-    const r = await buscarModelos(q, f);
+    const r = await buscarModelos(q, f, { totalSinFiltros: true });
     facetas = r.facetas;
+    totalSinFiltros = r.totalSinFiltros;
     const todos = r.modelos;
     total = todos.length;
     current = Math.min(page, Math.max(1, Math.ceil(total / PER_PAGE)));
@@ -69,6 +71,7 @@ export default async function TiendaPage({
       page={Math.min(current, totalPages)}
       totalPages={totalPages}
       total={total}
+      totalSinFiltros={totalSinFiltros}
       whatsapp={process.env.STORE_WHATSAPP ?? null}
     />
   );

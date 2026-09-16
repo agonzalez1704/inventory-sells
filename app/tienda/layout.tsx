@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import Link from "next/link";
 import { Poppins } from "next/font/google";
 import {
@@ -14,6 +15,7 @@ import { getTiendaInfo } from "@/modules/config/lib";
 import { TiendaInfoProvider } from "@/modules/tienda/TiendaInfoProvider";
 import { CartProvider } from "@/modules/tienda/CartProvider";
 import { CartButton } from "@/modules/tienda/CartDrawer";
+import { BuscadorEncabezado } from "@/modules/tienda/BuscadorEncabezado";
 import { MARCA } from "@/lib/marca";
 
 const display = Poppins({
@@ -132,8 +134,15 @@ export default async function TiendaLayout({
       <header className="sticky top-0 z-30 border-b border-tienda-100 dark:border-tienda-900 bg-white/85 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
           <Wordmark />
-          <div className="flex items-center gap-4">
-            <span className="hidden items-center gap-1.5 text-xs font-medium text-muted-foreground lg:inline-flex">
+          {/* Desktop search. Suspense: it reads the URL's query, and without a
+              boundary that read would make the whole storefront shell dynamic. */}
+          <div className="hidden min-w-0 max-w-2xl flex-1 lg:block">
+            <Suspense fallback={<div className="h-12 rounded-xl border border-border bg-background" />}>
+              <BuscadorEncabezado />
+            </Suspense>
+          </div>
+          <div className="flex shrink-0 items-center gap-4">
+            <span className="hidden items-center gap-1.5 text-xs font-medium text-muted-foreground xl:inline-flex">
               <MapPin className="h-3.5 w-3.5 text-tienda-500" />
               {tienda.ciudad ? `${tienda.ciudad} · ` : ""}Envíos a todo México
             </span>
