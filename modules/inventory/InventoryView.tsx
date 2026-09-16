@@ -50,6 +50,7 @@ import { ProductEditModal } from "./ProductEditModal";
 import { ProductPhotoModal } from "./ProductPhotoModal";
 import { ManualProductModal } from "./ManualProductModal";
 import { EditarInventarioModal } from "./EditarInventarioModal";
+import { PanelProducto } from "./PanelProducto";
 
 export type InventoryRow = FilaInventario;
 
@@ -153,7 +154,9 @@ export function InventoryView({
 
   const [importOpen, setImportOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
-  const [foto, setFoto] = useState<FilaInventario | null>(null);
+  const [foto, setFoto] = useState<{ id: string; name: string; image_url: string | null } | null>(null);
+  // The product side panel (redesign part 2); the row opens it for everyone who may see the list.
+  const [panelId, setPanelId] = useState<string | null>(null);
   const [newInvOpen, setNewInvOpen] = useState(false);
   const [editInv, setEditInv] = useState<Inventory | null>(null);
   const [manualOpen, setManualOpen] = useState(false);
@@ -443,11 +446,8 @@ export function InventoryView({
                 {paged.map((p) => (
                   <li
                     key={p.id}
-                    onClick={puedeGestionar ? () => setEditId(p.id) : undefined}
-                    className={cn(
-                      "border-b border-border/60 transition-colors last:border-0 hover:bg-muted/40",
-                      puedeGestionar && "cursor-pointer",
-                    )}
+                    onClick={() => setPanelId(p.id)}
+                    className="cursor-pointer border-b border-border/60 transition-colors last:border-0 hover:bg-muted/40"
                   >
                     {/* Phone */}
                     <div className="flex items-center gap-3 px-3 py-2.5 lg:hidden">
@@ -558,6 +558,22 @@ export function InventoryView({
           Ver {total.toLocaleString("es-MX")} productos
         </Button>
       </Drawer>
+
+      {panelId && (
+        <PanelProducto
+          productId={panelId}
+          ids={paged.map((p) => p.id)}
+          onNavegar={setPanelId}
+          onClose={() => setPanelId(null)}
+          puedeGestionar={puedeGestionar}
+          verCostos={verCostos}
+          onEditar={setEditId}
+          onFoto={setFoto}
+          // Part 3 replaces this with the new adjustment panel; until then the
+          // editor's stock section does the job.
+          onAjustar={setEditId}
+        />
+      )}
 
       <Modal open={importOpen} onClose={() => setImportOpen(false)} title="Importar inventario">
         <ImportPanel
