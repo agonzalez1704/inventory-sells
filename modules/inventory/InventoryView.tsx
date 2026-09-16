@@ -266,10 +266,15 @@ export function InventoryView({
     />
   );
 
-  // Desktop row grid: columns the reader may not see simply are not there.
-  const columnas = ["44px", "minmax(0,1fr)", "200px", verVentas ? "100px" : null, "88px", verCostos ? "88px" : null, "36px"]
+  // Desktop row grid. Between lg and xl the filter rail takes the room, so
+  // sales and cost wait for xl — at ~1000px they squeezed the product name to
+  // "11 PR…". Columns the reader may not see are never there at all.
+  const colsXl = ["44px", "minmax(0,1fr)", "190px", verVentas ? "100px" : null, "88px", verCostos ? "88px" : null, "36px"]
     .filter(Boolean)
     .join(" ");
+  const colsLg = ["44px", "minmax(0,1fr)", "180px", "88px", "36px"].join(" ");
+  const colsStyle = { "--cols-lg": colsLg, "--cols-xl": colsXl } as React.CSSProperties;
+  const gridCols = "lg:[grid-template-columns:var(--cols-lg)] xl:[grid-template-columns:var(--cols-xl)]";
 
   return (
     <section className="space-y-5">
@@ -420,15 +425,18 @@ export function InventoryView({
           ) : (
             <>
               <div
-                className="hidden h-10 items-center gap-3 border-b border-border px-4 text-xs font-medium uppercase tracking-wide text-muted-foreground lg:grid"
-                style={{ gridTemplateColumns: columnas }}
+                className={cn(
+                  "hidden h-10 items-center gap-3 border-b border-border px-4 text-xs font-medium uppercase tracking-wide text-muted-foreground lg:grid",
+                  gridCols,
+                )}
+                style={colsStyle}
               >
                 <span />
                 <span>Producto</span>
                 <span>Existencia</span>
-                {verVentas && <span className="text-right">Vendidas</span>}
+                {verVentas && <span className="hidden text-right xl:block">Vendidas</span>}
                 <span className="text-right">Precio</span>
-                {verCostos && <span className="text-right">Costo</span>}
+                {verCostos && <span className="hidden text-right xl:block">Costo</span>}
                 <span />
               </div>
               <ul>
@@ -461,7 +469,7 @@ export function InventoryView({
                     </div>
 
                     {/* Desktop */}
-                    <div className="hidden min-h-16 items-center gap-3 px-4 py-2 lg:grid" style={{ gridTemplateColumns: columnas }}>
+                    <div className={cn("hidden min-h-16 items-center gap-3 px-4 py-2 lg:grid", gridCols)} style={colsStyle}>
                       <FotoBoton p={p} onClick={() => setFoto(p)} />
                       <div className="min-w-0">
                         <p className="truncate text-sm font-semibold">
@@ -489,7 +497,7 @@ export function InventoryView({
                         <AlertaStock p={p} />
                       </div>
                       {verVentas && (
-                        <div className="text-right text-sm tabular-nums">
+                        <div className="hidden text-right text-sm tabular-nums xl:block">
                           {p.ventas_30d}
                           <span className="text-xs text-muted-foreground"> /30 d</span>
                           {p.ventas_anuales != null && (
@@ -501,7 +509,9 @@ export function InventoryView({
                       )}
                       <span className="text-right text-sm font-medium tabular-nums">{formatMXN(p.price_cents)}</span>
                       {verCostos && (
-                        <span className="text-right text-sm tabular-nums text-muted-foreground">{formatMXN(p.cost_cents)}</span>
+                        <span className="hidden text-right text-sm tabular-nums text-muted-foreground xl:block">
+                          {formatMXN(p.cost_cents)}
+                        </span>
                       )}
                       <Link
                         href={`/inventario/${p.id}`}
