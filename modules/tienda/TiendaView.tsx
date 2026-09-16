@@ -11,6 +11,7 @@ import {
   Truck,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   MessageCircle,
   Loader2,
   MapPin,
@@ -255,15 +256,36 @@ export function TiendaView({
               {sinResultados ? "" : `${total} ${unidad(total)}`}
               {!sinResultados && q ? ` para “${q}”` : ""}
             </p>
-            {filtrando && (
-              <button
-                type="button"
-                onClick={() => navegar("/tienda", false)}
-                className="h-11 cursor-pointer text-sm font-medium text-tienda-700 hover:underline"
-              >
-                Limpiar
-              </button>
-            )}
+            <div className="flex items-center gap-4">
+              {/* "Ordenar", per the design. A native select: on a phone the
+                  system picker is the best one there is. */}
+              {!sinResultados && (
+                <label className="relative flex h-11 items-center gap-1.5 text-sm">
+                  <span className="hidden text-muted-foreground lg:inline">Ordenar:</span>
+                  <select
+                    value={filtros.orden ?? ""}
+                    onChange={(e) => aplicar({ ...filtros, orden: (e.target.value || null) as Filtros["orden"] })}
+                    aria-label="Ordenar"
+                    className="h-11 cursor-pointer appearance-none bg-transparent pr-5 text-base font-medium text-foreground outline-none lg:text-sm"
+                  >
+                    <option value="">{q ? "Relevancia" : "Recomendados"}</option>
+                    <option value="vendidos">Más vendidos</option>
+                    <option value="precio_asc">Menor precio</option>
+                    <option value="precio_desc">Mayor precio</option>
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-0 h-4 w-4 text-muted-foreground" />
+                </label>
+              )}
+              {filtrando && (
+                <button
+                  type="button"
+                  onClick={() => navegar("/tienda", false)}
+                  className="h-11 cursor-pointer text-sm font-medium text-tienda-700 hover:underline"
+                >
+                  Limpiar
+                </button>
+              )}
+            </div>
           </div>
           <div className="hidden lg:block">
             <ChipsActivos filtros={filtros} onCambio={aplicar} />

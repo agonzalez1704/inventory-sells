@@ -46,19 +46,23 @@ export async function buscarModelos(
 
   // With filters on, also count the search without them: the gap is what the
   // results page tells the customer their filters are hiding.
-  const conFiltros = Object.keys(f).length > 0;
+  // The order changes no count: leave it out of the facet calls.
+  const { orden: _orden, ...fFacetas } = f;
+  const conFiltros = Object.keys(fFacetas).length > 0;
   const [cat, fac, sin] = await Promise.all([
     insforgeAdmin.database.rpc("tienda_catalogo", { p_f: f, p_ids: ranking, p_limit: 1000, p_offset: 0 }),
-    insforgeAdmin.database.rpc("tienda_facetas_ctx", { p_f: f, p_ids: ranking }),
+    insforgeAdmin.database.rpc("tienda_facetas_ctx", { p_f: fFacetas, p_ids: ranking }),
     opciones.totalSinFiltros && conFiltros
       ? insforgeAdmin.database.rpc("tienda_facetas_ctx", { p_f: {}, p_ids: ranking })
       : Promise.resolve(null),
   ]);
   if (cat.error) throw new Error(`tienda_catalogo: ${cat.error.message}`);
 
-  // A model is as relevant as its best-matching variant.
+  // A model is as relevant as its best-matching variant. An explicit "Ordenar"
+  // wins: SQL already returned them in that order.
   const mejor = (m: ModeloTienda) => Math.min(...m.variantes.map((v) => rango.get(v.id) ?? Infinity));
-  const modelos = ((cat.data ?? []) as ModeloTienda[]).sort((a, b) => mejor(a) - mejor(b));
+  const lista = (cat.data ?? []) as ModeloTienda[];
+  const modelos = f.orden ? lista : lista.sort((a, b) => mejor(a) - mejor(b));
   return {
     modelos,
     facetas: fac.data,

@@ -46,7 +46,8 @@ export default async function TiendaPage({
     // must not take the catalog down with them: the panel just shows no numbers.
     const [rows, fac] = await Promise.all([
       modelosTienda(f, PER_PAGE, (page - 1) * PER_PAGE),
-      facetasTienda(f).catch(() => null),
+      // The order changes no count, and would only split the cache.
+      facetasTienda(Object.fromEntries(Object.entries(f).filter(([k]) => k !== "orden"))).catch(() => null),
     ]);
     modelos = rows;
     current = page;

@@ -7,11 +7,16 @@ export type Facet = { value: string; n: number };
 export const LISTAS = ["cat", "marca", "cal", "marco", "tag"] as const;
 type Lista = (typeof LISTAS)[number];
 
+/** "Ordenar". Null = the default: relevance when searching, stock-first when browsing. */
+export type Orden = "vendidos" | "precio_asc" | "precio_desc";
+export const ORDENES: Orden[] = ["vendidos", "precio_asc", "precio_desc"];
+
 export type Filtros = Record<Lista, string[]> & {
   vmarca: string | null;
   vmodelo: string | null;
   anio: number | null;
   stock: boolean;
+  orden: Orden | null;
 };
 
 export type Facetas = Record<Lista | "vmarca" | "vmodelo" | "anio", Facet[]> & {
@@ -21,7 +26,7 @@ export type Facetas = Record<Lista | "vmarca" | "vmodelo" | "anio", Facet[]> & {
 
 export const SIN_FILTROS: Filtros = {
   cat: [], marca: [], cal: [], marco: [], tag: [],
-  vmarca: null, vmodelo: null, anio: null, stock: false,
+  vmarca: null, vmodelo: null, anio: null, stock: false, orden: null,
 };
 
 type SP = Record<string, string | string[] | undefined>;
@@ -47,6 +52,7 @@ export function leerFiltros(sp: SP): Filtros {
     vmodelo,
     anio: vmodelo && Number.isInteger(anio) && anio >= 1900 && anio <= 2100 ? anio : null,
     stock: primero(sp.stock) === "1",
+    orden: ORDENES.find((o) => o === primero(sp.orden)) ?? null,
   };
 }
 
@@ -58,6 +64,7 @@ export function filtrosSQL(f: Filtros): Record<string, unknown> {
   if (f.vmodelo) o.vmodelo = f.vmodelo;
   if (f.anio) o.anio = f.anio;
   if (f.stock) o.stock = true;
+  if (f.orden) o.orden = f.orden;
   return o;
 }
 
@@ -69,6 +76,7 @@ export function urlTienda(f: Filtros, q: string): string {
   if (f.vmodelo) sp.set("vmodelo", f.vmodelo);
   if (f.anio) sp.set("anio", String(f.anio));
   if (f.stock) sp.set("stock", "1");
+  if (f.orden) sp.set("orden", f.orden);
   const s = sp.toString();
   return s ? `/tienda?${s}` : "/tienda";
 }
