@@ -27,7 +27,7 @@ import { CompatibleBox } from "./CompatibleBox";
 import { BarraPedido } from "./CartDrawer";
 import { logoDeMarca } from "./marca-logo";
 import { MARCA } from "@/lib/marca";
-import { BarraFiltros, ChipsActivos, HojaFiltros, PanelFiltros } from "./FiltrosTienda";
+import { BarraFiltros, BarraVehiculo, ChipsActivos, HojaFiltros, PanelFiltros } from "./FiltrosTienda";
 import { BuscadorTienda } from "./BuscadorTienda";
 import { RielPedido } from "./RielPedido";
 import { cuantosFiltros, SIN_FILTROS, urlTienda, type Facetas, type Filtros } from "./filtros";
@@ -71,6 +71,7 @@ export function TiendaView({
   total,
   whatsapp,
   totalSinFiltros = null,
+  compat = null,
 }: {
   modelos: ModeloTienda[];
   facetas: Facetas;
@@ -82,6 +83,8 @@ export function TiendaView({
   whatsapp: string | null;
   /** Search only: how many models the query finds with no filters on. */
   totalSinFiltros?: number | null;
+  /** Vehicle chosen: what each listed product fits, by product id. */
+  compat?: Record<string, string> | null;
 }) {
   const router = useRouter();
   const tienda = useTiendaInfo();
@@ -207,6 +210,8 @@ export function TiendaView({
         </nav>
       )}
 
+      <BarraVehiculo facetas={facetas} filtros={filtros} onCambio={aplicar} />
+
       {/* Brands as a way in — only on the untouched catalog. */}
       {!filtrando && marcas.length > 1 && (
         <section className="mt-4">
@@ -247,7 +252,7 @@ export function TiendaView({
 
       <div className="mt-4 lg:grid lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-8 xl:grid-cols-[240px_minmax(0,1fr)_280px]">
         <aside className="hidden lg:sticky lg:top-20 lg:block lg:max-h-[calc(100vh-6rem)] lg:self-start lg:overflow-y-auto lg:pr-1">
-          <PanelFiltros facetas={facetas} filtros={filtros} onCambio={aplicar} />
+          <PanelFiltros facetas={facetas} filtros={filtros} onCambio={aplicar} vehiculoArriba />
         </aside>
 
         <div className="min-w-0">
@@ -255,6 +260,9 @@ export function TiendaView({
             <p className="text-sm text-muted-foreground">
               {sinResultados ? "" : `${total} ${unidad(total)}`}
               {!sinResultados && q ? ` para “${q}”` : ""}
+              {!sinResultados && filtros.vmarca
+                ? ` para ${[filtros.vmarca, filtros.vmodelo, filtros.anio].filter(Boolean).join(" ")}`
+                : ""}
             </p>
             <div className="flex items-center gap-4">
               {/* "Ordenar", per the design. A native select: on a phone the
@@ -311,13 +319,20 @@ export function TiendaView({
               {/* Phone: one grouped list, a row per model. Desktop: a grid. */}
               <ul
                 className={cn(
-                  "mt-1 divide-y divide-border overflow-hidden rounded-2xl border border-border bg-background transition-opacity lg:mt-3 lg:grid lg:grid-cols-3 lg:gap-3 lg:divide-y-0 lg:overflow-visible lg:rounded-none lg:border-0 lg:bg-transparent",
+                  "mt-1 divide-y divide-border overflow-hidden rounded-2xl border border-border bg-background transition-opacity lg:mt-3",
+                  // Ruli keeps rows on desktop too: part names are long and the
+                  // fit line needs the width.
+                  !ES_RULI &&
+                    "lg:grid lg:grid-cols-3 lg:gap-3 lg:divide-y-0 lg:overflow-visible lg:rounded-none lg:border-0 lg:bg-transparent",
                   pending && "opacity-60",
                 )}
               >
                 {modelos.map((m) => (
                   <li key={`${m.brand}|${m.category}|${m.modelo}`}>
-                    <ModeloCard m={m} />
+                    <ModeloCard
+                      m={m}
+                      compat={m.variantes.map((v) => compat?.[v.id]).find(Boolean) ?? null}
+                    />
                   </li>
                 ))}
               </ul>
@@ -520,7 +535,9 @@ function PageBtn({
  * page — three price rows inside every card made the phone list unreadable
  * (the user's call, 2026-09-15). On desktop the same element is a grid card.
  */
-export function ModeloCard({ m }: { m: ModeloTienda }) {
+export function ModeloCard({ m, compat = null }: { m: ModeloTienda; compat?: string | null }) {
+  // Lead Displays turns the row into a grid card on desktop; Ruli stays a row.
+  const tarjeta = !ES_RULI;
   const disponibles = m.variantes.filter((v) => v.disponible);
   const locales = disponibles.filter((v) => !(v.entrega_dias ?? 0));
   // Variants arrive cheapest first: open the cheapest one that can be sold.
@@ -536,11 +553,19 @@ export function ModeloCard({ m }: { m: ModeloTienda }) {
       href={`/tienda/${destino.id}`}
       aria-label={`Ver ${titulo}`}
       className={cn(
-        "flex items-center gap-3 p-3 transition-colors active:bg-muted/60 lg:h-full lg:flex-col lg:items-stretch lg:gap-0 lg:overflow-hidden lg:rounded-2xl lg:border lg:border-border lg:bg-background lg:p-0 lg:hover:border-tienda-300",
+        "flex items-center gap-3 p-3 transition-colors active:bg-muted/60",
+        tarjeta
+          ? "lg:h-full lg:flex-col lg:items-stretch lg:gap-0 lg:overflow-hidden lg:rounded-2xl lg:border lg:border-border lg:bg-background lg:p-0 lg:hover:border-tienda-300"
+          : "hover:bg-muted/40",
         disponibles.length === 0 && "opacity-70",
       )}
     >
-      <span className="flex h-[68px] w-[68px] shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-muted/50 lg:aspect-[4/3] lg:h-auto lg:w-full lg:rounded-none">
+      <span
+        className={cn(
+          "flex h-[68px] w-[68px] shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-muted/50",
+          tarjeta && "lg:aspect-[4/3] lg:h-auto lg:w-full lg:rounded-none",
+        )}
+      >
         {m.imagen ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={foto(m.imagen, 384)} alt={titulo} loading="lazy" className="h-full w-full object-cover" />
@@ -549,7 +574,7 @@ export function ModeloCard({ m }: { m: ModeloTienda }) {
         )}
       </span>
 
-      <span className="flex min-w-0 flex-1 flex-col gap-0.5 lg:px-3 lg:pt-3">
+      <span className={cn("flex min-w-0 flex-1 flex-col gap-0.5", tarjeta && "lg:px-3 lg:pt-3")}>
         {m.brand && (
           <span className="truncate text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
             {m.brand}
@@ -565,9 +590,17 @@ export function ModeloCard({ m }: { m: ModeloTienda }) {
             .filter(Boolean)
             .join(" · ")}
         </span>
+        {compat && (
+          <span className="line-clamp-2 text-[13px] text-tienda-700 dark:text-tienda-300">Le queda a {compat}</span>
+        )}
       </span>
 
-      <span className="flex shrink-0 flex-col items-end gap-1 lg:flex-row lg:items-center lg:justify-between lg:px-3 lg:pb-3 lg:pt-2">
+      <span
+        className={cn(
+          "flex shrink-0 flex-col items-end gap-1",
+          tarjeta && "lg:flex-row lg:items-center lg:justify-between lg:px-3 lg:pb-3 lg:pt-2",
+        )}
+      >
         <span className="text-right leading-tight">
           {n > 1 && m.desde_cents ? (
             <span className="block text-[11px] text-muted-foreground lg:mr-1 lg:inline">desde</span>

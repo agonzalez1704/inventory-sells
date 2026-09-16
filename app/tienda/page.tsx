@@ -1,5 +1,6 @@
 import { facetasTienda, modelosTienda } from "@/modules/tienda/lecturas";
 import { buscarModelos } from "@/modules/tienda/busqueda";
+import { compatibilidadDe } from "@/modules/tienda/compat-vehiculo";
 import { TiendaView } from "@/modules/tienda/TiendaView";
 import type { ModeloTienda } from "@/lib/calidades";
 import { filtrosSQL, leerFacetas, leerFiltros } from "@/modules/tienda/filtros";
@@ -63,6 +64,9 @@ export default async function TiendaPage({
 
   const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
 
+  // A vehicle chosen: tell the customer what each listed part fits.
+  const compat = filtros.vmarca ? await compatibilidadDe(modelos, filtros) : null;
+
   return (
     <TiendaView
       modelos={modelos}
@@ -73,6 +77,7 @@ export default async function TiendaPage({
       totalPages={totalPages}
       total={total}
       totalSinFiltros={totalSinFiltros}
+      compat={compat}
       whatsapp={process.env.STORE_WHATSAPP ?? null}
     />
   );

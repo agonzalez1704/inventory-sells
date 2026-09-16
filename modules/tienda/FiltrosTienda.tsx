@@ -45,10 +45,13 @@ export function PanelFiltros({
   facetas,
   filtros,
   onCambio,
+  vehiculoArriba = false,
 }: {
   facetas: Facetas;
   filtros: Filtros;
   onCambio: Cambio;
+  /** Desktop: the vehicle lives in BarraVehiculo above the catalog, not here. */
+  vehiculoArriba?: boolean;
 }) {
   const set = (parcial: Partial<Filtros>) => onCambio({ ...filtros, ...parcial });
   // Price ladder order (cheapest tier first), not popularity: it is a scale.
@@ -61,7 +64,7 @@ export function PanelFiltros({
 
   return (
     <div className="space-y-5">
-      {facetas.vmarca.length > 0 && (
+      {facetas.vmarca.length > 0 && !vehiculoArriba && (
         <Seccion titulo="Tu vehículo">
           <div className="grid gap-2">
             <Selector
@@ -144,6 +147,70 @@ export function PanelFiltros({
           />
         )}
       </Seccion>
+    </div>
+  );
+}
+
+/**
+ * Desktop, per the approved Ruli design: the vehicle is the first question at
+ * an auto-parts counter, so it sits in a bar above the catalog — make, model,
+ * year — and says plainly that the list now only shows parts that fit.
+ * Renders nothing where no vehicle tags exist (Lead Displays).
+ */
+export function BarraVehiculo({
+  facetas,
+  filtros,
+  onCambio,
+}: {
+  facetas: Facetas;
+  filtros: Filtros;
+  onCambio: Cambio;
+}) {
+  if (facetas.vmarca.length === 0) return null;
+  const set = (parcial: Partial<Filtros>) => onCambio({ ...filtros, ...parcial });
+
+  return (
+    <div className="mt-6 hidden flex-wrap items-center gap-3 rounded-2xl border border-border bg-background px-4 py-3 lg:flex">
+      <span className="text-sm font-semibold text-foreground">Tu vehículo</span>
+      <div className="w-56">
+        <Selector
+          label="Marca"
+          valor={filtros.vmarca}
+          opciones={facetas.vmarca}
+          onElegir={(v) => set({ vmarca: v, vmodelo: null, anio: null })}
+        />
+      </div>
+      <div className="w-56">
+        <Selector
+          label="Modelo"
+          valor={filtros.vmodelo}
+          opciones={facetas.vmodelo}
+          deshabilitado={!filtros.vmarca}
+          onElegir={(v) => set({ vmodelo: v, anio: null })}
+        />
+      </div>
+      <div className="w-44">
+        <Selector
+          label="Año"
+          valor={filtros.anio ? String(filtros.anio) : null}
+          opciones={facetas.anio}
+          deshabilitado={!filtros.vmodelo}
+          numerico
+          onElegir={(v) => set({ anio: v ? Number(v) : null })}
+        />
+      </div>
+      {filtros.vmarca && (
+        <>
+          <span className="text-sm text-muted-foreground">Solo te mostramos piezas que le quedan</span>
+          <button
+            type="button"
+            onClick={() => set({ vmarca: null, vmodelo: null, anio: null })}
+            className="ml-auto h-11 cursor-pointer text-sm font-medium text-tienda-700 hover:underline"
+          >
+            Quitar vehículo
+          </button>
+        </>
+      )}
     </div>
   );
 }
