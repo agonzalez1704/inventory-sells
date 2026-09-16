@@ -269,7 +269,7 @@ export function InventoryView({
   // Desktop row grid. Between lg and xl the filter rail takes the room, so
   // sales and cost wait for xl — at ~1000px they squeezed the product name to
   // "11 PR…". Columns the reader may not see are never there at all.
-  const colsXl = ["44px", "minmax(0,1fr)", "190px", verVentas ? "100px" : null, "88px", verCostos ? "88px" : null, "36px"]
+  const colsXl = ["44px", "minmax(0,1fr)", "170px", verVentas ? "100px" : null, "88px", verCostos ? "88px" : null, "36px"]
     .filter(Boolean)
     .join(" ");
   const colsLg = ["44px", "minmax(0,1fr)", "180px", "88px", "36px"].join(" ");
@@ -481,8 +481,9 @@ export function InventoryView({
                           )}
                         </p>
                         <p className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-                          <span className="truncate font-mono">{p.sku}</span>
-                          {p.category && <span className="shrink-0">· {p.category}</span>}
+                          {/* The SKU keeps a readable minimum; the category gives way first. */}
+                          <span className="min-w-[5.5rem] truncate font-mono">{p.sku}</span>
+                          {p.category && <span className="truncate">· {p.category}</span>}
                           {!inv && (
                             <Badge tone="neutral" className="shrink-0">
                               {invName[p.inventory_id] ?? "—"}
