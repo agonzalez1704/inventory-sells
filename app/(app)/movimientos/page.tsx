@@ -20,15 +20,43 @@ export default async function MovimientosPage() {
       .lt("created_at", endISO)
       .order("created_at", { ascending: false });
 
-  const [{ data: gastos }, { data: ingresos }] = await Promise.all([
+  const [{ data: gastos }, { data: ingresos }, { data: sucs }, { data: chk }] = await Promise.all([
     mios("gastos"),
     mios("ingresos"),
+    insforgeAdmin.database.from("sucursales").select("id, nombre").eq("is_active", true),
+    insforgeAdmin.database
+      .from("checkins")
+      .select("sucursal_id")
+      .eq("profile_id", userId)
+      .gte("created_at", startISO)
+      .lt("created_at", endISO)
+      .limit(1),
   ]);
+  // The drawer this person can count: the sucursal they checked in at today
+  // (or the only drawer, when the business has no sucursales).
+  const sucursales = (sucs ?? []) as { id: string; nombre: string }[];
+  const chkId = ((chk ?? []) as { sucursal_id: string }[])[0]?.sucursal_id ?? null;
+  const cajon =
+    sucursales.length === 0
+      ? { sucursalId: null, nombre: null }
+      : chkId
+        ? { sucursalId: chkId, nombre: sucursales.find((x) => x.id === chkId)?.nombre ?? null }
+        : null;
+  const { data: cierre } = await (cajon?.sucursalId
+    ? insforgeAdmin.database.from("caja_conteos").select("id").eq("sucursal_id", cajon.sucursalId)
+    : insforgeAdmin.database.from("caja_conteos").select("id").is("sucursal_id", null)
+  )
+    .eq("fecha", mxHoy())
+    .eq("tipo", "cierre")
+    .limit(1);
 
   return (
     <MovimientosView
       gastos={(gastos ?? []) as Gasto[]}
       ingresos={(ingresos ?? []) as Gasto[]}
+      cajon={cajon}
+      cerrado={(cierre ?? []).length > 0}
+      hoy={mxHoy()}
     />
   );
 }

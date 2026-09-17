@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { auth } from "@clerk/nextjs/server";
 import { getProfile, requirePagePermiso } from "@/lib/auth/profile";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
@@ -597,6 +598,13 @@ export default async function CajaPage({
   }
 
   return (
+    <>
+    <nav className="mb-5 flex gap-6 border-b border-border text-sm font-semibold">
+      <span className="py-2.5 shadow-[inset_0_-2px_0_hsl(var(--foreground))]">Corte del periodo</span>
+      <Link href="/caja/cuadre" className="py-2.5 text-muted-foreground hover:text-foreground">
+        Cuadre del día
+      </Link>
+    </nav>
     <CajaView
       data={{
         from,
@@ -623,5 +631,6 @@ export default async function CajaPage({
         porSucursal,
       }}
     />
+    </>
   );
 }

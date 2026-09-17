@@ -7,6 +7,8 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { MovModal, type Gasto } from "./CajaView";
+import { ContarEfectivo } from "./ContarEfectivo";
+import { Banknote } from "lucide-react";
 
 // The seller-facing slice of the caja: register a gasto or an ingreso extra
 // WITHOUT seeing the corte. The list below is only what this user captured
@@ -14,10 +16,18 @@ import { MovModal, type Gasto } from "./CajaView";
 export function MovimientosView({
   gastos,
   ingresos,
+  cajon,
+  cerrado,
+  hoy,
 }: {
   gastos: Gasto[];
   ingresos: Gasto[];
+  /** The drawer this person may count; null = no check-in today. */
+  cajon: { sucursalId: string | null; nombre: string | null } | null;
+  cerrado: boolean;
+  hoy: string;
 }) {
+  const [contar, setContar] = useState<"conteo" | "cierre" | null>(null);
   const [gastoOpen, setGastoOpen] = useState(false);
   const [ingresoOpen, setIngresoOpen] = useState(false);
 
@@ -47,6 +57,31 @@ export function MovimientosView({
           </Button>
         </div>
       </div>
+
+      {/* Blind count: what's in the drawer, without seeing what there should be. */}
+      <Card className="flex flex-wrap items-center gap-3 p-4">
+        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-soft text-brand-foreground">
+          <Banknote className="h-5 w-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold">Caja{cajon?.nombre ? ` · ${cajon.nombre}` : ""}</p>
+          <p className="text-xs text-muted-foreground">
+            {cerrado
+              ? "El día ya está cerrado."
+              : cajon
+                ? "Cuenta el efectivo a media jornada o al cerrar."
+                : "Haz check-in en tu sucursal para contar su caja."}
+          </p>
+        </div>
+        {!cerrado && cajon && (
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={() => setContar("conteo")}>
+              Contar
+            </Button>
+            <Button onClick={() => setContar("cierre")}>Cerrar el día</Button>
+          </div>
+        )}
+      </Card>
 
       {filas.length === 0 ? (
         <EmptyState
@@ -99,6 +134,19 @@ export function MovimientosView({
 
       <MovModal open={gastoOpen} onClose={() => setGastoOpen(false)} tipo="gasto" />
       <MovModal open={ingresoOpen} onClose={() => setIngresoOpen(false)} tipo="ingreso" />
+      {cajon && (
+        <ContarEfectivo
+          open={contar !== null}
+          onClose={() => setContar(null)}
+          tipo={contar ?? "conteo"}
+          fecha={hoy}
+          fechaLabel="Hoy"
+          sucursalId={cajon.sucursalId}
+          sucursalNombre={cajon.nombre}
+          esperadoCents={null}
+          fondoSugeridoCents={0}
+        />
+      )}
     </section>
   );
 }
