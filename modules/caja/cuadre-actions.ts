@@ -14,7 +14,9 @@ async function quienPuede() {
   const { userId } = await auth();
   if (!userId) throw new Error("No autenticado");
   const perms = await getPermisos(userId);
-  const verCorte = perms.has("admin_total") || perms.has("corte_ver");
+  // Seeing the expected amount (and so the difference) is for the corte and
+  // for whoever squares the drawer; caja_movimientos alone counts blind.
+  const verCorte = perms.has("admin_total") || perms.has("corte_ver") || perms.has("caja_cuadre");
   if (!verCorte && !perms.has("caja_movimientos")) throw new Error("Sin permiso para contar la caja");
   return { userId, verCorte, admin: perms.has("admin_total") };
 }

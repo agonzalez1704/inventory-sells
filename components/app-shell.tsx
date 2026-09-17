@@ -48,7 +48,14 @@ import { MARCA } from "@/lib/marca";
 // role doesn't grant are hidden.
 const GRUPOS: {
   label: string;
-  links: { href: string; label: string; icon: typeof Boxes; permiso?: Permiso }[];
+  links: {
+    href: string;
+    label: string;
+    icon: typeof Boxes;
+    permiso?: Permiso;
+    /** Shown instead, to whoever lacks `permiso` but has this one. */
+    alterno?: { permiso: Permiso; href: string };
+  }[];
 }[] = [
   {
     label: "Operación",
@@ -78,7 +85,7 @@ const GRUPOS: {
   {
     label: "Finanzas",
     links: [
-      { href: "/caja", label: "Caja", icon: Calculator, permiso: "corte_ver" },
+      { href: "/caja", label: "Caja", icon: Calculator, permiso: "corte_ver", alterno: { permiso: "caja_cuadre", href: "/caja/cuadre" } },
       { href: "/movimientos", label: "Movimientos", icon: Banknote, permiso: "caja_movimientos" },
       { href: "/reportes", label: "Reportes", icon: BarChart3, permiso: "corte_ver" },
       { href: "/asistente", label: "Asistente", icon: Sparkles, permiso: "ventas_ver" },
@@ -98,7 +105,12 @@ const GRUPOS: {
 function NavList({ permisos, onNavigate }: { permisos: Set<string>; onNavigate?: () => void }) {
   const pathname = usePathname();
   const puede = (p?: Permiso) => !p || permisos.has("admin_total") || permisos.has(p);
-  const grupos = GRUPOS.map((g) => ({ ...g, links: g.links.filter((l) => puede(l.permiso)) })).filter(
+  const grupos = GRUPOS.map((g) => ({
+    ...g,
+    links: g.links.flatMap((l) =>
+      puede(l.permiso) ? [l] : l.alterno && puede(l.alterno.permiso) ? [{ ...l, href: l.alterno.href }] : [],
+    ),
+  })).filter(
     (g) => g.links.length > 0,
   );
   return (

@@ -46,7 +46,18 @@ const ICONO = { venta: ShoppingCart, cobro_fiado: NotebookText, adelanto: Notebo
 
 type Fila = { k: "ev"; e: EventoCaja; saldo: number | null } | { k: "conteo"; c: ConteoCaja };
 
-export function CuadreView({ cuadre, hoy, admin }: { cuadre: Cuadre; hoy: string; admin: boolean }) {
+export function CuadreView({
+  cuadre,
+  hoy,
+  admin,
+  verCorte,
+}: {
+  cuadre: Cuadre;
+  hoy: string;
+  admin: boolean;
+  /** Without it (caja_cuadre only) the corte tab is hidden. */
+  verCorte: boolean;
+}) {
   const router = useRouter();
   const [vista, setVista] = useState<"efectivo" | "todo">("efectivo");
   const [contar, setContar] = useState<"conteo" | "cierre" | null>(null);
@@ -151,9 +162,11 @@ export function CuadreView({ cuadre, hoy, admin }: { cuadre: Cuadre; hoy: string
       </div>
 
       <nav className="flex gap-6 border-b border-border text-sm font-semibold">
-        <Link href="/caja" className="py-2.5 text-muted-foreground hover:text-foreground">
-          Corte del periodo
-        </Link>
+        {verCorte && (
+          <Link href="/caja" className="py-2.5 text-muted-foreground hover:text-foreground">
+            Corte del periodo
+          </Link>
+        )}
         <span className="py-2.5 shadow-[inset_0_-2px_0_hsl(var(--foreground))]">Cuadre del día</span>
       </nav>
 
