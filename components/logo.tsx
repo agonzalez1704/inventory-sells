@@ -1,9 +1,13 @@
+import { useId } from "react";
 import { MARCA } from "@/lib/marca";
 
 // Fiable wordmark. The "f" keeps its brand gradient; the rest inherits
 // currentColor so it adapts to the surrounding text color. viewBox is cropped
 // to the glyph bounds so it sizes cleanly via height (w-auto).
 function LogoFiable({ className }: { className?: string }) {
+  // One id per instance: with a shared id, the hidden desktop sidebar's copy
+  // owned the gradient and every visible logo drew its "f" with no fill.
+  const gradiente = `fiable-f-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   return (
     <svg
       className={className}
@@ -14,7 +18,7 @@ function LogoFiable({ className }: { className?: string }) {
     >
       <defs>
         <linearGradient
-          id="fiable-f"
+          id={gradiente}
           gradientUnits="userSpaceOnUse"
           x1="261.1447"
           y1="313.4824"
@@ -26,7 +30,7 @@ function LogoFiable({ className }: { className?: string }) {
         </linearGradient>
       </defs>
       <path
-        fill="url(#fiable-f)"
+        fill={`url(#${gradiente})`}
         d="M247.21,373.08h-11.58v-17.06h11.58v-6.43c0-16.66,7.85-24.43,28-24.43c4.28,0,9.12,0.48,11.82,1.03v15.31c-1.67-0.32-3.97-0.48-6.27-0.48c-7.62,0-10.95,3.33-10.95,9.36v5.63h16.9v17.06h-16.34v67.58h-23.16V373.08z"
       />
       <path

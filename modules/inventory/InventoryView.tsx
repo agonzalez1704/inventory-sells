@@ -299,7 +299,7 @@ export function InventoryView({
 
   return (
     <section className="space-y-5" data-ancho="completo">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <div className="flex items-end justify-between gap-3">
         <div className="min-w-0">
           <h1 className="text-2xl font-semibold tracking-tight">Inventario</h1>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -323,28 +323,34 @@ export function InventoryView({
               </Button>
             )}
           </div>
-          <Button variant="secondary" onClick={() => setEscaneando(true)} aria-label="Escanear QR">
+          <Button variant="secondary" onClick={() => setEscaneando(true)} className="hidden sm:inline-flex">
             <QrCode className="h-4 w-4" />
-            <span className="hidden sm:inline">Escanear QR</span>
+            Escanear QR
           </Button>
           {puedeGestionar && inventories.length > 0 && (
-            <Button onClick={() => setManualOpen(true)}>
-              <Plus className="h-4 w-4" />
-              Producto
+            <Button onClick={() => setManualOpen(true)} aria-label="Nuevo producto" className="h-11 w-11 px-0 sm:h-auto sm:w-auto sm:px-4">
+              <Plus className="h-5 w-5 sm:h-4 sm:w-4" />
+              <span className="hidden sm:inline">Producto</span>
             </Button>
           )}
         </div>
       </div>
 
       <div className="space-y-3">
-        <div className="relative max-w-2xl">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Busca por nombre, SKU o modelo…"
-            className="h-11 pl-9 text-base sm:text-sm"
-          />
+        <div className="flex max-w-2xl gap-2">
+          <div className="relative min-w-0 flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Busca por nombre, SKU o modelo…"
+              className="h-11 pl-9 text-base sm:text-sm"
+            />
+          </div>
+          {/* Phone: scanning sits by the search, where the thumb already is. */}
+          <Button variant="brand" onClick={() => setEscaneando(true)} aria-label="Escanear QR" className="h-11 w-11 shrink-0 px-0 sm:hidden">
+            <QrCode className="h-5 w-5" />
+          </Button>
         </div>
 
         {/* Phone: the filters that matter most are one tap; the rest in a sheet. */}
@@ -380,6 +386,24 @@ export function InventoryView({
             </button>
           )}
         </div>
+
+        {/* Phone: the order in effect, changeable without opening the sheet. */}
+        <label className="flex items-center justify-between gap-2 text-sm text-muted-foreground lg:hidden">
+          <span>{total.toLocaleString("es-MX")} resultados</span>
+          <select
+            value={orden ?? ""}
+            onChange={(e) => setOrden((e.target.value || null) as OrdenLista | null)}
+            aria-label="Ordenar"
+            className="h-10 cursor-pointer rounded-lg bg-transparent pr-1 text-right text-sm font-medium text-foreground outline-none"
+          >
+            <option value="">{query.trim() ? "Relevancia" : "Nombre A–Z"}</option>
+            {ORDENES.map((o) => (
+              <option key={o} value={o}>
+                {ORDEN_LABEL[o]}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
 
       <div className="lg:grid lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-6">
