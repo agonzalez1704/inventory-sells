@@ -177,7 +177,8 @@ export function PanelPedido({
             <span className="shrink-0 text-2xl font-semibold tabular-nums">{formatMXN(p.total_cents)}</span>
           </div>
 
-          {/* Where it is in its own trail */}
+          {/* Where it is in its own trail — a cancelled or expired order has none. */}
+          {etapa !== "cerrado" && (
           <ol className="flex items-start">
             {PASOS.map((paso, i) => {
               const label = i === 3 ? (recoger ? "Entregado" : "Entregado") : i === 2 ? (p.enviado_at ? "Enviado" : recoger ? "Listo" : "Preparado") : paso;
@@ -202,6 +203,7 @@ export function PanelPedido({
               );
             })}
           </ol>
+          )}
 
           {/* Pick list */}
           <div>
