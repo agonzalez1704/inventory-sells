@@ -298,7 +298,7 @@ export function InventoryView({
   const gridCols = "lg:[grid-template-columns:var(--cols-lg)] xl:[grid-template-columns:var(--cols-xl)]";
 
   return (
-    <section className="space-y-5">
+    <section className="space-y-5" data-ancho="completo">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
           <h1 className="text-2xl font-semibold tracking-tight">Inventario</h1>

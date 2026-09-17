@@ -28,6 +28,8 @@ import {
   ClipboardCheck,
   Menu,
   X,
+  PanelLeftClose,
+  PanelLeftOpen,
   Sparkles,
   Presentation as PresentationIcon,
 } from "lucide-react";
@@ -98,10 +100,10 @@ function NavList({ permisos, onNavigate }: { permisos: Set<string>; onNavigate?:
     (g) => g.links.length > 0,
   );
   return (
-    <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-4">
+    <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-4 nav-compacto:xl:px-2">
       {grupos.map((g) => (
         <div key={g.label}>
-          <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+          <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 nav-compacto:xl:sr-only">
             {g.label}
           </p>
           <div className="space-y-0.5">
@@ -113,16 +115,21 @@ function NavList({ permisos, onNavigate }: { permisos: Set<string>; onNavigate?:
                   href={href}
                   onClick={onNavigate}
                   aria-current={active ? "page" : undefined}
+                  title={label}
                   className={cn(
-                    "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors",
+                    "relative flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors nav-compacto:xl:justify-center",
                     active
                       ? "bg-muted text-foreground"
                       : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
                   )}
                 >
                   <Icon className="h-4 w-4 shrink-0" />
-                  <span className="min-w-0 flex-1 truncate">{label}</span>
-                  {href === "/asesor" && <AsesorNavBadge />}
+                  <span className="min-w-0 flex-1 truncate nav-compacto:xl:sr-only">{label}</span>
+                  {href === "/asesor" && (
+                    <span className="nav-compacto:xl:absolute nav-compacto:xl:-right-1 nav-compacto:xl:-top-1">
+                      <AsesorNavBadge />
+                    </span>
+                  )}
                 </Link>
               );
             })}
@@ -182,18 +189,33 @@ export function AppShell({
       {(
         <>
           {/* Desktop sidebar — fixed, so main just pads left to clear it. */}
-          <aside className="fixed inset-y-0 left-0 z-30 hidden w-56 flex-col border-r border-border bg-background xl:flex">
+          <aside className="fixed inset-y-0 left-0 z-30 hidden w-56 flex-col border-r border-border bg-background nav-compacto:w-16 xl:flex">
             <div className="brand-gradient h-[2px] w-full" />
-            <div className="flex h-[52px] shrink-0 items-center border-b border-border px-4">
-              <Link href="/" aria-label={`${MARCA.nombre} — inicio`}>
+            <div className="flex h-[52px] shrink-0 items-center justify-between gap-2 border-b border-border px-4 nav-compacto:justify-center nav-compacto:px-2">
+              <Link href="/" aria-label={`${MARCA.nombre} — inicio`} className="nav-compacto:hidden">
                 <Logo className="h-6 w-auto text-foreground" />
               </Link>
+              <button
+                type="button"
+                onClick={alternarNav}
+                aria-label="Encoger o expandir el menú"
+                title="Encoger o expandir el menú"
+                className="cursor-pointer rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                <PanelLeftClose className="h-4 w-4 nav-compacto:hidden" />
+                <PanelLeftOpen className="hidden h-4 w-4 nav-compacto:block" />
+              </button>
             </div>
             <Suspense fallback={<NavFallback />}>
               <NavListAsync permisos={permisos} />
             </Suspense>
-            <div className="flex shrink-0 items-center justify-between gap-2 border-t border-border p-3">
-              <UserButton showName />
+            <div className="flex shrink-0 items-center justify-between gap-2 border-t border-border p-3 nav-compacto:flex-col nav-compacto:px-2">
+              <span className="nav-compacto:hidden">
+                <UserButton showName />
+              </span>
+              <span className="hidden nav-compacto:block">
+                <UserButton />
+              </span>
               <ThemeToggle />
             </div>
           </aside>
@@ -243,11 +265,24 @@ export function AppShell({
             </div>
           )}
 
-          <main className="min-w-0 xl:pl-56">{children}</main>
+          <main className="min-w-0 xl:pl-56 nav-compacto:xl:pl-16">{children}</main>
         </>
       )}
     </>
   );
+}
+
+/** Pure DOM + CSS: nothing in React needs to re-render when the menu folds. */
+function alternarNav() {
+  const html = document.documentElement;
+  const compacto = html.dataset.nav !== "compacto";
+  if (compacto) html.dataset.nav = "compacto";
+  else delete html.dataset.nav;
+  try {
+    localStorage.setItem("nav_compacto", compacto ? "1" : "0");
+  } catch {
+    // Private mode: the choice just isn't remembered.
+  }
 }
 
 /** The signed-out header: the landing page and /sin-acceso, nothing else. */

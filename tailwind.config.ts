@@ -1,4 +1,5 @@
 import type { Config } from "tailwindcss";
+import plugin from "tailwindcss/plugin";
 
 const config: Config = {
   darkMode: "class",
@@ -68,7 +69,10 @@ const config: Config = {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    // The app sidebar folded to icons (set on <html> by the shell, remembered per browser).
+    plugin(({ addVariant }) => addVariant("nav-compacto", 'html[data-nav="compacto"] &')),
+  ],
 };
 
 export default config;

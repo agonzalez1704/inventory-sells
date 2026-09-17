@@ -68,7 +68,14 @@ async function cargarPermisosNav(): Promise<string[]> {
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <AppShell permisos={cargarPermisosNav()}>
-    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
+    {/* Before paint: a folded sidebar (app-shell) must not flash open on load. */}
+    <script
+      dangerouslySetInnerHTML={{
+        __html: `try{if(localStorage.getItem("nav_compacto")==="1")document.documentElement.dataset.nav="compacto"}catch(e){}`,
+      }}
+    />
+    {/* Wide screens (the inventory's filter rail + table) opt out of the cap. */}
+    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 has-[[data-ancho=completo]]:max-w-none xl:has-[[data-ancho=completo]]:px-8">
       <Suspense
         fallback={
           <div aria-busy className="animate-pulse space-y-4">
