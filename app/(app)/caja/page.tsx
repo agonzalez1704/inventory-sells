@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { auth } from "@clerk/nextjs/server";
 import { getProfile, requirePagePermiso } from "@/lib/auth/profile";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
@@ -360,7 +359,6 @@ export default async function CajaPage({
       gananciaDevuelta += (it.unit_price_cents - (it.products?.cost_cents ?? 0)) * it.qty;
     }
   }
-  const ganancia = isAdmin ? gananciaVentas - gananciaDevuelta : null;
 
   // --- Corte por inventario: revenue + margin attributed to each inventory via
   // sale_items -> product -> inventory. Cash basis: direct sales in full, credit
@@ -439,6 +437,9 @@ export default async function CajaPage({
     acumInv([row], factor);
   }
 
+  // After the credit-note loop above: computing it earlier left every abono's
+  // profit out of the net figure (it only counted direct sales).
+  const ganancia = isAdmin ? gananciaVentas - gananciaDevuelta : null;
   const etiquetado = etiquetadoOut();
   const porInventario = [...porInvMap.values()]
     .map((a) => ({
@@ -604,13 +605,6 @@ export default async function CajaPage({
   }
 
   return (
-    <>
-    <nav className="mb-5 flex gap-6 border-b border-border text-sm font-semibold">
-      <span className="py-2.5 shadow-[inset_0_-2px_0_hsl(var(--foreground))]">Corte del periodo</span>
-      <Link href="/caja/cuadre" className="py-2.5 text-muted-foreground hover:text-foreground">
-        Cuadre del día
-      </Link>
-    </nav>
     <CajaView
       data={{
         from,
@@ -639,6 +633,5 @@ export default async function CajaPage({
         porSucursal,
       }}
     />
-    </>
   );
 }

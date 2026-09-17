@@ -164,6 +164,7 @@ function Kpi({
           "mt-1.5 block text-2xl font-semibold tabular-nums tracking-tight sm:text-[28px]",
           tone === "in" && "text-emerald-700 dark:text-emerald-400",
           tone === "out" && "text-red-600 dark:text-red-400",
+          tone === "caja" && "text-brand-foreground",
         )}
       >
         {value}
@@ -322,6 +323,13 @@ export function CajaView({ data }: { data: CajaData }) {
           </Button>
         </div>
       </div>
+
+      <nav className="flex gap-6 border-b border-border text-sm font-semibold">
+        <span className="py-2.5 shadow-[inset_0_-2px_0_hsl(var(--foreground))]">Corte del periodo</span>
+        <Link href="/caja/cuadre" className="py-2.5 text-muted-foreground hover:text-foreground">
+          Cuadre del día
+        </Link>
+      </nav>
 
       <div className="flex flex-wrap items-center gap-2">
         <div className="inline-flex rounded-xl bg-muted p-1">
