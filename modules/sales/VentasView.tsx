@@ -246,7 +246,7 @@ export function VentasView({
         </div>
 
         {/* Phone: period and the common filters one tap away. */}
-        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] lg:hidden [&::-webkit-scrollbar]:hidden">
+        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 scrollbar-none lg:hidden [&::-webkit-scrollbar]:hidden">
           <button
             type="button"
             onClick={() => setFiltrosOpen(true)}
@@ -406,7 +406,7 @@ function FilaVenta({ v, activa, onClick }: { v: VentaLista; activa: boolean; onC
         </div>
       </div>
       <span className="hidden w-32 truncate text-sm text-muted-foreground xl:block">{v.vendedor ?? "—"}</span>
-      <span className="hidden w-56 items-center gap-1.5 whitespace-nowrap lg:flex [&_*]:whitespace-nowrap">
+      <span className="hidden w-56 items-center gap-1.5 whitespace-nowrap lg:flex **:whitespace-nowrap">
         <MetodoPill metodo={v.payment_method} />
         {v.cuenta && <CuentaChip cuenta={v.cuenta} />}
       </span>

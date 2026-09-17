@@ -38,8 +38,8 @@ function DrawerOverlay({ className, ...props }: DrawerPrimitive.Backdrop.Props) 
     <DrawerPrimitive.Backdrop
       data-slot="drawer-overlay"
       className={cn(
-        "fixed inset-0 z-50 min-h-dvh select-none bg-slate-950/45 opacity-[calc(1-var(--drawer-swipe-progress,0))] transition-opacity duration-[450ms] ease-[cubic-bezier(0.32,0.72,0,1)]",
-        "data-[ending-style]:pointer-events-none data-[ending-style]:opacity-0 data-[ending-style]:duration-[calc(var(--drawer-swipe-strength,1)*400ms)] data-[starting-style]:opacity-0 data-[swiping]:duration-0",
+        "fixed inset-0 z-50 min-h-dvh select-none bg-slate-950/45 opacity-[calc(1-var(--drawer-swipe-progress,0))] transition-opacity duration-450 ease-[cubic-bezier(0.32,0.72,0,1)]",
+        "data-ending-style:pointer-events-none data-ending-style:opacity-0 data-ending-style:duration-[calc(var(--drawer-swipe-strength,1)*400ms)] data-starting-style:opacity-0 data-swiping:duration-0",
         // iOS Safari: fixed backdrops stop short once the page has scrolled.
         "supports-[-webkit-touch-callout:none]:absolute",
         className,
@@ -65,13 +65,13 @@ function DrawerSwipeHandle({ className, ...props }: React.ComponentProps<"div">)
 }
 
 const POPUP = [
-  "group/drawer-popup pointer-events-auto fixed z-50 flex min-h-0 flex-col bg-background text-foreground shadow-2xl outline-none",
-  "[transform:translate3d(var(--translate-x,0px),var(--translate-y,0px),0)_scale(var(--stack-scale,1))] transition-[transform,height,opacity,filter] duration-[450ms] ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform",
+  "group/drawer-popup pointer-events-auto fixed z-50 flex min-h-0 flex-col bg-background text-foreground shadow-2xl outline-hidden",
+  "transform-[translate3d(var(--translate-x,0px),var(--translate-y,0px),0)_scale(var(--stack-scale,1))] transition-[transform,height,opacity,filter] duration-450 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform",
   // Nested drawers: the ones behind shrink and peek out.
   "[--peek:1rem] [--stack-step:0.05] [--stack-progress:clamp(0,var(--drawer-swipe-progress,0),1)] [--stack-peek-offset:max(0px,calc((var(--nested-drawers,0)-var(--stack-progress))*var(--peek)))] [--stack-scale-base:max(0,calc(1-(var(--nested-drawers,0)*var(--stack-step))))] [--stack-scale:clamp(0,calc(var(--stack-scale-base)+(var(--stack-step)*var(--stack-progress))),1)] [--stack-shrink:calc(1-var(--stack-scale))]",
-  "data-[nested-drawer-open]:brightness-95",
+  "data-nested-drawer-open:brightness-95",
   // Enter / exit / swipe.
-  "data-[starting-style]:[transform:var(--closed-transform)] data-[ending-style]:[transform:var(--closed-transform)] data-[ending-style]:opacity-[0.9999] data-[ending-style]:duration-[calc(var(--drawer-swipe-strength,1)*400ms)] data-[swiping]:duration-0 data-[nested-drawer-swiping]:duration-0",
+  "data-starting-style:transform-(--closed-transform) data-ending-style:transform-(--closed-transform) data-ending-style:opacity-[0.9999] data-ending-style:duration-[calc(var(--drawer-swipe-strength,1)*400ms)] data-swiping:duration-0 data-nested-drawer-swiping:duration-0",
   // Overshoot on a swipe shows the drawer's own color, not the page.
   "after:pointer-events-none after:absolute after:bg-background after:content-['']",
   // Down: bottom sheet.
@@ -111,7 +111,7 @@ function DrawerContent({
           {showSwipeHandle && <DrawerSwipeHandle />}
           <DrawerPrimitive.Content
             data-slot="drawer-content"
-            className="flex min-h-0 flex-1 select-text flex-col overflow-hidden rounded-[inherit] transition-opacity duration-300 [[data-swipe-direction=down][data-nested-drawer-open]_&]:opacity-0 group-data-[swiping]/drawer-popup:select-none"
+            className="flex min-h-0 flex-1 select-text flex-col overflow-hidden rounded-[inherit] transition-opacity duration-300 [[data-swipe-direction=down][data-nested-drawer-open]_&]:opacity-0 group-data-swiping/drawer-popup:select-none"
           >
             {children}
           </DrawerPrimitive.Content>

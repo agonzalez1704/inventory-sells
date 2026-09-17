@@ -100,7 +100,7 @@ export function EditarInventarioModal({
             <select
               value={sucursalId}
               onChange={(e) => setSucursalId(e.target.value)}
-              className="h-10 w-full cursor-pointer rounded-lg border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring/20"
+              className="h-10 w-full cursor-pointer rounded-lg border border-border bg-background px-3 text-sm outline-hidden focus:ring-2 focus:ring-ring/20"
             >
               <option value="">Sin sucursal — se vende desde cualquiera</option>
               {sucursales.map((su) => (

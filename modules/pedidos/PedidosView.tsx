@@ -228,9 +228,9 @@ export function PedidosView({
       {pedidos.length === 0 ? (
         <EmptyState icon={Package} title="Sin pedidos todavía" description="Aquí aparecen los pedidos de la tienda en línea y los que se pagan desde una cotización." />
       ) : vista === "tablero" ? (
-        <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:thin] lg:mx-0 lg:grid lg:grid-cols-4 lg:px-0">
+        <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-2 scrollbar-thin lg:mx-0 lg:grid lg:grid-cols-4 lg:px-0">
           {COLUMNAS.map((c) => (
-            <div key={c.key} className="flex w-[19rem] shrink-0 flex-col gap-2.5 rounded-2xl bg-muted/50 p-2.5 lg:w-auto">
+            <div key={c.key} className="flex w-76 shrink-0 flex-col gap-2.5 rounded-2xl bg-muted/50 p-2.5 lg:w-auto">
               <div className="px-1.5 pt-1">
                 <p className="flex items-center gap-2 text-sm font-semibold">
                   <span className={cn("h-2 w-2 rounded-full", c.color)} />

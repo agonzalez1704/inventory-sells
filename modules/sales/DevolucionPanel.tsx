@@ -161,7 +161,7 @@ export function DevolucionPanel({
               rows={2}
               maxLength={300}
               placeholder="Ej. no era el modelo, la pantalla no encendió"
-              className="w-full resize-none rounded-xl border border-border bg-background p-3 text-base outline-none focus:ring-2 focus:ring-ring/30 sm:text-sm"
+              className="w-full resize-none rounded-xl border border-border bg-background p-3 text-base outline-hidden focus:ring-2 focus:ring-ring/30 sm:text-sm"
             />
           </label>
 
@@ -177,7 +177,7 @@ export function DevolucionPanel({
           <Button variant="secondary" className="hidden h-12 flex-1 sm:inline-flex" onClick={onClose} disabled={pending}>
             Cancelar
           </Button>
-          <Button variant="danger" className="h-12 flex-[2] text-base sm:text-sm" onClick={guardar} loading={pending} disabled={!piezas}>
+          <Button variant="danger" className="h-12 flex-2 text-base sm:text-sm" onClick={guardar} loading={pending} disabled={!piezas}>
             {piezas ? `Devolver ${formatMXN(total)}` : "Elige qué regresa"}
           </Button>
         </div>

@@ -98,10 +98,10 @@ export function EtiquetasQR({ items, recortado }: { items: ItemEtiqueta[]; recor
             <div
               key={it.id}
               className={cn(
-                "flex h-[30mm] w-[50mm] items-center gap-[2mm] overflow-hidden p-[2mm] [break-inside:avoid]",
+                "flex h-[30mm] w-[50mm] items-center gap-[2mm] overflow-hidden p-[2mm] break-inside-avoid",
                 formato === "hoja"
                   ? "border border-dashed border-neutral-300"
-                  : "border border-neutral-300 print:border-0 print:[break-after:page]",
+                  : "border border-neutral-300 print:border-0 print:break-after-page",
               )}
             >
               <div

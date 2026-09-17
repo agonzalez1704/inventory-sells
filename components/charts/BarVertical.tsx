@@ -63,7 +63,7 @@ export function BarVertical({
                 marginLeft: `${xScale(d.key) ?? 0}%`,
                 borderRadius: "5px 5px 0 0",
               }}
-              className="absolute bottom-0 bg-gradient-to-t from-brand to-brand-strong transition-opacity hover:opacity-90"
+              className="absolute bottom-0 bg-linear-to-t from-brand to-brand-strong transition-opacity hover:opacity-90"
             />
           );
         })}

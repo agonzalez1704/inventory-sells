@@ -226,7 +226,7 @@ export function CotizacionBuilder({
       <Button
         variant="accent"
         size="lg"
-        className="flex-[2]"
+        className="flex-2"
         onClick={() => guardar("pendiente")}
         loading={pending}
         disabled={vacio}
@@ -281,7 +281,7 @@ export function CotizacionBuilder({
                   <p className="font-mono text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                     {p.sku}
                   </p>
-                  <p className="line-clamp-2 min-h-[2.25rem] text-sm font-medium leading-tight">{p.name}</p>
+                  <p className="line-clamp-2 min-h-9 text-sm font-medium leading-tight">{p.name}</p>
                   <div className="mt-1 flex items-center justify-between gap-1">
                     <span className="font-mono text-sm font-semibold tabular-nums text-accent">
                       {formatMXN(p.price_cents)}
@@ -323,7 +323,7 @@ export function CotizacionBuilder({
               />
             </div>
           ) : (
-            <ul className="max-h-[20rem] divide-y divide-border overflow-auto">
+            <ul className="max-h-80 divide-y divide-border overflow-auto">
                 {/* initial={false}: lines restored when editing an existing
                     quote are not new. popLayout so removing one lets the rest
                     close the gap. */}

@@ -96,7 +96,7 @@ export function CustomerPicker({
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-label="Elegir cliente"
-        className="flex h-11 w-full items-center gap-2 rounded-lg border border-border bg-background px-3 text-left text-sm transition-colors hover:border-ring/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+        className="flex h-11 w-full items-center gap-2 rounded-lg border border-border bg-background px-3 text-left text-sm transition-colors hover:border-ring/40 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/40"
       >
         <span
           className={cn(

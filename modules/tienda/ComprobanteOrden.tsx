@@ -75,7 +75,7 @@ export function ComprobanteOrden({ ordenId }: { ordenId: string }) {
         value={referencia}
         onChange={(e) => setReferencia(e.target.value)}
         placeholder="Referencia / clave de rastreo"
-        className="h-11 w-full rounded-xl border border-tienda-200 bg-background px-3 text-base sm:text-sm outline-none focus:ring-2 focus:ring-tienda-500/30 dark:border-tienda-800"
+        className="h-11 w-full rounded-xl border border-tienda-200 bg-background px-3 text-base sm:text-sm outline-hidden focus:ring-2 focus:ring-tienda-500/30 dark:border-tienda-800"
       />
       <div className="flex flex-wrap items-center gap-2">
         <button

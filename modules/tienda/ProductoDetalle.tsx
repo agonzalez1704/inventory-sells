@@ -76,7 +76,7 @@ function RejaMini({ titulo, items }: { titulo: string; items: RelacionadoProduct
                 <Smartphone className="h-8 w-8 text-muted-foreground/40" />
               )}
             </div>
-            <p className="line-clamp-2 min-h-[2.5rem] text-sm font-medium leading-tight text-foreground">{r.nombre}</p>
+            <p className="line-clamp-2 min-h-10 text-sm font-medium leading-tight text-foreground">{r.nombre}</p>
             <span className="mt-1 font-semibold tabular-nums text-foreground">
               {r.precio_cents > 0 ? formatPrecio(r.precio_cents) : "A cotizar"}
             </span>

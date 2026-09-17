@@ -63,7 +63,7 @@ export function ReciboImpreso({
 
   return (
     <div
-      className="fixed inset-0 z-[70] flex items-start justify-center overflow-y-auto bg-slate-950/60 p-4 backdrop-blur-sm sm:items-center"
+      className="fixed inset-0 z-70 flex items-start justify-center overflow-y-auto bg-slate-950/60 p-4 backdrop-blur-xs sm:items-center"
       role="dialog"
       aria-modal="true"
       aria-label="Venta registrada"
@@ -71,7 +71,7 @@ export function ReciboImpreso({
     >
       <div className="w-full max-w-[340px]" onClick={(e) => e.stopPropagation()}>
         {/* The machine: a slab with a lit status dot and the feed slot. */}
-        <div className="relative z-10 rounded-2xl border border-border bg-gradient-to-b from-muted to-background p-4 shadow-pop">
+        <div className="relative z-10 rounded-2xl border border-border bg-linear-to-b from-muted to-background p-4 shadow-pop">
           <div className="flex items-center justify-between">
             <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
               {esFiado ? "Nota registrada" : "Cobro completado"}

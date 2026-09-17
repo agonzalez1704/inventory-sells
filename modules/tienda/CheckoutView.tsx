@@ -451,7 +451,7 @@ export function CheckoutView() {
                     <select
                       value={estado}
                       onChange={(ev) => setEstado(ev.target.value)}
-                      className="h-12 w-full rounded-xl border border-border bg-background px-3 text-base outline-none focus:border-tienda-500 focus:ring-4 focus:ring-tienda-100"
+                      className="h-12 w-full rounded-xl border border-border bg-background px-3 text-base outline-hidden focus:border-tienda-500 focus:ring-4 focus:ring-tienda-100"
                     >
                       <option value="">Elige…</option>
                       {ESTADOS.map((x) => (
@@ -685,7 +685,7 @@ function Field({
         value={value}
         onChange={(ev) => onChange(ev.target.value)}
         // 16px text: smaller makes iOS zoom on focus.
-        className="h-12 w-full rounded-xl border border-border bg-background px-3 text-base text-foreground outline-none placeholder:text-muted-foreground/70 focus:border-tienda-500 focus:ring-4 focus:ring-tienda-100"
+        className="h-12 w-full rounded-xl border border-border bg-background px-3 text-base text-foreground outline-hidden placeholder:text-muted-foreground/70 focus:border-tienda-500 focus:ring-4 focus:ring-tienda-100"
       />
     </label>
   );

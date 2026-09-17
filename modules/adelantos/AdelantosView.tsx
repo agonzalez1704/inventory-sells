@@ -205,7 +205,7 @@ function AdelantoRow({ a }: { a: Adelanto }) {
 
       <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-muted">
         <div
-          className="h-full rounded-full bg-gradient-to-r from-brand to-brand-strong"
+          className="h-full rounded-full bg-linear-to-r from-brand to-brand-strong"
           style={{ width: `${pct}%` }}
         />
       </div>

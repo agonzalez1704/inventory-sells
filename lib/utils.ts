@@ -2,14 +2,11 @@ import { clsx, type ClassValue } from "clsx";
 import { extendTailwindMerge } from "tailwind-merge";
 
 /**
- * tailwind-merge ships v4's default scale, and this app runs Tailwind 3 with
- * its own tokens — so without this the library did not know `shadow-card`,
- * `shadow-pop` or `animate-fade-in` were shadows and animations at all:
- * `cn("shadow-sm", "shadow-card")` kept BOTH and let CSS order decide, which
- * means a className passed to a component silently failed to override it.
- *
- * Declaring the custom values puts them in the right conflict group. Drop this
- * extension when the app moves to Tailwind 4 and the names line up again.
+ * This app's own shadows (`shadow-card`, `shadow-pop`) and animation
+ * (`animate-fade-in`) are not in tailwind-merge's scale, so without declaring
+ * them `cn("shadow-sm", "shadow-card")` kept BOTH classes and let CSS order
+ * decide — a className passed to a component silently failed to override it.
+ * The scale itself now matches: the app is on Tailwind 4, like tailwind-merge.
  */
 const twMerge = extendTailwindMerge({
   extend: {

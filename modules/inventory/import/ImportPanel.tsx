@@ -576,7 +576,7 @@ function ReviewStep({
         </div>
       )}
 
-      <div className="mt-3 max-h-[22rem] overflow-auto rounded-lg border border-border">
+      <div className="mt-3 max-h-88 overflow-auto rounded-lg border border-border">
         <table className="w-full text-xs">
           <thead className="sticky top-0 bg-muted text-left text-muted-foreground">
             <tr>
@@ -603,7 +603,7 @@ function ReviewStep({
                   <EditCell value={r.size ?? ""} onChange={(v) => onUpdate(i, { size: v || undefined })} />
                   <EditCell value={r.color ?? ""} onChange={(v) => onUpdate(i, { color: v || undefined })} />
                   <td
-                    className="max-w-[11rem] truncate px-2 py-1 text-muted-foreground"
+                    className="max-w-44 truncate px-2 py-1 text-muted-foreground"
                     title={specs}
                   >
                     {specs || "—"}
@@ -615,7 +615,7 @@ function ReviewStep({
                     <button
                       onClick={() => onRemove(i)}
                       aria-label="Quitar fila"
-                      className="cursor-pointer rounded p-1 text-muted-foreground transition-colors hover:bg-red-50 dark:bg-red-950/40 hover:text-red-600 dark:text-red-400"
+                      className="cursor-pointer rounded-sm p-1 text-muted-foreground transition-colors hover:bg-red-50 dark:bg-red-950/40 hover:text-red-600 dark:text-red-400"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
@@ -665,7 +665,7 @@ function EditCell({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className={cn(
-          "w-full min-w-[5rem] rounded border border-transparent bg-transparent px-1.5 py-1 transition-colors hover:border-border focus:border-ring focus:bg-background focus:outline-none",
+          "w-full min-w-20 rounded-sm border border-transparent bg-transparent px-1.5 py-1 transition-colors hover:border-border focus:border-ring focus:bg-background focus:outline-hidden",
           mono && "font-mono",
         )}
       />
@@ -691,7 +691,7 @@ function NumCell({
         min={0}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-16 rounded border border-transparent bg-transparent px-1.5 py-1 text-right tabular-nums transition-colors hover:border-border focus:border-ring focus:bg-background focus:outline-none"
+        className="w-16 rounded-sm border border-transparent bg-transparent px-1.5 py-1 text-right tabular-nums transition-colors hover:border-border focus:border-ring focus:bg-background focus:outline-hidden"
       />
     </td>
   );

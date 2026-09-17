@@ -75,12 +75,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       }}
     />
     {/* Wide screens (the inventory's filter rail + table) opt out of the cap. */}
-    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 has-[[data-ancho=completo]]:max-w-none xl:has-[[data-ancho=completo]]:px-8">
+    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 has-data-[ancho=completo]:max-w-none xl:has-data-[ancho=completo]:px-8">
       <Suspense
         fallback={
           <div aria-busy className="animate-pulse space-y-4">
             <div className="h-8 w-56 rounded-lg bg-muted/60" />
-            <div className="h-4 w-80 rounded bg-muted/50" />
+            <div className="h-4 w-80 rounded-sm bg-muted/50" />
           </div>
         }
       >

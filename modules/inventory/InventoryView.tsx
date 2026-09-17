@@ -295,7 +295,7 @@ export function InventoryView({
     .join(" ");
   const colsLg = ["44px", "minmax(0,1fr)", "180px", "88px", "36px"].join(" ");
   const colsStyle = { "--cols-lg": colsLg, "--cols-xl": colsXl } as React.CSSProperties;
-  const gridCols = "lg:[grid-template-columns:var(--cols-lg)] xl:[grid-template-columns:var(--cols-xl)]";
+  const gridCols = "lg:grid-cols-(--cols-lg) xl:grid-cols-(--cols-xl)";
 
   return (
     <section className="space-y-5" data-ancho="completo">
@@ -354,7 +354,7 @@ export function InventoryView({
         </div>
 
         {/* Phone: the filters that matter most are one tap; the rest in a sheet. */}
-        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] lg:hidden [&::-webkit-scrollbar]:hidden">
+        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 scrollbar-none lg:hidden [&::-webkit-scrollbar]:hidden">
           <button
             type="button"
             onClick={() => setFiltrosOpen(true)}
@@ -394,7 +394,7 @@ export function InventoryView({
             value={orden ?? ""}
             onChange={(e) => setOrden((e.target.value || null) as OrdenLista | null)}
             aria-label="Ordenar"
-            className="h-10 cursor-pointer rounded-lg bg-transparent pr-1 text-right text-sm font-medium text-foreground outline-none"
+            className="h-10 cursor-pointer rounded-lg bg-transparent pr-1 text-right text-sm font-medium text-foreground outline-hidden"
           >
             <option value="">{query.trim() ? "Relevancia" : "Nombre A–Z"}</option>
             {ORDENES.map((o) => (
@@ -528,7 +528,7 @@ export function InventoryView({
                         </p>
                         <p className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
                           {/* The SKU keeps a readable minimum; the category gives way first. */}
-                          <span className="min-w-[5.5rem] truncate font-mono">{p.sku}</span>
+                          <span className="min-w-22 truncate font-mono">{p.sku}</span>
                           {p.category && <span className="truncate">· {p.category}</span>}
                           {!inv && (
                             <Badge tone="neutral" className="shrink-0">
@@ -879,7 +879,7 @@ function PanelFiltros({
         <select
           value={cat ?? ""}
           onChange={(e) => onCat(e.target.value || null)}
-          className="h-10 w-full cursor-pointer rounded-lg border border-border bg-background px-3 text-base outline-none focus:ring-2 focus:ring-ring/30 sm:text-sm"
+          className="h-10 w-full cursor-pointer rounded-lg border border-border bg-background px-3 text-base outline-hidden focus:ring-2 focus:ring-ring/30 sm:text-sm"
         >
           <option value="">Todas ({categorias.length})</option>
           {categorias.map((c) => (
@@ -908,7 +908,7 @@ function PanelFiltros({
                 onChange={(e) => set(e.target.value.replace(/[^\d]/g, ""))}
                 onBlur={aplicarPrecio}
                 onKeyDown={(e) => e.key === "Enter" && aplicarPrecio()}
-                className="h-10 w-full rounded-lg border border-border bg-background pl-6 pr-2 text-base tabular-nums outline-none focus:ring-2 focus:ring-ring/30 sm:text-sm"
+                className="h-10 w-full rounded-lg border border-border bg-background pl-6 pr-2 text-base tabular-nums outline-hidden focus:ring-2 focus:ring-ring/30 sm:text-sm"
               />
             </div>
           ))}
@@ -920,7 +920,7 @@ function PanelFiltros({
         <select
           value={orden ?? ""}
           onChange={(e) => onOrden((e.target.value || null) as OrdenLista | null)}
-          className="h-10 w-full cursor-pointer rounded-lg border border-border bg-background px-3 text-base outline-none focus:ring-2 focus:ring-ring/30 sm:text-sm"
+          className="h-10 w-full cursor-pointer rounded-lg border border-border bg-background px-3 text-base outline-hidden focus:ring-2 focus:ring-ring/30 sm:text-sm"
         >
           <option value="">{buscando ? "Relevancia" : "Nombre A–Z"}</option>
           {ORDENES.map((o) => (
