@@ -1,6 +1,90 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+
+@custom-variant dark (&:is(.dark *));
+
+/* The app sidebar folded to icons: <html data-nav="compacto"> (set by the
+   shell before paint). Was a plugin in tailwind.config.ts before v4. */
+@custom-variant nav-compacto (html[data-nav="compacto"] &);
+
+@theme {
+  --color-page: hsl(var(--page));
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-border: hsl(var(--border));
+  --color-ring: hsl(var(--ring));
+
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-accent-soft: hsl(var(--accent-soft));
+
+  --color-tienda-50: hsl(var(--tienda-50));
+  --color-tienda-100: hsl(var(--tienda-100));
+  --color-tienda-200: hsl(var(--tienda-200));
+  --color-tienda-300: hsl(var(--tienda-300));
+  --color-tienda-400: hsl(var(--tienda-400));
+  --color-tienda-500: hsl(var(--tienda-500));
+  --color-tienda-600: hsl(var(--tienda-600));
+  --color-tienda-700: hsl(var(--tienda-700));
+  --color-tienda-800: hsl(var(--tienda-800));
+  --color-tienda-900: hsl(var(--tienda-900));
+  --color-tienda-950: hsl(var(--tienda-950));
+
+  --color-brand: hsl(var(--brand));
+  --color-brand-strong: hsl(var(--brand-strong));
+  --color-brand-soft: hsl(var(--brand-soft));
+  --color-brand-foreground: hsl(var(--brand-foreground));
+
+  --font-sans: var(--font-sans), system-ui, sans-serif;
+  --font-mono: var(--font-mono), ui-monospace, monospace;
+
+  --radius-lg: 0.625rem;
+  --radius-xl: 0.875rem;
+  --radius-2xl: 1.125rem;
+
+  --shadow-xs: 0 1px 2px 0 rgb(15 23 42 / 0.04);
+  --shadow-card:
+    0 1px 3px 0 rgb(15 23 42 / 0.06), 0 1px 2px -1px rgb(15 23 42 / 0.05);
+  --shadow-pop: 0 10px 30px -10px rgb(15 23 42 / 0.2);
+
+  --animate-fade-in: fade-in 0.2s ease-out;
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
+
+
+@utility bg-dots {
+  /* Subtle brand-tinted dot texture. */
+  background-image: radial-gradient(
+    hsl(var(--brand) / 0.28) 1px,
+    transparent 1px
+  );
+  background-size: 14px 14px;
+}
+
+@utility brand-gradient {
+  /* The brand gradient as a fill. */
+  background-image: linear-gradient(
+    135deg,
+    hsl(var(--brand-strong)),
+    hsl(var(--brand))
+  );
+}
 
 @layer base {
   :root {
@@ -17,7 +101,7 @@
     --accent-foreground: 0 0% 100%;
     --accent-soft: 152 76% 96%; /* emerald-50 */
     /* Default brand (Fiable: gold → amber). lib/marca.ts overrides these
-       per deploy via an injected <style> in the root layout. */
+       per deploy via an injected \3c style> in the root layout. */
     --brand: 36 95% 62%;
     --brand-strong: 49 100% 50%;
     --brand-soft: 45 100% 95%;
@@ -66,25 +150,6 @@
 
   ::selection {
     background-color: hsl(var(--accent) / 0.18);
-  }
-}
-
-@layer utilities {
-  /* Subtle brand-tinted dot texture. */
-  .bg-dots {
-    background-image: radial-gradient(
-      hsl(var(--brand) / 0.28) 1px,
-      transparent 1px
-    );
-    background-size: 14px 14px;
-  }
-  /* The brand gradient as a fill. */
-  .brand-gradient {
-    background-image: linear-gradient(
-      135deg,
-      hsl(var(--brand-strong)),
-      hsl(var(--brand))
-    );
   }
 }
 

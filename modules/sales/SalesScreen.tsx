@@ -178,18 +178,18 @@ function ProductCard({
       <p className="flex items-baseline justify-between gap-1 font-mono text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
         <span className="truncate">{p.sku}</span>
         {p.sucursal_ajena ? (
-          <span className="shrink-0 rounded bg-amber-100 px-1 font-sans text-[10px] font-semibold normal-case text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">
+          <span className="shrink-0 rounded-sm bg-amber-100 px-1 font-sans text-[10px] font-semibold normal-case text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">
             En {p.sucursal_ajena}
           </span>
         ) : (
           p.inventory_name && (
-            <span className="shrink-0 rounded bg-muted px-1 font-sans text-[10px] font-medium normal-case">
+            <span className="shrink-0 rounded-sm bg-muted px-1 font-sans text-[10px] font-medium normal-case">
               {p.inventory_name}
             </span>
           )
         )}
       </p>
-      <p className="line-clamp-2 min-h-[2.25rem] text-sm font-medium leading-tight">
+      <p className="line-clamp-2 min-h-9 text-sm font-medium leading-tight">
         {p.name}
       </p>
       {(p.brand || p.category) && (
@@ -676,7 +676,7 @@ export function SalesScreen({
               allowed to grow, whether the shop has 6 categories or 216. */}
           {categorias.length > 1 && (
             <div className="mt-3 flex items-center gap-1.5">
-              <div className="flex flex-1 gap-1.5 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <div className="flex flex-1 gap-1.5 overflow-x-auto pb-1 [-ms-overflow-style:none] scrollbar-none [&::-webkit-scrollbar]:hidden">
                 <CatChip active={categoria === null} onClick={() => setCategoria(null)}>
                   Todos
                 </CatChip>
@@ -781,7 +781,7 @@ export function SalesScreen({
                 />
               </div>
             ) : (
-              <ul className="max-h-[20rem] divide-y divide-border overflow-auto">
+              <ul className="max-h-80 divide-y divide-border overflow-auto">
                   {/* initial={false}: lines already in the order when the panel
                       mounts are not new, and animating them would replay the
                       whole cart on every re-render. popLayout so a removed line

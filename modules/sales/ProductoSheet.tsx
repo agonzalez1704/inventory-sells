@@ -116,7 +116,7 @@ export function ProductoSheet({
           >
             <Thumb src={imagen} alt={p.name} />
             {imagen && (
-              <span className="absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-lg bg-background/80 text-foreground shadow-sm backdrop-blur-sm transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
+              <span className="absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-lg bg-background/80 text-foreground shadow-sm backdrop-blur-xs transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
                 <Expand className="h-4 w-4" />
               </span>
             )}
@@ -266,7 +266,7 @@ export function ProductoSheet({
       {fullscreen && imagen &&
         createPortal(
           <div
-            className="fixed inset-0 z-[70] flex items-center justify-center bg-black/90 p-4"
+            className="fixed inset-0 z-70 flex items-center justify-center bg-black/90 p-4"
             onClick={() => setFullscreen(false)}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -281,7 +281,7 @@ export function ProductoSheet({
               type="button"
               aria-label="Cerrar"
               onClick={() => setFullscreen(false)}
-              className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur-sm"
+              className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur-xs"
             >
               <X className="h-5 w-5" />
             </button>

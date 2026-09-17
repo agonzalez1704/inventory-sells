@@ -262,7 +262,7 @@ export function ItemSwapModal({
                         <span className="font-mono">{p.sku}</span>
                         {p.size && <span>· {p.size}</span>}
                         {p.inventory_name && (
-                          <span className="shrink-0 rounded bg-accent-soft px-1.5 py-0.5 font-medium text-accent">
+                          <span className="shrink-0 rounded-sm bg-accent-soft px-1.5 py-0.5 font-medium text-accent">
                             {p.inventory_name}
                           </span>
                         )}

@@ -134,7 +134,7 @@ export function EnviarPedido({ open, pedido, onClose }: { open: boolean; pedido:
                 value={costo}
                 onChange={(e) => setCosto(e.target.value.replace(/[^\d.,]/g, ""))}
                 placeholder="0.00"
-                className="w-full min-w-0 bg-transparent text-base tabular-nums outline-none sm:text-sm"
+                className="w-full min-w-0 bg-transparent text-base tabular-nums outline-hidden sm:text-sm"
               />
             </div>
             <span className="text-xs text-muted-foreground">Para saber si el envío que cobraste alcanzó.</span>
@@ -167,7 +167,7 @@ export function EnviarPedido({ open, pedido, onClose }: { open: boolean; pedido:
           <Button variant="secondary" className="hidden h-12 flex-1 sm:inline-flex" onClick={onClose} disabled={pending}>
             Cancelar
           </Button>
-          <Button className="h-12 flex-[2] text-base sm:text-sm" onClick={guardar} loading={pending} disabled={!listo}>
+          <Button className="h-12 flex-2 text-base sm:text-sm" onClick={guardar} loading={pending} disabled={!listo}>
             {avisar ? "Marcar enviado y avisar" : "Marcar enviado"}
           </Button>
         </div>

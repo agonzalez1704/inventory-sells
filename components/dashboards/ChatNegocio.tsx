@@ -101,7 +101,7 @@ export function ChatNegocio() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Pregunta lo que sea de tu negocio…"
-          className="h-12 flex-1 rounded-xl border border-border bg-background px-4 text-sm outline-none focus:border-brand"
+          className="h-12 flex-1 rounded-xl border border-border bg-background px-4 text-sm outline-hidden focus:border-brand"
         />
         <button
           disabled={ocupado || !input.trim()}

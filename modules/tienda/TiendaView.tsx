@@ -161,7 +161,7 @@ export function TiendaView({
           first screen before a single product. Search and filters are the
           page's first question, so they stick under the header while the list
           scrolls. */}
-      {/* Solid background, no backdrop-blur: a backdrop filter would become
+      {/* Solid background, no backdrop-blur-sm: a backdrop filter would become
           the containing block of the fixed search overlay inside and trap it
           in this bar. */}
       <div
@@ -216,7 +216,7 @@ export function TiendaView({
       {!filtrando && marcas.length > 1 && (
         <section className="mt-4">
           <h2 className="text-sm font-semibold text-foreground">Marcas</h2>
-          <div className="-mx-4 mt-2 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:-mx-6 sm:px-6 lg:mx-0 lg:px-0 [&::-webkit-scrollbar]:hidden">
+          <div className="-mx-4 mt-2 flex gap-2 overflow-x-auto px-4 pb-1 scrollbar-none sm:-mx-6 sm:px-6 lg:mx-0 lg:px-0 [&::-webkit-scrollbar]:hidden">
             {marcas.slice(0, 10).map((m) => {
               const logo = logoDeMarca(m.value);
               return (
@@ -274,7 +274,7 @@ export function TiendaView({
                     value={filtros.orden ?? ""}
                     onChange={(e) => aplicar({ ...filtros, orden: (e.target.value || null) as Filtros["orden"] })}
                     aria-label="Ordenar"
-                    className="h-11 cursor-pointer appearance-none bg-transparent pr-5 text-base font-medium text-foreground outline-none lg:text-sm"
+                    className="h-11 cursor-pointer appearance-none bg-transparent pr-5 text-base font-medium text-foreground outline-hidden lg:text-sm"
                   >
                     <option value="">{q ? "Relevancia" : "Recomendados"}</option>
                     <option value="vendidos">Más vendidos</option>
@@ -563,7 +563,7 @@ export function ModeloCard({ m, compat = null }: { m: ModeloTienda; compat?: str
       <span
         className={cn(
           "flex h-[68px] w-[68px] shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-muted/50",
-          tarjeta && "lg:aspect-[4/3] lg:h-auto lg:w-full lg:rounded-none",
+          tarjeta && "lg:aspect-4/3 lg:h-auto lg:w-full lg:rounded-none",
         )}
       >
         {m.imagen ? (
@@ -662,12 +662,12 @@ export function ProductCard({
               className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-105"
             />
           ) : (
-            <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-tienda-50 to-slate-50 text-tienda-400">
+            <div className="flex h-full w-full items-center justify-center bg-linear-to-br from-tienda-50 to-slate-50 text-tienda-400">
               <Smartphone className="h-9 w-9" />
             </div>
           )}
         </div>
-        <p className="line-clamp-2 min-h-[2.5rem] text-sm font-medium leading-tight text-foreground group-hover:text-tienda-800">
+        <p className="line-clamp-2 min-h-10 text-sm font-medium leading-tight text-foreground group-hover:text-tienda-800">
           {p.nombre}
         </p>
         {(p.marca || p.categoria) && (

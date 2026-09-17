@@ -158,7 +158,7 @@ export function UsuariosView({
                       value={u.role_id ?? ""}
                       disabled={pending}
                       onChange={(e) => reasignar(u.id, e.target.value)}
-                      className="h-9 rounded-lg border border-border bg-background px-2.5 text-sm outline-none focus:ring-2 focus:ring-ring/40"
+                      className="h-9 rounded-lg border border-border bg-background px-2.5 text-sm outline-hidden focus:ring-2 focus:ring-ring/40"
                     >
                       {!u.role_id && <option value="">Sin rol</option>}
                       {roles.map((r) => (

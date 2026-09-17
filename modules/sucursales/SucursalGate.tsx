@@ -83,7 +83,7 @@ export function SucursalGate() {
   }
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-background/95 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-80 flex items-center justify-center bg-background/95 p-4 backdrop-blur-xs">
       <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-6 text-center shadow-lg">
         <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-brand-soft text-brand-foreground">
           <MapPin className="h-6 w-6" />

@@ -141,7 +141,7 @@ export function ConfigView({
             disabled={!isAdmin || pending}
             rows={14}
             placeholder={PLACEHOLDER}
-            className="w-full rounded-lg border border-border bg-background p-3 text-sm leading-relaxed focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/10 disabled:opacity-70"
+            className="w-full rounded-lg border border-border bg-background p-3 text-sm leading-relaxed focus:border-ring focus:outline-hidden focus:ring-2 focus:ring-ring/10 disabled:opacity-70"
           />
         </label>
 

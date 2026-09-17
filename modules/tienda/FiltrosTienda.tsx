@@ -362,7 +362,7 @@ function Selector({
         disabled={deshabilitado}
         onChange={(e) => onElegir(e.target.value || null)}
         // 16px on phones: anything smaller makes iOS zoom the page on focus.
-        className="h-full min-w-0 flex-1 cursor-pointer bg-transparent text-base font-medium outline-none disabled:cursor-not-allowed lg:text-sm"
+        className="h-full min-w-0 flex-1 cursor-pointer bg-transparent text-base font-medium outline-hidden disabled:cursor-not-allowed lg:text-sm"
       >
         <option value="">{deshabilitado ? "—" : "Cualquiera"}</option>
         {lista.map((o) => (
@@ -406,8 +406,8 @@ function Interruptor({
       >
         <span
           className={cn(
-            "absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all",
-            activo ? "left-[1.375rem]" : "left-0.5",
+            "absolute top-0.5 h-6 w-6 rounded-full bg-white shadow-sm transition-all",
+            activo ? "left-5.5" : "left-0.5",
           )}
         />
       </span>
@@ -507,7 +507,7 @@ export function BarraFiltros({
   );
 
   return (
-    <div className="-mx-4 flex gap-2 overflow-x-auto px-4 py-1 [scrollbar-width:none] sm:-mx-6 sm:px-6 lg:hidden [&::-webkit-scrollbar]:hidden">
+    <div className="-mx-4 flex gap-2 overflow-x-auto px-4 py-1 scrollbar-none sm:-mx-6 sm:px-6 lg:hidden [&::-webkit-scrollbar]:hidden">
       <button
         type="button"
         onClick={onAbrir}

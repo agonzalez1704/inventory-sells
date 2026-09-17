@@ -23,7 +23,7 @@ export function BarHorizontal({
           </div>
           <div className="relative h-6 flex-1 overflow-hidden rounded-md bg-muted/60">
             <div
-              className="absolute inset-y-0 left-0 rounded-md bg-gradient-to-r from-brand to-brand-strong"
+              className="absolute inset-y-0 left-0 rounded-md bg-linear-to-r from-brand to-brand-strong"
               style={{ width: `${Math.max(2, (d.value / (xMax || 1)) * 100)}%` }}
             />
           </div>

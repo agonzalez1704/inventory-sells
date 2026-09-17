@@ -109,7 +109,7 @@ export function EditorDashboard({ dashboardId, titulo, widgets }: {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder={seleccion != null ? "Refina este elemento…" : "Pide un cambio…"}
-              className="h-11 flex-1 rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-brand"
+              className="h-11 flex-1 rounded-xl border border-border bg-background px-3 text-sm outline-hidden focus:border-brand"
             />
             <button disabled={ocupado || !input.trim()} aria-label="Enviar"
               className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-brand text-brand-foreground disabled:opacity-40">
@@ -128,7 +128,7 @@ export function EditorDashboard({ dashboardId, titulo, widgets }: {
                 key={i}
                 onClick={() => setSeleccion(seleccion === i ? null : i)}
                 style={{ gridColumn: `span ${Math.min(12, Math.max(2, w.w))}`, display: "grid" }}
-                className={`cursor-pointer rounded-2xl transition-shadow [&>div]:!col-span-full ${seleccion === i ? "ring-2 ring-brand" : "hover:ring-1 hover:ring-border"}`}
+                className={`cursor-pointer rounded-2xl transition-shadow [&>div]:col-span-full! ${seleccion === i ? "ring-2 ring-brand" : "hover:ring-1 hover:ring-border"}`}
                 title={`widget ${i} — clic para seleccionar`}
               >
                 <Widget datos={w} />

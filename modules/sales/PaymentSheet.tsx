@@ -210,7 +210,7 @@ function PaymentContent({
                   inputMode="decimal"
                   placeholder="0.00"
                   className={cn(
-                    "h-10 w-full rounded-lg border bg-background px-3 text-right font-mono tabular-nums outline-none focus:border-ring/40",
+                    "h-10 w-full rounded-lg border bg-background px-3 text-right font-mono tabular-nums outline-hidden focus:border-ring/40",
                     m.value === "saldo" && saldoExcedido
                       ? "border-red-500"
                       : "border-border",

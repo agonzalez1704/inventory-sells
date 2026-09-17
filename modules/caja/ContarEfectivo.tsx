@@ -148,7 +148,7 @@ export function ContarEfectivo({
                   onChange={(e) => setTotal(e.target.value.replace(/[^\d.]/g, ""))}
                   placeholder="0.00"
                   aria-label="Total contado"
-                  className="w-full min-w-0 bg-transparent text-3xl font-semibold tabular-nums outline-none"
+                  className="w-full min-w-0 bg-transparent text-3xl font-semibold tabular-nums outline-hidden"
                 />
               </div>
             ) : (
@@ -176,7 +176,7 @@ export function ContarEfectivo({
                           placeholder="0"
                           onFocus={(e) => e.target.select()}
                           onChange={(e) => set(Number(e.target.value.replace(/\D/g, "").slice(0, 4)))}
-                          className="w-10 bg-transparent text-center text-base font-semibold tabular-nums outline-none"
+                          className="w-10 bg-transparent text-center text-base font-semibold tabular-nums outline-hidden"
                         />
                         <button
                           type="button"
@@ -203,7 +203,7 @@ export function ContarEfectivo({
                       value={monedas}
                       onChange={(e) => setMonedas(e.target.value.replace(/[^\d.]/g, ""))}
                       placeholder="0"
-                      className="w-full min-w-0 bg-transparent text-base tabular-nums outline-none"
+                      className="w-full min-w-0 bg-transparent text-base tabular-nums outline-hidden"
                     />
                   </div>
                   <span className="flex-1 text-right text-sm font-semibold tabular-nums">{formatMXN(contadoCents)}</span>
@@ -265,7 +265,7 @@ export function ContarEfectivo({
                 onChange={(e) => setNota(e.target.value)}
                 maxLength={500}
                 placeholder="Ej. se dio cambio de más"
-                className="h-11 w-full rounded-lg border border-border bg-background px-3 text-base outline-none focus:ring-2 focus:ring-ring/30 sm:text-sm"
+                className="h-11 w-full rounded-lg border border-border bg-background px-3 text-base outline-hidden focus:ring-2 focus:ring-ring/30 sm:text-sm"
               />
             </label>
             {tipo === "cierre" && (
@@ -277,7 +277,7 @@ export function ContarEfectivo({
                     inputMode="decimal"
                     value={fondo}
                     onChange={(e) => setFondo(e.target.value.replace(/[^\d.]/g, ""))}
-                    className="w-full min-w-0 bg-transparent text-base tabular-nums outline-none sm:text-sm"
+                    className="w-full min-w-0 bg-transparent text-base tabular-nums outline-hidden sm:text-sm"
                   />
                 </div>
               </label>

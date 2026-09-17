@@ -146,7 +146,7 @@ function NavList({ permisos, onNavigate }: { permisos: Set<string>; onNavigate?:
                 {/* Only the folded rail needs names beside its icons. */}
                 <Tooltip.Portal>
                   <Tooltip.Positioner side="right" sideOffset={10} className="z-50 hidden nav-compacto:xl:block">
-                    <Tooltip.Popup className="origin-[var(--transform-origin)] rounded-md bg-foreground px-2.5 py-1.5 text-xs font-medium text-background shadow-pop transition-[transform,opacity] duration-150 data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:scale-95 data-[starting-style]:opacity-0">
+                    <Tooltip.Popup className="origin-(--transform-origin) rounded-md bg-foreground px-2.5 py-1.5 text-xs font-medium text-background shadow-pop transition-[transform,opacity] duration-150 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0">
                       {label}
                     </Tooltip.Popup>
                   </Tooltip.Positioner>
@@ -243,7 +243,7 @@ export function AppShell({
           </aside>
 
           {/* Mobile top bar */}
-          <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-border bg-background/80 px-3 backdrop-blur xl:hidden">
+          <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-border bg-background/80 px-3 backdrop-blur-sm xl:hidden">
             <div className="brand-gradient absolute inset-x-0 top-0 h-[2px]" />
             <button
               onClick={() => setOpen(true)}
@@ -305,7 +305,7 @@ function alternarNav() {
 export function HeaderPublico({ children }: { children: React.ReactNode }) {
   return (
         <div className="min-h-screen">
-          <header className="sticky top-0 z-30 border-b border-border bg-background/80 backdrop-blur">
+          <header className="sticky top-0 z-30 border-b border-border bg-background/80 backdrop-blur-sm">
             <div className="brand-gradient h-[2px] w-full" />
             <div className="mx-auto flex h-14 max-w-6xl items-center gap-2 px-3 sm:px-6">
               <Link href="/" className="flex shrink-0 items-center" aria-label={`${MARCA.nombre} — inicio`}>

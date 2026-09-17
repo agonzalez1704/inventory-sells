@@ -177,7 +177,7 @@ export function AjusteStock({
                     onFocus={(e) => e.target.select()}
                     onChange={(e) => setContado(e.target.value.replace(/[^\d]/g, "").slice(0, 6))}
                     onKeyDown={(e) => e.key === "Enter" && guardar()}
-                    className="w-full min-w-0 flex-1 bg-transparent text-center text-2xl font-semibold tabular-nums outline-none"
+                    className="w-full min-w-0 flex-1 bg-transparent text-center text-2xl font-semibold tabular-nums outline-hidden"
                   />
                   <button
                     type="button"
@@ -223,7 +223,7 @@ export function AjusteStock({
               rows={3}
               maxLength={500}
               placeholder="Ej. faltó una al contar el cajón B"
-              className="w-full resize-none rounded-xl border border-border bg-background p-3 text-base outline-none focus:ring-2 focus:ring-ring/30 sm:text-sm"
+              className="w-full resize-none rounded-xl border border-border bg-background p-3 text-base outline-hidden focus:ring-2 focus:ring-ring/30 sm:text-sm"
             />
           </label>
         </div>
@@ -232,7 +232,7 @@ export function AjusteStock({
           <Button variant="secondary" className="hidden h-12 flex-1 sm:inline-flex" onClick={onClose} disabled={pending}>
             Cancelar
           </Button>
-          <Button className="h-12 flex-[2] text-base sm:text-sm" onClick={guardar} loading={pending} disabled={!puedeGuardar}>
+          <Button className="h-12 flex-2 text-base sm:text-sm" onClick={guardar} loading={pending} disabled={!puedeGuardar}>
             Guardar ajuste{n != null && delta !== 0 && ` · queda en ${n}`}
           </Button>
         </div>

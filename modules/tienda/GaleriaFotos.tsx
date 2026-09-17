@@ -18,7 +18,7 @@ export function GaleriaFotos({ imagenes, alt }: { imagenes: string[]; alt: strin
     <div>
       {/* Phone: edge to edge and shorter (4:3), so the quality choice is
           still on the first screen. */}
-      <div className="flex aspect-[4/3] items-center justify-center overflow-hidden border-y border-border bg-background sm:aspect-square sm:rounded-3xl sm:border">
+      <div className="flex aspect-4/3 items-center justify-center overflow-hidden border-y border-border bg-background sm:aspect-square sm:rounded-3xl sm:border">
         {actual ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -27,7 +27,7 @@ export function GaleriaFotos({ imagenes, alt }: { imagenes: string[]; alt: strin
             className="h-full w-full object-contain p-4"
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-tienda-50 to-slate-50 text-tienda-300">
+          <div className="flex h-full w-full items-center justify-center bg-linear-to-br from-tienda-50 to-slate-50 text-tienda-300">
             <Smartphone className="h-24 w-24" />
           </div>
         )}

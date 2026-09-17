@@ -121,7 +121,7 @@ export function EscanerQR({ onCodigo, onClose }: { onCodigo: (texto: string) => 
   return (
     <div className="fixed inset-0 z-50 bg-black text-white" role="dialog" aria-modal="true" aria-label="Escanear QR">
       <video ref={video} playsInline muted className="absolute inset-0 h-full w-full object-cover" />
-      <div className="absolute inset-x-0 top-0 flex h-16 items-center justify-between bg-gradient-to-b from-black/70 to-transparent px-2 pt-[env(safe-area-inset-top)]">
+      <div className="absolute inset-x-0 top-0 flex h-16 items-center justify-between bg-linear-to-b from-black/70 to-transparent px-2 pt-[env(safe-area-inset-top)]">
         <button
           type="button"
           onClick={onClose}

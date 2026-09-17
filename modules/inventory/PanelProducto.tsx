@@ -433,7 +433,7 @@ function TabInfo({
     <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_260px]">
       <div className="min-w-0 space-y-4">
         <div className="flex gap-2">
-          <div className="flex aspect-[4/3] min-w-0 flex-1 items-center justify-center overflow-hidden rounded-xl border border-border bg-muted/40">
+          <div className="flex aspect-4/3 min-w-0 flex-1 items-center justify-center overflow-hidden rounded-xl border border-border bg-muted/40">
             {fotos[sel] ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={urlFoto(fotos[sel], 828)} alt={p.name} className="h-full w-full object-contain" />
@@ -474,7 +474,7 @@ function TabInfo({
       </div>
 
       {/* On phones stock comes first: it is what people open the product for. */}
-      <div className="order-first space-y-3 md:order-none">
+      <div className="order-first space-y-3 md:order-0">
         <div className="rounded-xl border border-border bg-muted/30 p-4">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">En existencia</p>
           <p className="mt-1 flex items-baseline gap-1.5">
@@ -595,7 +595,7 @@ function PuntoReorden({
               onChange={(e) => setValor(e.target.value.replace(/[^\d]/g, ""))}
               onKeyDown={(e) => e.key === "Enter" && guardar()}
               placeholder="5"
-              className="h-10 w-20 rounded-lg border border-border bg-background px-3 text-base tabular-nums outline-none focus:ring-2 focus:ring-ring/30"
+              className="h-10 w-20 rounded-lg border border-border bg-background px-3 text-base tabular-nums outline-hidden focus:ring-2 focus:ring-ring/30"
             />
             <span className="text-sm text-muted-foreground">piezas</span>
           </div>
@@ -871,7 +871,7 @@ function TabNotas({ productId }: { productId: string }) {
           rows={3}
           maxLength={2000}
           placeholder="Escribe una nota para el equipo sobre esta pieza…"
-          className="w-full resize-none rounded-lg border border-dashed border-border bg-background p-3 text-base outline-none focus:border-solid focus:ring-2 focus:ring-ring/30 sm:text-sm"
+          className="w-full resize-none rounded-lg border border-dashed border-border bg-background p-3 text-base outline-hidden focus:border-solid focus:ring-2 focus:ring-ring/30 sm:text-sm"
         />
         <div className="mt-2 flex justify-end">
           <Button size="sm" className="h-9" onClick={guardar} loading={pending} disabled={!texto.trim()}>

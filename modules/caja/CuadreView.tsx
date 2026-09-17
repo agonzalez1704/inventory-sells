@@ -171,7 +171,7 @@ export function CuadreView({
       </nav>
 
       {c.sucursales.length > 1 && (
-        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:px-0">
+        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 scrollbar-none sm:mx-0 sm:px-0">
           {c.sucursales.map((s) => (
             <Link
               key={s.id}
@@ -192,7 +192,7 @@ export function CuadreView({
         <Link href={href({ dia: diaMas(-7) })} aria-label="Semana anterior" className={cn("hidden w-9 shrink-0 items-center justify-center rounded-xl border border-border hover:bg-muted sm:flex")}>
           <ChevronLeft className="h-4 w-4" />
         </Link>
-        <div ref={semanaRef} className="-mx-4 flex min-w-0 flex-1 gap-2 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:grid sm:grid-cols-7 sm:px-0">
+        <div ref={semanaRef} className="-mx-4 flex min-w-0 flex-1 gap-2 overflow-x-auto px-4 scrollbar-none sm:mx-0 sm:grid sm:grid-cols-7 sm:px-0">
           {c.semana.map((d) => {
             const on = d.fecha === c.fecha;
             const vacio = d.estado === "sin_movimientos";
@@ -201,7 +201,7 @@ export function CuadreView({
                 key={d.fecha}
                 href={href({ dia: d.fecha })}
                 className={cn(
-                  "flex min-w-[6.5rem] shrink-0 flex-col gap-1.5 rounded-xl border bg-background px-3 py-2.5 hover:bg-muted/50",
+                  "flex min-w-26 shrink-0 flex-col gap-1.5 rounded-xl border bg-background px-3 py-2.5 hover:bg-muted/50",
                   on ? "border-foreground ring-1 ring-foreground" : "border-border",
                   vacio && !on && "opacity-55",
                 )}
@@ -506,7 +506,7 @@ function FilaConteo({ c, primero }: { c: ConteoCaja; primero: boolean }) {
         </span>
       </li>
       {primero && !ok && c.tipo === "conteo" && (
-        <li className="flex items-center gap-1.5 px-4 py-1.5 text-xs text-amber-700 sm:pl-[8.5rem] dark:text-amber-400">
+        <li className="flex items-center gap-1.5 px-4 py-1.5 text-xs text-amber-700 sm:pl-34 dark:text-amber-400">
           La diferencia ya existía a las {hora(c.createdAt)}: busca en los movimientos de arriba.
         </li>
       )}

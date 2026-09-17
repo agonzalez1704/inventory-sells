@@ -97,7 +97,7 @@ export default async function TiendaLayout({
       {/* Utility bar — not on phones: the same promises sit on the product
           page and at the foot of the catalog, and here they cost 36px above
           the search on every screen. */}
-      <div className="hidden bg-gradient-to-r from-tienda-800 to-tienda-900 text-tienda-50 sm:block">
+      <div className="hidden bg-linear-to-r from-tienda-800 to-tienda-900 text-tienda-50 sm:block">
         <div className="mx-auto flex h-9 max-w-6xl items-center justify-between px-4 text-xs sm:px-6">
           <span className="inline-flex items-center gap-1.5">
             <ShieldCheck className="h-3.5 w-3.5" />
@@ -131,7 +131,7 @@ export default async function TiendaLayout({
       </div>
 
       {/* Header */}
-      <header className="sticky top-0 z-30 border-b border-tienda-100 dark:border-tienda-900 bg-white/85 backdrop-blur">
+      <header className="sticky top-0 z-30 border-b border-tienda-100 dark:border-tienda-900 bg-white/85 backdrop-blur-sm">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6 xl:max-w-7xl">
           <Wordmark />
           {/* Desktop search. Suspense: it reads the URL's query, and without a

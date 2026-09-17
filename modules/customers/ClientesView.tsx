@@ -572,7 +572,7 @@ function TelefonosExtra({
             onClick={() => remove(p.id)}
             disabled={pending}
             aria-label={`Quitar ${p.telefono}`}
-            className="cursor-pointer rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-red-600 dark:hover:text-red-400"
+            className="cursor-pointer rounded-sm p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-red-600 dark:hover:text-red-400"
           >
             <X className="h-3.5 w-3.5" />
           </button>

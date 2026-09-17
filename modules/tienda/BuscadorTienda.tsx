@@ -167,7 +167,7 @@ export function BuscadorTienda({
             autoComplete="off"
             // 16px text: smaller makes iOS zoom the page on focus.
             className={cn(
-              "h-12 w-full rounded-xl border bg-background pl-11 pr-12 text-base text-foreground outline-none placeholder:text-muted-foreground [&::-webkit-search-cancel-button]:hidden",
+              "h-12 w-full rounded-xl border bg-background pl-11 pr-12 text-base text-foreground outline-hidden placeholder:text-muted-foreground [&::-webkit-search-cancel-button]:hidden",
               abierto ? "border-tienda-500 ring-4 ring-tienda-100" : "border-border",
             )}
           />
