@@ -631,22 +631,24 @@ function PuntoReorden({
 function EtiquetaQR({ id }: { id: string }) {
   const svg = useMemo(() => renderSVG(enlaceProducto(window.location.origin, id), { border: 2 }), [id]);
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-border p-3">
-      <div
-        className="h-16 w-16 shrink-0 rounded-md bg-white p-1 [&>svg]:h-full [&>svg]:w-full"
-        // uqr's own <svg>, built from this site's product link.
-        dangerouslySetInnerHTML={{ __html: svg }}
-      />
-      <div className="min-w-0 flex-1">
-        <p className="text-[15px] font-semibold">Etiqueta QR</p>
-        <p className="text-xs text-muted-foreground">Pégala en el anaquel: al escanearla abre este producto.</p>
+    <div className="rounded-xl border border-border p-4">
+      <div className="flex items-center gap-3">
+        <div
+          className="h-16 w-16 shrink-0 rounded-md bg-white [&>svg]:h-full [&>svg]:w-full"
+          // uqr's own <svg>, built from this site's product link.
+          dangerouslySetInnerHTML={{ __html: svg }}
+        />
+        <div className="min-w-0">
+          <p className="text-[15px] font-semibold">Etiqueta QR</p>
+          <p className="text-xs leading-snug text-muted-foreground">Al escanearla abre este producto.</p>
+        </div>
       </div>
       <Link
         href={`/etiquetas?ids=${id}`}
-        className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-border px-3 text-sm font-medium hover:bg-muted"
+        className="mt-3 inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-lg border border-border text-sm font-medium hover:bg-muted"
       >
         <Printer className="h-4 w-4" />
-        Imprimir
+        Imprimir etiqueta
       </Link>
     </div>
   );
