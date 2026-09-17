@@ -34,6 +34,8 @@ import {
   Presentation as PresentationIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Tooltip } from "@base-ui/react/tooltip";
+import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
 import type { Permiso } from "@/lib/permissions";
 import { Logo } from "@/components/logo";
 import { AsesorNavBadge } from "@/components/asesor-nav-badge";
@@ -100,6 +102,7 @@ function NavList({ permisos, onNavigate }: { permisos: Set<string>; onNavigate?:
     (g) => g.links.length > 0,
   );
   return (
+    <Tooltip.Provider delay={120}>
     <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-4 nav-compacto:xl:px-2">
       {grupos.map((g) => (
         <div key={g.label}>
@@ -110,12 +113,9 @@ function NavList({ permisos, onNavigate }: { permisos: Set<string>; onNavigate?:
             {g.links.map(({ href, label, icon: Icon }) => {
               const active = pathname.startsWith(href);
               return (
-                <Link
-                  key={href}
-                  href={href}
-                  onClick={onNavigate}
-                  aria-current={active ? "page" : undefined}
-                  title={label}
+                <Tooltip.Root key={href}>
+                <Tooltip.Trigger
+                  render={<Link href={href} onClick={onNavigate} aria-current={active ? "page" : undefined} />}
                   className={cn(
                     "relative flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors nav-compacto:xl:justify-center",
                     active
@@ -130,13 +130,23 @@ function NavList({ permisos, onNavigate }: { permisos: Set<string>; onNavigate?:
                       <AsesorNavBadge />
                     </span>
                   )}
-                </Link>
+                </Tooltip.Trigger>
+                {/* Only the folded rail needs names beside its icons. */}
+                <Tooltip.Portal>
+                  <Tooltip.Positioner side="right" sideOffset={10} className="z-50 hidden nav-compacto:xl:block">
+                    <Tooltip.Popup className="origin-[var(--transform-origin)] rounded-md bg-foreground px-2.5 py-1.5 text-xs font-medium text-background shadow-pop transition-[transform,opacity] duration-150 data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:scale-95 data-[starting-style]:opacity-0">
+                      {label}
+                    </Tooltip.Popup>
+                  </Tooltip.Positioner>
+                </Tooltip.Portal>
+                </Tooltip.Root>
               );
             })}
           </div>
         </div>
       ))}
     </nav>
+    </Tooltip.Provider>
   );
 }
 
@@ -240,30 +250,24 @@ export function AppShell({
           </header>
 
           {/* Mobile drawer */}
-          {open && (
-            <div className="fixed inset-0 z-50 xl:hidden">
-              <button
-                aria-label="Cerrar menú"
-                onClick={() => setOpen(false)}
-                className="absolute inset-0 cursor-default bg-slate-900/40 backdrop-blur-sm"
-              />
-              <div className="absolute inset-y-0 left-0 flex w-64 max-w-[82%] flex-col border-r border-border bg-background shadow-pop">
-                <div className="flex h-14 shrink-0 items-center justify-between border-b border-border px-4">
-                  <Logo className="h-6 w-auto text-foreground" />
-                  <button
-                    onClick={() => setOpen(false)}
-                    aria-label="Cerrar menú"
-                    className="cursor-pointer rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-                <Suspense fallback={<NavFallback />}>
-                  <NavListAsync permisos={permisos} onNavigate={() => setOpen(false)} />
-                </Suspense>
+          <Drawer open={open} onOpenChange={setOpen} swipeDirection="left">
+            <DrawerContent className="xl:hidden data-[swipe-direction=left]:w-[min(16rem,82vw)]">
+              <div className="flex h-14 shrink-0 items-center justify-between border-b border-border px-4">
+                <Logo className="h-6 w-auto text-foreground" />
+                <DrawerTitle className="sr-only">Menú</DrawerTitle>
+                <button
+                  onClick={() => setOpen(false)}
+                  aria-label="Cerrar menú"
+                  className="cursor-pointer rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                >
+                  <X className="h-4 w-4" />
+                </button>
               </div>
-            </div>
-          )}
+              <Suspense fallback={<NavFallback />}>
+                <NavListAsync permisos={permisos} onNavigate={() => setOpen(false)} />
+              </Suspense>
+            </DrawerContent>
+          </Drawer>
 
           <main className="min-w-0 xl:pl-56 nav-compacto:xl:pl-16">{children}</main>
         </>

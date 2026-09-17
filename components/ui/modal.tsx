@@ -1,9 +1,10 @@
 "use client";
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Drawer } from "@/components/ui/drawer";
+import { Hoja } from "@/components/ui/drawer";
 import { useIsMobile } from "@/components/use-is-mobile";
 
 type ModalProps = {
@@ -34,9 +35,9 @@ export function Modal({ drawerClassName, ...props }: ModalProps) {
   if (isMobile) {
     const { open, onClose, title, children } = props;
     return (
-      <Drawer open={open} onClose={onClose} title={title} className={drawerClassName}>
+      <Hoja open={open} onClose={onClose} title={title} className={drawerClassName}>
         {children}
-      </Drawer>
+      </Hoja>
     );
   }
   return <DesktopModal {...props} />;
@@ -64,7 +65,9 @@ function DesktopModal({
 
   if (!open) return null;
 
-  return (
+  // Portaled like the drawers are, so a modal opened from inside one (Editar
+  // on the product panel) stacks above it instead of under it.
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 backdrop-blur-sm sm:p-8"
       onClick={onClose}
@@ -95,6 +98,7 @@ function DesktopModal({
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto p-5">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

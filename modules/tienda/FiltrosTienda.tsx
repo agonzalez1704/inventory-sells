@@ -1,5 +1,6 @@
 "use client";
 
+import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
 import { useEffect, useState } from "react";
 import { Check, Loader2, SlidersHorizontal, X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -431,28 +432,11 @@ export function HojaFiltros({
   pending: boolean;
   children: React.ReactNode;
 }) {
-  useEffect(() => {
-    if (!abierta) return;
-    const previo = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const esc = (e: KeyboardEvent) => e.key === "Escape" && onCerrar();
-    window.addEventListener("keydown", esc);
-    return () => {
-      document.body.style.overflow = previo;
-      window.removeEventListener("keydown", esc);
-    };
-  }, [abierta, onCerrar]);
-
-  if (!abierta) return null;
   return (
-    <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Filtros">
-      <button type="button" aria-label="Cerrar filtros" className="absolute inset-0 bg-black/45" onClick={onCerrar} />
-      <div className="absolute inset-x-0 bottom-0 top-16 flex flex-col rounded-t-2xl bg-background">
-        <div className="flex justify-center pt-2">
-          <span className="h-1.5 w-10 rounded-full bg-muted-foreground/25" />
-        </div>
+    <Drawer open={abierta} onOpenChange={(o) => !o && onCerrar()} showSwipeHandle>
+      <DrawerContent className="lg:hidden data-[swipe-direction=down]:top-16 data-[swipe-direction=down]:max-h-none">
         <div className="flex items-center justify-between px-4 pt-1">
-          <h2 className="text-lg font-semibold tracking-tight">Filtros</h2>
+          <DrawerTitle className="text-lg font-semibold tracking-tight">Filtros</DrawerTitle>
           <button
             type="button"
             onClick={onLimpiar}
@@ -472,8 +456,8 @@ export function HojaFiltros({
             {pie}
           </button>
         </div>
-      </div>
-    </div>
+      </DrawerContent>
+    </Drawer>
   );
 }
 

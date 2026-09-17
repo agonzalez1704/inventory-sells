@@ -51,6 +51,8 @@
   }
 
   body {
+    /* Base UI drawers: iOS Safari's backdrop is absolute and needs a positioned body. */
+    position: relative;
     background-color: hsl(var(--page));
     color: hsl(var(--foreground));
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";

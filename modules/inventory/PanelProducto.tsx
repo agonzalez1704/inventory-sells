@@ -29,6 +29,7 @@ import { Badge } from "@/components/ui/badge";
 import { renderSVG } from "uqr";
 import { enlaceProducto } from "./qr";
 import { Button } from "@/components/ui/button";
+import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
 import type { CardexResumen, MovimientoCardex } from "@/modules/cardex/actions";
 import {
   agregarNota,
@@ -65,8 +66,10 @@ export function PanelProducto({
   verCostos,
   onEditar,
   onFoto,
+  bloqueado = false,
 }: {
-  productId: string;
+  /** null = closed; the last product stays rendered while the panel slides out. */
+  productId: string | null;
   /** Ids of the list as shown, for ‹ ›. */
   ids: string[];
   onNavegar: (id: string) => void;
@@ -75,8 +78,13 @@ export function PanelProducto({
   verCostos: boolean;
   onEditar: (id: string) => void;
   onFoto: (p: { id: string; name: string; image_url: string | null }) => void;
+  /** A modal opened from the panel is on top: no focus trap, no dismissal. */
+  bloqueado?: boolean;
 }) {
   const router = useRouter();
+  const abierto = productId != null;
+  const [id, setId] = useState(productId);
+  if (productId && productId !== id) setId(productId);
   const [p, setP] = useState<DetalleProducto | null>(null);
   const [tab, setTab] = useState<Tab>("info");
   const [menu, setMenu] = useState(false);
@@ -87,7 +95,8 @@ export function PanelProducto({
 
   const cargar = useCallback(() => {
     let vivo = true;
-    detalleProducto(productId)
+    if (!id) return;
+    detalleProducto(id)
       .then((d) => {
         if (!vivo) return;
         setP(d);
@@ -97,7 +106,7 @@ export function PanelProducto({
     return () => {
       vivo = false;
     };
-  }, [productId]);
+  }, [id]);
 
   useEffect(() => {
     setP(null);
@@ -106,28 +115,24 @@ export function PanelProducto({
     return cargar();
   }, [cargar]);
 
-  const i = ids.indexOf(productId);
+  const i = id ? ids.indexOf(id) : -1;
   const anterior = i > 0 ? ids[i - 1] : null;
   const siguiente = i >= 0 && i < ids.length - 1 ? ids[i + 1] : null;
 
-  // Escape closes; arrows walk the list — unless the user is typing a note.
+  // Arrows walk the list — unless the user is typing or something is on top.
+  // (Escape, scroll lock and focus belong to the drawer.)
   useEffect(() => {
-    const previo = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    if (!abierto) return;
     const tecla = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
-      if (ajustando) return;
+      if (ajustando || bloqueado) return;
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT")) return;
-      if (e.key === "Escape") onClose();
-      else if (e.key === "ArrowLeft" && anterior) onNavegar(anterior);
+      if (e.key === "ArrowLeft" && anterior) onNavegar(anterior);
       else if (e.key === "ArrowRight" && siguiente) onNavegar(siguiente);
     };
     window.addEventListener("keydown", tecla);
-    return () => {
-      document.body.style.overflow = previo;
-      window.removeEventListener("keydown", tecla);
-    };
-  }, [onClose, onNavegar, anterior, siguiente, ajustando]);
+    return () => window.removeEventListener("keydown", tecla);
+  }, [abierto, onNavegar, anterior, siguiente, ajustando, bloqueado]);
 
   function toggleActivo() {
     if (!p) return;
@@ -161,14 +166,17 @@ export function PanelProducto({
   }
 
   return (
-    <div className="fixed inset-0 z-40">
-      <button type="button" aria-label="Cerrar" className="absolute inset-0 hidden bg-black/40 sm:block" onClick={onClose} />
-      <aside
-        role="dialog"
-        aria-modal="true"
+    <Drawer
+      open={abierto}
+      onOpenChange={(o) => !o && !bloqueado && onClose()}
+      swipeDirection="right"
+      modal={!bloqueado}
+    >
+      <DrawerContent
         aria-label={p?.name ?? "Producto"}
-        className="absolute inset-0 flex flex-col bg-background shadow-2xl sm:left-auto sm:w-[min(780px,100%)] sm:border-l sm:border-border"
+        className="data-[swipe-direction=right]:w-[min(780px,100vw)]"
       >
+        <DrawerTitle className="sr-only">{p?.name ?? "Producto"}</DrawerTitle>
         {/* Header actions */}
         <div className="flex items-center gap-2 border-b border-border px-3 py-2.5 sm:px-5">
           <Button variant="ghost" size="icon" onClick={onClose} aria-label="Cerrar panel">
@@ -335,8 +343,9 @@ export function PanelProducto({
             </>
           )}
         </div>
-        {p && ajustando && (
+        {p && (
           <AjusteStock
+            open={ajustando}
             producto={p}
             onClose={() => setAjustando(false)}
             onAjustado={(cantidad) => {
@@ -347,8 +356,8 @@ export function PanelProducto({
             }}
           />
         )}
-      </aside>
-    </div>
+      </DrawerContent>
+    </Drawer>
   );
 }
 

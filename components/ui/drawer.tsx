@@ -1,54 +1,163 @@
 "use client";
 
 import * as React from "react";
-import { Drawer as Vaul } from "vaul";
+import { Drawer as DrawerPrimitive } from "@base-ui/react/drawer";
 import { cn } from "@/lib/utils";
 
-/**
- * How much room is left above the software keyboard, and how tall it is.
- *
- * iOS does not shrink the layout viewport when the keyboard opens — it covers
- * it. So `bottom: 0` is behind the keyboard, and any height in vh or dvh still
- * measures the whole screen. visualViewport is the only thing that reports what
- * is actually visible.
- *
- * Returns nulls until measured, so the server render and the first paint use
- * the CSS fallback instead of guessing a number that would flash.
- */
-function useAreaVisible(activo: boolean) {
-  const [v, setV] = React.useState<{ alto: number; teclado: number } | null>(null);
+// shadcn's Base UI drawer (ui.shadcn.com/docs/components/drawer), translated
+// to this repo's Tailwind 3 (arbitrary data-[…] variants instead of v4's
+// data-starting-style:, var() instead of (--x)) and its color tokens.
+// Slides in and out, swipes to dismiss, and stacks nested drawers.
 
-  React.useEffect(() => {
-    const vv = typeof window !== "undefined" ? window.visualViewport : null;
-    if (!activo || !vv) return;
+type Direccion = NonNullable<DrawerPrimitive.Root.Props["swipeDirection"]>;
 
-    const medir = () => {
-      // What the keyboard covers: everything the layout viewport has that the
-      // visual one does not, minus whatever it has been scrolled by.
-      const teclado = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
-      setV({ alto: vv.height, teclado });
-    };
+const DrawerContext = React.createContext<{ swipeDirection: Direccion; showSwipeHandle: boolean }>({
+  swipeDirection: "down",
+  showSwipeHandle: false,
+});
 
-    medir();
-    vv.addEventListener("resize", medir);
-    vv.addEventListener("scroll", medir);
-    return () => {
-      vv.removeEventListener("resize", medir);
-      vv.removeEventListener("scroll", medir);
-    };
-  }, [activo]);
-
-  return v;
+function Drawer({
+  swipeDirection = "down",
+  showSwipeHandle = false,
+  ...props
+}: DrawerPrimitive.Root.Props & { showSwipeHandle?: boolean }) {
+  const ctx = React.useMemo(() => ({ swipeDirection, showSwipeHandle }), [swipeDirection, showSwipeHandle]);
+  return (
+    <DrawerContext.Provider value={ctx}>
+      <DrawerPrimitive.Root data-slot="drawer" swipeDirection={swipeDirection} {...props} />
+    </DrawerContext.Provider>
+  );
 }
 
-// What the sheet gives back at the top: the grab handle's own box, mt-2.5 (10px)
-// plus h-1.5 (6px). The sheet is otherwise as tall as the visible area, so this
-// sliver of overlay is the only thing saying it is a sheet and not a page — and
-// it is where a thumb reaches to drag it shut.
-const RESPIRO_HANDLE = 16;
+const DrawerTrigger = DrawerPrimitive.Trigger;
+const DrawerClose = DrawerPrimitive.Close;
+const DrawerPortal = DrawerPrimitive.Portal;
 
-// Bottom drawer (vaul / shadcn-style) — the mobile counterpart to Modal.
-export function Drawer({
+function DrawerOverlay({ className, ...props }: DrawerPrimitive.Backdrop.Props) {
+  return (
+    <DrawerPrimitive.Backdrop
+      data-slot="drawer-overlay"
+      className={cn(
+        "fixed inset-0 z-50 min-h-dvh select-none bg-slate-950/45 opacity-[calc(1-var(--drawer-swipe-progress,0))] transition-opacity duration-[450ms] ease-[cubic-bezier(0.32,0.72,0,1)]",
+        "data-[ending-style]:pointer-events-none data-[ending-style]:opacity-0 data-[ending-style]:duration-[calc(var(--drawer-swipe-strength,1)*400ms)] data-[starting-style]:opacity-0 data-[swiping]:duration-0",
+        // iOS Safari: fixed backdrops stop short once the page has scrolled.
+        "supports-[-webkit-touch-callout:none]:absolute",
+        className,
+      )}
+      {...props}
+    />
+  );
+}
+
+function DrawerSwipeHandle({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="drawer-swipe-handle"
+      aria-hidden="true"
+      className={cn(
+        "flex h-5 w-full shrink-0 cursor-grab items-end justify-center active:cursor-grabbing",
+        "after:block after:h-1.5 after:w-10 after:rounded-full after:bg-muted-foreground/30 after:content-['']",
+        className,
+      )}
+      {...props}
+    />
+  );
+}
+
+const POPUP = [
+  "group/drawer-popup pointer-events-auto fixed z-50 flex min-h-0 flex-col bg-background text-foreground shadow-2xl outline-none",
+  "[transform:translate3d(var(--translate-x,0px),var(--translate-y,0px),0)_scale(var(--stack-scale,1))] transition-[transform,height,opacity,filter] duration-[450ms] ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform",
+  // Nested drawers: the ones behind shrink and peek out.
+  "[--peek:1rem] [--stack-step:0.05] [--stack-progress:clamp(0,var(--drawer-swipe-progress,0),1)] [--stack-peek-offset:max(0px,calc((var(--nested-drawers,0)-var(--stack-progress))*var(--peek)))] [--stack-scale-base:max(0,calc(1-(var(--nested-drawers,0)*var(--stack-step))))] [--stack-scale:clamp(0,calc(var(--stack-scale-base)+(var(--stack-step)*var(--stack-progress))),1)] [--stack-shrink:calc(1-var(--stack-scale))]",
+  "data-[nested-drawer-open]:brightness-95",
+  // Enter / exit / swipe.
+  "data-[starting-style]:[transform:var(--closed-transform)] data-[ending-style]:[transform:var(--closed-transform)] data-[ending-style]:opacity-[0.9999] data-[ending-style]:duration-[calc(var(--drawer-swipe-strength,1)*400ms)] data-[swiping]:duration-0 data-[nested-drawer-swiping]:duration-0",
+  // Overshoot on a swipe shows the drawer's own color, not the page.
+  "after:pointer-events-none after:absolute after:bg-background after:content-['']",
+  // Down: bottom sheet.
+  "data-[swipe-direction=down]:inset-x-0 data-[swipe-direction=down]:bottom-0 data-[swipe-direction=down]:max-h-[calc(100dvh-3rem)] data-[swipe-direction=down]:origin-bottom data-[swipe-direction=down]:rounded-t-2xl data-[swipe-direction=down]:border-t data-[swipe-direction=down]:border-border",
+  "data-[swipe-direction=down]:[--closed-transform:translate3d(0,calc(100%+2px),0)] data-[swipe-direction=down]:[--translate-y:calc(var(--drawer-swipe-movement-y,0px)-var(--stack-peek-offset)-(var(--stack-shrink)*var(--drawer-frontmost-height,var(--drawer-height,0px))))]",
+  "data-[swipe-direction=down]:after:inset-x-0 data-[swipe-direction=down]:after:top-full data-[swipe-direction=down]:after:h-12",
+  // Right: side panel.
+  "data-[swipe-direction=right]:inset-y-0 data-[swipe-direction=right]:right-0 data-[swipe-direction=right]:w-[min(24rem,88vw)] data-[swipe-direction=right]:origin-right data-[swipe-direction=right]:border-l data-[swipe-direction=right]:border-border",
+  "data-[swipe-direction=right]:[--closed-transform:translate3d(calc(100%+2px),0,0)] data-[swipe-direction=right]:[--translate-x:calc(var(--drawer-swipe-movement-x,0px)-var(--stack-peek-offset)-(var(--stack-shrink)*100%))]",
+  "data-[swipe-direction=right]:after:inset-y-0 data-[swipe-direction=right]:after:left-full data-[swipe-direction=right]:after:w-12",
+  // Left: navigation.
+  "data-[swipe-direction=left]:inset-y-0 data-[swipe-direction=left]:left-0 data-[swipe-direction=left]:w-[min(18rem,85vw)] data-[swipe-direction=left]:origin-left data-[swipe-direction=left]:border-r data-[swipe-direction=left]:border-border",
+  "data-[swipe-direction=left]:[--closed-transform:translate3d(calc(-100%-2px),0,0)] data-[swipe-direction=left]:[--translate-x:calc(var(--drawer-swipe-movement-x,0px)+var(--stack-peek-offset)+(var(--stack-shrink)*100%))]",
+  "data-[swipe-direction=left]:after:inset-y-0 data-[swipe-direction=left]:after:right-full data-[swipe-direction=left]:after:w-12",
+].join(" ");
+
+function DrawerContent({
+  className,
+  children,
+  overlay = true,
+  ...props
+}: DrawerPrimitive.Popup.Props & {
+  /** A nested drawer skips its own overlay: the parent's already dims the page. */
+  overlay?: boolean;
+}) {
+  const { swipeDirection, showSwipeHandle } = React.useContext(DrawerContext);
+  return (
+    <DrawerPortal>
+      {overlay && <DrawerOverlay />}
+      <DrawerPrimitive.Viewport data-slot="drawer-viewport" className="pointer-events-none fixed inset-0 z-50 select-none">
+        <DrawerPrimitive.Popup
+          data-slot="drawer-popup"
+          data-swipe-direction={swipeDirection}
+          className={cn(POPUP, className)}
+          {...props}
+        >
+          {showSwipeHandle && <DrawerSwipeHandle />}
+          <DrawerPrimitive.Content
+            data-slot="drawer-content"
+            className="flex min-h-0 flex-1 select-text flex-col overflow-hidden rounded-[inherit] transition-opacity duration-300 [[data-swipe-direction=down][data-nested-drawer-open]_&]:opacity-0 group-data-[swiping]/drawer-popup:select-none"
+          >
+            {children}
+          </DrawerPrimitive.Content>
+        </DrawerPrimitive.Popup>
+      </DrawerPrimitive.Viewport>
+    </DrawerPortal>
+  );
+}
+
+function DrawerHeader({ className, ...props }: React.ComponentProps<"div">) {
+  return <div data-slot="drawer-header" className={cn("flex shrink-0 flex-col gap-1 px-5 pt-3", className)} {...props} />;
+}
+
+function DrawerFooter({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="drawer-footer"
+      className={cn("mt-auto flex shrink-0 flex-col gap-2 px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3", className)}
+      {...props}
+    />
+  );
+}
+
+function DrawerTitle({ className, ...props }: DrawerPrimitive.Title.Props) {
+  return <DrawerPrimitive.Title data-slot="drawer-title" className={cn("text-base font-semibold", className)} {...props} />;
+}
+
+function DrawerDescription({ className, ...props }: DrawerPrimitive.Description.Props) {
+  return (
+    <DrawerPrimitive.Description
+      data-slot="drawer-description"
+      className={cn("text-sm text-muted-foreground", className)}
+      {...props}
+    />
+  );
+}
+
+/**
+ * The app's form sheet (Modal's phone half, filter sheets): a bottom drawer
+ * with a title, sized to its content, aware of the software keyboard.
+ *
+ * Dismissal is the handle, the backdrop or Escape — not a drag on the body:
+ * on iOS the pinch that undoes an input's auto-zoom moves a finger down, and a
+ * half-filled form closing on that is the costliest accident a sheet can have.
+ */
+function Hoja({
   open,
   onClose,
   title,
@@ -61,85 +170,36 @@ export function Drawer({
   children: React.ReactNode;
   className?: string;
 }) {
-  const area = useAreaVisible(open);
-
   return (
-    <Vaul.Root
-      open={open}
-      onOpenChange={(o) => !o && onClose()}
-      /*
-        vaul's own keyboard handling is what broke this sheet.
-        On focus it sets an inline height on the drawer, and for a SHORT one —
-        anything under 80% of the screen, which every form in this app is — it
-        uses `visualViewportHeight - 26`. A three-field expense form was being
-        stretched to fill the entire visible viewport: title and buttons thrown
-        to the top, a blank expanse in the middle, the inputs behind the
-        keyboard.
-        The geometry below does the same job without the height heuristic, so
-        the sheet stays the size of its content.
-
-        This flag also gates vaul's own iOS scroll lock, which sounds like a
-        bad trade — it is not. Radix's Dialog sits underneath and brings
-        RemoveScroll, so the page behind stays put either way.
-      */
-      repositionInputs={false}
-      // Dismissal belongs to the handle, the backdrop and the X — not to any
-      // downward drag on the content. The reported chain: iOS auto-zooms on a
-      // small input, the pinch to undo the zoom puts one finger travelling
-      // down, vaul reads it as a dismiss drag, and a half-filled form is gone.
-      // Forms are exactly where accidental dismissal costs the most.
-      handleOnly
-    >
-      <Vaul.Portal>
-        <Vaul.Overlay className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm" />
-        <Vaul.Content
-          className={cn(
-            // dvh, not vh: on iOS `vh` measures the viewport as if the browser
-            // chrome weren't there, so a 94vh sheet is taller than the screen
-            // actually is and its top starts off-screen. Only the fallback —
-            // once visualViewport reports, the inline values win.
-            "fixed inset-x-0 bottom-0 z-50 flex max-h-[calc(100dvh-16px)] flex-col rounded-t-2xl border-t border-border bg-background outline-none",
-            className,
-          )}
-          style={
-            area
-              ? {
-                  // Sit on top of the keyboard rather than behind it, and never
-                  // be taller than what is left above it.
-                  bottom: area.teclado,
-                  maxHeight: area.alto - RESPIRO_HANDLE,
-                }
-              : undefined
-          }
-        >
-          {/* Vaul's own Handle, not a decorative div: with handleOnly, this
-              is the one place a drag can dismiss from. Larger hit area than
-              the visible pill, which is what a thumb actually needs. */}
-          <Vaul.Handle className="!mx-auto !mt-2.5 !h-1.5 !w-10 shrink-0 !rounded-full !bg-muted" />
-          <Vaul.Title className="shrink-0 px-5 pb-2 pt-3 text-sm font-semibold">
-            {title}
-          </Vaul.Title>
-          {/*
-            min-h-0 is what makes the sheet size to its content. A flex child
-            defaults to min-height:auto, so this scroller refuses to shrink below
-            its content and pushes the sheet to its full max height — leaving a
-            blank expanse under a short form, and putting the buttons off-screen
-            once the keyboard opens.
-          */}
+    <Drawer open={open} onOpenChange={(o) => !o && onClose()} showSwipeHandle>
+      <DrawerPrimitive.VirtualKeyboardProvider>
+        <DrawerContent className={className}>
+          <DrawerHeader className="pb-2">
+            <DrawerTitle className="text-sm">{title}</DrawerTitle>
+          </DrawerHeader>
           <div
-            className="min-h-0 flex-1 overflow-y-auto px-5 pb-6"
-            style={{
-              // The home indicator only needs clearing when nothing else is
-              // down there; with the keyboard up, that space is the keyboard's.
-              paddingBottom: area?.teclado
-                ? "1.5rem"
-                : "max(1.5rem, env(safe-area-inset-bottom))",
-            }}
+            data-base-ui-swipe-ignore
+            className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-[max(1.5rem,calc(env(safe-area-inset-bottom)+var(--drawer-keyboard-inset,0px)))]"
           >
             {children}
           </div>
-        </Vaul.Content>
-      </Vaul.Portal>
-    </Vaul.Root>
+        </DrawerContent>
+      </DrawerPrimitive.VirtualKeyboardProvider>
+    </Drawer>
   );
 }
+
+export {
+  Drawer,
+  DrawerTrigger,
+  DrawerClose,
+  DrawerPortal,
+  DrawerOverlay,
+  DrawerSwipeHandle,
+  DrawerContent,
+  DrawerHeader,
+  DrawerFooter,
+  DrawerTitle,
+  DrawerDescription,
+  Hoja,
+};

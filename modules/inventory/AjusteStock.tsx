@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { ArrowRight, Camera, Check, Minus, Plus, X } from "lucide-react";
 import { foto as urlFoto } from "@/lib/foto";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
+import { useIsMobile } from "@/components/use-is-mobile";
 import { ajustarStock, deshacerAjuste, type MotivoAjuste } from "./panel-actions";
 
 const MOTIVOS: [MotivoAjuste, string][] = [
@@ -24,10 +26,12 @@ const piezas = (n: number) => `${n} ${Math.abs(n) === 1 ? "pieza" : "piezas"}`;
  * "Deshacer". Desktop: a narrower panel on the right. Phone: a bottom sheet.
  */
 export function AjusteStock({
+  open,
   producto,
   onClose,
   onAjustado,
 }: {
+  open: boolean;
   producto: { id: string; name: string; image_url: string | null; quantity: number; inventario: string | null };
   onClose: () => void;
   /** New quantity after saving or undoing. */
@@ -38,18 +42,16 @@ export function AjusteStock({
   const [contado, setContado] = useState(String(enSistema));
   const [nota, setNota] = useState("");
   const [pending, start] = useTransition();
+  const isMobile = useIsMobile();
+  const input = useRef<HTMLInputElement>(null);
 
+  // Each opening starts from what the system says now.
   useEffect(() => {
-    const tecla = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.stopImmediatePropagation();
-        onClose();
-      }
-    };
-    // Capture: Escape closes this sheet, not the product panel under it.
-    window.addEventListener("keydown", tecla, true);
-    return () => window.removeEventListener("keydown", tecla, true);
-  }, [onClose]);
+    if (!open) return;
+    setMotivo("conteo");
+    setContado(String(producto.quantity));
+    setNota("");
+  }, [open, producto.id, producto.quantity]);
 
   const n = contado === "" ? null : Number(contado);
   const delta = n == null ? 0 : n - enSistema;
@@ -86,25 +88,27 @@ export function AjusteStock({
   }
 
   return (
-    <div className="absolute inset-0 z-10">
-      <button type="button" aria-label="Cerrar ajuste" className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <section
-        role="dialog"
-        aria-modal="true"
-        aria-label="Nuevo ajuste"
-        className="absolute inset-x-0 bottom-0 top-16 flex flex-col rounded-t-2xl bg-background shadow-2xl sm:inset-y-0 sm:left-auto sm:right-0 sm:top-0 sm:w-[min(440px,100%)] sm:rounded-none sm:border-l sm:border-border"
+    // Nested inside the product panel's drawer: the panel shrinks back behind it.
+    <Drawer
+      open={open}
+      onOpenChange={(o) => !o && onClose()}
+      swipeDirection={isMobile ? "down" : "right"}
+      showSwipeHandle={isMobile}
+    >
+      <DrawerContent
+        overlay={false}
+        // Desktop: straight to the count. Phone: the keyboard would hide the reasons.
+        initialFocus={isMobile ? undefined : input}
+        className="data-[swipe-direction=down]:top-16 data-[swipe-direction=down]:max-h-none data-[swipe-direction=right]:w-[min(440px,100vw)]"
       >
-        <div className="flex justify-center pt-2 sm:hidden">
-          <span className="h-1.5 w-10 rounded-full bg-muted-foreground/30" />
-        </div>
         <div className="flex items-center justify-between px-4 py-2.5 sm:px-6 sm:pt-5">
-          <h3 className="text-lg font-semibold sm:text-xl">Nuevo ajuste</h3>
+          <DrawerTitle className="text-lg font-semibold sm:text-xl">Nuevo ajuste</DrawerTitle>
           <Button variant="ghost" size="icon" onClick={onClose} aria-label="Cerrar">
             <X className="h-5 w-5" />
           </Button>
         </div>
 
-        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-4 pb-4 sm:px-6">
+        <div data-base-ui-swipe-ignore className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-4 pb-4 sm:px-6">
           <div className="flex items-center gap-3 rounded-xl border border-border bg-muted/30 p-3">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-background">
               {producto.image_url ? (
@@ -166,7 +170,7 @@ export function AjusteStock({
                     <Minus className="h-5 w-5" />
                   </button>
                   <input
-                    autoFocus
+                    ref={input}
                     inputMode="numeric"
                     aria-label="Piezas contadas"
                     value={contado}
@@ -232,7 +236,7 @@ export function AjusteStock({
             Guardar ajuste{n != null && delta !== 0 && ` · queda en ${n}`}
           </Button>
         </div>
-      </section>
-    </div>
+      </DrawerContent>
+    </Drawer>
   );
 }

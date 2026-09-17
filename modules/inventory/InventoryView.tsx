@@ -45,7 +45,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Modal } from "@/components/ui/modal";
-import { Drawer } from "@/components/ui/drawer";
+import { Hoja } from "@/components/ui/drawer";
 import { ImportPanel } from "./import/ImportPanel";
 import { ProductEditModal } from "./ProductEditModal";
 import { ProductPhotoModal } from "./ProductPhotoModal";
@@ -574,12 +574,12 @@ export function InventoryView({
         </div>
       )}
 
-      <Drawer open={filtrosOpen} onClose={() => setFiltrosOpen(false)} title="Filtros">
+      <Hoja open={filtrosOpen} onClose={() => setFiltrosOpen(false)} title="Filtros">
         <div className="max-h-[70vh] overflow-y-auto px-1 pb-2">{panelFiltros}</div>
         <Button className="mt-3 h-12 w-full" onClick={() => setFiltrosOpen(false)}>
           Ver {total.toLocaleString("es-MX")} productos
         </Button>
-      </Drawer>
+      </Hoja>
 
       {escaneando && (
         <EscanerQR
@@ -598,18 +598,18 @@ export function InventoryView({
         />
       )}
 
-      {panelId && (
-        <PanelProducto
-          productId={panelId}
-          ids={paged.map((p) => p.id)}
-          onNavegar={setPanelId}
-          onClose={() => setPanelId(null)}
-          puedeGestionar={puedeGestionar}
-          verCostos={verCostos}
-          onEditar={setEditId}
-          onFoto={setFoto}
-        />
-      )}
+      {/* Always mounted: the drawer needs to be there to slide out. */}
+      <PanelProducto
+        productId={panelId}
+        ids={paged.map((p) => p.id)}
+        onNavegar={setPanelId}
+        onClose={() => setPanelId(null)}
+        puedeGestionar={puedeGestionar}
+        verCostos={verCostos}
+        onEditar={setEditId}
+        onFoto={setFoto}
+        bloqueado={editId != null || foto != null}
+      />
 
       <Modal open={importOpen} onClose={() => setImportOpen(false)} title="Importar inventario">
         <ImportPanel

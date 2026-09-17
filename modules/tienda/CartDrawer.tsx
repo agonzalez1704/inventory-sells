@@ -1,13 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { Drawer as Vaul } from "vaul";
+import { Drawer, DrawerClose, DrawerContent, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 import { ShoppingCart, Smartphone, X } from "lucide-react";
 import { foto } from "@/lib/foto";
 import { formatPrecio } from "@/lib/money";
 import { puntosRecoger } from "@/lib/tienda-info";
 import { useIsMobile } from "@/components/use-is-mobile";
-import { cn } from "@/lib/utils";
 import { useCart } from "./CartProvider";
 import { useTiendaInfo } from "./TiendaInfoProvider";
 import { EntregaSelector, entregaEfectiva } from "./EntregaSelector";
@@ -21,35 +20,27 @@ export function CartButton() {
   const isMobile = useIsMobile();
 
   return (
-    <Vaul.Root open={open} onOpenChange={setOpen} direction={isMobile ? "bottom" : "right"}>
-      <Vaul.Trigger asChild>
-        <button
-          aria-label={`Carrito${count ? ` (${count})` : ""}`}
-          className="relative flex h-11 w-11 cursor-pointer items-center justify-center rounded-xl border border-tienda-100 bg-background text-foreground transition-colors hover:border-tienda-300 hover:text-tienda-700 dark:border-tienda-900 dark:text-tienda-300"
-        >
-          <ShoppingCart className="h-5 w-5" />
-          {ready && count > 0 && (
-            <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-tienda-600 px-1 text-[11px] font-semibold text-white">
-              {count}
-            </span>
-          )}
-        </button>
-      </Vaul.Trigger>
-
-      <Vaul.Portal>
-        <Vaul.Overlay className="fixed inset-0 z-50 bg-slate-900/45" />
-        <Vaul.Content
-          className={cn(
-            "fixed z-50 flex flex-col bg-background outline-none",
-            isMobile
-              ? "inset-x-0 bottom-0 top-10 rounded-t-[20px]"
-              : "bottom-0 right-0 top-0 w-full max-w-md",
-          )}
-        >
-          <CartBody mobile={isMobile} />
-        </Vaul.Content>
-      </Vaul.Portal>
-    </Vaul.Root>
+    <Drawer
+      open={open}
+      onOpenChange={setOpen}
+      swipeDirection={isMobile ? "down" : "right"}
+      showSwipeHandle={isMobile}
+    >
+      <DrawerTrigger
+        aria-label={`Carrito${count ? ` (${count})` : ""}`}
+        className="relative flex h-11 w-11 cursor-pointer items-center justify-center rounded-xl border border-tienda-100 bg-background text-foreground transition-colors hover:border-tienda-300 hover:text-tienda-700 dark:border-tienda-900 dark:text-tienda-300"
+      >
+        <ShoppingCart className="h-5 w-5" />
+        {ready && count > 0 && (
+          <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-tienda-600 px-1 text-[11px] font-semibold text-white">
+            {count}
+          </span>
+        )}
+      </DrawerTrigger>
+      <DrawerContent className="data-[swipe-direction=down]:top-10 data-[swipe-direction=down]:max-h-none data-[swipe-direction=down]:rounded-t-[20px] data-[swipe-direction=right]:w-[min(28rem,100vw)]">
+        <CartBody />
+      </DrawerContent>
+    </Drawer>
   );
 }
 
@@ -58,7 +49,7 @@ export function CartButton() {
  * the order is received, then the total and a button that says exactly what
  * happens next ("Apartar por 2 horas" when the customer comes in person).
  */
-function CartBody({ mobile }: { mobile: boolean }) {
+function CartBody() {
   const { items, subtotal, setQty, count, setOpen, open, entrega, setEntrega } = useCart();
   const tienda = useTiendaInfo();
   const puntos = puntosRecoger(tienda);
@@ -69,26 +60,21 @@ function CartBody({ mobile }: { mobile: boolean }) {
 
   return (
     <>
-      {mobile && <div aria-hidden className="mx-auto mt-2 h-1.5 w-10 shrink-0 rounded-full bg-muted" />}
-
       <div className="flex items-center justify-between py-1.5 pl-4 pr-2">
         <div className="flex items-baseline gap-2">
-          <Vaul.Title className="text-lg font-semibold tracking-tight text-foreground">Tu pedido</Vaul.Title>
+          <DrawerTitle className="text-lg font-semibold tracking-tight text-foreground">Tu pedido</DrawerTitle>
           {count > 0 && (
             <span className="text-sm text-muted-foreground">
               {count} {count === 1 ? "pieza" : "piezas"}
             </span>
           )}
         </div>
-        <Vaul.Close asChild>
-          <button
-            type="button"
-            aria-label="Cerrar"
-            className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </Vaul.Close>
+        <DrawerClose
+          aria-label="Cerrar"
+          className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted"
+        >
+          <X className="h-5 w-5" />
+        </DrawerClose>
       </div>
 
       {items.length === 0 ? (
