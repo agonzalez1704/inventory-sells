@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -52,6 +52,12 @@ export function CuadreView({ cuadre, hoy, admin }: { cuadre: Cuadre; hoy: string
   const [contar, setContar] = useState<"conteo" | "cierre" | null>(null);
   const [pending, start] = useTransition();
   const c = cuadre;
+  // Phones scroll the week sideways: start at the selected day (the right end).
+  const semanaRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = semanaRef.current;
+    if (el) el.scrollLeft = el.scrollWidth;
+  }, [c.fecha]);
   const cierre = c.conteos.find((x) => x.tipo === "cierre") ?? null;
   const ultimo = c.conteos.at(-1) ?? null;
   const sucNombre = c.sucursales.find((s) => s.id === c.sucursalId)?.nombre ?? null;
@@ -174,7 +180,7 @@ export function CuadreView({ cuadre, hoy, admin }: { cuadre: Cuadre; hoy: string
         <Link href={href({ dia: diaMas(-7) })} aria-label="Semana anterior" className={cn("hidden w-9 shrink-0 items-center justify-center rounded-xl border border-border hover:bg-muted sm:flex", !anterior && "invisible")}>
           <ChevronLeft className="h-4 w-4" />
         </Link>
-        <div className="-mx-4 flex min-w-0 flex-1 gap-2 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:grid sm:grid-cols-7 sm:px-0">
+        <div ref={semanaRef} className="-mx-4 flex min-w-0 flex-1 gap-2 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:grid sm:grid-cols-7 sm:px-0">
           {c.semana.map((d) => {
             const on = d.fecha === c.fecha;
             const vacio = d.estado === "sin_movimientos";
