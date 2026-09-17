@@ -206,31 +206,6 @@ export async function updateProduct(
   });
 }
 
-// Manual stock correction (recount / damage / return) → adjust_stock RPC.
-// Returns the new quantity.
-export async function adjustStock(
-  productId: string,
-  delta: number,
-  reason: "adjustment" | "return",
-  note: string | null,
-): Promise<ActionResult<number>> {
-  return attempt("adjustStock", async () => {
-  await assertPermiso("inventario_gestionar");
-  if (!Number.isInteger(delta) || delta === 0)
-    throw new Error("Ajuste inválido");
-  const insforge = await createInsForgeServerClient();
-  const { data, error } = await insforge.database.rpc("adjust_stock", {
-    p_product_id: productId,
-    p_delta: delta,
-    p_reason: reason,
-    p_note: note?.trim() || null,
-  });
-  if (error) throw new Error(error.message ?? "Error al ajustar stock");
-  updateTag("tienda");
-  return Number(data);
-  });
-}
-
 /**
  * Extra views of one product (the _FRO/_BOT/… supplier shots), main photo not
  * included — the caller already has image_url. Ordered front-first.

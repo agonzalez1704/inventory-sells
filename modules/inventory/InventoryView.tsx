@@ -569,9 +569,6 @@ export function InventoryView({
           verCostos={verCostos}
           onEditar={setEditId}
           onFoto={setFoto}
-          // Part 3 replaces this with the new adjustment panel; until then the
-          // editor's stock section does the job.
-          onAjustar={setEditId}
         />
       )}
 

@@ -69,6 +69,15 @@ const TITULO: Record<string, string> = {
   reserva: "Reserva",
 };
 
+/** Adjustments made from the product panel carry a fixed reason. */
+const MOTIVO: Record<string, string> = {
+  conteo: "Ajuste · conteo físico",
+  danada: "Ajuste · pieza dañada",
+  robo: "Ajuste · robo o faltante",
+  devolucion: "Devolución de cliente",
+  otro: "Ajuste · otro",
+};
+
 export async function getCardex(
   productId: string,
   limite = 200,
@@ -97,7 +106,7 @@ export async function getCardex(
 
   const { data: movData } = await insforgeAdmin.database
     .from("inventory_movements")
-    .select("id, delta, reason, ref_id, note, created_by, created_at")
+    .select("id, delta, reason, motivo, ref_id, note, created_by, created_at")
     .eq("product_id", productId)
     .order("created_at", { ascending: false })
     .limit(limite);
@@ -105,6 +114,7 @@ export async function getCardex(
     id: string;
     delta: number;
     reason: string;
+    motivo: string | null;
     ref_id: string | null;
     note: string | null;
     created_by: string | null;
@@ -199,7 +209,7 @@ export async function getCardex(
       reason: m.reason,
       delta: Number(m.delta ?? 0),
       saldo: saldoDespues,
-      titulo: TITULO[m.reason] ?? m.reason,
+      titulo: m.motivo && m.ref_id ? "Ajuste deshecho" : (m.motivo ? MOTIVO[m.motivo] : null) ?? TITULO[m.reason] ?? m.reason,
       detalle,
       costo_unitario_cents: costo,
       quien: m.created_by ? nombreDe.get(m.created_by) ?? m.created_by : "—",

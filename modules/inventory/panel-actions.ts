@@ -263,3 +263,47 @@ export async function duplicarProducto(id: string): Promise<ActionResult<{ id: s
     throw new Error("No se pudo generar un SKU libre para la copia");
   });
 }
+
+export type MotivoAjuste = "conteo" | "danada" | "robo" | "devolucion" | "otro";
+
+/**
+ * "Contaste N": the database works out the delta, and refuses when the stock
+ * moved since the user saw `esperado` (a sale while they were counting).
+ */
+export async function ajustarStock(
+  productId: string,
+  contado: number,
+  esperado: number,
+  motivo: MotivoAjuste,
+  nota: string | null,
+): Promise<ActionResult<{ movimientoId: string; cantidad: number }>> {
+  return attempt("ajustarStock", async () => {
+    await assertPermiso("inventario_gestionar");
+    if (!Number.isInteger(contado) || contado < 0) throw new Error("La cantidad no puede ser negativa");
+    const insforge = await createInsForgeServerClient();
+    const { data, error } = await insforge.database.rpc("ajustar_stock", {
+      p_product_id: productId,
+      p_contado: contado,
+      p_esperado: esperado,
+      p_motivo: motivo,
+      p_nota: nota?.trim() || null,
+    });
+    if (error) throw new Error(error.message ?? "No se pudo ajustar el stock");
+    const fila = ((data ?? []) as { movimiento_id: string; cantidad: number }[])[0];
+    if (!fila) throw new Error("No se pudo ajustar el stock");
+    updateTag("tienda");
+    return { movimientoId: fila.movimiento_id, cantidad: Number(fila.cantidad) };
+  });
+}
+
+/** The toast's "Deshacer": writes the inverse movement (15-minute window). */
+export async function deshacerAjuste(movimientoId: string): Promise<ActionResult<number>> {
+  return attempt("deshacerAjuste", async () => {
+    await assertPermiso("inventario_gestionar");
+    const insforge = await createInsForgeServerClient();
+    const { data, error } = await insforge.database.rpc("deshacer_ajuste", { p_movimiento_id: movimientoId });
+    if (error) throw new Error(error.message ?? "No se pudo deshacer");
+    updateTag("tienda");
+    return Number(data);
+  });
+}

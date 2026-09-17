@@ -39,6 +39,7 @@ import {
   type DetalleProducto,
   type NotaProducto,
 } from "./panel-actions";
+import { AjusteStock } from "./AjusteStock";
 
 const MINIMO_DEFAULT = 5;
 type Tab = "info" | "hist" | "notas";
@@ -61,7 +62,6 @@ export function PanelProducto({
   verCostos,
   onEditar,
   onFoto,
-  onAjustar,
 }: {
   productId: string;
   /** Ids of the list as shown, for ‹ ›. */
@@ -72,12 +72,12 @@ export function PanelProducto({
   verCostos: boolean;
   onEditar: (id: string) => void;
   onFoto: (p: { id: string; name: string; image_url: string | null }) => void;
-  onAjustar: (id: string) => void;
 }) {
   const router = useRouter();
   const [p, setP] = useState<DetalleProducto | null>(null);
   const [tab, setTab] = useState<Tab>("info");
   const [menu, setMenu] = useState(false);
+  const [ajustando, setAjustando] = useState(false);
   const [pending, start] = useTransition();
 
   const cargar = useCallback(() => {
@@ -92,6 +92,7 @@ export function PanelProducto({
 
   useEffect(() => {
     setP(null);
+    setAjustando(false);
     return cargar();
   }, [cargar]);
 
@@ -105,6 +106,7 @@ export function PanelProducto({
     document.body.style.overflow = "hidden";
     const tecla = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
+      if (ajustando) return;
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT")) return;
       if (e.key === "Escape") onClose();
       else if (e.key === "ArrowLeft" && anterior) onNavegar(anterior);
@@ -115,7 +117,7 @@ export function PanelProducto({
       document.body.style.overflow = previo;
       window.removeEventListener("keydown", tecla);
     };
-  }, [onClose, onNavegar, anterior, siguiente]);
+  }, [onClose, onNavegar, anterior, siguiente, ajustando]);
 
   function toggleActivo() {
     if (!p) return;
@@ -305,17 +307,31 @@ export function PanelProducto({
                     p={p}
                     verCostos={verCostos}
                     puedeGestionar={puedeGestionar}
-                    onAjustar={() => onAjustar(p.id)}
+                    onAjustar={() => setAjustando(true)}
                     onUbicacion={onNavegar}
                     onMinimo={(min) => setP({ ...p, stock_minimo: min })}
                   />
                 )}
-                {tab === "hist" && <TabHistorial productId={p.id} existencia={p.quantity} verCostos={verCostos} />}
+                {tab === "hist" && (
+                  <TabHistorial key={p.quantity} productId={p.id} existencia={p.quantity} verCostos={verCostos} />
+                )}
                 {tab === "notas" && <TabNotas productId={p.id} />}
               </div>
             </>
           )}
         </div>
+        {p && ajustando && (
+          <AjusteStock
+            producto={p}
+            onClose={() => setAjustando(false)}
+            onAjustado={(cantidad) => {
+              setP((prev) => (prev && prev.id === p.id
+                  ? { ...prev, quantity: cantidad, ubicaciones: prev.ubicaciones.map((u) => (u.actual ? { ...u, quantity: cantidad } : u)) }
+                  : prev));
+              router.refresh();
+            }}
+          />
+        )}
       </aside>
     </div>
   );

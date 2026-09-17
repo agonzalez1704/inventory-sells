@@ -13,7 +13,6 @@ import { Button } from "@/components/ui/button";
 import {
   getProductForEdit,
   updateProduct,
-  adjustStock,
   type EditableProduct,
 } from "./actions";
 import { listarProveedores, type Proveedor } from "@/modules/proveedores/actions";
@@ -60,13 +59,9 @@ export function ProductEditModal({
   const [product, setProduct] = useState<EditableProduct | null>(null);
   const [form, setForm] = useState<Form | null>(null);
   const [qty, setQty] = useState(0);
-  const [delta, setDelta] = useState("");
-  const [reason, setReason] = useState<"adjustment" | "return">("adjustment");
-  const [note, setNote] = useState("");
   const [loadError, setLoadError] = useState<string | null>(null);
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [saving, startSave] = useTransition();
-  const [adjusting, startAdjust] = useTransition();
 
   useEffect(() => {
     let cancelled = false;
@@ -125,26 +120,6 @@ export function ProductEditModal({
         onClose();
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Error al guardar");
-      }
-    });
-  }
-
-  function applyAdjust() {
-    const d = parseInt(delta, 10);
-    if (!Number.isInteger(d) || d === 0) {
-      toast.error("Escribe un ajuste distinto de cero");
-      return;
-    }
-    startAdjust(async () => {
-      try {
-        const newQty = unwrap(await adjustStock(productId, d, reason, note || null));
-        setQty(newQty);
-        setDelta("");
-        setNote("");
-        toast.success(`Stock ajustado a ${newQty}`);
-        router.refresh();
-      } catch (e) {
-        toast.error(e instanceof Error ? e.message : "Error al ajustar");
       }
     });
   }
@@ -272,41 +247,9 @@ export function ProductEditModal({
               <span className="text-sm font-medium">Stock actual</span>
               <span className="font-mono text-lg font-semibold tabular-nums">{qty}</span>
             </div>
-            <div className="mt-3 flex flex-wrap items-end gap-2">
-              <div className="w-24">
-                <span className="mb-1 block text-xs font-medium text-muted-foreground">
-                  Ajuste (+/−)
-                </span>
-                <Input
-                  type="number"
-                  step={1}
-                  placeholder="-2"
-                  value={delta}
-                  onChange={(e) => setDelta(e.target.value)}
-                />
-              </div>
-              <div className="w-36">
-                <span className="mb-1 block text-xs font-medium text-muted-foreground">
-                  Motivo
-                </span>
-                <Select
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value as "adjustment" | "return")}
-                >
-                  <option value="adjustment">Ajuste</option>
-                  <option value="return">Devolución</option>
-                </Select>
-              </div>
-              <div className="min-w-32 flex-1">
-                <span className="mb-1 block text-xs font-medium text-muted-foreground">
-                  Nota (opcional)
-                </span>
-                <Input value={note} onChange={(e) => setNote(e.target.value)} />
-              </div>
-              <Button variant="secondary" onClick={applyAdjust} loading={adjusting}>
-                Aplicar
-              </Button>
-            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Para corregirlo usa “Ajustar stock” en el panel del producto: pide motivo y se puede deshacer.
+            </p>
           </div>
 
           <div className="flex justify-end gap-2 border-t border-border pt-4">
