@@ -146,9 +146,15 @@ export default async function CajaPage({
       .gte("entregado_at", startISO)
       .lt("entregado_at", endISO),
   ]);
-  const { data: inventoriesData } = await insforge.database
-    .from("inventories")
-    .select("id, name");
+  const hace90 = rangoUTC(new Date(Date.parse(`${to}T12:00:00Z`) - 90 * 86_400_000).toISOString().slice(0, 10), to).startISO;
+  const [{ data: inventoriesData }, { data: catG }, { data: catI }] = await Promise.all([
+    insforge.database.from("inventories").select("id, name"),
+    insforge.database.from("gastos").select("categoria").not("categoria", "is", null).gte("created_at", hace90).order("created_at", { ascending: false }).limit(200),
+    insforge.database.from("ingresos").select("categoria").not("categoria", "is", null).gte("created_at", hace90).order("created_at", { ascending: false }).limit(200),
+  ]);
+  const unicas = (rows: unknown) => [
+    ...new Set(((rows ?? []) as { categoria: string | null }[]).map((r) => r.categoria?.trim()).filter(Boolean) as string[]),
+  ].slice(0, 6);
   const invName = new Map(
     ((inventoriesData ?? []) as { id: string; name: string }[]).map((i) => [i.id, i.name]),
   );
@@ -396,9 +402,9 @@ export default async function CajaPage({
           };
         a.unidades += it.qty * factor;
         a.ventaCents += Math.round(it.unit_price_cents * it.qty * factor);
-        a.gananciaCents += Math.round(
-          (it.unit_price_cents - (it.products?.cost_cents ?? 0)) * it.qty * factor,
-        );
+        // Same cost basis as the net profit: what these pieces cost (FIFO),
+        // the catalog cost only for sales made before cost layers existed.
+        a.gananciaCents += Math.round((it.unit_price_cents * it.qty - costoLinea(it)) * factor);
         a.movimientos.push({
           // Prorated lines carry the scaled unit money so qty × precio matches
           // the cash attributed today; the name flags it as an abono.
@@ -406,7 +412,7 @@ export default async function CajaPage({
           producto: (it.products?.name ?? "—") + (factor < 1 ? " · abono" : ""),
           sku: it.products?.sku ?? "—",
           qty: it.qty,
-          costoCents: Math.round((it.products?.cost_cents ?? 0) * factor),
+          costoCents: Math.round((costoLinea(it) / Math.max(1, it.qty)) * factor),
           precioCents: Math.round(it.unit_price_cents * factor),
         });
         porInvMap.set(invId, a);
@@ -609,6 +615,8 @@ export default async function CajaPage({
       data={{
         from,
         to,
+        hoy: mxHoy(),
+        categorias: { gasto: unicas(catG), ingreso: unicas(catI) },
         isAdmin,
         ventasCount,
         ingresosPorMetodo,

@@ -160,10 +160,15 @@ export function VentasView({
             {label}
           </button>
         ))}
-        <div className="mt-2 flex items-center gap-1.5 px-1">
-          <Input type="date" value={desde} max={hoy} onChange={(e) => setDesde(e.target.value)} className="h-9 min-w-0 px-2 text-sm" />
-          <span className="text-muted-foreground">–</span>
-          <Input type="date" value={hasta} max={hoy} onChange={(e) => setHasta(e.target.value)} className="h-9 min-w-0 px-2 text-sm" />
+        <div className="mt-2 grid gap-1.5 px-1">
+          <label className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span className="w-10">Desde</span>
+            <Input type="date" value={desde} max={hoy} onChange={(e) => setDesde(e.target.value)} className="h-9 min-w-0 flex-1 px-2 text-sm" />
+          </label>
+          <label className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span className="w-10">Hasta</span>
+            <Input type="date" value={hasta} max={hoy} onChange={(e) => setHasta(e.target.value)} className="h-9 min-w-0 flex-1 px-2 text-sm" />
+          </label>
         </div>
         {(desde !== filtros.from || hasta !== filtros.to) && desde && hasta && (
           <Button size="sm" className="mx-1 mt-2" onClick={() => ir({ from: desde <= hasta ? desde : hasta, to: desde <= hasta ? hasta : desde })}>
@@ -296,7 +301,7 @@ export function VentasView({
                 <span className="w-20">Hora</span>
                 <span className="flex-1">Producto · cliente</span>
                 <span className="hidden w-32 xl:block">Vendedor</span>
-                <span className="w-48">Pago</span>
+                <span className="w-56">Pago</span>
                 <span className="w-24 text-right">Total</span>
                 <span className="w-4" />
               </div>
@@ -401,7 +406,7 @@ function FilaVenta({ v, activa, onClick }: { v: VentaLista; activa: boolean; onC
         </div>
       </div>
       <span className="hidden w-32 truncate text-sm text-muted-foreground xl:block">{v.vendedor ?? "—"}</span>
-      <span className="hidden w-48 items-center gap-1.5 lg:flex">
+      <span className="hidden w-56 items-center gap-1.5 whitespace-nowrap lg:flex [&_*]:whitespace-nowrap">
         <MetodoPill metodo={v.payment_method} />
         {v.cuenta && <CuentaChip cuenta={v.cuenta} />}
       </span>
