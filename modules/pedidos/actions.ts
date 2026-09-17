@@ -4,6 +4,7 @@ import { auth } from "@clerk/nextjs/server";
 import { after } from "next/server";
 import { assertPermiso, getProfile } from "@/lib/auth/profile";
 import { insforgeAdmin } from "@/lib/insforge/admin";
+import { createInsForgeServerClient } from "@/lib/insforge/server";
 import { pedirDropshipAutomatico } from "@/lib/aliexpress";
 import { attempt, type ActionResult } from "@/lib/errors";
 
@@ -121,6 +122,36 @@ export async function marcarDropshipPedido(
       .eq("id", ordenId)
       .in("dropship_estado", ["por_pedir", "pidiendo"]);
     if (error) throw new Error(error.message ?? "No se pudo marcar");
+    return null;
+  });
+}
+
+/**
+ * Move a paid order along its own trail: prepared → ready (pickup) / shipped
+ * (with the label's data) → delivered, or one step back.
+ *
+ * Whoever prepares orders (`surtir`) does this, not only admins: it is counter
+ * work, and the RPC checks the permiso again.
+ */
+export async function avanzarPedido(
+  ordenId: string,
+  paso: "preparado" | "listo" | "enviado" | "entregado" | "deshacer",
+  datos: { paqueteria?: string; numero?: string; costo_cents?: number | null; nota?: string } = {},
+): Promise<ActionResult<null>> {
+  return attempt("avanzarPedido", async () => {
+    await assertPermiso("surtir");
+    const insforge = await createInsForgeServerClient();
+    const { error } = await insforge.database.rpc("avanzar_orden_web", {
+      p_id: ordenId,
+      p_paso: paso,
+      p_datos: {
+        paqueteria: datos.paqueteria?.trim() ?? null,
+        numero: datos.numero?.trim() ?? null,
+        costo_cents: datos.costo_cents ?? null,
+        nota: datos.nota?.trim() ?? null,
+      },
+    });
+    if (error) throw new Error(error.message ?? "No se pudo actualizar el pedido");
     return null;
   });
 }

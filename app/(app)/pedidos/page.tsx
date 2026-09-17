@@ -13,16 +13,16 @@ export default async function PedidosPage() {
   const { data } = await insforgeAdmin.database
     .from("ordenes_web")
     .select(
-      "id, folio, nombre, telefono, email, cp, estado, municipio, direccion, referencias, status, metodo, tipo_entrega, total_cents, created_at, apartada_hasta, sucursal, dropship_estado, dropship_ref, orden_web_items(nombre, qty, products(enlace_proveedor, inventories(es_dropship)))",
+      "id, folio, nombre, telefono, email, cp, estado, municipio, direccion, referencias, status, metodo, tipo_entrega, total_cents, envio_cents, envio_desc, created_at, paid_at, apartada_hasta, sucursal, dropship_estado, dropship_ref, preparado_at, listo_at, enviado_at, entregado_at, guia_paqueteria, guia_numero, guia_costo_cents, entrega_nota, cotizacion_id, cotizaciones(folio), orden_web_items(nombre, qty, products(sku, image_url, quantity, enlace_proveedor, inventories(name, es_dropship, sucursales(nombre))))",
     )
     .order("created_at", { ascending: false })
     .limit(100);
 
   // PostgREST returns to-one embeds as objects; the SDK types them as arrays.
-  const pedidos = ((data ?? []) as unknown as PedidoWeb[]).slice().sort((a, b) => {
-    const rank = (s: string) => (s === "pendiente" ? 0 : 1);
-    return rank(a.status) - rank(b.status);
-  });
+  const pedidos = ((data ?? []) as unknown as (PedidoWeb & { cotizaciones: { folio: string } | null })[]).map((p) => ({
+    ...p,
+    cotizacion_folio: p.cotizaciones?.folio ?? null,
+  }));
 
   // Pickup + dropship means the supplier ships to the SHOP; hand the operator
   // that address instead of a blank block.
