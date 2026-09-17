@@ -2,8 +2,8 @@ import { createInsForgeServerClient } from "@/lib/insforge/server";
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { getPermisos, getProfile, requirePagePermiso } from "@/lib/auth/profile";
 import { mxHoy, rangoUTC } from "@/lib/caja-range";
-import { RecentSales, type SaleWithItems } from "@/modules/sales/RecentSales";
-import { VentasFiltros } from "@/modules/sales/VentasFiltros";
+import type { SaleWithItems } from "@/modules/sales/RecentSales";
+import { VentasView, type ResumenVentas, type VentaLista } from "@/modules/sales/VentasView";
 import type { PaymentMethod } from "@/lib/types";
 
 
@@ -21,10 +21,12 @@ export default async function VentasPage({
     metodo?: string;
     canal?: string;
     venta?: string;
+    solo?: string;
   }>;
 }) {
   const sp = await searchParams;
-  const from = sp.from ?? mxHoy();
+  const hoy = mxHoy();
+  const from = sp.from ?? hoy;
   const to = sp.to ?? from;
   const abrirId = sp.venta ?? null;
   const metodo = METODOS.includes(sp.metodo as PaymentMethod) ? (sp.metodo as PaymentMethod) : null;
@@ -56,7 +58,7 @@ export default async function VentasPage({
   }[];
 
   const SELECT_VENTA =
-    "id, total_cents, payment_method, customer_name, canal, created_at, settled_at, sold_by, sale_items(product_id, qty, unit_price_cents, products(name, sku))";
+    "id, total_cents, payment_method, customer_name, canal, created_at, settled_at, sold_by, sale_items(product_id, qty, unit_price_cents, products(name, sku, image_url))";
 
   // A sale belongs to the day its money landed. Direct sales land when they
   // are created; a credit note lands when it settles — so the range filters
@@ -83,24 +85,16 @@ export default async function VentasPage({
     directasQuery = directasQuery.eq("sold_by", userId);
     cobradasQuery = cobradasQuery.eq("sold_by", userId);
   }
-  if (metodo) {
-    directasQuery = directasQuery.eq("payment_method", metodo);
-    cobradasQuery = cobradasQuery.eq("payment_method", metodo);
-  }
+  // The method filter is applied below, after counting: the rail shows how
+  // many sales each method has in the period.
   if (canal) {
     directasQuery = directasQuery.eq("canal", canal);
     cobradasQuery = cobradasQuery.eq("canal", canal);
   }
 
-  const [
-    { data: directasData },
-    { data: cobradasData },
-    { data: invData },
-    { data: profileData },
-  ] = await Promise.all([
+  const [{ data: directasData }, { data: cobradasData }, { data: profileData }] = await Promise.all([
     directasQuery,
     cobradasQuery,
-    insforge.database.from("inventories").select("id, name"),
     insforge.database.from("profiles").select("id, full_name"),
   ]);
   const salesData = [...(directasData ?? []), ...(cobradasData ?? [])];
@@ -221,35 +215,32 @@ export default async function VentasPage({
     lista = lista.map((s) => ({ ...s, cuenta: porSale.get(s.id) ?? null }));
   }
 
-  const totalPeriodo = netSales.reduce((a, s) => a + s.total_cents, 0);
+  const porMetodo: ResumenVentas["porMetodo"] = {};
+  for (const v of netSales) {
+    const m = v.payment_method ?? "otro";
+    const r = (porMetodo[m] ??= { n: 0, totalCents: 0 });
+    r.n += 1;
+    r.totalCents += v.total_cents;
+  }
+  const visibles = lista.filter(
+    (v) => v.id === abrirId || ((!metodo || v.payment_method === metodo) && (sp.solo !== "fiados" || v.settled_at)),
+  );
+  const enFiltro = visibles.filter((v) => v.id !== abrirId || netSales.some((n) => n.id === v.id));
 
   return (
-    <section className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Ventas</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Filtra por fecha, método y canal. Toca una venta para ver sus productos
-          {isAdmin ? ", corregir el pago o registrar una devolución" : ""}.
-        </p>
-      </div>
-
-      <VentasFiltros
-        from={from}
-        to={to}
-        metodo={metodo}
-        canal={canal}
-        count={netSales.length}
-        totalCents={totalPeriodo}
-      />
-
-      <RecentSales
-        sales={lista}
-        isAdmin={isAdmin}
-        customers={customers}
-        abrirId={abrirId}
-        titulo="Ventas del periodo"
-        subtitulo="Toca una venta para ver sus productos. La búsqueda abarca todas las ventas."
-      />
-    </section>
+    <VentasView
+      ventas={visibles as VentaLista[]}
+      resumen={{
+        count: enFiltro.length,
+        totalCents: enFiltro.reduce((a, v) => a + v.total_cents, 0),
+        porMetodo,
+        fiados: netSales.filter((v) => v.settled_at).length,
+      }}
+      filtros={{ from, to, metodo, canal, solo: sp.solo === "fiados" ? "fiados" : null }}
+      hoy={hoy}
+      customers={customers}
+      isAdmin={isAdmin}
+      abrirId={abrirId}
+    />
   );
 }

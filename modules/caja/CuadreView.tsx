@@ -90,7 +90,6 @@ export function CuadreView({ cuadre, hoy, admin }: { cuadre: Cuadre; hoy: string
   const primerDescuadre = c.conteos.find((x) => x.contadoCents !== x.esperadoAhoraCents) ?? null;
 
   const siguiente = c.fecha < hoy;
-  const anterior = true;
   const diaMas = (n: number) => {
     const d = new Date(`${c.fecha}T12:00:00Z`);
     d.setUTCDate(d.getUTCDate() + n);
@@ -177,7 +176,7 @@ export function CuadreView({ cuadre, hoy, admin }: { cuadre: Cuadre; hoy: string
 
       {/* The week: where a difference lives, at a glance. */}
       <div className="flex items-stretch gap-2">
-        <Link href={href({ dia: diaMas(-7) })} aria-label="Semana anterior" className={cn("hidden w-9 shrink-0 items-center justify-center rounded-xl border border-border hover:bg-muted sm:flex", !anterior && "invisible")}>
+        <Link href={href({ dia: diaMas(-7) })} aria-label="Semana anterior" className={cn("hidden w-9 shrink-0 items-center justify-center rounded-xl border border-border hover:bg-muted sm:flex")}>
           <ChevronLeft className="h-4 w-4" />
         </Link>
         <div ref={semanaRef} className="-mx-4 flex min-w-0 flex-1 gap-2 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:grid sm:grid-cols-7 sm:px-0">
