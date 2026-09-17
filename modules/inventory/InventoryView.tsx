@@ -22,6 +22,7 @@ import {
   SlidersHorizontal,
   RotateCcw,
   X,
+  QrCode,
 } from "lucide-react";
 import type { Inventory } from "@/lib/types";
 import { foto as urlFoto } from "@/lib/foto";
@@ -51,6 +52,9 @@ import { ProductPhotoModal } from "./ProductPhotoModal";
 import { ManualProductModal } from "./ManualProductModal";
 import { EditarInventarioModal } from "./EditarInventarioModal";
 import { PanelProducto } from "./PanelProducto";
+import { EscanerQR } from "./EscanerQR";
+import { idDeCodigo } from "./qr";
+import { toast } from "sonner";
 
 export type InventoryRow = FilaInventario;
 
@@ -66,7 +70,7 @@ const ORDEN_LABEL: Record<OrdenLista, string> = {
 /** Today's threshold for "bajo" when a product has no reorder point of its own. */
 const MINIMO_DEFAULT = 5;
 
-function ExportMenu({ verCostos }: { verCostos: boolean }) {
+function ExportMenu({ verCostos, etiquetasHref }: { verCostos: boolean; etiquetasHref: string }) {
   const [open, setOpen] = useState(false);
   const item = "block rounded-md px-3 py-2 transition-colors hover:bg-muted cursor-pointer";
   return (
@@ -84,6 +88,10 @@ function ExportMenu({ verCostos }: { verCostos: boolean }) {
               <p className="text-sm font-medium">Lista para cliente</p>
               <p className="text-xs text-muted-foreground">Solo precios de venta</p>
             </a>
+            <Link href={etiquetasHref} onClick={() => setOpen(false)} className={item}>
+              <p className="text-sm font-medium">Etiquetas QR</p>
+              <p className="text-xs text-muted-foreground">De lo que ves filtrado, para imprimir</p>
+            </Link>
             {verCostos && (
               <a href="/api/inventario/export?variant=internal" onClick={() => setOpen(false)} className={item}>
                 <p className="text-sm font-medium">Inventario interno</p>
@@ -156,11 +164,15 @@ export function InventoryView({
   const [editId, setEditId] = useState<string | null>(null);
   const [foto, setFoto] = useState<{ id: string; name: string; image_url: string | null } | null>(null);
   // The product side panel (redesign part 2); the row opens it for everyone who may see the list.
-  const [panelId, setPanelId] = useState<string | null>(null);
+  // In the URL too: a printed QR label is a link to /inventario?p=<id>.
+  const [panelId, setPanelId] = useQueryState("p", parseAsString.withOptions(opt));
+  const [escaneando, setEscaneando] = useState(false);
   const [newInvOpen, setNewInvOpen] = useState(false);
   const [editInv, setEditInv] = useState<Inventory | null>(null);
   const [manualOpen, setManualOpen] = useState(false);
   const [filtrosOpen, setFiltrosOpen] = useState(false);
+
+  const cerrarEscaner = useCallback(() => setEscaneando(false), []);
 
   const invName = useMemo(() => Object.fromEntries(inventories.map((i) => [i.id, i.name])), [inventories]);
   const inv = selectedInv === "all" ? null : selectedInv;
@@ -171,6 +183,12 @@ export function InventoryView({
   );
   // The inventory chooser is not counted: it has its own always-visible place.
   const activos = [alerta, cat, pmin ?? pmax, orden].filter((x) => x != null).length;
+
+  const etiquetasHref = `/etiquetas?${new URLSearchParams(
+    Object.entries({ q: query, inv, alerta, cat, pmin, pmax, orden }).flatMap(([k, v]) =>
+      v != null && v !== "" ? [[k, String(v)]] : [],
+    ),
+  )}`;
 
   const PER_PAGE = 50;
   const [page, setPage] = useState(1);
@@ -297,7 +315,7 @@ export function InventoryView({
         </div>
         <div className="flex items-center gap-2">
           <div className="hidden items-center gap-2 sm:flex">
-            {stats.productos > 0 && <ExportMenu verCostos={verCostos} />}
+            {stats.productos > 0 && <ExportMenu verCostos={verCostos} etiquetasHref={etiquetasHref} />}
             {puedeGestionar && (
               <Button variant="secondary" onClick={() => setImportOpen(true)}>
                 <Upload className="h-4 w-4" />
@@ -305,6 +323,10 @@ export function InventoryView({
               </Button>
             )}
           </div>
+          <Button variant="secondary" onClick={() => setEscaneando(true)} aria-label="Escanear QR">
+            <QrCode className="h-4 w-4" />
+            <span className="hidden sm:inline">Escanear QR</span>
+          </Button>
           {puedeGestionar && inventories.length > 0 && (
             <Button onClick={() => setManualOpen(true)}>
               <Plus className="h-4 w-4" />
@@ -558,6 +580,23 @@ export function InventoryView({
           Ver {total.toLocaleString("es-MX")} productos
         </Button>
       </Drawer>
+
+      {escaneando && (
+        <EscanerQR
+          onClose={cerrarEscaner}
+          onCodigo={(texto) => {
+            setEscaneando(false);
+            const id = idDeCodigo(texto);
+            if (id) {
+              setPanelId(id);
+            } else {
+              // A supplier's own code (SKU, model): try it as a search.
+              setQuery(texto.trim().slice(0, 80));
+              toast("No es una etiqueta de producto: lo busqué como texto");
+            }
+          }}
+        />
+      )}
 
       {panelId && (
         <PanelProducto

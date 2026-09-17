@@ -16,6 +16,7 @@ import {
   MapPin,
   MoreHorizontal,
   Pencil,
+  Printer,
   ShoppingCart,
   Trash2,
   Truck,
@@ -25,6 +26,8 @@ import { foto as urlFoto } from "@/lib/foto";
 import { formatMXN } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { renderSVG } from "uqr";
+import { enlaceProducto } from "./qr";
 import { Button } from "@/components/ui/button";
 import type { CardexResumen, MovimientoCardex } from "@/modules/cardex/actions";
 import {
@@ -78,13 +81,19 @@ export function PanelProducto({
   const [tab, setTab] = useState<Tab>("info");
   const [menu, setMenu] = useState(false);
   const [ajustando, setAjustando] = useState(false);
+  // A scanned label from another business, or a deleted product.
+  const [noHay, setNoHay] = useState(false);
   const [pending, start] = useTransition();
 
   const cargar = useCallback(() => {
     let vivo = true;
     detalleProducto(productId)
-      .then((d) => vivo && setP(d))
-      .catch(() => vivo && setP(null));
+      .then((d) => {
+        if (!vivo) return;
+        setP(d);
+        setNoHay(!d);
+      })
+      .catch(() => vivo && setNoHay(true));
     return () => {
       vivo = false;
     };
@@ -92,6 +101,7 @@ export function PanelProducto({
 
   useEffect(() => {
     setP(null);
+    setNoHay(false);
     setAjustando(false);
     return cargar();
   }, [cargar]);
@@ -234,7 +244,12 @@ export function PanelProducto({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-5 sm:px-7">
-          {!p ? (
+          {noHay ? (
+            <div className="py-24 text-center">
+              <p className="font-semibold">Producto no encontrado</p>
+              <p className="mt-1 text-sm text-muted-foreground">Puede ser de otro negocio o ya no existir.</p>
+            </div>
+          ) : !p ? (
             <div className="flex items-center justify-center gap-2 py-24 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
               Cargando producto…
@@ -506,6 +521,7 @@ function TabInfo({
         </div>
 
         <PuntoReorden p={p} puedeGestionar={puedeGestionar} onMinimo={onMinimo} />
+        <EtiquetaQR id={p.id} />
       </div>
     </div>
   );
@@ -608,6 +624,30 @@ function PuntoReorden({
           </p>
         </>
       )}
+    </div>
+  );
+}
+
+function EtiquetaQR({ id }: { id: string }) {
+  const svg = useMemo(() => renderSVG(enlaceProducto(window.location.origin, id), { border: 2 }), [id]);
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-border p-3">
+      <div
+        className="h-16 w-16 shrink-0 rounded-md bg-white p-1 [&>svg]:h-full [&>svg]:w-full"
+        // uqr's own <svg>, built from this site's product link.
+        dangerouslySetInnerHTML={{ __html: svg }}
+      />
+      <div className="min-w-0 flex-1">
+        <p className="text-[15px] font-semibold">Etiqueta QR</p>
+        <p className="text-xs text-muted-foreground">Pégala en el anaquel: al escanearla abre este producto.</p>
+      </div>
+      <Link
+        href={`/etiquetas?ids=${id}`}
+        className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-border px-3 text-sm font-medium hover:bg-muted"
+      >
+        <Printer className="h-4 w-4" />
+        Imprimir
+      </Link>
     </div>
   );
 }
