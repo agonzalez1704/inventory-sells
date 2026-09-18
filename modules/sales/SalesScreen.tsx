@@ -877,9 +877,9 @@ export function SalesScreen({
                     agregarDeTexto(query);
                   }
                 }}
-                placeholder="Nombre, SKU o modelo — escribe o escanea"
+                placeholder="Nombre, SKU o modelo"
                 enterKeyHint="go"
-                className="h-13 w-full rounded-xl border-2 border-foreground bg-background pr-28 pl-11 text-base outline-hidden placeholder:text-muted-foreground"
+                className="h-13 w-full rounded-xl border-2 border-foreground bg-background pr-10 pl-11 sm:pr-28 text-base outline-hidden placeholder:text-muted-foreground"
               />
               <span className="absolute top-1/2 right-3 flex -translate-y-1/2 items-center gap-2">
                 {buscando && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
