@@ -4,6 +4,13 @@ export function toCents(pesos: number): number {
   return Math.round(pesos * 100);
 }
 
+/** A unit price after a % discount. Must round exactly like register_sale:
+ *  round(price * (100 - pct) / 100.0), half-up per unit — or the till shows
+ *  one total and the database charges another. */
+export function conDescuento(cents: number, pct: number): number {
+  return Math.round((cents * (100 - pct)) / 100);
+}
+
 export function fromCents(cents: number): number {
   return cents / 100;
 }

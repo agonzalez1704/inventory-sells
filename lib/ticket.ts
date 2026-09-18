@@ -1,4 +1,5 @@
 import { formatMXN } from "@/lib/money";
+import { MARCA } from "@/lib/marca";
 
 // A receipt to print on the Hostech HT-100 (80mm thermal, ~48 mono chars).
 export type TicketItem = {
@@ -15,6 +16,9 @@ export type TicketData = {
   metodoPago?: string | null;
   cliente?: string | null;
   tipo?: "venta" | "fiado";
+  /** Catalog total before the discount, and the discount's name — the
+   *  customer should see what they saved, not just a smaller number. */
+  descuento?: { subtotal: number; etiqueta: string } | null;
 };
 
 const PAGO: Record<string, string> = {
@@ -22,6 +26,8 @@ const PAGO: Record<string, string> = {
   tarjeta: "Tarjeta",
   transferencia: "Transferencia",
   otro: "Otro",
+  saldo: "Saldo a favor",
+  mixto: "Pago mixto",
 };
 
 const esc = (s: string) =>
@@ -76,8 +82,8 @@ export function buildTicketHTML(d: TicketData): string {
   .foot { margin-top: 8px; }
 </style></head>
 <body>
-  <div class="center brand">FIABLE</div>
-  <div class="center muted">Celulares y refacciones</div>
+  <div class="center brand">${esc(MARCA.tienda.nombre.toUpperCase())}</div>
+  <div class="center muted">${esc(MARCA.tienda.tagline)}</div>
   ${esFiado ? `<div class="center" style="margin-top:4px"><span class="tag">NOTA DE CRÉDITO · PENDIENTE DE PAGO</span></div>` : ""}
   <div class="sep"></div>
   <div class="meta"><span>Folio: ${folioCorto(d.folio)}</span><span>${esc(fecha)}</span></div>
@@ -85,11 +91,13 @@ export function buildTicketHTML(d: TicketData): string {
   <div class="sep"></div>
   ${filas}
   <div class="sep"></div>
+  ${d.descuento ? `<div class="row"><span>Subtotal</span><span class="amt">${formatMXN(d.descuento.subtotal)}</span></div>
+  <div class="row"><span>${esc(d.descuento.etiqueta)}</span><span class="amt">-${formatMXN(d.descuento.subtotal - d.total)}</span></div>` : ""}
   <div class="total"><span>TOTAL</span><span>${formatMXN(d.total)}</span></div>
   ${d.metodoPago && !esFiado ? `<div>Pago: ${PAGO[d.metodoPago] ?? d.metodoPago}</div>` : ""}
   <div class="sep"></div>
   <div class="center foot">${esFiado ? "Comprobante de nota de crédito" : "¡Gracias por su compra!"}</div>
-  <div class="center muted">fiable.vercel.app</div>
+  ${typeof location !== "undefined" ? `<div class="center muted">${esc(location.host)}</div>` : ""}
 </body></html>`;
 }
 

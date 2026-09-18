@@ -87,6 +87,8 @@ export async function registerSale(
   // up to the sale total and marks the sale 'mixto'; one entry is treated as a
   // plain single-method sale.
   pagos?: PagoSplit[],
+  /** Admin-only override of the customer's discount; the RPC checks the role. */
+  descuentoPct?: number | null,
 ): Promise<{ saleId: string }> {
   const { userId } = await auth();
   if (!userId) throw new Error("No autenticado");
@@ -108,6 +110,7 @@ export async function registerSale(
       pagos && (pagos.length > 1 || pagos.some((p) => p.metodo === "saldo"))
         ? pagos
         : null,
+    ...(descuentoPct != null ? { p_descuento_pct: descuentoPct } : {}),
   });
 
   if (error) throw new Error(error.message ?? "Error al registrar la venta");
@@ -125,6 +128,7 @@ export async function registerLoan(
   /** Null means the walk-in placeholder — only some shops allow that. */
   customerId: string | null,
   note: string | null,
+  descuentoPct?: number | null,
 ): Promise<{ saleId: string }> {
   const { userId } = await auth();
   if (!userId) throw new Error("No autenticado");
@@ -140,6 +144,7 @@ export async function registerLoan(
     p_items: items.map((i) => ({ product_id: i.product_id, qty: i.qty })),
     p_customer_id: customerId ?? null,
     p_note: note?.trim() || null,
+    ...(descuentoPct != null ? { p_descuento_pct: descuentoPct } : {}),
   });
 
   if (error) throw new Error(error.message ?? "Error al registrar la nota de crédito");

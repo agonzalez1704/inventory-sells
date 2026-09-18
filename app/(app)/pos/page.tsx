@@ -13,6 +13,8 @@ export default async function PosPage() {
   const userId = await requirePagePermiso("pos_vender");
   const perms = await getPermisos(userId);
   const verCostos = perms.has("admin_total") || perms.has("costos_ver");
+  const esAdmin = perms.has("admin_total");
+  const puedeCotizar = esAdmin || perms.has("cotizar");
   const insforge = await createInsForgeServerClient();
 
   // The first screenful, not the catalog. Shipping every active product was
@@ -32,7 +34,7 @@ export default async function PosPage() {
       insforge.database.from("inventories").select("id, name"),
       insforge.database
         .from("customers")
-        .select("id, nombre, telefono, is_system")
+        .select("id, nombre, telefono, is_system, descuento_pct")
         .eq("is_active", true)
         .order("is_system", { ascending: false })
         .order("nombre", { ascending: true }),
@@ -71,6 +73,7 @@ export default async function PosPage() {
     nombre: string;
     telefono: string;
     is_system: boolean;
+    descuento_pct: number | null;
   }[];
 
   // Counts travel with them: they decide which get a chip and which sit in
@@ -78,25 +81,18 @@ export default async function PosPage() {
   const categorias = categoriasData;
 
   return (
-    <section className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Punto de venta</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Busca, agrega al carrito y cobra. El stock se descuenta solo.
-        </p>
-      </div>
-
-      <SalesScreen
-        products={products}
-        categorias={categorias}
-        customers={customers}
-        verCostos={verCostos}
-        precioBase={precioBase}
-        fiadoExigeCliente={exigeCliente}
-        clickAbreDetalle={clickDetalle}
-        comprobanteObligatorio={comprobanteOblig}
-        inventariosAjenos={ajenos}
-      />
-    </section>
+    <SalesScreen
+      products={products}
+      categorias={categorias}
+      customers={customers}
+      verCostos={verCostos}
+      precioBase={precioBase}
+      fiadoExigeCliente={exigeCliente}
+      clickAbreDetalle={clickDetalle}
+      comprobanteObligatorio={comprobanteOblig}
+      inventariosAjenos={ajenos}
+      esAdmin={esAdmin}
+      puedeCotizar={puedeCotizar}
+    />
   );
 }

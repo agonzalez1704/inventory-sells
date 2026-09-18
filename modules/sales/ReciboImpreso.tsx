@@ -123,6 +123,18 @@ export function ReciboImpreso({
               </p>
             ))}
             <p className="my-2 border-t border-dashed border-neutral-300" />
+            {ticket.descuento && (
+              <>
+                <p className="flex justify-between text-neutral-700">
+                  <span>Subtotal</span>
+                  <span className="tabular-nums">{formatMXN(ticket.descuento.subtotal)}</span>
+                </p>
+                <p className="flex justify-between text-neutral-700">
+                  <span>{ticket.descuento.etiqueta}</span>
+                  <span className="tabular-nums">−{formatMXN(ticket.descuento.subtotal - ticket.total)}</span>
+                </p>
+              </>
+            )}
             <p className="flex items-baseline justify-between text-sm font-bold">
               <span>TOTAL</span>
               <span className="tabular-nums">{formatMXN(ticket.total)}</span>

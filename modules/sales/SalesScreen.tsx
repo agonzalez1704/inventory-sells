@@ -1,47 +1,53 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useQueryState, parseAsString } from "nuqs";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import NumberFlow from "@number-flow/react";
 import {
-  Search,
-  Plus,
+  Banknote,
+  FileText,
+  Loader2,
   Minus,
   Package,
-  Trash2,
+  Plus,
+  Printer,
+  QrCode,
+  Search,
   ShoppingCart,
-  Check,
+  Tag,
+  Trash2,
+  Wallet,
 } from "lucide-react";
-import { formatMXN } from "@/lib/money";
-import { buscarProductos } from "@/modules/inventory/buscar";
-import { guardarComprobante } from "./comprobantes";
-import type { PaymentMethod, PaymentMethodVenta, Product } from "@/lib/types";
+import { conDescuento, formatMXN } from "@/lib/money";
 import { foto } from "@/lib/foto";
 import { cn } from "@/lib/utils";
-import { Card } from "@/components/ui/card";
-import { BarraInferior } from "@/components/ui/barra-inferior";
-import { Input } from "@/components/ui/input";
+import type { PaymentMethodVenta, Product } from "@/lib/types";
+import { imprimirTicketNavegador, type TicketData } from "@/lib/ticket";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { EmptyState } from "@/components/ui/empty-state";
-import type { TicketData } from "@/lib/ticket";
+import { Input } from "@/components/ui/input";
+import { BarraInferior } from "@/components/ui/barra-inferior";
+import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
+import { useConfirm } from "@/components/ui/use-confirm";
 import { CustomerPicker, type PickerCustomer } from "@/modules/customers/CustomerPicker";
 import { ResumenClienteChip } from "@/modules/customers/ResumenClienteChip";
 import { CompatPanel } from "@/modules/compat/CompatPanel";
-import { AnimatePresence, m } from "framer-motion";
-import NumberFlow from "@number-flow/react";
-import { Motion } from "@/components/ui/motion";
-import { PaymentSheet } from "./PaymentSheet";
+import { buscarProductos, productosPorId, type CategoriaConteo } from "@/modules/inventory/buscar";
+import { EscanerQR } from "@/modules/inventory/EscanerQR";
+import { idDeCodigo } from "@/modules/inventory/qr";
+import { saldoDeCliente } from "@/modules/garantias/cliente-actions";
+import { misInventariosAjenos } from "@/modules/sucursales/actions";
+import { crearCotizacion } from "@/modules/cotizaciones/actions";
+import { guardarComprobante } from "./comprobantes";
+import { PaymentSheet, type Comprobante } from "./PaymentSheet";
+import { ApartarPanel } from "./ApartarPanel";
 import { ReciboImpreso } from "./ReciboImpreso";
 import { ProductoSheet } from "./ProductoSheet";
 import { CategoriaSheet } from "./CategoriaSheet";
-import type { CategoriaConteo } from "@/modules/inventory/buscar";
 import { useLongPress } from "./useLongPress";
 import type { PrecioBase } from "./pos-prefs";
 import { registerSale, registerLoan, type PagoSplit } from "./actions";
-import { saldoDeCliente } from "@/modules/garantias/cliente-actions";
-import { misInventariosAjenos } from "@/modules/sucursales/actions";
 
 export type SalesProduct = Pick<
   Product,
@@ -57,37 +63,59 @@ export type SalesProduct = Pick<
   etiqueta?: string | null;
 };
 
-const GRID_LIMIT = 30;
+export type PosCustomer = PickerCustomer & { descuento_pct?: number | null };
 
-export function Thumb({
-  src,
-  alt,
-  className,
-}: {
-  src?: string | null;
-  alt: string;
-  className?: string;
-}) {
+const GRID_LIMIT = 30;
+const CHIPS = 12;
+// The open sale survives a refresh — including the one a deploy forces
+// mid-sale. Per device: the counter laptop and a phone are different tills.
+const LS_VENTA = "pos_venta_v1";
+const LS_ULTIMA = "pos_ultima_venta_v1";
+const DESCUENTOS = [5, 10, 15, 20];
+
+type Guardado = {
+  cart: Record<string, number>;
+  customerId: string | null;
+  mode: "venta" | "prestamo";
+  note: string;
+  descManual: number | null;
+};
+type Ultima = { ticket: TicketData };
+
+function leer<T>(k: string): T | null {
+  try {
+    const v = localStorage.getItem(k);
+    return v ? (JSON.parse(v) as T) : null;
+  } catch {
+    return null;
+  }
+}
+function escribir(k: string, v: unknown) {
+  try {
+    if (v == null) localStorage.removeItem(k);
+    else localStorage.setItem(k, JSON.stringify(v));
+  } catch {
+    // Private mode / blocked storage: the sale still works, it just won't
+    // survive a refresh.
+  }
+}
+
+export function Thumb({ src, alt, className }: { src?: string | null; alt: string; className?: string }) {
   if (src) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={foto(src, 256)}
-        alt={alt}
-        loading="lazy"
-        className={cn("h-full w-full object-contain", className)}
-      />
+      <img src={foto(src, 256)} alt={alt} loading="lazy" className={cn("h-full w-full object-contain", className)} />
     );
   }
   return (
-    <span className="flex h-full w-full items-center justify-center bg-muted text-muted-foreground">
-      <Package className="h-6 w-6" />
+    <span className="flex h-full w-full items-center justify-center bg-muted text-muted-foreground/50">
+      <Package className="h-7 w-7" />
     </span>
   );
 }
 
-// Grid card (photo-first) — the whole card adds to the order, and holding it
-// opens the detail sheet instead.
+// Photo-first card: the + adds, the card body adds too (or opens the detail,
+// per the shop's setting), and holding it always opens the detail.
 function ProductCard({
   p,
   inCart,
@@ -101,241 +129,132 @@ function ProductCard({
   onAdd: () => void;
   onVerDetalle: () => void;
   precioBase: PrecioBase;
-  /** Admin's shop-wide choice: click opens the sheet instead of adding. */
   clickAbreDetalle: boolean;
 }) {
   const soldOut = p.quantity === 0;
   const maxed = inCart >= p.quantity;
   const { handlers, consumioElTap } = useLongPress(onVerDetalle);
   const alCosto = precioBase === "costo";
-  const importe = alCosto ? p.cost_cents ?? 0 : p.price_cents;
+  const importe = alCosto ? (p.cost_cents ?? 0) : p.price_cents;
   return (
-    <m.button
-      // Results fade up as they arrive instead of snapping in mid-search.
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.2 }}
-      // The lift used to be hover:-translate-y-0.5. Framer owns `transform`
-      // once it animates y, so a CSS translate on the same element would be
-      // overwritten — same 2px, moved to where it still works.
-      whileHover={soldOut || maxed ? undefined : { y: -2 }}
-      // A long press already opened the sheet; the click it leaves behind must
-      // not also drop the product into the sale.
+    <div
+      role="button"
+      tabIndex={0}
       onClick={() => {
         if (consumioElTap()) return;
         if (clickAbreDetalle) return onVerDetalle();
-        onAdd();
+        if (!soldOut && !maxed) onAdd();
       }}
+      onKeyDown={(e) => e.key === "Enter" && e.target === e.currentTarget && onAdd()}
       {...handlers}
-      // Without this the browser's own text-selection callout fires at the same
-      // time and the sheet opens under a selection handle.
       style={{ WebkitTouchCallout: "none", WebkitUserSelect: "none", userSelect: "none" }}
-      // In detail-first mode the card must stay pressable even sold out or
-      // maxed: reading the part is the point, and the sheet's own button
-      // handles "Agotado". In add-first mode the old behavior stands.
-      disabled={clickAbreDetalle ? false : soldOut || maxed}
       className={cn(
-        "group relative flex flex-col rounded-2xl border border-border bg-background p-2.5 text-left transition-all",
-        soldOut
-          ? "opacity-60"
-          : "cursor-pointer hover:border-ring/40 hover:shadow-md hover:shadow-black/5",
+        "group relative flex cursor-pointer flex-col overflow-hidden rounded-2xl border bg-background text-left shadow-xs transition-[border-color,box-shadow] outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+        inCart ? "border-foreground" : "border-border hover:border-foreground/30 hover:shadow-card",
+        soldOut && "opacity-60",
       )}
     >
       {inCart > 0 && (
-        <span className="absolute right-4 top-4 z-10 flex h-6 min-w-6 items-center justify-center rounded-full bg-accent px-1.5 text-xs font-semibold text-white shadow-sm">
+        <span className="absolute top-2 left-2 z-10 flex h-6 min-w-6 items-center justify-center rounded-full bg-foreground px-1.5 text-xs font-semibold text-background tabular-nums">
           {inCart}
         </span>
       )}
-      <div className="relative mb-2 aspect-square overflow-hidden rounded-xl bg-background">
+      <div className="relative aspect-square bg-muted/60">
         <Thumb src={p.image_url} alt={p.name} className="transition-transform duration-300 group-hover:scale-105" />
-        {soldOut && (
-          <span className="absolute inset-x-0 bottom-0 bg-red-600/90 py-0.5 text-center text-[10px] font-semibold text-white">
-            Agotado
-          </span>
-        )}
-        {!soldOut && !maxed && (
-          // A real control, not decoration: in detail-first mode the card body
-          // opens the sheet, so the + is the one-tap add that mode takes away.
-          // stopPropagation keeps the tap from ALSO opening the sheet. Bigger
-          // on phones — 40px is a thumb target, 32px was a stylus one.
-          <span
-            role="button"
-            aria-label={`Agregar ${p.name}`}
-            onClick={(e) => {
-              e.stopPropagation();
-              onAdd();
-            }}
-            className="absolute bottom-1.5 right-1.5 flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md transition-transform group-hover:scale-110 active:scale-95 sm:h-8 sm:w-8"
-          >
-            <Plus className="h-5 w-5 sm:h-4 sm:w-4" />
-          </span>
-        )}
-      </div>
-      {/* The part number, first and unmissable. Searching "SHN07" returns the
-          721 and the 712 of the same family, and the code is the only thing
-          that tells them apart — the names differ by a word buried mid-string,
-          which is no use when you are scanning a grid. */}
-      <p className="flex items-baseline justify-between gap-1 font-mono text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-        <span className="truncate">{p.sku}</span>
-        {p.sucursal_ajena ? (
-          <span className="shrink-0 rounded-sm bg-amber-100 px-1 font-sans text-[10px] font-semibold normal-case text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">
-            En {p.sucursal_ajena}
-          </span>
+        {soldOut ? (
+          <span className="absolute inset-x-0 bottom-0 bg-red-600/90 py-0.5 text-center text-[11px] font-semibold text-white">Agotado</span>
         ) : (
-          p.inventory_name && (
-            <span className="shrink-0 rounded-sm bg-muted px-1 font-sans text-[10px] font-medium normal-case">
-              {p.inventory_name}
-            </span>
+          !maxed && (
+            <button
+              type="button"
+              aria-label={`Agregar ${p.name}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                onAdd();
+              }}
+              className="absolute right-2 bottom-2 flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-primary text-primary-foreground shadow-pop transition-transform active:scale-95 group-hover:scale-105"
+            >
+              <Plus className="h-5 w-5" />
+            </button>
           )
         )}
-      </p>
-      <p className="line-clamp-2 min-h-9 text-sm font-medium leading-tight">
-        {p.name}
-      </p>
-      {(p.brand || p.category) && (
-        <p className="mt-0.5 truncate text-xs capitalize text-muted-foreground">
-          {[p.brand, p.category].filter(Boolean).join(" · ")}
+      </div>
+      <div className="flex flex-1 flex-col gap-0.5 px-2.5 pt-2 pb-2.5">
+        {/* The part number tells apart the 721 and the 712 of one family —
+            the names differ by a word buried mid-string. */}
+        <p className="flex items-center justify-between gap-1 font-mono text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+          <span className="truncate">{p.sku}</span>
+          {p.sucursal_ajena && (
+            <span className="shrink-0 rounded-sm bg-amber-100 px-1 font-sans text-[10px] font-semibold normal-case text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">
+              En {p.sucursal_ajena}
+            </span>
+          )}
         </p>
-      )}
-      <div className="mt-1 flex items-center justify-between gap-1">
-        {importe ? (
+        <p className="line-clamp-2 text-sm leading-tight font-semibold">{p.name}</p>
+        <p className="truncate text-xs text-muted-foreground capitalize">{p.category || p.inventory_name}</p>
+        <div className="mt-auto flex items-center justify-between gap-1 pt-1">
+          {importe ? (
+            <span className={cn("text-base font-semibold tabular-nums", alCosto && "text-amber-700 dark:text-amber-400")}>
+              {alCosto && <span className="mr-1 text-[10px] font-medium uppercase">costo</span>}
+              {formatMXN(importe).replace(".00", "")}
+            </span>
+          ) : (
+            <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+              Sin precio
+            </span>
+          )}
           <span
             className={cn(
-              "font-mono text-sm font-semibold tabular-nums",
-              // Cost is a different number with the same shape as the price,
-              // and confusing the two at the counter charges the wrong amount.
-              // Different colour and an explicit label, not just a swap.
-              alCosto ? "text-amber-700 dark:text-amber-400" : "text-accent",
+              "shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium tabular-nums",
+              p.quantity <= 3 && !soldOut
+                ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+                : "bg-muted text-muted-foreground",
             )}
           >
-            {alCosto && <span className="mr-1 text-[10px] font-medium uppercase">costo</span>}
-            {formatMXN(importe)}
+            {soldOut ? "—" : `${p.quantity} disp.`}
           </span>
-        ) : (
-          <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700 ring-1 ring-inset ring-amber-600/20 dark:bg-amber-950/40 dark:text-amber-300">
-            Sin precio
-          </span>
-        )}
-        <span className="shrink-0 text-[11px] text-muted-foreground">
-          {soldOut ? "—" : `${p.quantity} disp.`}
-        </span>
+        </div>
       </div>
-    </m.button>
+    </div>
   );
 }
 
-// Compact row — used by the AI "compatible models" fallback list.
-function ProductRow({
-  p,
-  inCart,
-  onAdd,
-  onVerDetalle,
-  clickAbreDetalle,
-}: {
-  p: SalesProduct;
-  inCart: number;
-  onAdd: () => void;
-  onVerDetalle: () => void;
-  clickAbreDetalle: boolean;
-}) {
-  const soldOut = p.quantity === 0;
-  const maxed = inCart >= p.quantity;
+// Compact row — the AI "compatible models" fallback list.
+function ProductRow({ p, inCart, onAdd }: { p: SalesProduct; inCart: number; onAdd: () => void }) {
+  const off = p.quantity === 0 || inCart >= p.quantity;
   return (
     <button
-      onClick={clickAbreDetalle ? onVerDetalle : onAdd}
-      // In detail-first mode the card must stay pressable even sold out or
-      // maxed: reading the part is the point, and the sheet's own button
-      // handles "Agotado". In add-first mode the old behavior stands.
-      disabled={clickAbreDetalle ? false : soldOut || maxed}
-      className={cn(
-        "flex w-full items-center gap-3 rounded-xl border border-border bg-background p-2.5 text-left transition-colors",
-        soldOut || maxed
-          ? "opacity-60"
-          : "cursor-pointer hover:border-ring/30 hover:bg-muted/40 active:bg-muted",
-      )}
+      type="button"
+      onClick={onAdd}
+      disabled={off}
+      className="flex w-full cursor-pointer items-center gap-3 rounded-xl border border-border bg-background p-2.5 text-left hover:bg-muted/40 disabled:cursor-default disabled:opacity-60"
     >
       <span className="h-10 w-10 shrink-0 overflow-hidden rounded-lg">
         <Thumb src={p.image_url} alt={p.name} />
       </span>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium">{p.name}</p>
-        {/* The code was only a fallback here. On a line the seller is about to
-            charge for, it is the thing they check against the shelf. */}
-        <p className="truncate text-xs text-muted-foreground">
-          <span className="font-mono font-medium uppercase">{p.sku}</span>
-          {[p.brand, p.category].filter(Boolean).length > 0 && (
-            <span className="capitalize">
-              {" · "}
-              {[p.brand, p.category].filter(Boolean).join(" · ")}
-            </span>
-          )}
-          {p.sucursal_ajena ? (
-            <span className="font-semibold text-amber-700 dark:text-amber-400">{" · "}En {p.sucursal_ajena}</span>
-          ) : (
-            p.inventory_name && <span>{" · "}{p.inventory_name}</span>
-          )}
-        </p>
-      </div>
-      <span className="shrink-0 font-mono text-sm font-semibold tabular-nums">
-        {p.price_cents ? (
-          formatMXN(p.price_cents)
-        ) : (
-          <span className="font-sans text-xs font-medium text-amber-700 dark:text-amber-300">
-            Sin precio
-          </span>
-        )}
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-medium">{p.name}</span>
+        <span className="block truncate font-mono text-xs text-muted-foreground uppercase">{p.sku}</span>
       </span>
-      <span
-        className={cn(
-          "flex h-7 w-7 shrink-0 items-center justify-center rounded-full",
-          soldOut || maxed ? "bg-muted text-muted-foreground" : "bg-primary text-primary-foreground",
-        )}
-      >
-        <Plus className="h-4 w-4" />
-      </span>
+      <span className="shrink-0 text-sm font-semibold tabular-nums">{p.price_cents ? formatMXN(p.price_cents) : "Sin precio"}</span>
+      <Plus className="h-4 w-4 shrink-0" />
     </button>
   );
 }
 
-function Stepper({
-  value,
-  onDec,
-  onInc,
-  canInc,
-}: {
-  value: number;
-  onDec: () => void;
-  onInc: () => void;
-  canInc: boolean;
-}) {
+function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
-    // inline-flex, not flex: a block-level flex box stretches to the full width
-    // of its parent, so the fixed-width buttons packed left and left a big empty
-    // bordered gap to the right. inline-flex sizes the control to its contents.
-    <div className="inline-flex items-center overflow-hidden rounded-lg border border-border">
-      <m.button
-        whileTap={{ scale: 0.95 }}
-        onClick={onDec}
-        aria-label="Quitar uno"
-        className="flex h-8 w-9 cursor-pointer items-center justify-center text-muted-foreground transition-colors hover:bg-muted active:bg-muted"
-      >
-        <Minus className="h-3.5 w-3.5" />
-      </m.button>
-      {/* The number rolls rather than swapping, so a mistaken double-tap is
-          visible as movement instead of a digit that was already different. */}
-      <div className="flex h-8 min-w-9 items-center justify-center border-x border-border px-1 text-sm font-medium tabular-nums">
-        <NumberFlow value={value} />
-      </div>
-      <m.button
-        whileTap={{ scale: 0.95 }}
-        onClick={onInc}
-        disabled={!canInc}
-        aria-label="Agregar uno"
-        className="flex h-8 w-9 cursor-pointer items-center justify-center text-muted-foreground transition-colors hover:bg-muted active:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
-      >
-        <Plus className="h-3.5 w-3.5" />
-      </m.button>
-    </div>
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        "inline-flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border px-3.5 text-sm whitespace-nowrap capitalize",
+        active ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background hover:bg-muted",
+      )}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -349,65 +268,52 @@ export function SalesScreen({
   clickAbreDetalle,
   comprobanteObligatorio = false,
   inventariosAjenos: inventariosAjenosProp = {},
+  esAdmin = false,
+  puedeCotizar = false,
 }: {
   /** First page of the catalog, rendered before any search runs. */
   products: SalesProduct[];
-  /** Counted in SQL — deriving these needs the whole catalog, which is the
-   *  thing we stopped shipping. The count is what decides which ones are worth
-   *  a chip: Ruli has 216 and they are opaque ERP codes. */
   categorias: CategoriaConteo[];
-  customers: PickerCustomer[];
-  /** Gates cost and margin in the detail sheet — the same permiso as elsewhere. */
+  customers: PosCustomer[];
   verCostos: boolean;
-  /** This user's own choice of which figure the cards show. */
   precioBase: PrecioBase;
-  /** This shop's rule, not the code's: Ruli demands a registered debtor, Fiable
-   *  cannot make a walk-in stand still to be registered. */
+  /** Ruli demands a registered debtor; Fiable lets a walk-in owe with a note. */
   fiadoExigeCliente: boolean;
-  /** Admin's shop-wide POS behavior: click opens detail instead of adding. */
   clickAbreDetalle: boolean;
-  /** Shop rule: a transfer needs its proof before the charge completes. */
   comprobanteObligatorio?: boolean;
-  /** inventory_id -> sucursal where that stock physically sits. Visible on the
-   *  grid ("se lo mando traer" is a sale) but not addable to the cart. */
+  /** inventory_id -> sucursal where that stock sits: visible, not sellable here. */
   inventariosAjenos?: Record<string, string>;
+  /** Manual discount is the admin's call; the RPC enforces it too. */
+  esAdmin?: boolean;
+  puedeCotizar?: boolean;
 }) {
   const router = useRouter();
-  const mostrador = useMemo(
-    () => customers.find((c) => c.is_system) ?? customers[0],
-    [customers],
-  );
-  // The search box lives in the URL so a refresh — including the one a new
-  // deploy forces mid-sale — doesn't wipe what the seller was looking for.
-  const [query, setQuery] = useQueryState(
-    "q",
-    parseAsString.withDefault("").withOptions({ history: "replace" }),
-  );
+  const [confirmar, confirmDialog] = useConfirm();
+  const mostrador = useMemo(() => customers.find((c) => c.is_system) ?? customers[0], [customers]);
+  const [query, setQuery] = useQueryState("q", parseAsString.withDefault("").withOptions({ history: "replace" }));
   const [categoria, setCategoria] = useState<string | null>(null);
   const [cart, setCart] = useState<Record<string, number>>({});
   const [mode, setMode] = useState<"venta" | "prestamo">("venta");
-  const [customer, setCustomer] = useState<PickerCustomer>(mostrador);
+  const [customer, setCustomer] = useState<PosCustomer>(mostrador);
   const [note, setNote] = useState("");
-  // Held open by the card the seller pressed, not by an id: the grid re-reads
-  // itself from the server while the sheet is open, and an id would point at a
-  // row that is no longer in the page.
+  const [descManual, setDescManual] = useState<number | null>(null);
+  const [editDesc, setEditDesc] = useState(false);
   const [detalle, setDetalle] = useState<SalesProduct | null>(null);
-  // Read per customer, not once: the seller switches customer mid-sale and the
-  // credit belongs to whoever is standing there now.
   const [saldo, setSaldo] = useState(0);
   const [catsAbiertas, setCatsAbiertas] = useState(false);
+  const [paymentOpen, setPaymentOpen] = useState(false);
+  const [apartarOpen, setApartarOpen] = useState(false);
+  const [carritoOpen, setCarritoOpen] = useState(false);
+  const [escaneando, setEscaneando] = useState(false);
+  const [recibo, setRecibo] = useState<{ ticket: TicketData; usoSaldo: number; saldoRestante: number } | null>(null);
+  const [ultima, setUltima] = useState<Ultima | null>(null);
+  const [restaurado, setRestaurado] = useState(false);
+  const [pending, startTransition] = useTransition();
+  const [cotizando, startCotizar] = useTransition();
+  const buscador = useRef<HTMLInputElement>(null);
 
-  // Chips are for the categories people actually reach for. On Ruli the twelve
-  // biggest cover 16,680 of 19,237 products — 87% — and rendering all 216 is
-  // what buried the product grid under a wall of five-letter codes.
-  //
-  // The selected one is pinned in even when it is not in the top twelve, or
-  // picking from the sheet would leave nothing on screen showing what is on.
-  const CHIPS = 12;
   const chips = useMemo(() => {
-    const orden = [...categorias].sort(
-      (a, b) => b.productos - a.productos || a.categoria.localeCompare(b.categoria, "es"),
-    );
+    const orden = [...categorias].sort((a, b) => b.productos - a.productos || a.categoria.localeCompare(b.categoria, "es"));
     const top = orden.slice(0, CHIPS);
     if (categoria && !top.some((c) => c.categoria === categoria)) {
       const elegida = orden.find((c) => c.categoria === categoria);
@@ -415,18 +321,15 @@ export function SalesScreen({
     }
     return top;
   }, [categorias, categoria]);
-  // LIVE branch-block map. Starts from the server prop but re-fetches on
-  // mount and whenever the tab regains focus: the counter laptop keeps this
-  // page open for days, and yesterday's map was refusing today's counter.
+
+  // LIVE branch-block map: the counter laptop keeps this page open for days,
+  // and yesterday's map was refusing today's counter.
   const [inventariosAjenos, setInventariosAjenos] = useState(inventariosAjenosProp);
   useEffect(() => {
     let on = true;
-    const refrescar = () =>
-      misInventariosAjenos().then((m) => on && setInventariosAjenos(m)).catch(() => undefined);
+    const refrescar = () => misInventariosAjenos().then((m) => on && setInventariosAjenos(m)).catch(() => undefined);
     refrescar();
-    const onFocus = () => {
-      if (document.visibilityState === "visible") refrescar();
-    };
+    const onFocus = () => document.visibilityState === "visible" && refrescar();
     document.addEventListener("visibilitychange", onFocus);
     window.addEventListener("focus", onFocus);
     return () => {
@@ -435,28 +338,16 @@ export function SalesScreen({
       window.removeEventListener("focus", onFocus);
     };
   }, []);
-  const [paymentOpen, setPaymentOpen] = useState(false);
-  const [recibo, setRecibo] = useState<{
-    ticket: TicketData;
-    usoSaldo: number;
-    saldoRestante: number;
-  } | null>(null);
-  const [pending, startTransition] = useTransition();
 
-  // Re-created when the server hands down a fresh map (e.g. right after the
-  // seller's check-in refreshes the page) — memoizing it once froze the
-  // pre-check-in blocks and refused the seller's own branch.
   const marcarAjenos = useCallback(
-    (ps: SalesProduct[]) =>
-      ps.map((p) => ({ ...p, sucursal_ajena: inventariosAjenos[p.inventory_id ?? ""] ?? null })),
+    (ps: SalesProduct[]) => ps.map((p) => ({ ...p, sucursal_ajena: inventariosAjenos[p.inventory_id ?? ""] ?? null })),
     [inventariosAjenos],
   );
   const [results, setResults] = useState<SalesProduct[]>(() => marcarAjenos(products));
   const [buscando, setBuscando] = useState(false);
 
-  // Every product the register has ever shown this session. The cart holds ids,
-  // and results are now a page of the catalog rather than all of it — without
-  // this, changing the search would drop items out of the open sale.
+  // Every product the register has shown this session: the cart holds ids and
+  // results are only a page of the catalog.
   const [conocidos, setConocidos] = useState<Record<string, SalesProduct>>(() =>
     Object.fromEntries(products.map((p) => [p.id, p])),
   );
@@ -467,21 +358,50 @@ export function SalesScreen({
       return next;
     });
   }, []);
-  const byId = conocidos;
 
-  // Search runs in the database now: at 21k products the catalog is too big to
-  // ship to the browser, let alone re-filter on every keystroke. Debounced so
-  // typing costs one query, not one per character.
+  // ---- Restore the open sale (once), re-reading stock and price fresh.
+  useEffect(() => {
+    const g = leer<Guardado>(LS_VENTA);
+    setUltima(leer<Ultima>(LS_ULTIMA));
+    if (!g || !Object.keys(g.cart ?? {}).length) {
+      setRestaurado(true);
+      return;
+    }
+    productosPorId(Object.keys(g.cart))
+      .then((ps) => {
+        recordar(ps as SalesProduct[]);
+        const stock = new Map(ps.map((p) => [p.id, p.quantity]));
+        const limpio: Record<string, number> = {};
+        for (const [id, q] of Object.entries(g.cart)) {
+          const n = Math.min(q, stock.get(id) ?? 0);
+          if (n > 0) limpio[id] = n;
+        }
+        setCart(limpio);
+        setMode(g.mode ?? "venta");
+        setNote(g.note ?? "");
+        if (esAdmin) setDescManual(g.descManual ?? null);
+        const c = customers.find((x) => x.id === g.customerId);
+        if (c) setCustomer(c);
+        if (Object.keys(limpio).length) toast("Se recuperó la venta que estaba en curso");
+      })
+      .catch(() => undefined)
+      .finally(() => setRestaurado(true));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!restaurado) return;
+    const vacia = !Object.keys(cart).length;
+    escribir(LS_VENTA, vacia ? null : ({ cart, customerId: customer.id, mode, note, descManual } satisfies Guardado));
+  }, [restaurado, cart, customer.id, mode, note, descManual]);
+
+  // ---- Search runs in the database, debounced.
   useEffect(() => {
     let cancelado = false;
     setBuscando(true);
     const t = setTimeout(async () => {
       try {
-        const rows = (await buscarProductos({
-          query,
-          categoria,
-          limit: GRID_LIMIT,
-        })) as SalesProduct[];
+        const rows = (await buscarProductos({ query, categoria, limit: GRID_LIMIT })) as SalesProduct[];
         if (cancelado) return;
         setResults(marcarAjenos(rows));
         recordar(rows);
@@ -495,51 +415,52 @@ export function SalesScreen({
       cancelado = true;
       clearTimeout(t);
     };
-    // Same reason as the inventory list: this grid feeds itself from the server
-    // now, so the router.refresh() after a sale never reached it and the card
-    // kept showing the stock the shelf had before the sale. A refresh re-runs the
-    // server component and hands down a new `products` array — that is the cue.
+    // A router.refresh() after a sale hands down a new `products`: the cue to
+    // re-read stock on the cards.
   }, [query, categoria, recordar, products, marcarAjenos]);
 
-  const buscarCompat = useCallback(async (modelo: string) => {
-    const rows = (await buscarProductos({ query: modelo, limit: 4 })) as SalesProduct[];
-    recordar(rows);
-    return rows;
-  }, [recordar]);
+  const buscarCompat = useCallback(
+    async (modelo: string) => {
+      const rows = (await buscarProductos({ query: modelo, limit: 4 })) as SalesProduct[];
+      recordar(rows);
+      return rows;
+    },
+    [recordar],
+  );
 
+  // ---- The sale's numbers.
+  const pctCliente = customer.is_system ? 0 : Number(customer.descuento_pct) || 0;
+  const pct = descManual ?? pctCliente;
+  const origen: "manual" | "cliente" | null = descManual != null ? (descManual > 0 ? "manual" : null) : pctCliente > 0 ? "cliente" : null;
   const lines = Object.entries(cart)
-    .map(([id, qty]) => ({ product: byId[id], qty }))
+    .map(([id, qty]) => ({ product: conocidos[id], qty }))
     .filter((l) => l.product);
-  const total = lines.reduce((s, l) => s + l.product.price_cents * l.qty, 0);
+  const subtotal = lines.reduce((s, l) => s + l.product.price_cents * l.qty, 0);
+  const total = lines.reduce((s, l) => s + conDescuento(l.product.price_cents, pct) * l.qty, 0);
   const count = lines.reduce((s, l) => s + l.qty, 0);
+  const etiquetaDesc = origen === "manual" ? `Descuento especial · ${pct}%` : `Descuento del cliente · ${pct}%`;
 
   function add(p: SalesProduct) {
-    // The LIVE prop map decides, never the row decoration — a stale card
-    // must not refuse stock the seller can sell since checking in.
     const ajena = inventariosAjenos[p.inventory_id ?? ""];
     if (ajena) {
-      toast.error(
-        `${p.name} está en la sucursal ${ajena}. Ofrécelo y mándalo traer — se cobra desde allá.`,
-      );
-      return;
+      toast.error(`${p.name} está en la sucursal ${ajena}. Ofrécelo y mándalo traer — se cobra desde allá.`);
+      return false;
     }
-    // Imported catalogs carry products their ERP never priced. They have to be
-    // visible — staff need to see the part exists — but the database rejects a
-    // sale line at zero, so stop it here with an answer instead of an error.
     if (!p.price_cents) {
       toast.error(`${p.name} no tiene precio. Asígnalo en Inventario.`);
-      return;
+      return false;
     }
-    setCart((c) => {
-      const cur = c[p.id] ?? 0;
-      if (cur >= p.quantity) return c;
-      return { ...c, [p.id]: cur + 1 };
-    });
+    if ((cart[p.id] ?? 0) >= p.quantity) {
+      toast.error(p.quantity ? `Solo hay ${p.quantity} de ${p.name}` : `${p.name} está agotado`);
+      return false;
+    }
+    recordar([p]);
+    setCart((c) => ({ ...c, [p.id]: Math.min((c[p.id] ?? 0) + 1, p.quantity) }));
+    return true;
   }
   function setQty(id: string, qty: number) {
     setCart((c) => {
-      const max = byId[id]?.quantity ?? 0;
-      const next = Math.max(0, Math.min(qty, max));
+      const next = Math.max(0, Math.min(qty, conocidos[id]?.quantity ?? 0));
       if (next === 0) {
         const { [id]: _omit, ...rest } = c;
         return rest;
@@ -547,26 +468,67 @@ export function SalesScreen({
       return { ...c, [id]: next };
     });
   }
-  function remove(id: string) {
-    setCart((c) => {
-      const { [id]: _omit, ...rest } = c;
-      return rest;
-    });
+
+  function limpiar() {
+    setCart({});
+    setCustomer(mostrador);
+    setNote("");
+    setDescManual(null);
+    setEditDesc(false);
+    setMode("venta");
+  }
+  async function pedirLimpiar() {
+    if (!lines.length) return;
+    const ok = await confirmar({ title: "¿Vaciar la venta?", description: `Se quitan ${count} piezas del carrito.`, confirmLabel: "Vaciar", tone: "danger" });
+    if (ok) {
+      limpiar();
+      setCarritoOpen(false);
+    }
   }
 
-  // A credit note is a debt, and somebody has to be identifiable as owing it.
-  // Which shop demands a registered customer is a business rule, so it arrives
-  // from config. Where a walk-in debt is allowed the note becomes the debtor —
-  // the only thing on the row that will ever say who owes — so it is required
-  // there, and required means an identification and not two characters. The
-  // length matches the database, which is the actual guard.
+  // Enter in the search (or a USB scanner, which types the code + Enter): a
+  // label link adds that product; anything else adds the exact SKU, or the top
+  // hit. Looked up fresh — a scanner is faster than the debounce.
+  async function agregarDeTexto(texto: string) {
+    const t = texto.trim();
+    if (!t) return;
+    const id = idDeCodigo(t);
+    let p: SalesProduct | undefined;
+    if (id) {
+      p = ((await productosPorId([id])) as SalesProduct[])[0];
+      if (!p) return void toast.error("Esa etiqueta no es de un producto de esta tienda");
+    } else {
+      const rows = (await buscarProductos({ query: t, limit: 5 })) as SalesProduct[];
+      p = rows.find((r) => r.sku.toLowerCase() === t.toLowerCase()) ?? rows.find((r) => r.quantity > 0) ?? rows[0];
+      if (!p) return void toast.error(`Nada coincide con “${t}”`);
+    }
+    if (add(p)) {
+      toast.success(`Agregado · ${p.name}`, { duration: 1500 });
+      setQuery("");
+    }
+  }
+
+  // The camera scanner keeps reading until closed; the same label twice within
+  // two seconds is one read, not two pieces.
+  const ultimoEscaneo = useRef<{ texto: string; t: number } | null>(null);
+  const [escKey, setEscKey] = useState(0);
+  // Stable: the scanner restarts its camera whenever this identity changes.
+  const cerrarEscaner = useCallback(() => setEscaneando(false), []);
+  async function alEscanear(texto: string) {
+    const ahora = Date.now();
+    const u = ultimoEscaneo.current;
+    ultimoEscaneo.current = { texto, t: ahora };
+    if (!(u && u.texto === texto && ahora - u.t < 2000)) await agregarDeTexto(texto);
+    setTimeout(() => setEscKey((k) => k + 1), 900);
+  }
+
+  // Credit rules — the database is the actual guard; this says why the
+  // button is grey before anyone presses it.
   const aMostrador = mode === "prestamo" && customer.is_system;
   const faltaCliente = aMostrador && fiadoExigeCliente;
   const faltaNota = aMostrador && !fiadoExigeCliente && note.trim().length < 5;
+  const canSubmit = lines.length > 0 && !faltaCliente && !faltaNota && !pending;
 
-  // Mostrador can never hold credit, so it is not even asked for. Cleared on
-  // every switch before the fetch lands: showing the previous customer's credit
-  // for a beat is how the wrong person spends it.
   useEffect(() => {
     setSaldo(0);
     if (customer.is_system) return;
@@ -578,34 +540,31 @@ export function SalesScreen({
       cancelado = true;
     };
   }, [customer.id, customer.is_system]);
-  const canSubmit = lines.length > 0 && !faltaCliente && !faltaNota;
 
-  function submit(
-    metodo?: PaymentMethodVenta,
-    pagos?: PagoSplit[],
-    comprobante?: { referencia: string | null; foto: File | null; cuentaId: string | null },
-  ) {
+  function submit(metodo?: PaymentMethodVenta, pagos?: PagoSplit[], comprobante?: Comprobante) {
     if (!canSubmit) return;
     const items = lines.map((l) => ({ product_id: l.product.id, qty: l.qty }));
-    // Snapshot ticket data now — the cart is cleared before the user taps
-    // "Imprimir" in the toast, so the closure must capture, not read state.
     const esFiado = mode === "prestamo";
     const pm: PaymentMethodVenta = metodo ?? "efectivo";
-    const ticketItems = lines.map((l) => ({
-      nombre: l.product.name,
-      qty: l.qty,
-      precioUnit: l.product.price_cents,
-      total: l.product.price_cents * l.qty,
-    }));
-    const ticketTotal = total;
-    const ticketCliente = customer.is_system ? null : customer.nombre;
-    const ticketPago = esFiado ? null : pm;
+    const manual = esAdmin && descManual != null ? descManual : null;
+    // Snapshot now — the cart is cleared before anyone taps "Imprimir".
+    const ticketBase = {
+      items: lines.map((l) => {
+        const u = conDescuento(l.product.price_cents, pct);
+        return { nombre: l.product.name, qty: l.qty, precioUnit: u, total: u * l.qty };
+      }),
+      total,
+      metodoPago: esFiado ? null : pm,
+      cliente: customer.is_system ? null : customer.nombre,
+      tipo: (esFiado ? "fiado" : "venta") as TicketData["tipo"],
+      descuento: origen ? { subtotal, etiqueta: etiquetaDesc } : null,
+    };
 
     startTransition(async () => {
       try {
         const { saleId } = esFiado
-          ? await registerLoan(items, customer.is_system ? null : customer.id, note)
-          : await registerSale(items, pm, customer.id, pagos);
+          ? await registerLoan(items, customer.is_system ? null : customer.id, note, manual)
+          : await registerSale(items, pm, customer.id, pagos, manual);
 
         // Transfer proof rides AFTER the sale: its failure downgrades a toast,
         // never the charge.
@@ -618,28 +577,15 @@ export function SalesScreen({
           const rc = await guardarComprobante(saleId, comprobante.referencia, form, comprobante.cuentaId);
           if (!rc.ok) toast.error(`Venta ok, pero el comprobante no se guardó: ${rc.error}`);
         }
-        const ticket: TicketData = {
-          folio: saleId,
-          fecha: new Date().toISOString(),
-          items: ticketItems,
-          total: ticketTotal,
-          metodoPago: ticketPago,
-          cliente: ticketCliente,
-          tipo: esFiado ? "fiado" : "venta",
-        };
-        // What was spent of the credit, and what is left. The point of a
-        // partial spend is that the rest stays with the customer, and the
-        // seller has to be able to tell them so before they walk out.
+        const ticket: TicketData = { folio: saleId, fecha: new Date().toISOString(), ...ticketBase };
         const usoSaldo = (pagos ?? []).find((p) => p.metodo === "saldo")?.monto_cents ?? 0;
-        const restante = Math.max(0, saldo - usoSaldo);
-        // The printed-receipt overlay IS the success feedback now — it carries
-        // the same TicketData the toast's Imprimir button used to.
-        setRecibo({ ticket, usoSaldo, saldoRestante: restante });
-        setCart({});
-        setCustomer(mostrador);
-        setNote("");
+        setRecibo({ ticket, usoSaldo, saldoRestante: Math.max(0, saldo - usoSaldo) });
+        setUltima({ ticket });
+        escribir(LS_ULTIMA, { ticket });
+        limpiar();
         setQuery("");
         setPaymentOpen(false);
+        setCarritoOpen(false);
         router.refresh();
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Error al registrar");
@@ -647,55 +593,321 @@ export function SalesScreen({
     });
   }
 
-  // Venta opens the payment sheet; fiado registers directly.
   function onCta() {
     if (!canSubmit) return;
     if (mode === "prestamo") submit();
     else setPaymentOpen(true);
   }
 
-  const cta = mode === "prestamo" ? "Registrar crédito" : "Cobrar";
+  function cotizar() {
+    if (!lines.length) return;
+    startCotizar(async () => {
+      const r = await crearCotizacion(
+        lines.map((l) => ({ product_id: l.product.id, qty: l.qty })),
+        customer.is_system ? null : customer.id,
+        null,
+        "",
+        "mostrador",
+        "borrador",
+      );
+      if (!r.ok) {
+        toast.error(r.error);
+        return;
+      }
+      toast.success(`Cotización ${r.data.folio} creada`);
+      limpiar();
+      router.push(`/cotizaciones/${r.data.id}`);
+    });
+  }
+
+  // ---- Keyboard: F2 charges, F4 switches to credit, Esc clears. Any other
+  // key typed with focus nowhere lands in the search (a USB scanner too).
+  const hayOverlay = paymentOpen || apartarOpen || carritoOpen || escaneando || !!detalle || !!recibo || catsAbiertas;
+  const teclado = useRef({ onCta, pedirLimpiar, hayOverlay, query });
+  teclado.current = { onCta, pedirLimpiar, hayOverlay, query };
+  useEffect(() => {
+    const tecla = (e: KeyboardEvent) => {
+      const k = teclado.current;
+      if (k.hayOverlay) return;
+      if (e.key === "F2") {
+        e.preventDefault();
+        k.onCta();
+      } else if (e.key === "F4") {
+        e.preventDefault();
+        setMode((m) => (m === "venta" ? "prestamo" : "venta"));
+      } else if (e.key === "Escape") {
+        if (k.query) setQuery("");
+        else k.pedirLimpiar();
+      } else {
+        const t = e.target as HTMLElement | null;
+        const enCampo = t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable);
+        if (!enCampo && e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) buscador.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", tecla);
+    return () => window.removeEventListener("keydown", tecla);
+  }, [setQuery]);
+
+  const hora = (iso: string) => new Date(iso).toLocaleTimeString("es-MX", { hour: "numeric", minute: "2-digit" });
+  const resumenCobro = `${count} ${count === 1 ? "pieza" : "piezas"}${customer.is_system ? "" : ` · ${customer.nombre}`}`;
+
+  // ---- The order panel: the right column on a counter, a sheet on a phone.
+  const orden = (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+        <h2 className="text-[15px] font-semibold">Venta en curso</h2>
+        {count > 0 && (
+          <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground tabular-nums">
+            {count} {count === 1 ? "pieza" : "piezas"}
+          </span>
+        )}
+        <div className="ml-auto inline-flex rounded-lg bg-muted p-0.5 text-sm">
+          {(["venta", "prestamo"] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => setMode(m)}
+              className={cn(
+                "h-8 cursor-pointer rounded-md px-3 font-medium",
+                mode === m ? "bg-background text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {m === "venta" ? "Venta" : "Crédito"}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div data-base-ui-swipe-ignore className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+        {lines.length === 0 ? (
+          <div className="flex flex-col items-center gap-2 px-6 py-10 text-center text-sm text-muted-foreground">
+            <ShoppingCart className="h-8 w-8 text-muted-foreground/40" />
+            Toca un producto, escanea su etiqueta o escribe y presiona Enter.
+          </div>
+        ) : (
+          <ul className="divide-y divide-border px-4">
+            {lines.map((l) => {
+              const u = conDescuento(l.product.price_cents, pct);
+              return (
+                <li key={l.product.id} className="flex items-center gap-2.5 py-2.5">
+                  <span className="h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-border">
+                    <Thumb src={l.product.image_url} alt={l.product.name} />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[13px] font-semibold">{l.product.name}</p>
+                    <p className="truncate text-[11px] text-muted-foreground">
+                      {formatMXN(l.product.price_cents).replace(".00", "")} c/u
+                      {l.product.inventory_name && ` · ${l.product.inventory_name}`}
+                    </p>
+                  </div>
+                  <div className="flex h-9 items-center overflow-hidden rounded-lg border border-border">
+                    <button
+                      type="button"
+                      aria-label="Una menos"
+                      onClick={() => setQty(l.product.id, l.qty - 1)}
+                      className="flex h-full w-8 cursor-pointer items-center justify-center text-muted-foreground hover:bg-muted"
+                    >
+                      {l.qty === 1 ? <Trash2 className="h-3.5 w-3.5" /> : <Minus className="h-3.5 w-3.5" />}
+                    </button>
+                    <span className="w-7 text-center text-sm font-semibold tabular-nums">{l.qty}</span>
+                    <button
+                      type="button"
+                      aria-label="Una más"
+                      disabled={l.qty >= l.product.quantity}
+                      onClick={() => setQty(l.product.id, l.qty + 1)}
+                      className="flex h-full w-8 cursor-pointer items-center justify-center text-muted-foreground hover:bg-muted disabled:cursor-default disabled:opacity-30"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  <span className="w-20 text-right text-sm font-semibold tabular-nums">{formatMXN(u * l.qty)}</span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+
+        <div className="space-y-2.5 px-4 pt-1 pb-3">
+          <CustomerPicker customers={customers} value={customer} onChange={(c) => setCustomer(c as PosCustomer)} />
+          {!customer.is_system && <ResumenClienteChip customerId={customer.id} />}
+          {mode === "prestamo" && (
+            <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-900 dark:bg-amber-950/30">
+              <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">Se registra como nota de crédito</p>
+              <Input
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder={aMostrador ? "¿Quién debe? Nombre, teléfono o seña" : "¿Qué se acordó? Plazo, referencia…"}
+                className="h-10 bg-background text-base sm:text-sm"
+              />
+              {faltaCliente && <p className="text-xs text-amber-800 dark:text-amber-300">Un crédito necesita cliente registrado. Elige o crea uno arriba.</p>}
+              {aMostrador && !fiadoExigeCliente && (
+                <p className="text-xs text-amber-800 dark:text-amber-300">Sin cliente registrado, la nota es lo único que dirá quién debe.</p>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="space-y-1.5 border-t border-border bg-muted/30 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:pb-3">
+        {(origen || esAdmin) && lines.length > 0 && (
+          <>
+            <div className="flex justify-between text-[13px]">
+              <span className="text-muted-foreground">Piezas</span>
+              <span className="tabular-nums">{formatMXN(subtotal)}</span>
+            </div>
+            <div className="flex items-center justify-between gap-2 text-[13px]">
+              {esAdmin ? (
+                <button
+                  type="button"
+                  onClick={() => setEditDesc((v) => !v)}
+                  className="inline-flex cursor-pointer items-center gap-1 text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                >
+                  <Tag className="h-3.5 w-3.5" />
+                  {origen ? etiquetaDesc : "Agregar descuento"}
+                </button>
+              ) : (
+                <span className="text-muted-foreground">{etiquetaDesc}</span>
+              )}
+              {origen && <span className="text-red-700 tabular-nums dark:text-red-400">−{formatMXN(subtotal - total)}</span>}
+            </div>
+            {esAdmin && editDesc && (
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {pctCliente > 0 && (
+                  <Chip active={descManual == null} onClick={() => setDescManual(null)}>
+                    Cliente {pctCliente}%
+                  </Chip>
+                )}
+                <Chip active={descManual === 0 || (descManual == null && pctCliente === 0)} onClick={() => setDescManual(pctCliente > 0 ? 0 : null)}>
+                  Sin
+                </Chip>
+                {DESCUENTOS.map((d) => (
+                  <Chip key={d} active={descManual === d} onClick={() => setDescManual(d)}>
+                    {d}%
+                  </Chip>
+                ))}
+                <input
+                  inputMode="decimal"
+                  aria-label="Otro porcentaje"
+                  placeholder="Otro %"
+                  className="h-9 w-20 rounded-full border border-border bg-background px-3 text-sm outline-hidden"
+                  onChange={(e) => {
+                    const v = Number(e.target.value.replace(",", "."));
+                    if (v > 0 && v <= 100) setDescManual(Math.round(v * 100) / 100);
+                  }}
+                />
+              </div>
+            )}
+          </>
+        )}
+        <div className="flex items-baseline justify-between">
+          <span className="text-[15px] font-semibold">Total</span>
+          <span className="text-[26px] font-bold tracking-tight tabular-nums">
+            <NumberFlow value={total / 100} locales="es-MX" format={{ style: "currency", currency: "MXN" }} />
+          </span>
+        </div>
+        <Button
+          variant={mode === "prestamo" ? "brand" : "primary"}
+          className="mt-1 h-13 w-full rounded-xl text-base"
+          onClick={onCta}
+          loading={pending}
+          disabled={!canSubmit}
+        >
+          {mode === "prestamo" ? (
+            "Registrar crédito"
+          ) : (
+            <>
+              <Banknote className="h-5 w-5" /> Cobrar {formatMXN(total)}
+            </>
+          )}
+        </Button>
+        <div className="flex gap-2 pt-0.5">
+          {puedeCotizar && (
+            <Button variant="secondary" className="h-10 flex-1" onClick={cotizar} loading={cotizando} disabled={!lines.length}>
+              <FileText className="h-4 w-4" /> Cotizar
+            </Button>
+          )}
+          <Button variant="secondary" className="h-10 flex-1" onClick={() => setApartarOpen(true)} disabled={!lines.length || mode === "prestamo"}>
+            <Wallet className="h-4 w-4" /> Apartar
+          </Button>
+          <Button variant="secondary" className="h-10 w-11 px-0" aria-label="Vaciar venta" onClick={pedirLimpiar} disabled={!lines.length}>
+            <Trash2 className="h-4 w-4 text-red-700 dark:text-red-400" />
+          </Button>
+        </div>
+        <p className="hidden pt-0.5 text-center text-[11px] text-muted-foreground lg:block">F2 cobra · F4 crédito · Esc limpia</p>
+      </div>
+    </div>
+  );
 
   return (
-    <Motion>
-    <>
-      <div className="gap-5 pb-32 lg:grid lg:grid-cols-7 lg:pb-0">
-        {/* Product picker */}
-        <div className="lg:col-span-5">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Buscar producto (ej: moto g42, redmi note 7…)"
-              className="h-12 rounded-xl pl-10 text-base"
-            />
+    <section data-ancho="completo" className="pb-28 lg:pb-0">
+      <div className="mb-4 flex flex-wrap items-end gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Punto de venta</h1>
+          <p className="mt-0.5 text-sm text-muted-foreground">Busca, escanea o toca para agregar. El stock se descuenta solo.</p>
+        </div>
+        {ultima && (
+          <div className="ml-auto hidden items-center gap-2.5 rounded-xl border border-border bg-background px-3 py-1.5 sm:flex">
+            <Printer className="h-4 w-4 text-muted-foreground" />
+            <div className="leading-tight">
+              <p className="text-[10px] text-muted-foreground">Última venta</p>
+              <p className="text-[13px] font-semibold tabular-nums">
+                {formatMXN(ultima.ticket.total)} · {hora(ultima.ticket.fecha)}
+              </p>
+            </div>
+            <Button variant="secondary" className="h-8 px-2.5 text-xs" onClick={() => imprimirTicketNavegador(ultima.ticket)}>
+              Reimprimir
+            </Button>
+          </div>
+        )}
+      </div>
+
+      <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start lg:gap-5">
+        <div>
+          <div className="flex gap-2.5">
+            <div className="relative flex-1">
+              <Search className="pointer-events-none absolute top-1/2 left-3.5 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+              <input
+                ref={buscador}
+                autoFocus
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    agregarDeTexto(query);
+                  }
+                }}
+                placeholder="Nombre, SKU o modelo — escribe o escanea"
+                enterKeyHint="go"
+                className="h-13 w-full rounded-xl border-2 border-foreground bg-background pr-28 pl-11 text-base outline-hidden placeholder:text-muted-foreground"
+              />
+              <span className="absolute top-1/2 right-3 flex -translate-y-1/2 items-center gap-2">
+                {buscando && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+                <span className="hidden rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground sm:inline">Enter agrega</span>
+              </span>
+            </div>
+            <Button variant="brand" className="h-13 w-13 shrink-0 rounded-xl px-0" aria-label="Escanear etiqueta" onClick={() => setEscaneando(true)}>
+              <QrCode className="h-6 w-6" />
+            </Button>
           </div>
 
-          {/* One scrolling line, never a wrapping block: this row must not be
-              allowed to grow, whether the shop has 6 categories or 216. */}
           {categorias.length > 1 && (
-            <div className="mt-3 flex items-center gap-1.5">
-              <div className="flex flex-1 gap-1.5 overflow-x-auto pb-1 [-ms-overflow-style:none] scrollbar-none [&::-webkit-scrollbar]:hidden">
-                <CatChip active={categoria === null} onClick={() => setCategoria(null)}>
-                  Todos
-                </CatChip>
+            <div className="mt-3 flex items-center gap-2">
+              <div className="flex flex-1 gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <Chip active={categoria === null} onClick={() => setCategoria(null)}>
+                  Todas
+                </Chip>
                 {chips.map((c) => (
-                  <CatChip
-                    key={c.categoria}
-                    active={categoria === c.categoria}
-                    onClick={() =>
-                      setCategoria(categoria === c.categoria ? null : c.categoria)
-                    }
-                  >
-                    {c.categoria}
-                  </CatChip>
+                  <Chip key={c.categoria} active={categoria === c.categoria} onClick={() => setCategoria(categoria === c.categoria ? null : c.categoria)}>
+                    {c.categoria} <span className="tabular-nums opacity-60">{c.productos}</span>
+                  </Chip>
                 ))}
               </div>
               {categorias.length > CHIPS && (
                 <button
+                  type="button"
                   onClick={() => setCatsAbiertas(true)}
-                  className="shrink-0 cursor-pointer rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-ring/40 hover:text-foreground"
+                  className="h-9 shrink-0 cursor-pointer rounded-full border border-border bg-background px-3 text-sm text-muted-foreground hover:bg-muted"
                 >
                   Todas ({categorias.length})
                 </button>
@@ -705,21 +917,17 @@ export function SalesScreen({
 
           {results.length === 0 ? (
             <div className="mt-3">
-              <p className="px-1 py-6 text-center text-sm text-muted-foreground">
-                Sin resultados.
-              </p>
-              {query.trim() && (
+              <p className="px-1 py-6 text-center text-sm text-muted-foreground">{buscando ? "Buscando…" : "Sin resultados."}</p>
+              {query.trim() && !buscando && (
                 <CompatPanel
                   query={query}
                   buscar={buscarCompat}
-                  renderItem={(p) => (
-                    <ProductRow key={p.id} p={p} inCart={cart[p.id] ?? 0} onAdd={() => add(p)} onVerDetalle={() => setDetalle(p)} clickAbreDetalle={clickAbreDetalle} />
-                  )}
+                  renderItem={(p) => <ProductRow key={p.id} p={p} inCart={cart[p.id] ?? 0} onAdd={() => add(p)} />}
                 />
               )}
             </div>
           ) : (
-            <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+            <div className={cn("mt-3 grid grid-cols-2 gap-2.5 transition-opacity sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5", buscando && "opacity-60")}>
               {results.map((p) => (
                 <ProductCard
                   key={p.id}
@@ -735,272 +943,114 @@ export function SalesScreen({
           )}
         </div>
 
-        {/* Order panel */}
-        <div className="mt-5 lg:col-span-2 lg:mt-0">
-          {/* overflow-visible, not hidden: the customer picker's dropdown opens
-              UPWARD with its search box at the top, and the card's clip was
-              eating exactly that end of it — a list with no search, which is
-              how it got reported. Everything inside that needs clipping
-              (images, thumbs) carries its own overflow-hidden. */}
-          <Card className="overflow-visible lg:sticky lg:top-20">
-            <div className="flex items-center gap-2 border-b border-border px-4 py-3">
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent-soft text-accent">
-                <ShoppingCart className="h-4 w-4" />
-              </span>
-              <h2 className="text-sm font-semibold">Orden actual</h2>
-              <div className="ml-auto inline-flex rounded-lg bg-muted p-0.5 text-xs">
-                {(["venta", "prestamo"] as const).map((m) => (
-                  <button
-                    key={m}
-                    onClick={() => setMode(m)}
-                    className={cn(
-                      "cursor-pointer rounded-md px-3 py-1 font-medium transition-colors",
-                      mode === m
-                        ? "bg-background text-foreground shadow-xs"
-                        : "text-muted-foreground hover:text-foreground",
-                    )}
-                  >
-                    {m === "venta" ? "Venta" : "Crédito"}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Only the LIST is swapped for the empty state. The totals below
-                stay mounted at zero: a bar that appears already reading $1,240
-                has nothing to count up from, so the first product added was the
-                one whose total never animated. It also reads better — the panel
-                says what it is for before it holds anything. */}
-            {lines.length === 0 ? (
-              <div className="p-4">
-                <EmptyState
-                  icon={ShoppingCart}
-                  title="Orden vacía"
-                  description="Toca un producto para agregarlo a la venta."
-                  className="border-0 py-10"
-                />
-              </div>
-            ) : (
-              <ul className="max-h-80 divide-y divide-border overflow-auto">
-                  {/* initial={false}: lines already in the order when the panel
-                      mounts are not new, and animating them would replay the
-                      whole cart on every re-render. popLayout so a removed line
-                      leaves while the ones under it slide up. */}
-                  <AnimatePresence initial={false} mode="popLayout">
-                  {lines.map((l) => (
-                    <m.li
-                      key={l.product.id}
-                      layout
-                      initial={{ opacity: 0, scale: 0.96 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.96 }}
-                      transition={{ opacity: { duration: 0.2 }, layout: { duration: 0.2 } }}
-                      className="flex gap-3 px-4 py-3"
-                    >
-                      <span className="h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-border">
-                        <Thumb src={l.product.image_url} alt={l.product.name} />
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        {/* Name + delete on one row so the trash reads as this
-                            line's, not a control floating off in the margin. */}
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-medium">{l.product.name}</p>
-                            <p className="mt-0.5 text-xs text-muted-foreground tabular-nums">
-                              {formatMXN(l.product.price_cents)} c/u
-                            </p>
-                          </div>
-                          <m.button
-                            whileTap={{ scale: 0.95 }}
-                            onClick={() => remove(l.product.id)}
-                            aria-label={`Quitar ${l.product.name}`}
-                            className="-mr-1 -mt-1 shrink-0 cursor-pointer rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-red-50 dark:bg-red-950/40 hover:text-red-600 dark:text-red-400"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </m.button>
-                        </div>
-                        {/* Stepper left, running line total right — the total
-                            sits where the eye lands after changing quantity. */}
-                        <div className="mt-2 flex items-center justify-between gap-2">
-                          <Stepper
-                            value={l.qty}
-                            onDec={() => setQty(l.product.id, l.qty - 1)}
-                            onInc={() => setQty(l.product.id, l.qty + 1)}
-                            canInc={l.qty < l.product.quantity}
-                          />
-                          <span className="text-sm font-semibold tabular-nums text-accent">
-                            {formatMXN(l.product.price_cents * l.qty)}
-                          </span>
-                        </div>
-                      </div>
-                    </m.li>
-                  ))}
-                </AnimatePresence>
-              </ul>
-            )}
-
-          <div className="space-y-3 border-t border-border p-4">
-                <CustomerPicker customers={customers} value={customer} onChange={setCustomer} />
-                {customer && !customer.is_system && (
-                  <ResumenClienteChip customerId={customer.id} />
-                )}
-                {mode === "prestamo" && (
-                  <>
-                    <Input
-                      value={note}
-                      onChange={(e) => setNote(e.target.value)}
-                      placeholder={
-                        aMostrador
-                          ? "¿Quién debe? Nombre, teléfono o seña"
-                          : "Nota (opcional): plazo, referencia…"
-                      }
-                    />
-                    {faltaCliente && (
-                      <p className="text-xs text-amber-700 dark:text-amber-300">
-                        Un crédito necesita cliente registrado. Elige o crea uno arriba.
-                      </p>
-                    )}
-                    {aMostrador && !fiadoExigeCliente && (
-                      <p className="text-xs text-amber-700 dark:text-amber-300">
-                        Sin cliente registrado, la nota es lo único que dirá quién
-                        debe. Escribe nombre, teléfono o una seña.
-                      </p>
-                    )}
-                  </>
-                )}
-
-                <div className="space-y-1.5 border-t border-dashed border-border pt-3">
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>Artículos</span>
-                    <span className="tabular-nums">
-                      <NumberFlow value={count} />
-                    </span>
-                  </div>
-                  <div className="flex items-baseline justify-between">
-                    <span className="text-sm font-medium">Total</span>
-                    {/* Same formatter as formatMXN — es-MX currency — so the
-                        rolling total reads identically to every other amount
-                        on the screen. Cents, because that is how it is held. */}
-                    <span className="font-mono text-2xl font-semibold tabular-nums tracking-tight">
-                      <NumberFlow
-                        value={total / 100}
-                        locales="es-MX"
-                        format={{ style: "currency", currency: "MXN" }}
-                      />
-                    </span>
-                  </div>
-                </div>
-
-                {/* Desktop action — mobile uses the fixed bottom bar */}
-                <Button
-                  variant="accent"
-                  size="lg"
-                  className="hidden w-full lg:flex"
-                  onClick={onCta}
-                  loading={pending}
-                  disabled={!canSubmit}
-                >
-                  <Check className="h-4 w-4" />
-                  {cta} {formatMXN(total)}
-                </Button>
-              </div>
-            </Card>
-        </div>
+        {/* overflow-visible: the customer picker's dropdown opens upward and
+            a clip would eat its search box. */}
+        <aside className="hidden max-h-[calc(100dvh-2rem)] flex-col rounded-2xl border border-border bg-background shadow-xs lg:sticky lg:top-4 lg:flex">
+          {orden}
+        </aside>
       </div>
 
-      {/* Fixed mobile checkout bar.
-          Always mounted, like the quote builder's. It used to appear with the
-          first product, which meant its total arrived already written and never
-          rolled — the same reason the panel's total was moved out of the
-          conditional. The grid's pb-32 already reserved this space whether the
-          bar was there or not, so nothing shifts. */}
       <BarraInferior>
-        <div className="mx-auto flex max-w-6xl items-center gap-3">
-          <div className="leading-tight">
-            <p className="text-xs text-muted-foreground">
-              <NumberFlow value={count} /> art. ·{" "}
-              {mode === "prestamo" ? "Crédito" : "Total"}
+        <div className="flex items-center gap-2.5">
+          <button type="button" onClick={() => setCarritoOpen(true)} className="min-w-0 cursor-pointer text-left leading-tight">
+            <p className="truncate text-[11px] text-muted-foreground">
+              {count} {count === 1 ? "pieza" : "piezas"}
+              {origen ? ` · con ${pct}% desc.` : ""}
+              {mode === "prestamo" ? " · crédito" : ""}
             </p>
-            <p className="font-mono text-lg font-semibold tabular-nums">
-              <NumberFlow
-                value={total / 100}
-                locales="es-MX"
-                format={{ style: "currency", currency: "MXN" }}
-              />
+            <p className="text-[22px] font-bold tabular-nums">
+              <NumberFlow value={total / 100} locales="es-MX" format={{ style: "currency", currency: "MXN" }} />
             </p>
-          </div>
+          </button>
+          <div className="flex-1" />
           <Button
-            variant="accent"
-            size="lg"
-            className="ml-auto h-12 flex-1 text-base"
-            onClick={onCta}
-            loading={pending}
-            disabled={!canSubmit}
+            variant="secondary"
+            className="relative h-13 w-13 rounded-2xl px-0"
+            aria-label="Ver carrito"
+            onClick={() => setCarritoOpen(true)}
           >
-            {cta}
+            <ShoppingCart className="h-5 w-5" />
+            {count > 0 && (
+              <span className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-foreground px-1 text-[11px] font-semibold text-background tabular-nums">
+                {count}
+              </span>
+            )}
+          </Button>
+          <Button
+            variant={mode === "prestamo" ? "brand" : "primary"}
+            className="h-13 rounded-2xl px-6 text-base"
+            onClick={() => (lines.length ? onCta() : setCarritoOpen(true))}
+            loading={pending}
+            disabled={!lines.length}
+          >
+            {mode === "prestamo" ? "Crédito" : "Cobrar"}
           </Button>
         </div>
       </BarraInferior>
+
+      <Drawer open={carritoOpen} onOpenChange={setCarritoOpen} showSwipeHandle>
+        <DrawerContent className="top-24 max-h-none">
+          <DrawerTitle className="sr-only">Venta en curso</DrawerTitle>
+          {orden}
+        </DrawerContent>
+      </Drawer>
 
       <PaymentSheet
         open={paymentOpen}
         onClose={() => setPaymentOpen(false)}
         total={total}
+        resumen={resumenCobro}
         pending={pending}
         comprobanteObligatorio={comprobanteObligatorio}
         saldoDisponible={saldo}
         onConfirm={(metodo, pagos, comprobante) => submit(metodo, pagos, comprobante)}
       />
 
-      {recibo && (
-        <ReciboImpreso
-          ticket={recibo.ticket}
-          usoSaldo={recibo.usoSaldo}
-          saldoRestante={recibo.saldoRestante}
-          onClose={() => setRecibo(null)}
+      <ApartarPanel
+        open={apartarOpen}
+        lineas={lines.map((l) => ({
+          productId: l.product.id,
+          nombre: l.product.name,
+          qty: l.qty,
+          unit: conDescuento(l.product.price_cents, pct),
+        }))}
+        clienteInicial={customer.is_system ? "" : `${customer.nombre}${customer.telefono ? ` · ${customer.telefono}` : ""}`}
+        onClose={() => setApartarOpen(false)}
+        onListo={() => {
+          setApartarOpen(false);
+          setCarritoOpen(false);
+          limpiar();
+        }}
+      />
+
+      {escaneando && (
+        <EscanerQR
+          key={escKey}
+          onClose={cerrarEscaner}
+          onCodigo={(texto) => {
+            alEscanear(texto);
+          }}
         />
       )}
 
+      {recibo && (
+        <ReciboImpreso ticket={recibo.ticket} usoSaldo={recibo.usoSaldo} saldoRestante={recibo.saldoRestante} onClose={() => setRecibo(null)} />
+      )}
+
       {catsAbiertas && (
-        <CategoriaSheet
-          categorias={categorias}
-          activa={categoria}
-          onPick={setCategoria}
-          onClose={() => setCatsAbiertas(false)}
-        />
+        <CategoriaSheet categorias={categorias} activa={categoria} onPick={setCategoria} onClose={() => setCatsAbiertas(false)} />
       )}
 
       <ProductoSheet
         p={detalle}
         verCostos={verCostos}
         onClose={() => setDetalle(null)}
-        onAgregar={add}
+        onAgregar={(p) => {
+          add(p);
+        }}
       />
-    </>
-    </Motion>
-  );
-}
 
-function CatChip({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        "shrink-0 cursor-pointer whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-medium capitalize transition-colors",
-        active
-          ? "bg-accent text-white shadow-sm shadow-accent/25"
-          : "border border-border bg-background text-muted-foreground hover:border-ring/40 hover:text-foreground",
-      )}
-    >
-      {children}
-    </button>
+      {confirmDialog}
+    </section>
   );
 }
