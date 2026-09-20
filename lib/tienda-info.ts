@@ -25,6 +25,10 @@ export type TiendaInfo = {
   entregaDias: string | null;
   garantiaDias: number | null;
   garantiaCondicion: string | null;
+  /** The warranty policy as it should be PRINTED on a ticket. Free text so the
+   *  shop can reword it without a deploy; empty falls back to the two fields
+   *  above, which is what the storefront already promises. */
+  ticketTerminos: string | null;
   direccion: string | null;
   ciudad: string | null;
   horario: string | null;
@@ -43,6 +47,7 @@ export const TIENDA_VACIA: TiendaInfo = {
   entregaDias: null,
   garantiaDias: null,
   garantiaCondicion: null,
+  ticketTerminos: null,
   direccion: null,
   ciudad: null,
   horario: null,
@@ -75,6 +80,7 @@ export function normalizarTienda(raw: unknown): TiendaInfo {
     // A warranty of "0 days" is a real answer; only a missing one is null.
     garantiaDias: Number.isFinite(dias) && dias >= 0 ? Math.round(dias) : null,
     garantiaCondicion: texto(o.garantiaCondicion),
+    ticketTerminos: texto(o.ticketTerminos),
     direccion: texto(o.direccion),
     ciudad: texto(o.ciudad),
     horario: texto(o.horario),
@@ -117,4 +123,18 @@ export function puntosRecoger(t: TiendaInfo): PuntoRecoger[] {
   return t.direccion
     ? [{ nombre: null, direccion: t.direccion, horario: t.horario }]
     : [];
+}
+
+/**
+ * The warranty text a ticket prints.
+ *
+ * The shop's own wording wins; otherwise it is built from the two fields the
+ * storefront already shows, so a shop that never opens this setting still
+ * hands the customer the terms it publishes.
+ */
+export function terminosGarantia(t: TiendaInfo): string | null {
+  if (t.ticketTerminos) return t.ticketTerminos;
+  if (t.garantiaDias == null) return null;
+  const cond = t.garantiaCondicion ? `, ${t.garantiaCondicion}` : "";
+  return `Garantía: ${t.garantiaDias} días por defecto de fábrica${cond}. Conserva este ticket, es el comprobante.`;
 }

@@ -46,6 +46,24 @@ const WIDTH = 48; // 80mm @ Font A
 const ascii = (s: string) =>
   s.normalize("NFD").replace(/[̀-ͯ]/g, "");
 
+/** Break text into printable lines — a head truncates, it does not wrap. */
+function envolver(s: string, ancho: number): string[] {
+  const out: string[] = [];
+  for (const parrafo of s.split(/\n+/)) {
+    let linea = "";
+    for (const w of parrafo.split(/\s+/).filter(Boolean)) {
+      if (!linea) linea = w.slice(0, ancho);
+      else if (linea.length + 1 + w.length <= ancho) linea += ` ${w}`;
+      else {
+        out.push(linea);
+        linea = w.slice(0, ancho);
+      }
+    }
+    if (linea) out.push(linea);
+  }
+  return out;
+}
+
 class EscPos {
   private parts: number[] = [];
   raw(...b: number[]) {
@@ -114,6 +132,12 @@ export function buildEscPos(d: TicketData): Uint8Array {
   p.sep();
   p.bold(true).lr("TOTAL", formatMXN(d.total)).bold(false);
   if (d.metodoPago && !esFiado) p.line(`Pago: ${PAGO[d.metodoPago] ?? d.metodoPago}`);
+  if (d.garantia) {
+    p.sep();
+    // ascii() inside line() strips the accents the head cannot print; the
+    // wrapping is ours, because a thermal head just cuts at the column.
+    for (const l of envolver(d.garantia, WIDTH)) p.line(l);
+  }
   p.sep();
   p.align("center").line(esFiado ? "Comprobante de nota de credito" : "Gracias por su compra!");
   p.line("fiable.vercel.app");

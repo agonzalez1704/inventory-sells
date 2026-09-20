@@ -44,6 +44,7 @@ export function ConfigView({
     entregaDias: tienda.entregaDias ?? "",
     garantiaDias: tienda.garantiaDias?.toString() ?? "",
     garantiaCondicion: tienda.garantiaCondicion ?? "",
+    ticketTerminos: tienda.ticketTerminos ?? "",
     direccion: tienda.direccion ?? "",
     ciudad: tienda.ciudad ?? "",
     horario: tienda.horario ?? "",
@@ -71,6 +72,7 @@ export function ConfigView({
     entregaDias: t.entregaDias,
     garantiaDias: t.garantiaDias === "" ? null : Number(t.garantiaDias),
     garantiaCondicion: t.garantiaCondicion,
+    ticketTerminos: t.ticketTerminos,
     direccion: t.direccion,
     ciudad: t.ciudad,
     horario: t.horario,
@@ -95,6 +97,7 @@ export function ConfigView({
       entregaDias: tienda.entregaDias ?? "",
       garantiaDias: tienda.garantiaDias?.toString() ?? "",
       garantiaCondicion: tienda.garantiaCondicion ?? "",
+      ticketTerminos: tienda.ticketTerminos ?? "",
       direccion: tienda.direccion ?? "",
       ciudad: tienda.ciudad ?? "",
       horario: tienda.horario ?? "",
@@ -266,6 +269,20 @@ export function ConfigView({
           <Campo label="Días de garantía" value={t.garantiaDias} onChange={campo("garantiaDias")} placeholder="30" />
           <Campo label="Condición de la garantía" value={t.garantiaCondicion}
             onChange={campo("garantiaCondicion")} placeholder="devolviendo la pieza con sus sellos intactos" />
+          <label className="block sm:col-span-2">
+            <span className="mb-1.5 block text-sm font-medium">Garantía impresa en el ticket</span>
+            <textarea
+              value={t.ticketTerminos}
+              onChange={(e) => setT((prev) => ({ ...prev, ticketTerminos: e.target.value }))}
+              rows={3}
+              placeholder="30 días de garantía por defecto de fábrica, devolviendo la pieza con sus sellos intactos. No cubre golpes, humedad ni mal uso. Conserva este ticket, es el comprobante."
+              className="w-full rounded-lg border border-border bg-background p-3 text-sm leading-relaxed focus:border-ring focus:ring-2 focus:ring-ring/10 focus:outline-hidden disabled:opacity-70"
+            />
+            <span className="mt-1.5 block text-xs text-muted-foreground">
+              Lo que el cliente se lleva por escrito. Vacío imprime los días y la
+              condición de arriba.
+            </span>
+          </label>
         </fieldset>
 
         <fieldset className="mt-5" disabled={!isAdmin || pending}>

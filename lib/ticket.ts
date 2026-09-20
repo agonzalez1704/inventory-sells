@@ -19,6 +19,9 @@ export type TicketData = {
   /** Catalog total before the discount, and the discount's name — the
    *  customer should see what they saved, not just a smaller number. */
   descuento?: { subtotal: number; etiqueta: string } | null;
+  /** The shop's warranty terms, from Configuración → Tienda. The customer's
+   *  copy of what was promised — the ticket is the proof of purchase. */
+  garantia?: string | null;
 };
 
 const PAGO: Record<string, string> = {
@@ -80,6 +83,7 @@ export function buildTicketHTML(d: TicketData): string {
   .total { display: flex; justify-content: space-between; font-size: 15px; font-weight: 800; }
   .tag { display: inline-block; border: 1px solid #000; padding: 1px 6px; font-weight: 700; }
   .foot { margin-top: 8px; }
+  .terminos { font-size: 11px; line-height: 1.3; white-space: pre-wrap; }
 </style></head>
 <body>
   <div class="center brand">${esc(MARCA.tienda.nombre.toUpperCase())}</div>
@@ -95,6 +99,7 @@ export function buildTicketHTML(d: TicketData): string {
   <div class="row"><span>${esc(d.descuento.etiqueta)}</span><span class="amt">-${formatMXN(d.descuento.subtotal - d.total)}</span></div>` : ""}
   <div class="total"><span>TOTAL</span><span>${formatMXN(d.total)}</span></div>
   ${d.metodoPago && !esFiado ? `<div>Pago: ${PAGO[d.metodoPago] ?? d.metodoPago}</div>` : ""}
+  ${d.garantia ? `<div class="sep"></div><div class="terminos">${esc(d.garantia)}</div>` : ""}
   <div class="sep"></div>
   <div class="center foot">${esFiado ? "Comprobante de nota de crédito" : "¡Gracias por su compra!"}</div>
   ${typeof location !== "undefined" ? `<div class="center muted">${esc(location.host)}</div>` : ""}
@@ -152,6 +157,7 @@ export function ticketDesdeVenta(args: {
   cliente?: string | null;
   tipo?: "venta" | "fiado";
   fecha?: string;
+  garantia?: string | null;
 }): TicketData {
   return {
     folio: args.folio,
@@ -161,5 +167,6 @@ export function ticketDesdeVenta(args: {
     metodoPago: args.metodoPago ?? null,
     cliente: args.cliente ?? null,
     tipo: args.tipo ?? "venta",
+    garantia: args.garantia ?? null,
   };
 }

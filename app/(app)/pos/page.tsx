@@ -5,6 +5,8 @@ import { SalesScreen, type SalesProduct } from "@/modules/sales/SalesScreen";
 import { listarCategorias } from "@/modules/inventory/buscar";
 import { fiadoExigeCliente, posClickAbreDetalle, comprobanteObligatorio } from "@/modules/config/negocio";
 import { inventariosAjenos } from "@/modules/sucursales/guard";
+import { getTiendaInfo } from "@/modules/config/lib";
+import { terminosGarantia } from "@/lib/tienda-info";
 
 
 // The register: search products, build the cart, cobrar. The sales history lives
@@ -41,11 +43,12 @@ export default async function PosPage() {
       listarCategorias(),
     ]);
 
-  const [precioBase, exigeCliente, clickDetalle, comprobanteOblig] = await Promise.all([
+  const [precioBase, exigeCliente, clickDetalle, comprobanteOblig, tienda] = await Promise.all([
     getPrecioBasePos(),
     fiadoExigeCliente(),
     posClickAbreDetalle(),
     comprobanteObligatorio(),
+    getTiendaInfo(),
   ]);
 
   const invName = new Map(
@@ -93,6 +96,7 @@ export default async function PosPage() {
       inventariosAjenos={ajenos}
       esAdmin={esAdmin}
       puedeCotizar={puedeCotizar}
+      garantia={terminosGarantia(tienda)}
     />
   );
 }

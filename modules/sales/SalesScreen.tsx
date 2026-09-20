@@ -270,6 +270,7 @@ export function SalesScreen({
   inventariosAjenos: inventariosAjenosProp = {},
   esAdmin = false,
   puedeCotizar = false,
+  garantia = null,
 }: {
   /** First page of the catalog, rendered before any search runs. */
   products: SalesProduct[];
@@ -286,6 +287,8 @@ export function SalesScreen({
   /** Manual discount is the admin's call; the RPC enforces it too. */
   esAdmin?: boolean;
   puedeCotizar?: boolean;
+  /** Warranty terms printed on every ticket (Configuración → Tienda). */
+  garantia?: string | null;
 }) {
   const router = useRouter();
   const [confirmar, confirmDialog] = useConfirm();
@@ -555,9 +558,12 @@ export function SalesScreen({
       }),
       total,
       metodoPago: esFiado ? null : pm,
-      cliente: customer.is_system ? null : customer.nombre,
+      // Always named, Mostrador included: the ticket is the customer's copy
+      // and it should say who it was made out to.
+      cliente: customer.nombre,
       tipo: (esFiado ? "fiado" : "venta") as TicketData["tipo"],
       descuento: origen ? { subtotal, etiqueta: etiquetaDesc } : null,
+      garantia,
     };
 
     startTransition(async () => {

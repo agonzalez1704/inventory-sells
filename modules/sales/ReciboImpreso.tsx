@@ -160,6 +160,12 @@ export function ReciboImpreso({
                 )}
               </>
             )}
+            {ticket.garantia && (
+              <>
+                <p className="my-2 border-t border-dashed border-neutral-300" />
+                <p className="text-[11px] leading-snug whitespace-pre-wrap text-neutral-700">{ticket.garantia}</p>
+              </>
+            )}
             <p className="mt-3 text-center text-neutral-500">¡Gracias por su compra!</p>
           </article>
         </div>
