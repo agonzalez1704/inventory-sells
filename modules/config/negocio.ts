@@ -6,14 +6,20 @@ import { getProfile } from "@/lib/auth/profile";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
 import type { ValorBase } from "@/lib/marca";
 import { normalizarTienda, type TiendaInfo } from "@/lib/tienda-info";
+import { attempt, type ActionResult } from "@/lib/errors";
 
+// Returns a result instead of throwing: Next strips a thrown message in
+// production, and the form showed "Minified React error #441" for two weeks
+// while the database was plainly answering "permission denied for table
+// config_negocio".
 export async function updateNegocioInfo(
   info: string,
   asesores: string,
   valorBase: ValorBase,
   tienda: TiendaInfo,
   fiadoExige: boolean,
-): Promise<void> {
+): Promise<ActionResult<null>> {
+  return attempt("updateNegocioInfo", async () => {
   const { userId } = await auth();
   if (!userId) throw new Error("No autenticado");
   const profile = await getProfile(userId);
@@ -38,6 +44,8 @@ export async function updateNegocioInfo(
   // saving here is the only writer, so this pairing is the whole invalidation
   // story (nextjs-app-like.md steps 2+3).
   updateTag("tienda-info");
+  return null;
+  });
 }
 
 /**

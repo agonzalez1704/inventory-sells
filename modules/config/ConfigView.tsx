@@ -116,13 +116,13 @@ export function ConfigView({
 
   function save() {
     start(async () => {
-      try {
-        await updateNegocioInfo(text, nums, base, tiendaEnviada, exige);
-        toast.success("Guardado");
-        router.refresh();
-      } catch (e) {
-        toast.error(e instanceof Error ? e.message : "Error al guardar");
+      const r = await updateNegocioInfo(text, nums, base, tiendaEnviada, exige);
+      if (!r.ok) {
+        toast.error(r.error);
+        return;
       }
+      toast.success("Guardado");
+      router.refresh();
     });
   }
 
