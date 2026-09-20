@@ -10,8 +10,7 @@ import { impresoraUsbLista, vincularImpresoraUSB, webUsbDisponible } from "@/lib
  * Pair this computer with the counter's printer, once.
  *
  * After it, every ticket prints with no dialog at all — the browser remembers
- * the grant across reloads. Renders nothing where it cannot help: a phone, a
- * browser without WebUSB, or a computer that is already paired.
+ * the grant across reloads. Hidden only once this computer is paired.
  */
 export function VincularImpresora({ className }: { className?: string }) {
   // Shown unless this computer is already paired — including where WebUSB is
