@@ -26,6 +26,7 @@ import { cn } from "@/lib/utils";
 import type { PaymentMethodVenta, Product } from "@/lib/types";
 import { type TicketData } from "@/lib/ticket";
 import { imprimirTicketAuto } from "@/lib/escpos-usb";
+import { VincularImpresora } from "@/components/ticket/VincularImpresora";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { BarraInferior } from "@/components/ui/barra-inferior";
@@ -856,8 +857,10 @@ export function SalesScreen({
           <h1 className="text-2xl font-semibold tracking-tight">Punto de venta</h1>
           <p className="mt-0.5 text-sm text-muted-foreground">Busca, escanea o toca para agregar. El stock se descuenta solo.</p>
         </div>
+        <div className="ml-auto flex items-center gap-2">
+        <VincularImpresora className="h-9" />
         {ultima && (
-          <div className="ml-auto hidden items-center gap-2.5 rounded-xl border border-border bg-background px-3 py-1.5 sm:flex">
+          <div className="hidden items-center gap-2.5 rounded-xl border border-border bg-background px-3 py-1.5 sm:flex">
             <Printer className="h-4 w-4 text-muted-foreground" />
             <div className="leading-tight">
               <p className="text-[10px] text-muted-foreground">Última venta</p>
@@ -870,6 +873,7 @@ export function SalesScreen({
             </Button>
           </div>
         )}
+        </div>
       </div>
 
       <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start lg:gap-5">

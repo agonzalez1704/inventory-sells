@@ -7,6 +7,7 @@ import { MARCA } from "@/lib/marca";
 import { imprimirTicketNavegador, type TicketData } from "@/lib/ticket";
 import { imprimirTicketUSB, impresoraUsbLista } from "@/lib/escpos-usb";
 import { Button } from "@/components/ui/button";
+import { VincularImpresora } from "@/components/ticket/VincularImpresora";
 
 // The charge's success screen: a little thermal printer feeds the ticket out,
 // the way the real one on the counter does. The paper is always white — a
@@ -196,6 +197,8 @@ export function ReciboImpreso({
           </article>
         </div>
 
+        {/* Right where someone notices the dialog: pair once, never again. */}
+        <VincularImpresora className="mt-4 h-11 w-full" />
         <div className="mt-4 flex gap-2">
           <Button
             variant="secondary"

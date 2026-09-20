@@ -207,6 +207,27 @@ export async function imprimirTicketAuto(d: TicketData): Promise<"usb" | "dialog
   return "dialogo";
 }
 
+/**
+ * Ask for the printer ONCE. The grant is stored by the browser per origin, so
+ * from here on printing needs no dialog and no permission prompt.
+ */
+export async function vincularImpresoraUSB(): Promise<void> {
+  const usb = getUsb();
+  if (!usb) throw new Error("Este navegador no soporta WebUSB. Usa Chrome o Edge en computadora.");
+  const device = await usb.requestDevice({ filters: [] });
+  // Open it once: a printer whose interface the Windows driver already owns
+  // fails HERE, while the seller can still read why, instead of silently at
+  // the first sale.
+  await device.open().catch((e: unknown) => {
+    throw new Error(
+      e instanceof Error && /access|denied|security/i.test(e.message)
+        ? "Windows tiene tomada esa impresora con su driver. Usa el acceso directo de Chrome con impresión directa."
+        : "No se pudo abrir la impresora.",
+    );
+  });
+  await device.close().catch(() => undefined);
+}
+
 /** Is a printer already granted to this computer? Then printing asks nothing. */
 export async function impresoraUsbLista(): Promise<boolean> {
   const usb = getUsb();
