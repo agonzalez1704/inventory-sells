@@ -14,14 +14,21 @@ import { impresoraUsbLista, vincularImpresoraUSB, webUsbDisponible } from "@/lib
  * browser without WebUSB, or a computer that is already paired.
  */
 export function VincularImpresora({ className }: { className?: string }) {
+  // Shown unless this computer is already paired — including where WebUSB is
+  // missing. Hiding it there is what made the button "only appear for the
+  // owner": every seller on another browser saw nothing at all and had no way
+  // to know why. Now it is there and it says what to do instead.
   const [mostrar, setMostrar] = useState(false);
   const [pending, setPending] = useState(false);
 
   useEffect(() => {
-    if (!webUsbDisponible()) return;
+    if (!webUsbDisponible()) {
+      setMostrar(true);
+      return;
+    }
     impresoraUsbLista()
       .then((lista) => setMostrar(!lista))
-      .catch(() => undefined);
+      .catch(() => setMostrar(true));
   }, []);
 
   if (!mostrar) return null;
@@ -32,6 +39,13 @@ export function VincularImpresora({ className }: { className?: string }) {
       className={className}
       loading={pending}
       onClick={async () => {
+        if (!webUsbDisponible()) {
+          toast.error(
+            "Este navegador no puede imprimir sin diálogos. Abre el punto de venta en Chrome o Edge de computadora, o usa el acceso directo de Chrome con impresión directa.",
+            { duration: 8000 },
+          );
+          return;
+        }
         setPending(true);
         try {
           await vincularImpresoraUSB();
