@@ -104,8 +104,13 @@ export function ReciboImpreso({
             }}
           >
             <p className="text-center text-sm font-bold tracking-wide">
-              {MARCA.tienda.nombre}
+              {ticket.encabezado?.[0] ?? MARCA.tienda.nombre}
             </p>
+            {ticket.encabezado?.slice(1).map((l, i) => (
+              <p key={i} className="text-center text-neutral-500">
+                {l}
+              </p>
+            ))}
             <p className="text-center text-neutral-500">{fecha}</p>
             <p className="text-center text-neutral-500">
               {esFiado ? "NOTA DE CRÉDITO" : "TICKET DE VENTA"} · {ticket.folio.slice(0, 8).toUpperCase()}

@@ -118,8 +118,9 @@ export function buildEscPos(d: TicketData): Uint8Array {
 
   const p = new EscPos();
   p.raw(0x1b, 0x40); // init
-  p.align("center").size(true).bold(true).line("FIABLE").size(false).bold(false);
-  p.line("Celulares y refacciones");
+  const cab = d.encabezado?.length ? d.encabezado : ["FIABLE", "Celulares y refacciones"];
+  p.align("center").size(true).bold(true).line(cab[0]).size(false).bold(false);
+  for (const l of cab.slice(1)) for (const w of envolver(l, WIDTH)) p.line(w);
   if (esFiado) p.bold(true).line("NOTA DE CREDITO - PENDIENTE DE PAGO").bold(false);
   p.align("left").sep();
   p.lr(`Folio: ${folio}`, fecha);

@@ -45,6 +45,7 @@ export function ConfigView({
     garantiaDias: tienda.garantiaDias?.toString() ?? "",
     garantiaCondicion: tienda.garantiaCondicion ?? "",
     ticketTerminos: tienda.ticketTerminos ?? "",
+    ticketEncabezado: tienda.ticketEncabezado ?? "",
     direccion: tienda.direccion ?? "",
     ciudad: tienda.ciudad ?? "",
     horario: tienda.horario ?? "",
@@ -73,6 +74,7 @@ export function ConfigView({
     garantiaDias: t.garantiaDias === "" ? null : Number(t.garantiaDias),
     garantiaCondicion: t.garantiaCondicion,
     ticketTerminos: t.ticketTerminos,
+    ticketEncabezado: t.ticketEncabezado,
     direccion: t.direccion,
     ciudad: t.ciudad,
     horario: t.horario,
@@ -98,6 +100,7 @@ export function ConfigView({
       garantiaDias: tienda.garantiaDias?.toString() ?? "",
       garantiaCondicion: tienda.garantiaCondicion ?? "",
       ticketTerminos: tienda.ticketTerminos ?? "",
+      ticketEncabezado: tienda.ticketEncabezado ?? "",
       direccion: tienda.direccion ?? "",
       ciudad: tienda.ciudad ?? "",
       horario: tienda.horario ?? "",
@@ -269,6 +272,20 @@ export function ConfigView({
           <Campo label="Días de garantía" value={t.garantiaDias} onChange={campo("garantiaDias")} placeholder="30" />
           <Campo label="Condición de la garantía" value={t.garantiaCondicion}
             onChange={campo("garantiaCondicion")} placeholder="devolviendo la pieza con sus sellos intactos" />
+          <label className="block sm:col-span-2">
+            <span className="mb-1.5 block text-sm font-medium">Encabezado del ticket</span>
+            <textarea
+              value={t.ticketEncabezado}
+              onChange={(e) => setT((prev) => ({ ...prev, ticketEncabezado: e.target.value }))}
+              rows={3}
+              placeholder={"LEAD DISPLAYS\nPantallas y refacciones para celular\n5 de Mayo #216, Centro · Tel. 477 000 0000"}
+              className="w-full rounded-lg border border-border bg-background p-3 text-sm leading-relaxed focus:border-ring focus:ring-2 focus:ring-ring/10 focus:outline-hidden disabled:opacity-70"
+            />
+            <span className="mt-1.5 block text-xs text-muted-foreground">
+              Un renglón por línea. El primero sale grande; los demás, debajo en
+              chico. Vacío imprime el nombre de la tienda.
+            </span>
+          </label>
           <label className="block sm:col-span-2">
             <span className="mb-1.5 block text-sm font-medium">Garantía impresa en el ticket</span>
             <textarea

@@ -22,6 +22,9 @@ export type TicketData = {
   /** The shop's warranty terms, from Configuración → Tienda. The customer's
    *  copy of what was promised — the ticket is the proof of purchase. */
   garantia?: string | null;
+  /** Header lines (Configuración → Tienda). First is the big one. Empty keeps
+   *  the brand's own name and tagline. */
+  encabezado?: string[] | null;
 };
 
 const PAGO: Record<string, string> = {
@@ -38,6 +41,19 @@ const esc = (s: string) =>
 
 const folioCorto = (folio: string) =>
   folio.replace(/-/g, "").slice(0, 8).toUpperCase();
+
+/** First line big, the rest under it — or the brand, for a shop that never
+ *  set one. */
+function encabezado(d: TicketData): string {
+  const lineas = d.encabezado?.length
+    ? d.encabezado
+    : [MARCA.tienda.nombre.toUpperCase(), MARCA.tienda.tagline];
+  const [titulo, ...resto] = lineas;
+  return (
+    `<div class="center brand">${esc(titulo)}</div>` +
+    resto.map((l) => `<div class="center muted">${esc(l)}</div>`).join("")
+  );
+}
 
 // Self-contained HTML document sized for an 80mm roll, printed via a hidden
 // iframe so we never navigate away or trip popup blockers.
@@ -86,8 +102,7 @@ export function buildTicketHTML(d: TicketData): string {
   .terminos { font-size: 11px; line-height: 1.3; white-space: pre-wrap; }
 </style></head>
 <body>
-  <div class="center brand">${esc(MARCA.tienda.nombre.toUpperCase())}</div>
-  <div class="center muted">${esc(MARCA.tienda.tagline)}</div>
+  ${encabezado(d)}
   ${esFiado ? `<div class="center" style="margin-top:4px"><span class="tag">NOTA DE CRÉDITO · PENDIENTE DE PAGO</span></div>` : ""}
   <div class="sep"></div>
   <div class="meta"><span>Folio: ${folioCorto(d.folio)}</span><span>${esc(fecha)}</span></div>

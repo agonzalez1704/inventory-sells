@@ -271,6 +271,7 @@ export function SalesScreen({
   esAdmin = false,
   puedeCotizar = false,
   garantia = null,
+  encabezado = null,
 }: {
   /** First page of the catalog, rendered before any search runs. */
   products: SalesProduct[];
@@ -289,6 +290,8 @@ export function SalesScreen({
   puedeCotizar?: boolean;
   /** Warranty terms printed on every ticket (Configuración → Tienda). */
   garantia?: string | null;
+  /** Ticket header lines (Configuración → Tienda). */
+  encabezado?: string[] | null;
 }) {
   const router = useRouter();
   const [confirmar, confirmDialog] = useConfirm();
@@ -564,6 +567,7 @@ export function SalesScreen({
       tipo: (esFiado ? "fiado" : "venta") as TicketData["tipo"],
       descuento: origen ? { subtotal, etiqueta: etiquetaDesc } : null,
       garantia,
+      encabezado,
     };
 
     startTransition(async () => {

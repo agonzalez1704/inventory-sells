@@ -29,6 +29,10 @@ export type TiendaInfo = {
    *  shop can reword it without a deploy; empty falls back to the two fields
    *  above, which is what the storefront already promises. */
   ticketTerminos: string | null;
+  /** What the ticket prints at the top, one line each: shop name, then
+   *  whatever the shop wants under it (branch, address, phone, RFC). Empty
+   *  falls back to the brand's own name and tagline. */
+  ticketEncabezado: string | null;
   direccion: string | null;
   ciudad: string | null;
   horario: string | null;
@@ -48,6 +52,7 @@ export const TIENDA_VACIA: TiendaInfo = {
   garantiaDias: null,
   garantiaCondicion: null,
   ticketTerminos: null,
+  ticketEncabezado: null,
   direccion: null,
   ciudad: null,
   horario: null,
@@ -81,6 +86,7 @@ export function normalizarTienda(raw: unknown): TiendaInfo {
     garantiaDias: Number.isFinite(dias) && dias >= 0 ? Math.round(dias) : null,
     garantiaCondicion: texto(o.garantiaCondicion),
     ticketTerminos: texto(o.ticketTerminos),
+    ticketEncabezado: texto(o.ticketEncabezado),
     direccion: texto(o.direccion),
     ciudad: texto(o.ciudad),
     horario: texto(o.horario),
@@ -137,4 +143,14 @@ export function terminosGarantia(t: TiendaInfo): string | null {
   if (t.garantiaDias == null) return null;
   const cond = t.garantiaCondicion ? `, ${t.garantiaCondicion}` : "";
   return `Garantía: ${t.garantiaDias} días por defecto de fábrica${cond}. Conserva este ticket, es el comprobante.`;
+}
+
+/** The ticket's header lines, or null to keep the brand's own name and tagline. */
+export function encabezadoTicket(t: TiendaInfo): string[] | null {
+  if (!t.ticketEncabezado) return null;
+  const lineas = t.ticketEncabezado
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+  return lineas.length ? lineas : null;
 }
