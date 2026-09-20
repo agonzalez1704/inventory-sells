@@ -5,6 +5,8 @@ import { mxHoy, rangoUTC } from "@/lib/caja-range";
 import type { SaleWithItems } from "@/modules/sales/RecentSales";
 import { VentasView, type ResumenVentas, type VentaLista } from "@/modules/sales/VentasView";
 import type { PaymentMethod } from "@/lib/types";
+import { getTiendaInfo } from "@/modules/config/lib";
+import { encabezadoTicket, terminosGarantia } from "@/lib/tienda-info";
 
 
 const METODOS: PaymentMethod[] = ["efectivo", "tarjeta", "transferencia", "otro"];
@@ -227,8 +229,11 @@ export default async function VentasPage({
   );
   const enFiltro = visibles.filter((v) => v.id !== abrirId || netSales.some((n) => n.id === v.id));
 
+  const tienda = await getTiendaInfo();
+
   return (
     <VentasView
+      ticketTienda={{ encabezado: encabezadoTicket(tienda), garantia: terminosGarantia(tienda) }}
       ventas={visibles as VentaLista[]}
       resumen={{
         count: enFiltro.length,

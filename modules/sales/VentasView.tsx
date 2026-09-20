@@ -14,7 +14,7 @@ import { CuentaChip } from "@/components/ui/cuenta";
 import { GarantiaModal } from "@/modules/garantias/GarantiaModal";
 import type { PickerCustomer } from "@/modules/customers/CustomerPicker";
 import { EditModal, type SaleWithItems } from "./RecentSales";
-import { PanelVenta, MetodoPill } from "./PanelVenta";
+import { PanelVenta, MetodoPill, type TicketTienda } from "./PanelVenta";
 import { buscarVentas } from "./actions";
 
 export type VentaLista = Omit<SaleWithItems, "sale_items"> & {
@@ -62,6 +62,7 @@ export function VentasView({
   customers,
   isAdmin,
   abrirId,
+  ticketTienda,
 }: {
   ventas: VentaLista[];
   resumen: ResumenVentas;
@@ -70,6 +71,8 @@ export function VentasView({
   customers: PickerCustomer[];
   isAdmin: boolean;
   abrirId: string | null;
+  /** What a reprinted ticket prints at the top and in the warranty block. */
+  ticketTienda: TicketTienda;
 }) {
   const router = useRouter();
   const [navegando, start] = useTransition();
@@ -341,6 +344,7 @@ export function VentasView({
         bloqueado={corregir != null || garantia != null}
         onCorregir={setCorregir}
         onGarantia={setGarantia}
+        ticketTienda={ticketTienda}
       />
 
       {corregir && <EditModal sale={corregir as SaleWithItems} customers={customers} onClose={() => setCorregir(null)} />}

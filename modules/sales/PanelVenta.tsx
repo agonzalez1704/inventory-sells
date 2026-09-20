@@ -35,6 +35,7 @@ export function PanelVenta({
   bloqueado,
   onCorregir,
   onGarantia,
+  ticketTienda,
 }: {
   /** null = closed; the last sale stays rendered while the panel slides out. */
   venta: VentaLista | null;
@@ -47,6 +48,7 @@ export function PanelVenta({
   bloqueado: boolean;
   onCorregir: (v: VentaLista) => void;
   onGarantia: (v: VentaLista) => void;
+  ticketTienda: TicketTienda;
 }) {
   const [v, setV] = useState(venta);
   if (venta && venta !== v) setV(venta);
@@ -92,7 +94,7 @@ export function PanelVenta({
               </Button>
               <div className="flex-1" />
               <div className="hidden sm:block">
-                <Ticket v={v} />
+                <Ticket v={v} tienda={ticketTienda} />
               </div>
               <Button variant="secondary" size="sm" className="h-9" onClick={() => onGarantia(v)}>
                 <ShieldCheck className="h-4 w-4" />
@@ -207,7 +209,7 @@ export function PanelVenta({
             </div>
 
             <div className="border-t border-border px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2.5 sm:hidden">
-              <Ticket v={v} />
+              <Ticket v={v} tienda={ticketTienda} />
             </div>
 
             {isAdmin && <DevolucionPanel open={devolviendo} venta={v} onClose={() => setDevolviendo(false)} />}
@@ -218,7 +220,10 @@ export function PanelVenta({
   );
 }
 
-function Ticket({ v }: { v: VentaLista }) {
+/** The shop's own header and warranty terms, from Configuración → Tienda. */
+export type TicketTienda = { encabezado: string[] | null; garantia: string | null };
+
+function Ticket({ v, tienda }: { v: VentaLista; tienda: TicketTienda }) {
   return (
     <PrintTicketButtons
       data={() => ({
@@ -234,6 +239,8 @@ function Ticket({ v }: { v: VentaLista }) {
         metodoPago: v.payment_method,
         cliente: v.customer_name,
         tipo: "venta",
+        encabezado: tienda.encabezado,
+        garantia: tienda.garantia,
       })}
     />
   );
