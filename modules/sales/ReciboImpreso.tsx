@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Check, Printer, Loader2 } from "lucide-react";
 import { formatMXN } from "@/lib/money";
 import { MARCA } from "@/lib/marca";
 import { imprimirTicketNavegador, type TicketData } from "@/lib/ticket";
+import { imprimirTicketUSB, impresoraUsbLista } from "@/lib/escpos-usb";
 import { Button } from "@/components/ui/button";
 
 // The charge's success screen: a little thermal printer feeds the ticket out,
@@ -47,6 +48,26 @@ export function ReciboImpreso({
 }) {
   const [impreso, setImpreso] = useState(false);
   const [sinMotion, setSinMotion] = useState(false);
+  const [usbOk, setUsbOk] = useState(false);
+  // One print per sale: the effect must not fire twice in development's
+  // double render, and a re-render must never reprint a ticket.
+  const yaImpreso = useRef(false);
+
+  // Paired printer: the ticket comes out on its own, the way a till does it.
+  useEffect(() => {
+    let vivo = true;
+    impresoraUsbLista().then((listo) => {
+      if (!vivo) return;
+      setUsbOk(listo);
+      if (listo && !yaImpreso.current) {
+        yaImpreso.current = true;
+        imprimirTicketUSB(ticket).catch(() => undefined);
+      }
+    });
+    return () => {
+      vivo = false;
+    };
+  }, [ticket]);
 
   useEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -179,10 +200,10 @@ export function ReciboImpreso({
           <Button
             variant="secondary"
             className="flex-1"
-            onClick={() => imprimirTicketNavegador(ticket)}
+            onClick={() => (usbOk ? imprimirTicketUSB(ticket).catch(() => imprimirTicketNavegador(ticket)) : imprimirTicketNavegador(ticket))}
           >
             <Printer className="h-4 w-4" />
-            Imprimir
+            {usbOk ? "Imprimir otra" : "Imprimir"}
           </Button>
           <Button variant="accent" className="flex-1" onClick={onClose} autoFocus>
             <Check className="h-4 w-4" />

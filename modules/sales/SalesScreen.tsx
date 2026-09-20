@@ -24,7 +24,8 @@ import { conDescuento, formatMXN } from "@/lib/money";
 import { foto } from "@/lib/foto";
 import { cn } from "@/lib/utils";
 import type { PaymentMethodVenta, Product } from "@/lib/types";
-import { imprimirTicketNavegador, type TicketData } from "@/lib/ticket";
+import { type TicketData } from "@/lib/ticket";
+import { imprimirTicketAuto } from "@/lib/escpos-usb";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { BarraInferior } from "@/components/ui/barra-inferior";
@@ -864,7 +865,7 @@ export function SalesScreen({
                 {formatMXN(ultima.ticket.total)} · {hora(ultima.ticket.fecha)}
               </p>
             </div>
-            <Button variant="secondary" className="h-8 px-2.5 text-xs" onClick={() => imprimirTicketNavegador(ultima.ticket)}>
+            <Button variant="secondary" className="h-8 px-2.5 text-xs" onClick={() => imprimirTicketAuto(ultima.ticket)}>
               Reimprimir
             </Button>
           </div>

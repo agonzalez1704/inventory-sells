@@ -1,5 +1,5 @@
 import { formatMXN } from "@/lib/money";
-import type { TicketData } from "@/lib/ticket";
+import { imprimirTicketNavegador, type TicketData } from "@/lib/ticket";
 import type { CorteData } from "@/lib/corte";
 
 // Direct ESC/POS printing over WebUSB — one tap, auto-cut, no OS dialog.
@@ -21,6 +21,8 @@ type USBDevice = {
 };
 type USBApi = {
   requestDevice(opts: { filters: unknown[] }): Promise<USBDevice>;
+  /** Printers this origin was already granted — no prompt. */
+  getDevices(): Promise<USBDevice[]>;
 };
 
 function getUsb(): USBApi | null {
@@ -155,7 +157,11 @@ export async function enviarBytesUSB(bytes: Uint8Array): Promise<void> {
       "Este navegador no soporta WebUSB. Usa Chrome o Edge en computadora.",
     );
   }
-  const device = await usb.requestDevice({ filters: [] });
+  // Granted once, silent forever: the permission survives reloads, so the
+  // chooser only appears the first time on this computer. Asking every time is
+  // what made "imprimir" a two-click dialog dance at the counter.
+  const [recordada] = await usb.getDevices().catch((): USBDevice[] => []);
+  const device = recordada ?? (await usb.requestDevice({ filters: [] }));
   await device.open();
   if (device.configuration === null) await device.selectConfiguration(1);
 
@@ -179,6 +185,34 @@ export async function enviarBytesUSB(bytes: Uint8Array): Promise<void> {
 
 export async function imprimirTicketUSB(d: TicketData): Promise<void> {
   await enviarBytesUSB(buildEscPos(d));
+}
+
+/**
+ * Print with no dialog when this computer has already been paired with the
+ * printer; fall back to the OS dialog when it has not.
+ *
+ * Returns how it printed, so a caller can say so — "se imprimió" and "elige la
+ * impresora" are different outcomes for whoever is at the counter.
+ */
+export async function imprimirTicketAuto(d: TicketData): Promise<"usb" | "dialogo"> {
+  if (await impresoraUsbLista()) {
+    try {
+      await imprimirTicketUSB(d);
+      return "usb";
+    } catch {
+      // The driver may have claimed the interface since; the dialog still works.
+    }
+  }
+  imprimirTicketNavegador(d);
+  return "dialogo";
+}
+
+/** Is a printer already granted to this computer? Then printing asks nothing. */
+export async function impresoraUsbLista(): Promise<boolean> {
+  const usb = getUsb();
+  if (!usb) return false;
+  const ds = await usb.getDevices().catch((): USBDevice[] => []);
+  return ds.length > 0;
 }
 
 export function buildEscPosCorte(d: CorteData): Uint8Array {
