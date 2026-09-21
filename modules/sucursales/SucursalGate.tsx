@@ -3,10 +3,21 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { MapPin } from "lucide-react";
+import { MapPin, Monitor } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { unwrap } from "@/lib/errors";
-import { estadoCheckin, registrarCheckin } from "./actions";
+import { activarEquipo, estadoCheckin, registrarCheckin, registrarCheckinEquipo } from "./actions";
+
+// This computer's pairing with its branch (see sucursal_equipos). Per device.
+const LS_EQUIPO = "sucursal_equipo_v1";
+const leerToken = () => {
+  try {
+    return localStorage.getItem(LS_EQUIPO);
+  } catch {
+    return null;
+  }
+};
 
 /**
  * The start-of-day gate for employees tied to branches. It renders NOTHING for
@@ -21,22 +32,41 @@ export function SucursalGate() {
   const [permitidas, setPermitidas] = useState<string[]>([]);
   const [pidiendo, setPidiendo] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [codigo, setCodigo] = useState("");
+  const [vinculando, setVinculando] = useState(false);
+
+  function listo(sucursal: string) {
+    toast.success(`Día iniciado en ${sucursal}`);
+    setAbierto(false);
+    // Pages behind the overlay rendered before the check-in (branch locks).
+    router.refresh();
+  }
 
   useEffect(() => {
     let on = true;
     estadoCheckin()
-      .then((e) => {
+      .then(async (e) => {
         if (!on) return;
-        if (e.requiere && !e.sucursal) {
-          setPermitidas(e.permitidas);
-          setAbierto(true);
+        if (!(e.requiere && !e.sucursal)) return;
+        // A paired counter computer vouches for its branch: no overlay at all.
+        const token = leerToken();
+        if (token) {
+          const r = await registrarCheckinEquipo(token);
+          if (!on) return;
+          if (r.ok) return listo(r.data.sucursal);
+          try {
+            localStorage.removeItem(LS_EQUIPO);
+          } catch {}
         }
+        setPermitidas(e.permitidas);
+        setAbierto(true);
       })
       // A failed status read must not lock the shop out of its own register.
       .catch(() => {});
     return () => {
       on = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (!abierto) return null;
@@ -58,12 +88,7 @@ export function SucursalGate() {
               pos.coords.accuracy,
             ),
           );
-          toast.success(`Día iniciado en ${r.sucursal}`);
-          setAbierto(false);
-          // The pages behind the overlay were server-rendered BEFORE the
-          // check-in, so their branch-lock props say "not here yet" — the POS
-          // would keep refusing the seller's own stock. Recompute everything.
-          router.refresh();
+          listo(r.sucursal);
         } catch (e) {
           setError(e instanceof Error ? e.message : "No se pudo registrar");
         } finally {
@@ -110,6 +135,50 @@ export function SucursalGate() {
         <p className="mt-3 text-[11px] text-muted-foreground">
           Se registra una vez al día: sucursal, hora y distancia.
         </p>
+
+        {/* A desktop has no GPS and reads hundreds of meters off: the counter
+            computer is paired once with an admin's code instead. */}
+        <div className="mt-5 border-t border-border pt-4 text-left">
+          <p className="flex items-center gap-1.5 text-sm font-medium">
+            <Monitor className="h-4 w-4" />
+            ¿Es la computadora del mostrador?
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Pide al administrador un código de 6 dígitos (Configuración → Sucursales). Se captura una sola vez.
+          </p>
+          <div className="mt-2 flex gap-2">
+            <Input
+              value={codigo}
+              onChange={(e) => setCodigo(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              inputMode="numeric"
+              placeholder="123456"
+              className="font-mono tracking-widest"
+            />
+            <Button
+              variant="secondary"
+              loading={vinculando}
+              disabled={codigo.length !== 6}
+              onClick={async () => {
+                setVinculando(true);
+                setError(null);
+                try {
+                  const a = unwrap(await activarEquipo(codigo));
+                  try {
+                    localStorage.setItem(LS_EQUIPO, a.token);
+                  } catch {}
+                  const r = unwrap(await registrarCheckinEquipo(a.token));
+                  listo(r.sucursal);
+                } catch (e) {
+                  setError(e instanceof Error ? e.message : "No se pudo vincular");
+                } finally {
+                  setVinculando(false);
+                }
+              }}
+            >
+              Vincular
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   );

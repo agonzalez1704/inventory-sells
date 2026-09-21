@@ -5,7 +5,7 @@ import { fiadoExigeCliente, posClickAbreDetalle, comprobanteObligatorio } from "
 import { ConfigView } from "@/modules/config/ConfigView";
 import { Card } from "@/components/ui/card";
 import { insforgeAdmin } from "@/lib/insforge/admin";
-import { listarSucursales } from "@/modules/sucursales/actions";
+import { listarEquipos, listarSucursales } from "@/modules/sucursales/actions";
 import { SucursalesConfig } from "@/modules/sucursales/SucursalesConfig";
 import { listarCuentasAdmin } from "@/modules/config/cuentas";
 import { CuentasNegocio } from "@/modules/config/CuentasNegocio";
@@ -62,7 +62,7 @@ export default async function ConfiguracionPage() {
       c?.aliexpress_token && c.aliexpress_expira && new Date(c.aliexpress_expira) > new Date(),
     );
   }
-  const sucursales = isAdmin ? await listarSucursales() : [];
+  const [sucursales, equipos] = isAdmin ? await Promise.all([listarSucursales(), listarEquipos()]) : [[], []];
   const cuentas = isAdmin ? await listarCuentasAdmin() : [];
   const aliAuthUrl = aliKey
     ? `https://api-sg.aliexpress.com/oauth/authorize?response_type=code&client_id=${aliKey}&redirect_uri=${encodeURIComponent("https://fiable.vercel.app/api/aliexpress/callback")}&force_auth=true`
@@ -79,7 +79,7 @@ export default async function ConfiguracionPage() {
         isAdmin={isAdmin}
       />
 
-      {isAdmin && <SucursalesConfig sucursales={sucursales} />}
+      {isAdmin && <SucursalesConfig sucursales={sucursales} equipos={equipos} />}
 
       {isAdmin && <CuentasNegocio cuentas={cuentas} isAdmin={isAdmin} />}
 

@@ -226,3 +226,117 @@ export async function misInventariosAjenos(): Promise<Record<string, string>> {
   const { inventariosAjenos } = await import("./guard");
   return Object.fromEntries(await inventariosAjenos(userId));
 }
+
+// ---- Counter computers ----------------------------------------------------
+//
+// A desktop has no GPS and reads hundreds of meters off, so it is paired with
+// its branch once and vouches for it. An admin mints a short code; the
+// employee types it on that computer, which keeps a token from then on.
+
+export type EquipoSucursal = { id: string; sucursal_id: string; activado_at: string | null };
+
+async function sucursalesPermitidas(userId: string): Promise<Sucursal[]> {
+  const { data } = await insforgeAdmin.database
+    .from("profile_sucursales")
+    .select("sucursales(id, nombre, lat, lng, radio_m, is_active)")
+    .eq("profile_id", userId);
+  return ((data ?? []) as unknown as { sucursales: Sucursal | null }[])
+    .map((r) => r.sucursales)
+    .filter((s): s is Sucursal => !!s && s.is_active);
+}
+
+const aleatorio = (bytes: number) =>
+  Array.from(crypto.getRandomValues(new Uint8Array(bytes)), (b) => b.toString(16).padStart(2, "0")).join("");
+
+/** Admin: a 6-digit code, valid 15 minutes, to pair one computer with a branch. */
+export async function crearCodigoEquipo(sucursalId: string): Promise<ActionResult<{ codigo: string }>> {
+  return attempt("crearCodigoEquipo", async () => {
+    const userId = await assertPermiso("usuarios_gestionar");
+    // Six digits: typed by hand at the counter. Unique among live codes is
+    // enough — a used or expired code is cleared.
+    const codigo = String(100000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 900000));
+    const { error } = await insforgeAdmin.database.from("sucursal_equipos").insert([
+      {
+        sucursal_id: sucursalId,
+        codigo,
+        codigo_expira: new Date(Date.now() + 15 * 60_000).toISOString(),
+        created_by: userId,
+      },
+    ]);
+    if (error) throw new Error(/unique|duplicate/i.test(error.message ?? "") ? "Intenta de nuevo" : error.message);
+    return { codigo };
+  });
+}
+
+/** Employee, on the counter computer: trade the code for this device's token. */
+export async function activarEquipo(codigo: string): Promise<ActionResult<{ token: string; sucursal: string }>> {
+  return attempt("activarEquipo", async () => {
+    const { userId } = await auth();
+    if (!userId) throw new Error("No autenticado");
+    const limpio = codigo.replace(/\D/g, "");
+    const { data } = await insforgeAdmin.database
+      .from("sucursal_equipos")
+      .select("id, sucursal_id, codigo_expira, sucursales(nombre)")
+      .eq("codigo", limpio)
+      .is("token", null)
+      .maybeSingle();
+    const eq = data as { id: string; sucursal_id: string; codigo_expira: string; sucursales: { nombre: string } | null } | null;
+    if (!eq || new Date(eq.codigo_expira).getTime() < Date.now())
+      throw new Error("Código inválido o vencido. Pide uno nuevo al administrador.");
+    const permitidas = await sucursalesPermitidas(userId);
+    if (!permitidas.some((s) => s.id === eq.sucursal_id))
+      throw new Error(`Ese código es de ${eq.sucursales?.nombre ?? "otra sucursal"}, y no trabajas ahí.`);
+    const token = aleatorio(32);
+    const { error } = await insforgeAdmin.database
+      .from("sucursal_equipos")
+      .update({ token, codigo: null, codigo_expira: null, activado_at: new Date().toISOString(), activado_por: userId })
+      .eq("id", eq.id);
+    if (error) throw new Error(error.message ?? "No se pudo vincular");
+    return { token, sucursal: eq.sucursales?.nombre ?? "" };
+  });
+}
+
+/** Start the day from a paired computer: its branch, no location needed. */
+export async function registrarCheckinEquipo(token: string): Promise<ActionResult<{ sucursal: string }>> {
+  return attempt("registrarCheckinEquipo", async () => {
+    const { userId } = await auth();
+    if (!userId) throw new Error("No autenticado");
+    const { data } = await insforgeAdmin.database
+      .from("sucursal_equipos")
+      .select("sucursal_id")
+      .eq("token", token)
+      .maybeSingle();
+    const eq = data as { sucursal_id: string } | null;
+    if (!eq) throw new Error("Esta computadora ya no está vinculada");
+    const s = (await sucursalesPermitidas(userId)).find((x) => x.id === eq.sucursal_id);
+    if (!s) throw new Error("Esta computadora es de una sucursal donde no trabajas");
+    const { error } = await insforgeAdmin.database
+      .from("checkins")
+      .insert([{ profile_id: userId, sucursal_id: s.id, lat: s.lat, lng: s.lng, distancia_m: 0, metodo: "equipo" }]);
+    if (error) throw new Error(error.message ?? "No se pudo registrar");
+    return { sucursal: s.nombre };
+  });
+}
+
+/** Admin: paired computers, to see and revoke them. */
+export async function listarEquipos(): Promise<EquipoSucursal[]> {
+  const { userId } = await auth();
+  if (!userId) return [];
+  const perms = await getPermisos(userId);
+  if (!perms.has("admin_total") && !perms.has("usuarios_gestionar")) return [];
+  const { data } = await insforgeAdmin.database
+    .from("sucursal_equipos")
+    .select("id, sucursal_id, activado_at")
+    .not("token", "is", null)
+    .order("activado_at", { ascending: false });
+  return (data ?? []) as EquipoSucursal[];
+}
+
+export async function quitarEquipo(id: string): Promise<ActionResult<null>> {
+  return attempt("quitarEquipo", async () => {
+    await assertPermiso("usuarios_gestionar");
+    const { error } = await insforgeAdmin.database.from("sucursal_equipos").delete().eq("id", id);
+    if (error) throw new Error(error.message ?? "No se pudo quitar");
+    return null;
+  });
+}

@@ -3,21 +3,53 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { MapPin, Plus, Archive, Crosshair } from "lucide-react";
+import { MapPin, Plus, Archive, Crosshair, Monitor, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { unwrap } from "@/lib/errors";
-import { crearSucursal, archivarSucursal, type Sucursal } from "./actions";
+import {
+  crearSucursal,
+  archivarSucursal,
+  crearCodigoEquipo,
+  quitarEquipo,
+  type EquipoSucursal,
+  type Sucursal,
+} from "./actions";
 
 /**
  * Branch management, built for how a branch is actually registered: the admin
  * STANDS at the counter and presses "Usar mi ubicación" — the coordinates are
  * the phone's, not something anyone types.
  */
-export function SucursalesConfig({ sucursales }: { sucursales: Sucursal[] }) {
+export function SucursalesConfig({ sucursales, equipos }: { sucursales: Sucursal[]; equipos: EquipoSucursal[] }) {
   const router = useRouter();
   const [pending, start] = useTransition();
+  // The live pairing code, per branch — shown until it is used or reloaded.
+  const [codigos, setCodigos] = useState<Record<string, string>>({});
+
+  function generarCodigo(s: Sucursal) {
+    start(async () => {
+      const r = await crearCodigoEquipo(s.id);
+      if (!r.ok) {
+        toast.error(r.error);
+        return;
+      }
+      setCodigos((c) => ({ ...c, [s.id]: r.data.codigo }));
+    });
+  }
+
+  function quitar(id: string) {
+    start(async () => {
+      const r = await quitarEquipo(id);
+      if (!r.ok) {
+        toast.error(r.error);
+        return;
+      }
+      toast.success("Computadora desvinculada");
+      router.refresh();
+    });
+  }
   const [nombre, setNombre] = useState("");
   const [radio, setRadio] = useState("300");
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
@@ -134,7 +166,26 @@ export function SucursalesConfig({ sucursales }: { sucursales: Sucursal[] }) {
                 <span className="block text-xs text-muted-foreground">
                   radio {s.radio_m} m
                 </span>
+                {equipos.filter((e) => e.sucursal_id === s.id).map((e, i) => (
+                  <span key={e.id} className="mt-1 inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground mr-1">
+                    <Monitor className="h-3 w-3" /> Computadora {i + 1}
+                    <button type="button" onClick={() => quitar(e.id)} aria-label="Desvincular computadora" className="cursor-pointer hover:text-red-600">
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+                {codigos[s.id] && (
+                  <span className="mt-1.5 block text-xs">
+                    Código para la computadora del mostrador:{" "}
+                    <b className="font-mono text-base tracking-widest">{codigos[s.id]}</b>
+                    <span className="text-muted-foreground"> · vence en 15 min</span>
+                  </span>
+                )}
               </span>
+              <Button type="button" variant="secondary" size="sm" onClick={() => generarCodigo(s)} disabled={pending}>
+                <Monitor className="h-3.5 w-3.5" />
+                Vincular computadora
+              </Button>
               <button
                 type="button"
                 onClick={() => archivar(s)}
