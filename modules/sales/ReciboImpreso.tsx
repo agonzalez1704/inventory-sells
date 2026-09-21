@@ -4,8 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { Check, Printer, Loader2 } from "lucide-react";
 import { formatMXN } from "@/lib/money";
 import { MARCA } from "@/lib/marca";
-import { imprimirTicketNavegador, type TicketData } from "@/lib/ticket";
-import { imprimirTicketUSB, impresoraUsbLista } from "@/lib/escpos-usb";
+import { type TicketData } from "@/lib/ticket";
+import { avisarFalloUSB, imprimirTicketAuto, imprimirTicketUSB, impresoraUsbLista } from "@/lib/escpos-usb";
 import { Button } from "@/components/ui/button";
 import { VincularImpresora } from "@/components/ticket/VincularImpresora";
 
@@ -62,7 +62,7 @@ export function ReciboImpreso({
       setUsbOk(listo);
       if (listo && !yaImpreso.current) {
         yaImpreso.current = true;
-        imprimirTicketUSB(ticket).catch(() => undefined);
+        imprimirTicketUSB(ticket).catch(avisarFalloUSB);
       }
     });
     return () => {
@@ -203,7 +203,7 @@ export function ReciboImpreso({
           <Button
             variant="secondary"
             className="flex-1"
-            onClick={() => (usbOk ? imprimirTicketUSB(ticket).catch(() => imprimirTicketNavegador(ticket)) : imprimirTicketNavegador(ticket))}
+            onClick={() => imprimirTicketAuto(ticket)}
           >
             <Printer className="h-4 w-4" />
             {usbOk ? "Imprimir otra" : "Imprimir"}

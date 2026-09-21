@@ -1,4 +1,5 @@
 import { formatMXN } from "@/lib/money";
+import { toast } from "sonner";
 import { imprimirTicketNavegador, type TicketData } from "@/lib/ticket";
 import type { CorteData } from "@/lib/corte";
 
@@ -199,8 +200,9 @@ export async function imprimirTicketAuto(d: TicketData): Promise<"usb" | "dialog
     try {
       await imprimirTicketUSB(d);
       return "usb";
-    } catch {
-      // The driver may have claimed the interface since; the dialog still works.
+    } catch (e) {
+      // Falling back quietly hid the reason for days: say it, then print anyway.
+      avisarFalloUSB(e);
     }
   }
   imprimirTicketNavegador(d);
@@ -226,6 +228,23 @@ export async function vincularImpresoraUSB(): Promise<void> {
     );
   });
   await device.close().catch(() => undefined);
+}
+
+/**
+ * Why direct printing failed, in words the counter can act on. The usual
+ * cause is the operating system's own printer driver holding the USB port —
+ * Windows (Generic/Text) or macOS (the printer added in System Settings) —
+ * and then no browser can write to it.
+ */
+export function avisarFalloUSB(e: unknown): void {
+  const msg = e instanceof Error ? e.message : String(e);
+  const tomada = /claim|access|denied|busy|security|in use/i.test(msg);
+  toast.error(
+    tomada
+      ? "La impresora está tomada por el sistema (su driver). Se abrió el diálogo. Para imprimir directo usa Chrome con impresión directa."
+      : `No se pudo imprimir directo (${msg}). Se abrió el diálogo.`,
+    { duration: 10000 },
+  );
 }
 
 /** Is a printer already granted to this computer? Then printing asks nothing. */
