@@ -1,6 +1,4 @@
 import { formatMXN } from "@/lib/money";
-import { toast } from "sonner";
-import { imprimirTicketNavegador, type TicketData } from "@/lib/ticket";
 import type { CorteData } from "@/lib/corte";
 
 // Direct ESC/POS printing over WebUSB — one tap, auto-cut, no OS dialog.
@@ -36,36 +34,12 @@ export function webUsbDisponible(): boolean {
 }
 
 // --- ESC/POS byte builder -------------------------------------------------
-const PAGO: Record<string, string> = {
-  efectivo: "Efectivo",
-  tarjeta: "Tarjeta",
-  transferencia: "Transferencia",
-  otro: "Otro",
-};
 const WIDTH = 48; // 80mm @ Font A
 
 // Thermal heads use a single-byte codepage; strip accents to plain ASCII so
 // "batería" doesn't come out garbled.
 const ascii = (s: string) =>
   s.normalize("NFD").replace(/[̀-ͯ]/g, "");
-
-/** Break text into printable lines — a head truncates, it does not wrap. */
-function envolver(s: string, ancho: number): string[] {
-  const out: string[] = [];
-  for (const parrafo of s.split(/\n+/)) {
-    let linea = "";
-    for (const w of parrafo.split(/\s+/).filter(Boolean)) {
-      if (!linea) linea = w.slice(0, ancho);
-      else if (linea.length + 1 + w.length <= ancho) linea += ` ${w}`;
-      else {
-        out.push(linea);
-        linea = w.slice(0, ancho);
-      }
-    }
-    if (linea) out.push(linea);
-  }
-  return out;
-}
 
 class EscPos {
   private parts: number[] = [];
@@ -111,45 +85,6 @@ class EscPos {
   }
 }
 
-export function buildEscPos(d: TicketData): Uint8Array {
-  const fecha = new Date(d.fecha).toLocaleString("es-MX", {
-    dateStyle: "short",
-    timeStyle: "short",
-  });
-  const folio = d.folio.replace(/-/g, "").slice(0, 8).toUpperCase();
-  const esFiado = d.tipo === "fiado";
-
-  const p = new EscPos();
-  p.raw(0x1b, 0x40); // init
-  const cab = d.encabezado?.length ? d.encabezado : ["FIABLE", "Celulares y refacciones"];
-  p.align("center").size(true).bold(true).line(cab[0]).size(false).bold(false);
-  for (const l of cab.slice(1)) for (const w of envolver(l, WIDTH)) p.line(w);
-  if (esFiado) p.bold(true).line("NOTA DE CREDITO - PENDIENTE DE PAGO").bold(false);
-  p.align("left").sep();
-  p.lr(`Folio: ${folio}`, fecha);
-  if (d.cliente) p.line(`Cliente: ${d.cliente}`);
-  p.sep();
-  for (const it of d.items) {
-    p.lr(it.nombre, formatMXN(it.total));
-    if (it.qty > 1) p.line(`  ${it.qty} x ${formatMXN(it.precioUnit)}`);
-  }
-  p.sep();
-  p.bold(true).lr("TOTAL", formatMXN(d.total)).bold(false);
-  if (d.metodoPago && !esFiado) p.line(`Pago: ${PAGO[d.metodoPago] ?? d.metodoPago}`);
-  if (d.garantia) {
-    p.sep();
-    // ascii() inside line() strips the accents the head cannot print; the
-    // wrapping is ours, because a thermal head just cuts at the column.
-    for (const l of envolver(d.garantia, WIDTH)) p.line(l);
-  }
-  p.sep();
-  p.align("center").line(esFiado ? "Comprobante de nota de credito" : "Gracias por su compra!");
-  p.line("fiable.vercel.app");
-  p.raw(0x0a, 0x0a, 0x0a); // feed
-  p.raw(0x1d, 0x56, 0x00); // full cut
-  return p.bytes();
-}
-
 // Send a raw ESC/POS byte stream to a user-picked USB printer.
 export async function enviarBytesUSB(bytes: Uint8Array): Promise<void> {
   const usb = getUsb();
@@ -182,77 +117,6 @@ export async function enviarBytesUSB(bytes: Uint8Array): Promise<void> {
   await device.claimInterface(iface.interfaceNumber);
   await device.transferOut(ep.endpointNumber, bytes);
   await device.close();
-}
-
-export async function imprimirTicketUSB(d: TicketData): Promise<void> {
-  await enviarBytesUSB(buildEscPos(d));
-}
-
-/**
- * Print with no dialog when this computer has already been paired with the
- * printer; fall back to the OS dialog when it has not.
- *
- * Returns how it printed, so a caller can say so — "se imprimió" and "elige la
- * impresora" are different outcomes for whoever is at the counter.
- */
-export async function imprimirTicketAuto(d: TicketData): Promise<"usb" | "dialogo"> {
-  if (await impresoraUsbLista()) {
-    try {
-      await imprimirTicketUSB(d);
-      return "usb";
-    } catch (e) {
-      // Falling back quietly hid the reason for days: say it, then print anyway.
-      avisarFalloUSB(e);
-    }
-  }
-  imprimirTicketNavegador(d);
-  return "dialogo";
-}
-
-/**
- * Ask for the printer ONCE. The grant is stored by the browser per origin, so
- * from here on printing needs no dialog and no permission prompt.
- */
-export async function vincularImpresoraUSB(): Promise<void> {
-  const usb = getUsb();
-  if (!usb) throw new Error("Este navegador no soporta WebUSB. Usa Chrome o Edge en computadora.");
-  const device = await usb.requestDevice({ filters: [] });
-  // Open it once: a printer whose interface the Windows driver already owns
-  // fails HERE, while the seller can still read why, instead of silently at
-  // the first sale.
-  await device.open().catch((e: unknown) => {
-    throw new Error(
-      e instanceof Error && /access|denied|security/i.test(e.message)
-        ? "Windows tiene tomada esa impresora con su driver. Usa el acceso directo de Chrome con impresión directa."
-        : "No se pudo abrir la impresora.",
-    );
-  });
-  await device.close().catch(() => undefined);
-}
-
-/**
- * Why direct printing failed, in words the counter can act on. The usual
- * cause is the operating system's own printer driver holding the USB port —
- * Windows (Generic/Text) or macOS (the printer added in System Settings) —
- * and then no browser can write to it.
- */
-export function avisarFalloUSB(e: unknown): void {
-  const msg = e instanceof Error ? e.message : String(e);
-  const tomada = /claim|access|denied|busy|security|in use/i.test(msg);
-  toast.error(
-    tomada
-      ? "La impresora está tomada por el sistema (su driver). Se abrió el diálogo. Para imprimir directo usa Chrome con impresión directa."
-      : `No se pudo imprimir directo (${msg}). Se abrió el diálogo.`,
-    { duration: 10000 },
-  );
-}
-
-/** Is a printer already granted to this computer? Then printing asks nothing. */
-export async function impresoraUsbLista(): Promise<boolean> {
-  const usb = getUsb();
-  if (!usb) return false;
-  const ds = await usb.getDevices().catch((): USBDevice[] => []);
-  return ds.length > 0;
 }
 
 export function buildEscPosCorte(d: CorteData): Uint8Array {

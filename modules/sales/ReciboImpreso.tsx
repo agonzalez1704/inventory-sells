@@ -1,13 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Check, Printer, Loader2 } from "lucide-react";
 import { formatMXN } from "@/lib/money";
 import { MARCA } from "@/lib/marca";
-import { type TicketData } from "@/lib/ticket";
-import { avisarFalloUSB, imprimirTicketAuto, imprimirTicketUSB, impresoraUsbLista } from "@/lib/escpos-usb";
+import { imprimirTicketNavegador, type TicketData } from "@/lib/ticket";
 import { Button } from "@/components/ui/button";
-import { VincularImpresora } from "@/components/ticket/VincularImpresora";
 
 // The charge's success screen: a little thermal printer feeds the ticket out,
 // the way the real one on the counter does. The paper is always white — a
@@ -49,26 +47,6 @@ export function ReciboImpreso({
 }) {
   const [impreso, setImpreso] = useState(false);
   const [sinMotion, setSinMotion] = useState(false);
-  const [usbOk, setUsbOk] = useState(false);
-  // One print per sale: the effect must not fire twice in development's
-  // double render, and a re-render must never reprint a ticket.
-  const yaImpreso = useRef(false);
-
-  // Paired printer: the ticket comes out on its own, the way a till does it.
-  useEffect(() => {
-    let vivo = true;
-    impresoraUsbLista().then((listo) => {
-      if (!vivo) return;
-      setUsbOk(listo);
-      if (listo && !yaImpreso.current) {
-        yaImpreso.current = true;
-        imprimirTicketUSB(ticket).catch(avisarFalloUSB);
-      }
-    });
-    return () => {
-      vivo = false;
-    };
-  }, [ticket]);
 
   useEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -197,16 +175,14 @@ export function ReciboImpreso({
           </article>
         </div>
 
-        {/* Right where someone notices the dialog: pair once, never again. */}
-        <VincularImpresora className="mt-4 h-11 w-full" />
         <div className="mt-4 flex gap-2">
           <Button
             variant="secondary"
             className="flex-1"
-            onClick={() => imprimirTicketAuto(ticket)}
+            onClick={() => imprimirTicketNavegador(ticket)}
           >
             <Printer className="h-4 w-4" />
-            {usbOk ? "Imprimir otra" : "Imprimir"}
+            Imprimir
           </Button>
           <Button variant="accent" className="flex-1" onClick={onClose} autoFocus>
             <Check className="h-4 w-4" />

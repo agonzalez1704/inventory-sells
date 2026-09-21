@@ -1,14 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { toast } from "sonner";
-import { Printer, Usb } from "lucide-react";
+import { Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { type TicketData } from "@/lib/ticket";
-import { imprimirTicketAuto, imprimirTicketUSB, impresoraUsbLista, webUsbDisponible } from "@/lib/escpos-usb";
+import { imprimirTicketNavegador, type TicketData } from "@/lib/ticket";
 
-// Print controls for a ticket: OS dialog (always) + direct WebUSB (when the
-// browser supports it). `data` may be a value or a lazy getter.
+// Prints through the browser. At the counter Chrome runs with
+// --kiosk-printing, which sends it straight to the default printer with no
+// dialog. Direct WebUSB printing was removed: every counter's OS driver owns
+// the USB port, so the browser only ever got "Access denied".
 export function PrintTicketButtons({
   data,
   size = "sm",
@@ -16,44 +15,14 @@ export function PrintTicketButtons({
   data: TicketData | (() => TicketData);
   size?: "sm" | "md" | "lg";
 }) {
-  const [usbOk, setUsbOk] = useState(false);
-  const [vinculada, setVinculada] = useState(false);
-  const [usbBusy, setUsbBusy] = useState(false);
-
-  useEffect(() => {
-    setUsbOk(webUsbDisponible());
-    impresoraUsbLista().then(setVinculada).catch(() => undefined);
-  }, []);
-
-  const resolve = () => (typeof data === "function" ? data() : data);
-
-  async function usb() {
-    setUsbBusy(true);
-    try {
-      await imprimirTicketUSB(resolve());
-      setVinculada(true);
-      toast.success("Enviado a la impresora");
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "No se pudo imprimir por USB");
-    } finally {
-      setUsbBusy(false);
-    }
-  }
-
   return (
-    <div className="flex items-center gap-2">
-      {/* Silent when this computer is paired with the printer; the OS dialog
-          otherwise. */}
-      <Button variant="ghost" size={size} onClick={() => imprimirTicketAuto(resolve())}>
-        <Printer className="h-4 w-4" />
-        Imprimir ticket
-      </Button>
-      {usbOk && !vinculada && (
-        <Button variant="ghost" size={size} onClick={usb} loading={usbBusy} title="Imprime sin diálogos desde entonces">
-          <Usb className="h-4 w-4" />
-          Vincular impresora
-        </Button>
-      )}
-    </div>
+    <Button
+      variant="ghost"
+      size={size}
+      onClick={() => imprimirTicketNavegador(typeof data === "function" ? data() : data)}
+    >
+      <Printer className="h-4 w-4" />
+      Imprimir ticket
+    </Button>
   );
 }

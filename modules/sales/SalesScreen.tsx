@@ -24,9 +24,7 @@ import { conDescuento, formatMXN } from "@/lib/money";
 import { foto } from "@/lib/foto";
 import { cn } from "@/lib/utils";
 import type { PaymentMethodVenta, Product } from "@/lib/types";
-import { type TicketData } from "@/lib/ticket";
-import { imprimirTicketAuto } from "@/lib/escpos-usb";
-import { VincularImpresora } from "@/components/ticket/VincularImpresora";
+import { imprimirTicketNavegador, type TicketData } from "@/lib/ticket";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { BarraInferior } from "@/components/ui/barra-inferior";
@@ -858,7 +856,6 @@ export function SalesScreen({
           <p className="mt-0.5 text-sm text-muted-foreground">Busca, escanea o toca para agregar. El stock se descuenta solo.</p>
         </div>
         <div className="ml-auto flex items-center gap-2">
-        <VincularImpresora className="h-9" />
         {ultima && (
           <div className="hidden items-center gap-2.5 rounded-xl border border-border bg-background px-3 py-1.5 sm:flex">
             <Printer className="h-4 w-4 text-muted-foreground" />
@@ -868,7 +865,7 @@ export function SalesScreen({
                 {formatMXN(ultima.ticket.total)} · {hora(ultima.ticket.fecha)}
               </p>
             </div>
-            <Button variant="secondary" className="h-8 px-2.5 text-xs" onClick={() => imprimirTicketAuto(ultima.ticket)}>
+            <Button variant="secondary" className="h-8 px-2.5 text-xs" onClick={() => imprimirTicketNavegador(ultima.ticket)}>
               Reimprimir
             </Button>
           </div>
