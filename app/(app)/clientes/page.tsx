@@ -1,10 +1,14 @@
+import { auth } from "@clerk/nextjs/server";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
+import { getPermisos } from "@/lib/auth/profile";
 import { ClientesView } from "@/modules/customers/ClientesView";
 import type { Customer } from "@/modules/customers/actions";
 import { saldosDeClientes } from "@/modules/garantias/cliente-actions";
 
 
 export default async function ClientesPage() {
+  const { userId } = await auth();
+  const isAdmin = userId ? (await getPermisos(userId)).has("admin_total") : false;
   const insforge = await createInsForgeServerClient();
   const [{ data }, saldos] = await Promise.all([
     insforge.database
@@ -18,5 +22,5 @@ export default async function ClientesPage() {
     saldosDeClientes(),
   ]);
 
-  return <ClientesView initial={(data ?? []) as Customer[]} saldos={saldos} />;
+  return <ClientesView initial={(data ?? []) as Customer[]} saldos={saldos} isAdmin={isAdmin} />;
 }

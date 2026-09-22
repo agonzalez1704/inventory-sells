@@ -3,6 +3,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
 import { insforgeAdmin } from "@/lib/insforge/admin";
+import { attempt, type ActionResult } from "@/lib/errors";
 
 export type CustomerTipo = "publico" | "mayoreo" | "tecnico";
 
@@ -234,5 +235,38 @@ export async function buscarClientes(q: string): Promise<Customer[]> {
     const extras = (c.customer_phones ?? []).map((p) => p.telefono).join(" ");
     const hay = `${c.nombre} ${c.telefono ?? ""} ${extras} ${c.email ?? ""}`.toLowerCase();
     return tokens.every((t) => hay.includes(t));
+  });
+}
+
+export type ResultadoFusion = {
+  ventas: number;
+  cotizaciones: number;
+  saldo_movs: number;
+  garantias: number;
+  telefonos: number;
+};
+
+/**
+ * Two records, one person: move everything onto the one that stays.
+ *
+ * Nothing is deleted — sales, quotes, store credit and warranties are
+ * re-pointed, the other numbers become extra phones, and the absorbed record
+ * is archived pointing at its survivor. Admin only, enforced by the RPC.
+ */
+export async function fusionarClientes(
+  conservarId: string,
+  absorberId: string,
+): Promise<ActionResult<ResultadoFusion>> {
+  return attempt("fusionarClientes", async () => {
+    const { userId } = await auth();
+    if (!userId) throw new Error("No autenticado");
+    const insforge = await createInsForgeServerClient();
+    const { data, error } = await insforge.database.rpc("fusionar_clientes", {
+      p_conservar: conservarId,
+      p_absorber: absorberId,
+    });
+    if (error) throw new Error(error.message ?? "No se pudieron combinar");
+    const row = (Array.isArray(data) ? data[0] : data) as ResultadoFusion | undefined;
+    return row ?? { ventas: 0, cotizaciones: 0, saldo_movs: 0, garantias: 0, telefonos: 0 };
   });
 }

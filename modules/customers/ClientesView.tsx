@@ -15,6 +15,7 @@ import {
   X,
   Wallet,
   CreditCard,
+  Merge,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
@@ -30,6 +31,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import {
   crearCliente,
   editarCliente,
+  fusionarClientes,
   archivarCliente,
   agregarTelefono,
   quitarTelefono,
@@ -59,16 +61,20 @@ function pct(v: number | string): number {
 export function ClientesView({
   initial,
   saldos = {},
+  isAdmin = false,
 }: {
   initial: Customer[];
   /** Store credit by customer id — only those who are owed something. */
   saldos?: Record<string, number>;
+  /** Merging moves history between records, so it is the admin's call. */
+  isAdmin?: boolean;
 }) {
   const [verSaldo, setVerSaldo] = useState<Customer | null>(null);
   const totalSaldo = Object.values(saldos).reduce((s, n) => s + n, 0);
   const [query, setQuery] = useState("");
   const [nuevo, setNuevo] = useState(false);
   const [editar, setEditar] = useState<Customer | null>(null);
+  const [fusionar, setFusionar] = useState<Customer | null>(null);
 
   const filtrados = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -145,6 +151,7 @@ export function ClientesView({
               saldo={saldos[c.id] ?? 0}
               onEdit={() => setEditar(c)}
               onVerSaldo={() => setVerSaldo(c)}
+              onFusionar={isAdmin ? () => setFusionar(c) : undefined}
             />
           ))}
         </div>
@@ -162,6 +169,13 @@ export function ClientesView({
       {editar && (
         <ClienteModal cliente={editar} onClose={() => setEditar(null)} />
       )}
+      {fusionar && (
+        <FusionModal
+          base={fusionar}
+          candidatos={initial.filter((c) => !c.is_system && c.id !== fusionar.id)}
+          onClose={() => setFusionar(null)}
+        />
+      )}
     </section>
   );
 }
@@ -171,11 +185,14 @@ function ClienteRow({
   saldo,
   onEdit,
   onVerSaldo,
+  onFusionar,
 }: {
   c: Customer;
   saldo: number;
   onEdit: () => void;
   onVerSaldo: () => void;
+  /** Undefined for anyone who may not merge. */
+  onFusionar?: () => void;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -297,6 +314,12 @@ function ClienteRow({
               <Pencil className="h-4 w-4" />
               Editar
             </Button>
+            {onFusionar && (
+              <Button variant="ghost" size="sm" onClick={onFusionar} disabled={pending} title="Combinar con otro registro del mismo cliente">
+                <Merge className="h-4 w-4" />
+                Combinar
+              </Button>
+            )}
             <button
               onClick={archivar}
               disabled={pending}
@@ -597,5 +620,180 @@ function TelefonosExtra({
         </Button>
       </div>
     </div>
+  );
+}
+
+/**
+ * "Combinar": the same person registered twice — "jairo" and "joven jairo"
+ * with the same phone written two ways — becomes one record.
+ *
+ * The seller picks the twin and which name stays; everything else (purchases,
+ * debt, store credit, quotes, warranties, the other phone numbers) moves onto
+ * it. Nothing is deleted: the absorbed record is archived.
+ */
+function FusionModal({
+  base,
+  candidatos,
+  onClose,
+}: {
+  base: Customer;
+  candidatos: Customer[];
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const [q, setQ] = useState("");
+  const [otro, setOtro] = useState<Customer | null>(null);
+  // Which record survives. Defaults to the one the merge started from.
+  const [conservar, setConservar] = useState<"base" | "otro">("base");
+  const [pending, start] = useTransition();
+
+  const sugeridos = useMemo(() => {
+    const digits = (s: string | null) => (s ?? "").replace(/\D/g, "").slice(-10);
+    const tel = digits(base.telefono);
+    const nombre = base.nombre.trim().toLowerCase();
+    const texto = q.trim().toLowerCase();
+    const puntua = (c: Customer) => {
+      const tels = [c.telefono, ...(c.customer_phones ?? []).map((p) => p.telefono)].map(digits);
+      if (tel && tels.includes(tel)) return 0; // same phone: almost surely the same person
+      if (c.nombre.toLowerCase().includes(nombre) || nombre.includes(c.nombre.toLowerCase())) return 1;
+      return 2;
+    };
+    return candidatos
+      .filter((c) =>
+        texto
+          ? `${c.nombre} ${c.telefono ?? ""} ${(c.customer_phones ?? []).map((p) => p.telefono).join(" ")}`
+              .toLowerCase()
+              .includes(texto)
+          : puntua(c) < 2,
+      )
+      .sort((a, b) => puntua(a) - puntua(b) || a.nombre.localeCompare(b.nombre, "es"))
+      .slice(0, 8);
+  }, [candidatos, q, base]);
+
+  const queda = conservar === "base" ? base : otro;
+  const seVa = conservar === "base" ? otro : base;
+
+  function combinar() {
+    if (!otro || !queda || !seVa) return;
+    start(async () => {
+      const r = await fusionarClientes(queda.id, seVa.id);
+      if (!r.ok) {
+        toast.error(r.error);
+        return;
+      }
+      const piezas = [
+        r.data.ventas && `${r.data.ventas} ${r.data.ventas === 1 ? "venta" : "ventas"}`,
+        r.data.cotizaciones && `${r.data.cotizaciones} cotiz.`,
+        r.data.saldo_movs && `${r.data.saldo_movs} mov. de saldo`,
+        r.data.garantias && `${r.data.garantias} garantías`,
+        r.data.telefonos && `${r.data.telefonos} tel.`,
+      ].filter(Boolean);
+      toast.success(
+        `Combinados en ${queda.nombre}${piezas.length ? ` · se movieron ${piezas.join(", ")}` : ""}`,
+      );
+      onClose();
+      router.refresh();
+    });
+  }
+
+  return (
+    <Modal open onClose={onClose} title="Combinar clientes" className="max-w-lg">
+      <div className="space-y-4">
+        <p className="text-sm text-muted-foreground">
+          Une dos registros de la misma persona. Las compras, la deuda, el saldo
+          y los teléfonos quedan en uno solo.
+        </p>
+
+        <div className="rounded-xl border border-border p-3">
+          <p className="text-xs text-muted-foreground">Vas a combinar</p>
+          <p className="text-sm font-medium">{base.nombre}</p>
+          {base.telefono && <p className="text-xs text-muted-foreground">{base.telefono}</p>}
+        </div>
+
+        {!otro ? (
+          <div className="space-y-2">
+            <p className="text-sm font-medium">¿Con cuál?</p>
+            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Busca por nombre o teléfono…" />
+            {sugeridos.length === 0 ? (
+              <p className="py-3 text-center text-sm text-muted-foreground">
+                {q ? "Sin resultados." : "Escribe para buscar al otro registro."}
+              </p>
+            ) : (
+              <ul className="divide-y divide-border rounded-xl border border-border">
+                {sugeridos.map((c) => (
+                  <li key={c.id}>
+                    <button
+                      type="button"
+                      onClick={() => setOtro(c)}
+                      className="flex w-full cursor-pointer items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-muted/50"
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-medium">{c.nombre}</span>
+                        <span className="block truncate text-xs text-muted-foreground">{c.telefono}</span>
+                      </span>
+                      <Merge className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        ) : (
+          <>
+            <fieldset className="space-y-2">
+              <legend className="mb-1 text-sm font-medium">¿Cuál registro se queda?</legend>
+              {(
+                [
+                  ["base", base],
+                  ["otro", otro],
+                ] as const
+              ).map(([k, c]) => (
+                <button
+                  key={k}
+                  type="button"
+                  aria-pressed={conservar === k}
+                  onClick={() => setConservar(k)}
+                  className={cn(
+                    "flex w-full cursor-pointer items-center gap-3 rounded-xl border p-3 text-left",
+                    conservar === k ? "border-primary bg-muted/40" : "border-border hover:bg-muted/30",
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "h-4 w-4 shrink-0 rounded-full border-2",
+                      conservar === k ? "border-primary bg-primary" : "border-border",
+                    )}
+                  />
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-medium">{c.nombre}</span>
+                    <span className="block truncate text-xs text-muted-foreground">
+                      {c.telefono}
+                      {pct(c.descuento_pct) > 0 && ` · ${pct(c.descuento_pct)}% desc.`}
+                    </span>
+                  </span>
+                </button>
+              ))}
+            </fieldset>
+
+            <p className="rounded-xl bg-muted/50 p-3 text-xs leading-relaxed text-muted-foreground">
+              Todo lo de <b className="text-foreground">{seVa?.nombre}</b> pasa a{" "}
+              <b className="text-foreground">{queda?.nombre}</b>: compras, notas de crédito, saldo a
+              favor, cotizaciones, garantías y sus teléfonos. El registro de {seVa?.nombre} se
+              archiva; nada se borra. Se queda el descuento más alto de los dos.
+            </p>
+
+            <div className="flex gap-2">
+              <Button variant="secondary" className="flex-1" onClick={() => setOtro(null)} disabled={pending}>
+                Elegir otro
+              </Button>
+              <Button className="flex-2" onClick={combinar} loading={pending}>
+                <Merge className="h-4 w-4" />
+                Combinar en {queda?.nombre}
+              </Button>
+            </div>
+          </>
+        )}
+      </div>
+    </Modal>
   );
 }
