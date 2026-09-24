@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import {
   Store,
@@ -46,14 +47,52 @@ export function CustomerPicker({
   const [q, setQ] = useState("");
   const [list, setList] = useState<PickerCustomer[]>(customers);
   const rootRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  // The list is rendered in a portal: inside the cart panel it was clipped by
+  // that panel's own scroll box, and the search box at the top of the dropdown
+  // was the half that got cut off. Fixed coordinates, measured from the
+  // trigger, so no ancestor can crop or stack over it.
+  const [caja, setCaja] = useState<{ left: number; width: number; top?: number; bottom?: number; alto: number } | null>(null);
+
+  const medir = useCallback(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const margen = 8;
+    const abajo = window.innerHeight - r.bottom - margen;
+    const arriba = r.top - margen;
+    // Open where it fits; when both are tight, take the roomier side.
+    const haciaArriba = openUp ? arriba > 220 || arriba >= abajo : arriba > abajo && abajo < 220;
+    setCaja({
+      left: Math.max(8, Math.min(r.left, window.innerWidth - r.width - 8)),
+      width: r.width,
+      ...(haciaArriba
+        ? { bottom: Math.max(8, window.innerHeight - r.top + margen) }
+        : { top: r.bottom + margen }),
+      alto: Math.min(420, Math.max(180, haciaArriba ? arriba : abajo)),
+    });
+  }, [openUp]);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    medir();
+    // Capture phase: the panel this lives in scrolls, and so does the page.
+    window.addEventListener("scroll", medir, true);
+    window.addEventListener("resize", medir);
+    return () => {
+      window.removeEventListener("scroll", medir, true);
+      window.removeEventListener("resize", medir);
+    };
+  }, [open, medir]);
 
   useEffect(() => setList(customers), [customers]);
 
   useEffect(() => {
     if (!open) return;
     function onDoc(e: MouseEvent) {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node))
-        setOpen(false);
+      const t = e.target as Node;
+      if (rootRef.current?.contains(t) || panelRef.current?.contains(t)) return;
+      setOpen(false);
     }
     function onEsc(e: KeyboardEvent) {
       if (e.key === "Escape") setOpen(false);
@@ -124,16 +163,29 @@ export function CustomerPicker({
         <ChevronsUpDown className="h-4 w-4 shrink-0 text-muted-foreground" />
       </button>
 
-      {open && (
+      {open &&
+        caja &&
+        createPortal(
         <div
-          className={cn(
-            "absolute left-0 z-40 w-full rounded-xl border border-border bg-background shadow-xl",
-            openUp ? "bottom-full mb-2" : "top-full mt-2",
-          )}
+          ref={panelRef}
+          style={{
+            position: "fixed",
+            left: caja.left,
+            width: caja.width,
+            top: caja.top,
+            bottom: caja.bottom,
+            maxHeight: caja.alto,
+          }}
+          // A drawer dismisses itself on an outside press, and this panel IS
+          // outside its popup: without stopping the press, picking a customer
+          // closed the cart sheet underneath.
+          onPointerDown={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          className="z-90 flex flex-col overflow-hidden rounded-xl border border-border bg-background shadow-2xl"
         >
           {view === "list" ? (
             <>
-              <div className="border-b border-border p-2">
+              <div className="shrink-0 border-b border-border p-2">
                 <div className="relative">
                   <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
@@ -145,7 +197,7 @@ export function CustomerPicker({
                   />
                 </div>
               </div>
-              <ul className="max-h-56 overflow-auto py-1">
+              <ul className="min-h-0 flex-1 overflow-auto py-1">
                 {filtered.map((c) => (
                   <li key={c.id}>
                     <button
@@ -183,7 +235,7 @@ export function CustomerPicker({
                   </li>
                 )}
               </ul>
-              <div className="border-t border-border p-1.5">
+              <div className="shrink-0 border-t border-border p-1.5">
                 <button
                   type="button"
                   onClick={() => setView("new")}
@@ -195,6 +247,7 @@ export function CustomerPicker({
               </div>
             </>
           ) : (
+            <div className="min-h-0 flex-1 overflow-y-auto">
             <NewCustomerForm
               onCancel={() => setView("list")}
               onClose={close}
@@ -203,8 +256,10 @@ export function CustomerPicker({
                 pick(c);
               }}
             />
+            </div>
           )}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
