@@ -149,20 +149,20 @@ function ProductCard({
       {...handlers}
       style={{ WebkitTouchCallout: "none", WebkitUserSelect: "none", userSelect: "none" }}
       className={cn(
-        "group relative flex cursor-pointer flex-col overflow-hidden rounded-2xl border bg-background text-left shadow-xs transition-[border-color,box-shadow] outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+        "group relative flex cursor-pointer flex-col overflow-hidden rounded-xl border bg-background text-left shadow-xs transition-[border-color,box-shadow] outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
         inCart ? "border-foreground" : "border-border hover:border-foreground/30 hover:shadow-card",
         soldOut && "opacity-60",
       )}
     >
       {inCart > 0 && (
-        <span className="absolute top-2 left-2 z-10 flex h-6 min-w-6 items-center justify-center rounded-full bg-foreground px-1.5 text-xs font-semibold text-background tabular-nums">
+        <span className="absolute top-1.5 left-1.5 z-10 flex h-5 min-w-5 items-center justify-center rounded-full bg-foreground px-1 text-[11px] font-semibold text-background tabular-nums">
           {inCart}
         </span>
       )}
       <div className="relative aspect-square bg-muted/60">
         <Thumb src={p.image_url} alt={p.name} className="transition-transform duration-300 group-hover:scale-105" />
         {soldOut ? (
-          <span className="absolute inset-x-0 bottom-0 bg-red-600/90 py-0.5 text-center text-[11px] font-semibold text-white">Agotado</span>
+          <span className="absolute inset-x-0 bottom-0 bg-red-600/90 text-center text-[10px] font-semibold text-white">Agotado</span>
         ) : (
           !maxed && (
             <button
@@ -172,17 +172,17 @@ function ProductCard({
                 e.stopPropagation();
                 onAdd();
               }}
-              className="absolute right-2 bottom-2 flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-primary text-primary-foreground shadow-pop transition-transform active:scale-95 group-hover:scale-105"
+              className="absolute right-1.5 bottom-1.5 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-primary text-primary-foreground shadow-pop transition-transform active:scale-95 group-hover:scale-105"
             >
-              <Plus className="h-5 w-5" />
+              <Plus className="h-4 w-4" />
             </button>
           )
         )}
       </div>
-      <div className="flex flex-1 flex-col gap-0.5 px-2.5 pt-2 pb-2.5">
+      <div className="flex flex-1 flex-col gap-px px-2 pt-1.5 pb-2">
         {/* The part number tells apart the 721 and the 712 of one family —
             the names differ by a word buried mid-string. */}
-        <p className="flex items-center justify-between gap-1 font-mono text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+        <p className="flex items-center justify-between gap-1 font-mono text-[10px] leading-tight font-semibold tracking-wide text-muted-foreground uppercase">
           <span className="truncate">{p.sku}</span>
           {p.sucursal_ajena && (
             <span className="shrink-0 rounded-sm bg-amber-100 px-1 font-sans text-[10px] font-semibold normal-case text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">
@@ -190,22 +190,22 @@ function ProductCard({
             </span>
           )}
         </p>
-        <p className="line-clamp-2 text-sm leading-tight font-semibold">{p.name}</p>
-        <p className="truncate text-xs text-muted-foreground capitalize">{p.category || p.inventory_name}</p>
-        <div className="mt-auto flex items-center justify-between gap-1 pt-1">
+        <p className="line-clamp-2 text-xs leading-tight font-semibold">{p.name}</p>
+        <p className="truncate text-[10px] leading-tight text-muted-foreground capitalize">{p.category || p.inventory_name}</p>
+        <div className="mt-auto flex items-center justify-between gap-1 pt-1.5">
           {importe ? (
-            <span className={cn("text-base font-semibold tabular-nums", alCosto && "text-amber-700 dark:text-amber-400")}>
+            <span className={cn("text-sm font-semibold tabular-nums", alCosto && "text-amber-700 dark:text-amber-400")}>
               {alCosto && <span className="mr-1 text-[10px] font-medium uppercase">costo</span>}
               {formatMXN(importe).replace(".00", "")}
             </span>
           ) : (
-            <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+            <span className="rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
               Sin precio
             </span>
           )}
           <span
             className={cn(
-              "shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium tabular-nums",
+              "shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium tabular-nums",
               p.quantity <= 3 && !soldOut
                 ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
                 : "bg-muted text-muted-foreground",
@@ -939,7 +939,10 @@ export function SalesScreen({
               )}
             </div>
           ) : (
-            <div className={cn("mt-3 grid grid-cols-2 gap-2.5 transition-opacity sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5", buscando && "opacity-60")}>
+            <div className={cn(
+                "mt-3 grid grid-cols-3 gap-2 transition-opacity sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8",
+                buscando && "opacity-60",
+              )}>
               {results.map((p) => (
                 <ProductCard
                   key={p.id}
