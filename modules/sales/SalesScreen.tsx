@@ -15,6 +15,7 @@ import {
   Printer,
   QrCode,
   Search,
+  SearchX,
   ShoppingCart,
   Tag,
   Trash2,
@@ -39,6 +40,8 @@ import { idDeCodigo } from "@/modules/inventory/qr";
 import { saldoDeCliente } from "@/modules/garantias/cliente-actions";
 import { misInventariosAjenos } from "@/modules/sucursales/actions";
 import { crearCotizacion } from "@/modules/cotizaciones/actions";
+import { AnotarDemanda } from "@/modules/demanda/AnotarDemanda";
+import { demandaReciente, type DemandaReciente } from "@/modules/demanda/actions";
 import { guardarComprobante } from "./comprobantes";
 import { PaymentSheet, type Comprobante } from "./PaymentSheet";
 import { ApartarPanel } from "./ApartarPanel";
@@ -311,6 +314,9 @@ export function SalesScreen({
   const [apartarOpen, setApartarOpen] = useState(false);
   const [carritoOpen, setCarritoOpen] = useState(false);
   const [escaneando, setEscaneando] = useState(false);
+  // "Lo piden y no lo tenemos": what the empty search becomes.
+  const [anotar, setAnotar] = useState<{ texto: string; productId: string | null } | null>(null);
+  const [pedidosPrevios, setPedidosPrevios] = useState<DemandaReciente[]>([]);
   const [recibo, setRecibo] = useState<{ ticket: TicketData; usoSaldo: number; saldoRestante: number } | null>(null);
   const [ultima, setUltima] = useState<Ultima | null>(null);
   const [restaurado, setRestaurado] = useState(false);
@@ -424,6 +430,22 @@ export function SalesScreen({
     // A router.refresh() after a sale hands down a new `products`: the cue to
     // re-read stock on the cards.
   }, [query, categoria, recordar, products, marcarAjenos]);
+
+  // A search that found nothing may already have been asked for before: the
+  // counter should see that before deciding whether to write it down again.
+  useEffect(() => {
+    if (buscando || results.length > 0 || query.trim().length < 2) {
+      setPedidosPrevios([]);
+      return;
+    }
+    let vivo = true;
+    demandaReciente(query)
+      .then((r) => vivo && setPedidosPrevios(r))
+      .catch(() => undefined);
+    return () => {
+      vivo = false;
+    };
+  }, [query, results.length, buscando]);
 
   const buscarCompat = useCallback(
     async (modelo: string) => {
@@ -928,8 +950,57 @@ export function SalesScreen({
           )}
 
           {results.length === 0 ? (
-            <div className="mt-3">
-              <p className="px-1 py-6 text-center text-sm text-muted-foreground">{buscando ? "Buscando…" : "Sin resultados."}</p>
+            <div className="mt-3 space-y-4">
+              {buscando ? (
+                <p className="px-1 py-6 text-center text-sm text-muted-foreground">Buscando…</p>
+              ) : query.trim().length >= 2 ? (
+                <div className="rounded-2xl border border-border bg-background p-5 sm:p-6">
+                  <div className="flex items-start gap-4">
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-brand-foreground">
+                      <SearchX className="h-5 w-5" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-lg font-semibold">Nadie tiene «{query.trim()}»</p>
+                      <p className="mt-0.5 text-sm text-muted-foreground">
+                        No está aquí ni en las otras sucursales. Anótalo: así entra al resurtido en vez de perderse.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-4 flex flex-wrap items-center gap-3">
+                    <Button variant="brand" className="h-12 rounded-xl px-5 text-base" onClick={() => setAnotar({ texto: query.trim(), productId: null })}>
+                      <Plus className="h-5 w-5" />
+                      Anotar que lo piden
+                    </Button>
+                    <span className="text-xs text-muted-foreground">
+                      Se guarda con fecha, hora, sucursal y quién atendió.
+                    </span>
+                  </div>
+
+                  {pedidosPrevios.length > 0 && (
+                    <div className="mt-5 border-t border-dashed border-border pt-4">
+                      <p className="flex items-center gap-2 text-sm font-medium">
+                        Ya lo habían pedido
+                        <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-700 dark:bg-red-950/40 dark:text-red-300">
+                          {pedidosPrevios.length === 1 ? "1 vez" : `${pedidosPrevios.length} veces`}
+                        </span>
+                      </p>
+                      <ul className="mt-2 space-y-1.5">
+                        {pedidosPrevios.map((r) => (
+                          <li key={r.id} className="text-xs text-muted-foreground tabular-nums">
+                            {new Date(r.created_at).toLocaleString("es-MX", { day: "2-digit", month: "short", hour: "numeric", minute: "2-digit" })}
+                            {r.quien && ` · ${r.quien}`}
+                            {r.sucursal && ` · ${r.sucursal}`}
+                            {r.cliente && ` · ${r.cliente}`}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="px-1 py-6 text-center text-sm text-muted-foreground">Sin resultados.</p>
+              )}
+
               {query.trim() && !buscando && (
                 <CompatPanel
                   query={query}
@@ -1063,6 +1134,19 @@ export function SalesScreen({
         onAgregar={(p) => {
           add(p);
         }}
+        onAnotarDemanda={(p) => {
+          setDetalle(null);
+          setAnotar({ texto: p.name, productId: p.id });
+        }}
+      />
+
+      <AnotarDemanda
+        open={!!anotar}
+        texto={anotar?.texto ?? ""}
+        productId={anotar?.productId ?? null}
+        customers={customers}
+        recientes={pedidosPrevios}
+        onClose={() => setAnotar(null)}
       />
 
       {confirmDialog}

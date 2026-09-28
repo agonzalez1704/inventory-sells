@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/input";
 import { EmptyState } from "@/components/ui/empty-state";
 import { entregaTexto } from "@/modules/proveedores/ProveedoresView";
+import { DemandaTab } from "@/modules/demanda/DemandaTab";
+import { listaDemanda, type DemandaAgrupada } from "@/modules/demanda/actions";
 import {
   asignarProveedorASku,
   cerrarPedidoSurtido,
@@ -38,14 +40,31 @@ export function SurtidoView({
   enCamino,
   proveedores,
   negocio,
+  demanda,
 }: {
   grupos: FaltantesProveedor[];
   enCamino: PedidoSurtido[];
   proveedores: { id: string; nombre: string; telefono: string | null }[];
   /** Shop name, for the message the supplier reads. */
   negocio: string;
+  /** What the counter could not sell, grouped by model. */
+  demanda: DemandaAgrupada[];
 }) {
-  const [tab, setTab] = useState<"pedir" | "camino">("pedir");
+  const [tab, setTab] = useState<"pedir" | "piden" | "camino">("pedir");
+  // The buyer widens the window from the tab itself; the server sends 30 days.
+  const [dias, setDias] = useState(30);
+  const [lista, setLista] = useState(demanda);
+  const [, startDias] = useTransition();
+  function cambiarDias(d: number) {
+    setDias(d);
+    startDias(async () => {
+      try {
+        setLista(await listaDemanda(d));
+      } catch {
+        toast.error("No se pudo leer la lista");
+      }
+    });
+  }
   const piezas = grupos.reduce((s, g) => s + g.piezas, 0);
 
   return (
@@ -71,6 +90,7 @@ export function SurtidoView({
           {(
             [
               ["pedir", "Por pedir", piezas],
+              ["piden", "Piden y no hay", demanda.reduce((s, d) => s + d.piezas, 0)],
               ["camino", "Por llegar", enCamino.length],
             ] as const
           ).map(([k, label, n]) => (
@@ -87,7 +107,9 @@ export function SurtidoView({
         </div>
       </div>
 
-      {tab === "pedir" ? (
+      {tab === "piden" ? (
+        <DemandaTab lista={lista} dias={dias} onDias={cambiarDias} />
+      ) : tab === "pedir" ? (
         grupos.length === 0 ? (
           <EmptyState icon={PackageCheck} title="Nada por pedir" description="Todo lo cotizado está en existencia o ya viene en camino." />
         ) : (

@@ -283,17 +283,17 @@ export function PanelNota({
                     disabled={pending}
                     onClick={() =>
                       start(async () => {
-                        try {
-                          await setFiadoPublico(v.id, !v.fiado_publico);
-                          toast.success(
-                            v.fiado_publico
-                              ? "Solo quien la hizo puede cobrarla"
-                              : "Cualquier vendedor puede cobrarla",
-                          );
-                          router.refresh();
-                        } catch (e) {
-                          toast.error(e instanceof Error ? e.message : "No se pudo cambiar");
+                        const r = await setFiadoPublico(v.id, !v.fiado_publico);
+                        if (!r.ok) {
+                          toast.error(r.error);
+                          return;
                         }
+                        toast.success(
+                          v.fiado_publico
+                            ? "Solo quien la hizo puede cobrarla"
+                            : "Cualquier vendedor puede cobrarla",
+                        );
+                        router.refresh();
                       })
                     }
                   >

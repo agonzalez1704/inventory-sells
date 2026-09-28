@@ -28,11 +28,14 @@ export function ProductoSheet({
   verCostos,
   onClose,
   onAgregar,
+  onAnotarDemanda,
 }: {
   p: SalesProduct | null;
   verCostos: boolean;
   onClose: () => void;
   onAgregar: (p: SalesProduct) => void;
+  /** A piece at zero is a sale being lost: offer to write the request down. */
+  onAnotarDemanda?: (p: SalesProduct) => void;
 }) {
   const [fullscreen, setFullscreen] = useState(false);
   const [vistas, setVistas] = useState<string[]>([]);
@@ -161,16 +164,27 @@ export function ProductoSheet({
 
           {/* The click that opens this replaced the tap that added, so the
               sheet must offer adding back — anchored to the column's foot. */}
-          <Button
-            className="mt-4 w-full sm:mt-auto"
-            disabled={p.quantity === 0}
-            onClick={() => {
-              onAgregar(p);
-              onClose();
-            }}
-          >
-            {p.quantity === 0 ? "Agotado" : "Agregar a la venta"}
-          </Button>
+          {p.quantity === 0 && onAnotarDemanda ? (
+            <div className="mt-4 space-y-2 sm:mt-auto">
+              <p className="rounded-xl bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
+                Sin piezas. Anótalo para que el resurtido lo tome en cuenta.
+              </p>
+              <Button variant="brand" className="w-full" onClick={() => onAnotarDemanda(p)}>
+                Anotar que la piden
+              </Button>
+            </div>
+          ) : (
+            <Button
+              className="mt-4 w-full sm:mt-auto"
+              disabled={p.quantity === 0}
+              onClick={() => {
+                onAgregar(p);
+                onClose();
+              }}
+            >
+              {p.quantity === 0 ? "Agotado" : "Agregar a la venta"}
+            </Button>
+          )}
         </div>
       </div>
 
