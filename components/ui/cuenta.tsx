@@ -9,12 +9,28 @@ import { listarCuentas } from "@/modules/config/cuentas";
 
 export { BANCOS, CLABE_CODIGOS, validarClabe, bancoDeClabe, type Cuenta } from "@/lib/bancos";
 
-// Mexican banks the shop may hold accounts at. No hotlinked logos: each bank
-// renders as a rounded tile in its brand color with its short mark — instantly
-// recognizable at the counter, zero external assets, works offline.
+// Mexican banks the shop may hold accounts at. A bank whose own logo ships
+// with the app (public/bancos) shows it — the counter recognizes the mark
+// faster than three letters; every other bank is a rounded tile in its brand
+// color with its short mark. Either way the asset is ours: nothing is
+// hotlinked, so it works with the shop's internet down.
 export function BancoIcon({ banco, size = "md" }: { banco: string; size?: "sm" | "md" | "lg" }) {
   const b = BANCOS[banco] ?? BANCOS.otro;
   const px = size === "lg" ? "h-10 w-10 text-sm" : size === "sm" ? "h-6 w-6 text-[9px]" : "h-8 w-8 text-[11px]";
+  if (b.logo) {
+    return (
+      <span
+        className={cn(
+          "inline-flex shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white p-1 ring-1 ring-black/10",
+          px,
+        )}
+        aria-hidden
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={b.logo} alt="" className="h-full w-full object-contain" />
+      </span>
+    );
+  }
   return (
     <span
       className={cn("inline-flex shrink-0 items-center justify-center rounded-lg font-bold tracking-tight", px)}

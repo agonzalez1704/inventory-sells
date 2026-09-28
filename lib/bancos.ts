@@ -1,7 +1,10 @@
 // Pure bank data + CLABE math — no React, importable from server actions and
 // client components alike.
 
-export const BANCOS: Record<string, { nombre: string; marca: string; bg: string; fg: string }> = {
+export const BANCOS: Record<
+  string,
+  { nombre: string; marca: string; bg: string; fg: string; logo?: string }
+> = {
   bbva:        { nombre: "BBVA",         marca: "BBVA", bg: "#072146", fg: "#ffffff" },
   banorte:     { nombre: "Banorte",      marca: "Bnte", bg: "#eb0029", fg: "#ffffff" },
   santander:   { nombre: "Santander",    marca: "San",  bg: "#ec0000", fg: "#ffffff" },
@@ -11,11 +14,11 @@ export const BANCOS: Record<string, { nombre: string; marca: string; bg: string;
   banregio:    { nombre: "Banregio",     marca: "Breg", bg: "#f47920", fg: "#ffffff" },
   azteca:      { nombre: "Banco Azteca", marca: "Azt",  bg: "#00693c", fg: "#ffffff" },
   bancoppel:   { nombre: "BanCoppel",    marca: "Cop",  bg: "#0055b8", fg: "#ffd500" },
-  nu:          { nombre: "Nu",           marca: "Nu",   bg: "#820ad1", fg: "#ffffff" },
+  nu:          { nombre: "Nu",           marca: "Nu",   bg: "#820ad1", fg: "#ffffff", logo: "/bancos/nu.svg" },
   klar:        { nombre: "Klar",         marca: "Klar", bg: "#101010", fg: "#ffffff" },
   hey:         { nombre: "Hey Banco",    marca: "Hey",  bg: "#0e1e2e", fg: "#3ddc97" },
   spin:        { nombre: "Spin by OXXO", marca: "Spin", bg: "#e10a17", fg: "#ffffff" },
-  mercadopago: { nombre: "Mercado Pago", marca: "MP",   bg: "#009ee3", fg: "#ffffff" },
+  mercadopago: { nombre: "Mercado Pago", marca: "MP",   bg: "#009ee3", fg: "#ffffff", logo: "/bancos/mercadopago.svg" },
   stp:         { nombre: "STP",          marca: "STP",  bg: "#20315f", fg: "#ffffff" },
   otro:        { nombre: "Otro",         marca: "$",    bg: "#6b7280", fg: "#ffffff" },
 };
