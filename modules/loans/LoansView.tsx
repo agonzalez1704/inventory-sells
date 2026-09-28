@@ -1,41 +1,41 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { toast } from "sonner";
-import { HandCoins, User, Pencil, Globe, Lock } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { HandCoins, MessageCircle, Printer, Search, User } from "lucide-react";
 import { formatMXN } from "@/lib/money";
-import type { PaymentMethod } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { Card } from "@/components/ui/card";
-import { Input, Select } from "@/components/ui/input";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useConfirm } from "@/components/ui/use-confirm";
-import { Modal } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
-import { ItemSwapModal, type SwapProduct } from "@/modules/sales/ItemSwapModal";
+import { imprimirTicketNavegador } from "@/lib/ticket";
+import type { PickerCustomer } from "@/modules/customers/CustomerPicker";
+import type { SwapProduct } from "@/modules/sales/ItemSwapModal";
+import { PanelNota } from "./PanelNota";
+import { CobrarPanel } from "./CobrarPanel";
 import {
-  CustomerPicker,
-  type PickerCustomer,
-} from "@/modules/customers/CustomerPicker";
-import { guardarComprobante } from "@/modules/sales/comprobantes";
-import { AdjuntarImagen } from "@/components/ui/adjuntar-imagen";
-import { CuentaPicker, useCuentas, SIN_CUENTAS_MSG } from "@/components/ui/cuenta";
-import {
-  setFiadoPublico,
-  settleLoan,
-  cancelLoan,
-  cambiarFiado,
-  abonarFiado,
-  asignarClienteFiado,
-} from "@/modules/sales/actions";
+  quienDebe,
+  resta as restaDe,
+  textoRecordatorio,
+  ticketDeNota,
+  waLink,
+  type PieNota,
+} from "./estado-cuenta";
 
 export type { SwapProduct };
 
 type LoanItem = {
   product_id: string | null;
   qty: number;
+  unit_price_cents?: number | null;
   products: { name: string; sku: string } | null;
+};
+export type Abono = {
+  id: string;
+  monto_cents: number;
+  metodo: string | null;
+  created_at: string;
+  /** Who took the money — the counter asks this more than any other question. */
+  quien: string | null;
 };
 export type Loan = {
   id: string;
@@ -44,554 +44,417 @@ export type Loan = {
   created_at: string;
   sale_items: LoanItem[];
   pagado_cents: number;
-  vendedor: string | null; // who created the fiado
-  cliente: PickerCustomer | null; // linked customer, if assigned
-  /** The customer's plazo at read time; null = no formal terms, no due date. */
+  abonos: Abono[];
+  vendedor: string | null;
+  cliente: PickerCustomer | null;
   credito_dias: number | null;
-  /** Visible to every seller — anyone at the counter may collect it. */
   fiado_publico?: boolean;
 };
 
-const PAYMENT_METHODS: [PaymentMethod, string][] = [
-  ["efectivo", "Efectivo"],
-  ["tarjeta", "Tarjeta"],
-  ["transferencia", "Transferencia"],
-  ["otro", "Otro"],
-];
+const DIA = 86_400_000;
+const diasDe = (iso: string) => Math.floor((Date.now() - new Date(iso).getTime()) / DIA);
 
-function ago(iso: string): string {
-  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
-  if (days <= 0) return "hoy";
-  if (days === 1) return "ayer";
-  return `hace ${days} días`;
-}
+const fechaCorta = (iso: string) =>
+  new Date(iso).toLocaleDateString("es-MX", { day: "2-digit", month: "short" });
+
+const edad = (dias: number) => (dias === 0 ? "hoy" : dias === 1 ? "ayer" : `${dias} días`);
+
+type Filtro = "todas" | "vencidas" | "abonos" | "sin-cliente";
 
 /**
- * Days until the note's due date (created_at + the customer's plazo).
- * Negative = overdue. Null when the customer has no formal terms.
+ * The debt book, read the way the counter reads it: oldest first, the amount
+ * still owed in the big type, and the three things anyone does with a note —
+ * collect it, take something on account, or hand over the ticket again.
  */
-function diasParaVencer(loan: Loan): number | null {
-  if (loan.credito_dias == null) return null;
-  const vence = new Date(loan.created_at).getTime() + loan.credito_dias * 86_400_000;
-  return Math.ceil((vence - Date.now()) / 86_400_000);
-}
-
-/**
- * Who may collect this note. Public = every seller sees it; private = only its
- * creator (and whoever reads all sales). The admin flips it here, per note.
- */
-function PublicoBadge({ loan, esAdmin }: { loan: Loan; esAdmin: boolean }) {
-  const router = useRouter();
-  const [pending, start] = useTransition();
-  const publica = loan.fiado_publico ?? false;
-
-  if (!esAdmin) {
-    return publica ? (
-      <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/20 dark:bg-emerald-950/40 dark:text-emerald-300">
-        <Globe className="mr-1 h-3 w-3" />
-        Pública
-      </span>
-    ) : null;
-  }
-
-  function alternar() {
-    start(async () => {
-      const r = await setFiadoPublico(loan.id, !publica);
-      if (!r.ok) {
-        toast.error(r.error);
-        return;
-      }
-      toast.success(!publica ? "Ahora cualquier vendedor puede cobrarla" : "Nota privada de nuevo");
-      router.refresh();
-    });
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={alternar}
-      disabled={pending}
-      title={publica ? "Todos los vendedores la ven. Clic para hacerla privada." : "Solo su creador la ve. Clic para que cualquier vendedor pueda cobrarla."}
-      className={cn(
-        "inline-flex cursor-pointer items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset transition-colors",
-        publica
-          ? "bg-emerald-50 text-emerald-700 ring-emerald-600/20 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300"
-          : "bg-muted text-muted-foreground ring-border hover:text-foreground",
-      )}
-    >
-      {publica ? <Globe className="mr-1 h-3 w-3" /> : <Lock className="mr-1 h-3 w-3" />}
-      {publica ? "Pública" : "Privada — hacer pública"}
-    </button>
-  );
-}
-
-function VenceBadge({ loan }: { loan: Loan }) {
-  const dias = diasParaVencer(loan);
-  if (dias == null) return null;
-  const vencida = dias < 0;
-  const texto = vencida
-    ? `Vencida hace ${Math.abs(dias)} ${Math.abs(dias) === 1 ? "día" : "días"}`
-    : dias === 0
-      ? "Vence hoy"
-      : `Vence en ${dias} ${dias === 1 ? "día" : "días"}`;
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset",
-        vencida || dias === 0
-          ? "bg-red-50 text-red-700 ring-red-600/20 dark:bg-red-950/40 dark:text-red-300"
-          : "bg-sky-50 text-sky-700 ring-sky-600/20 dark:bg-sky-950/40 dark:text-sky-300",
-      )}
-    >
-      {texto}
-    </span>
-  );
-}
-
 export function LoansView({
   loans,
   customers,
   abrirId,
   esAdmin = false,
   comprobanteObligatorio = false,
+  pie,
+  cobradoSemana = 0,
 }: {
   loans: Loan[];
   customers: PickerCustomer[];
   abrirId?: string | null;
-  /** admin_total: may flip a note between private and public. */
   esAdmin?: boolean;
-  /** Shop rule: a transfer needs its proof before the charge completes. */
   comprobanteObligatorio?: boolean;
+  /** Header and warranty text for anything this screen prints. */
+  pie: PieNota;
+  /** Collected in the last 7 days, for the header. */
+  cobradoSemana?: number;
 }) {
-  const total = loans.reduce(
-    (s, l) => s + Math.max(0, l.total_cents - l.pagado_cents),
-    0,
-  );
-
-  // Search so caja can find a fiado by quote folio (in the note), customer or
-  // seller — the manager reconciles the returned cash against the folio.
   const [q, setQ] = useState("");
-  const filtered = q.trim()
-    ? loans.filter((l) => {
-        const hay = `${l.note ?? ""} ${l.cliente?.nombre ?? ""} ${l.vendedor ?? ""}`.toLowerCase();
-        return hay.includes(q.trim().toLowerCase());
-      })
-    : loans;
+  const [filtro, setFiltro] = useState<Filtro>("todas");
+  const [panel, setPanel] = useState<Loan | null>(null);
+  const [cobrar, setCobrar] = useState<Loan | null>(null);
 
-  // Deep-link from a push notification: scroll to + briefly flash that fiado.
-  const [flash, setFlash] = useState<string | null>(abrirId ?? null);
+  // Deep link from a push notification.
   useEffect(() => {
     if (!abrirId) return;
-    setFlash(abrirId);
-    document.getElementById(`fiado-${abrirId}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
-    const t = setTimeout(() => setFlash(null), 2500);
-    return () => clearTimeout(t);
-  }, [abrirId]);
+    const l = loans.find((x) => x.id === abrirId);
+    if (l) setPanel(l);
+  }, [abrirId, loans]);
+
+  // The open panel has to follow a refresh, or an abono leaves it showing the
+  // old balance.
+  useEffect(() => {
+    setPanel((p) => (p ? (loans.find((l) => l.id === p.id) ?? null) : null));
+    setCobrar((c) => (c ? (loans.find((l) => l.id === c.id) ?? null) : null));
+  }, [loans]);
+
+  const porCobrar = loans.reduce((s, l) => s + restaDe(l), 0);
+  const vencidas = loans.filter((l) => diasDe(l.created_at) >= 15);
+  const vencidoCents = vencidas.reduce((s, l) => s + restaDe(l), 0);
+  const sinCliente = loans.filter((l) => !l.cliente || l.cliente.is_system);
+
+  const visibles = useMemo(() => {
+    const texto = q.trim().toLowerCase();
+    return loans.filter((l) => {
+      if (filtro === "vencidas" && diasDe(l.created_at) < 15) return false;
+      if (filtro === "abonos" && l.pagado_cents === 0) return false;
+      if (filtro === "sin-cliente" && l.cliente && !l.cliente.is_system) return false;
+      if (!texto) return true;
+      const hay = `${l.note ?? ""} ${l.cliente?.nombre ?? ""} ${l.cliente?.telefono ?? ""} ${l.vendedor ?? ""} ${l.sale_items
+        .map((i) => i.products?.name ?? "")
+        .join(" ")}`.toLowerCase();
+      return hay.includes(texto);
+    });
+  }, [loans, q, filtro]);
+
+  // A debtor with several open notes is one person owing one amount: their
+  // notes travel together so nobody collects one and misses the others.
+  const grupos = useMemo(() => {
+    const porCliente = new Map<string, Loan[]>();
+    const sueltas: Loan[] = [];
+    for (const l of visibles) {
+      const id = l.cliente && !l.cliente.is_system ? l.cliente.id : null;
+      if (!id) sueltas.push(l);
+      else porCliente.set(id, [...(porCliente.get(id) ?? []), l]);
+    }
+    const out: { key: string; nombre: string; notas: Loan[] }[] = [];
+    for (const [id, notas] of porCliente) {
+      if (notas.length === 1) sueltas.push(notas[0]);
+      else out.push({ key: id, nombre: notas[0].cliente?.nombre ?? "Cliente", notas });
+    }
+    for (const l of sueltas) out.push({ key: l.id, nombre: quienDebe(l), notas: [l] });
+    return out.sort(
+      (a, b) => new Date(a.notas[0].created_at).getTime() - new Date(b.notas[0].created_at).getTime(),
+    );
+  }, [visibles]);
+
+  const hermanasDe = (l: Loan) =>
+    l.cliente && !l.cliente.is_system ? loans.filter((x) => x.cliente?.id === l.cliente?.id && x.id !== l.id) : [];
 
   return (
-    <section className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+    <section className="space-y-5">
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Notas de crédito</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Ventas a crédito, pago pendiente.
-          </p>
+          <p className="mt-1 text-sm text-muted-foreground">Lo que te deben, de lo más viejo a lo más nuevo.</p>
         </div>
-        {loans.length > 0 && (
-          <div className="text-right">
-            <p className="text-xs font-medium text-muted-foreground">Por cobrar</p>
-            <p className="font-mono text-xl font-semibold tabular-nums">
-              {formatMXN(total)}
-            </p>
-          </div>
-        )}
+        <div className="flex flex-wrap gap-2.5">
+          <Kpi label="Por cobrar" valor={porCobrar} />
+          <Kpi label="Más de 15 días" valor={vencidoCents} tono="rojo" />
+          <Kpi label="Cobrado esta semana" valor={cobradoSemana} tono="verde" />
+        </div>
       </div>
 
       {loans.length === 0 ? (
         <EmptyState
           icon={HandCoins}
-          title="Sin notas de crédito pendientes"
-          description="Cuando vendas a crédito o entregues una cotización, aparecerá aquí para cobrarla después."
+          title="Nadie te debe nada"
+          description="Cuando vendas a crédito, la nota aparece aquí para cobrarla después."
         />
       ) : (
         <>
-          <Input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Buscar por folio (COT-…), cliente o vendedor"
-            className="max-w-sm"
-          />
-          {filtered.length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">
-              Nada coincide con «{q}».
-            </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative min-w-60 flex-1">
+              <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Busca por nombre, seña, teléfono, pieza o vendedor…"
+                className="h-11 pl-9"
+              />
+            </div>
+            {(
+              [
+                ["todas", "Todas", loans.length],
+                ["vencidas", "Vencidas", vencidas.length],
+                ["abonos", "Con abonos", loans.filter((l) => l.pagado_cents > 0).length],
+                ["sin-cliente", "Sin cliente", sinCliente.length],
+              ] as const
+            ).map(([k, label, n]) => (
+              <button
+                key={k}
+                type="button"
+                aria-pressed={filtro === k}
+                onClick={() => setFiltro(filtro === k ? "todas" : (k as Filtro))}
+                className={cn(
+                  "inline-flex h-11 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border px-4 text-sm",
+                  filtro === k ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background hover:bg-muted",
+                )}
+              >
+                {label} <b className="tabular-nums">{n}</b>
+              </button>
+            ))}
+          </div>
+
+          {sinCliente.length > 0 && filtro !== "sin-cliente" && (
+            <button
+              type="button"
+              onClick={() => setFiltro("sin-cliente")}
+              className="flex w-full cursor-pointer items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-left dark:border-amber-900 dark:bg-amber-950/30"
+            >
+              <User className="h-5 w-5 shrink-0 text-amber-700 dark:text-amber-400" />
+              <span className="flex-1 text-sm text-amber-900 dark:text-amber-200">
+                {sinCliente.length} {sinCliente.length === 1 ? "nota está" : "notas están"} a nombre de Mostrador, con una
+                seña escrita a mano. Quien no hizo la venta no sabe a quién cobrarle.
+              </span>
+              <span className="shrink-0 text-sm font-medium text-amber-900 underline underline-offset-2 dark:text-amber-200">
+                Verlas
+              </span>
+            </button>
+          )}
+
+          {grupos.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">Nada coincide con esa búsqueda.</p>
           ) : (
             <div className="space-y-2.5">
-              {filtered.map((l) => (
-                <LoanRow
-                  key={l.id}
-                  loan={l}
-                  customers={customers}
-                  resaltar={flash === l.id}
-                  esAdmin={esAdmin}
-                  comprobanteObligatorio={comprobanteObligatorio}
-                />
-              ))}
+              {grupos.map((g) =>
+                g.notas.length === 1 ? (
+                  <FilaNota
+                    key={g.key}
+                    loan={g.notas[0]}
+                    pie={pie}
+                    onAbrir={() => setPanel(g.notas[0])}
+                    onCobrar={() => setCobrar(g.notas[0])}
+                  />
+                ) : (
+                  <Grupo key={g.key} nombre={g.nombre} notas={g.notas} pie={pie} onAbrir={setPanel} onCobrar={setCobrar} />
+                ),
+              )}
             </div>
           )}
         </>
+      )}
+
+      <PanelNota
+        loan={panel}
+        hermanas={panel ? hermanasDe(panel) : []}
+        customers={customers}
+        pie={pie}
+        esAdmin={esAdmin}
+        comprobanteObligatorio={comprobanteObligatorio}
+        onClose={() => setPanel(null)}
+      />
+
+      {cobrar && (
+        <CobrarPanel
+          open
+          loan={cobrar}
+          pie={pie}
+          comprobanteObligatorio={comprobanteObligatorio}
+          onClose={() => setCobrar(null)}
+          onListo={() => setCobrar(null)}
+        />
       )}
     </section>
   );
 }
 
-function LoanRow({
-  loan,
-  customers,
-  resaltar = false,
-  esAdmin = false,
-  comprobanteObligatorio = false,
-}: {
-  loan: Loan;
-  customers: PickerCustomer[];
-  resaltar?: boolean;
-  esAdmin?: boolean;
-  comprobanteObligatorio?: boolean;
-}) {
-  const router = useRouter();
-  const [payment, setPayment] = useState<PaymentMethod>("efectivo");
-  const [refPago, setRefPago] = useState("");
-  const [fotoPago, setFotoPago] = useState<File | null>(null);
-  const [cuentaPago, setCuentaPago] = useState<string | null>(null);
-  const cuentas = useCuentas() ?? [];
-  const [swapOpen, setSwapOpen] = useState(false);
-  const [abonar, setAbonar] = useState(false);
-  const [cliente, setCliente] = useState<PickerCustomer | null>(loan.cliente);
-  const [pending, startTransition] = useTransition();
-  const [confirmar, dialogoConfirm] = useConfirm();
-
-  function asignar(c: PickerCustomer) {
-    const prev = cliente;
-    setCliente(c);
-    startTransition(async () => {
-      try {
-        await asignarClienteFiado(loan.id, c.id);
-        toast.success(`Cliente asignado · ${c.nombre}`);
-        router.refresh();
-      } catch (e) {
-        setCliente(prev);
-        toast.error(e instanceof Error ? e.message : "Error al asignar");
-      }
-    });
-  }
-
-  const resta = Math.max(0, loan.total_cents - loan.pagado_cents);
-  const pct = Math.min(100, Math.round((loan.pagado_cents / loan.total_cents) * 100));
-  const conAbonos = loan.pagado_cents > 0;
-
-  const items = loan.sale_items
-    .map((it) => `${it.products?.name ?? "?"}${it.qty > 1 ? ` ×${it.qty}` : ""}`)
-    .join(" · ");
-
-  function collect() {
-    if (payment === "transferencia" && comprobanteObligatorio && !refPago.trim() && !fotoPago)
-      return toast.error("El comprobante es obligatorio: pega la captura o escribe la referencia");
-    if (payment === "transferencia" && cuentas.length === 0)
-      return toast.error(SIN_CUENTAS_MSG);
-    if (payment === "transferencia" && !cuentaPago)
-      return toast.error("Elige a cuál cuenta llegó la transferencia");
-    startTransition(async () => {
-      try {
-        await settleLoan(loan.id, payment);
-        if (payment === "transferencia" && (refPago.trim() || fotoPago || cuentaPago)) {
-          let form: FormData | undefined;
-          if (fotoPago) {
-            form = new FormData();
-            form.append("file", fotoPago);
-          }
-          const rc = await guardarComprobante(loan.id, refPago.trim() || null, form, cuentaPago);
-          if (!rc.ok) toast.error(`Cobro ok, pero el comprobante no se guardó: ${rc.error}`);
-        }
-        toast.success(`Cobrado · ${formatMXN(resta)}`);
-        router.refresh();
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Error al cobrar");
-      }
-    });
-  }
-
-  async function cancel() {
-    if (
-      !(await confirmar({
-        title: "¿Cancelar la nota de crédito?",
-        description: "El producto vuelve al inventario y se borra la deuda.",
-        confirmLabel: "Sí, cancelar",
-        tone: "danger",
-      }))
-    )
-      return;
-    startTransition(async () => {
-      try {
-        await cancelLoan(loan.id);
-        toast.success("Nota de crédito cancelada, stock restaurado");
-        router.refresh();
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Error al cancelar");
-      }
-    });
-  }
-
+function Kpi({ label, valor, tono = "normal" }: { label: string; valor: number; tono?: "normal" | "rojo" | "verde" }) {
   return (
-    <Card
-      id={`fiado-${loan.id}`}
-      className={cn("p-4 transition-shadow", resaltar && "ring-2 ring-amber-400")}
+    <div
+      className={cn(
+        "min-w-40 rounded-xl border px-4 py-2.5",
+        tono === "rojo"
+          ? "border-red-200 bg-red-50/60 dark:border-red-900 dark:bg-red-950/20"
+          : tono === "verde"
+            ? "border-emerald-200 bg-emerald-50/60 dark:border-emerald-900 dark:bg-emerald-950/20"
+            : "border-border bg-background",
+      )}
     >
-      {dialogoConfirm}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0">
-          <p className="flex items-center gap-1.5 font-medium">
-            <User className="h-4 w-4 text-muted-foreground" />
-            {loan.cliente && !loan.cliente.is_system
-              ? loan.cliente.nombre
-              : loan.note || "Sin cliente"}
-          </p>
-          {loan.cliente && !loan.cliente.is_system && loan.note && (
-            <p className="mt-0.5 text-xs text-muted-foreground">Nota: {loan.note}</p>
-          )}
-          <p className="mt-1 text-sm text-muted-foreground">{items}</p>
-          <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-            {ago(loan.created_at)}
-            {loan.vendedor && <> · Creado por: {loan.vendedor}</>}
-            <VenceBadge loan={loan} />
-            <PublicoBadge loan={loan} esAdmin={esAdmin} />
-          </p>
-        </div>
-        <div className="text-right">
-          <p className="font-mono text-lg font-semibold tabular-nums">
-            {formatMXN(loan.total_cents)}
-          </p>
-          {conAbonos && (
-            <p className="text-xs text-muted-foreground">
-              Pagado {formatMXN(loan.pagado_cents)} · resta{" "}
-              <span className="font-medium text-foreground">{formatMXN(resta)}</span>
-            </p>
-          )}
-        </div>
-      </div>
-
-      <div className="mt-3 sm:max-w-xs">
-        <CustomerPicker
-          customers={customers}
-          value={cliente}
-          onChange={asignar}
-          placeholder="Asignar cliente"
-          excludeSystem
-          openUp={false}
-        />
-      </div>
-
-      {conAbonos && (
-        <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-muted">
-          <div
-            className="h-full rounded-full bg-linear-to-r from-brand to-brand-strong"
-            style={{ width: `${pct}%` }}
-          />
-        </div>
-      )}
-
-      <div className="mt-3 flex flex-wrap items-center justify-end gap-2 border-t border-border pt-3">
-        <Button
-          variant="ghost"
-          onClick={() => setSwapOpen(true)}
-          disabled={pending}
-        >
-          <Pencil className="h-4 w-4" />
-          Editar productos
-        </Button>
-        <Button variant="ghost" onClick={cancel} disabled={pending}>
-          Cancelar
-        </Button>
-        <Button variant="secondary" onClick={() => setAbonar(true)} disabled={pending}>
-          <HandCoins className="h-4 w-4" />
-          Abonar
-        </Button>
-        <Select
-          value={payment}
-          onChange={(e) => setPayment(e.target.value as PaymentMethod)}
-          className="h-9 w-auto"
-        >
-          {PAYMENT_METHODS.map(([v, label]) => (
-            <option key={v} value={v}>
-              {label}
-            </option>
-          ))}
-        </Select>
-        <Button variant="accent" onClick={collect} loading={pending}>
-          <HandCoins className="h-4 w-4" />
-          Cobrar {conAbonos ? formatMXN(resta) : ""}
-        </Button>
-      </div>
-
-      {payment === "transferencia" && (
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <Input
-            value={refPago}
-            onChange={(e) => setRefPago(e.target.value)}
-            placeholder="Referencia de la transferencia (opcional)"
-            className="h-9 max-w-72"
-          />
-          <AdjuntarImagen value={fotoPago} onChange={setFotoPago} />
-          <CuentaPicker cuentas={cuentas} value={cuentaPago} onChange={setCuentaPago} label="" />
-        </div>
-      )}
-
-      <ItemSwapModal
-        open={swapOpen}
-        onClose={() => setSwapOpen(false)}
-        title="Editar productos de la nota"
-        description="Agrega, quita o cambia productos de esta nota de crédito. El stock se ajusta solo: lo que quites regresa al inventario, lo nuevo se descuenta."
-        currentItems={loan.sale_items}
-        onSubmit={(items) => cambiarFiado(loan.id, items)}
-        successMsg={(t) => `Nota de crédito actualizada · ${formatMXN(t)}`}
-      />
-
-      {abonar && (
-        <AbonarFiadoModal
-          loan={loan}
-          resta={resta}
-          cliente={cliente}
-          customers={customers}
-          onAsignarCliente={asignar}
-          onClose={() => setAbonar(false)}
-          comprobanteObligatorio={comprobanteObligatorio}
-        />
-      )}
-    </Card>
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p
+        className={cn(
+          "text-2xl font-semibold tabular-nums",
+          tono === "rojo" && "text-red-700 dark:text-red-400",
+          tono === "verde" && "text-emerald-700 dark:text-emerald-400",
+        )}
+      >
+        {formatMXN(valor)}
+      </p>
+    </div>
   );
 }
 
-function AbonarFiadoModal({
-  comprobanteObligatorio = false,
+function FilaNota({
   loan,
-  resta,
-  cliente,
-  customers,
-  onAsignarCliente,
-  onClose,
+  pie,
+  onAbrir,
+  onCobrar,
+  compacta = false,
 }: {
   loan: Loan;
-  resta: number;
-  cliente: PickerCustomer | null;
-  customers: PickerCustomer[];
-  onAsignarCliente: (c: PickerCustomer) => void;
-  onClose: () => void;
-  comprobanteObligatorio?: boolean;
+  pie: PieNota;
+  onAbrir: () => void;
+  onCobrar: () => void;
+  compacta?: boolean;
 }) {
-  const router = useRouter();
-  const [monto, setMonto] = useState("");
-  const [metodo, setMetodo] = useState<PaymentMethod>("efectivo");
-  const [referencia, setReferencia] = useState("");
-  const [cuentaAbono, setCuentaAbono] = useState<string | null>(null);
-  const cuentasAbono = useCuentas() ?? [];
-  const [foto, setFoto] = useState<File | null>(null);
-  const [pending, start] = useTransition();
-
-  function save() {
-    const pesos = Number(monto.replace(",", "."));
-    if (!Number.isFinite(pesos) || pesos <= 0) return toast.error("Monto inválido");
-    if (Math.round(pesos * 100) > resta) return toast.error("El abono excede lo que falta");
-    if (metodo === "transferencia" && comprobanteObligatorio && !referencia.trim() && !foto)
-      return toast.error("El comprobante es obligatorio: pega la captura o escribe la referencia");
-    if (metodo === "transferencia" && cuentasAbono.length === 0)
-      return toast.error(SIN_CUENTAS_MSG);
-    if (metodo === "transferencia" && !cuentaAbono)
-      return toast.error("Elige a cuál cuenta llegó la transferencia");
-    start(async () => {
-      try {
-        await abonarFiado(loan.id, pesos, metodo);
-        if (metodo === "transferencia" && (referencia.trim() || foto || cuentaAbono)) {
-          let form: FormData | undefined;
-          if (foto) {
-            form = new FormData();
-            form.append("file", foto);
-          }
-          const rc = await guardarComprobante(loan.id, referencia.trim() || null, form, cuentaAbono);
-          if (!rc.ok) toast.error(`Abono ok, pero el comprobante no se guardó: ${rc.error}`);
-        }
-        toast.success(`Abono registrado · ${formatMXN(Math.round(pesos * 100))}`);
-        onClose();
-        router.refresh();
-      } catch (e) {
-        toast.error(e instanceof Error ? e.message : "Error al abonar");
-      }
-    });
-  }
+  const dias = diasDe(loan.created_at);
+  const falta = restaDe(loan);
+  const pct = loan.total_cents > 0 ? Math.min(100, Math.round((loan.pagado_cents / loan.total_cents) * 100)) : 0;
+  const sinCliente = !loan.cliente || loan.cliente.is_system;
+  const tel = loan.cliente && !loan.cliente.is_system ? loan.cliente.telefono : null;
 
   return (
-    <Modal open onClose={onClose} title="Abono a la nota de crédito" className="max-w-sm">
-      <div className="space-y-3">
-        <p className="text-sm text-muted-foreground">
-          {loan.note || "Nota de crédito"} · falta{" "}
-          <span className="font-medium text-foreground">{formatMXN(resta)}</span>
-        </p>
-        <label className="block">
-          <span className="mb-1 block text-xs font-medium text-muted-foreground">
-            Cliente
+    <div
+      className={cn(
+        "rounded-2xl border p-3.5 sm:p-4",
+        compacta
+          ? "border-border bg-muted/20"
+          : dias >= 15
+            ? "border-red-200 bg-red-50/40 dark:border-red-900/70 dark:bg-red-950/20"
+            : dias >= 7
+              ? "border-amber-200 bg-amber-50/40 dark:border-amber-900/70 dark:bg-amber-950/20"
+              : "border-border bg-background",
+      )}
+    >
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+        <button type="button" onClick={onAbrir} className="min-w-0 flex-1 cursor-pointer text-left">
+          <span className="flex flex-wrap items-center gap-2">
+            <span className="truncate font-semibold">{quienDebe(loan)}</span>
+            {sinCliente && (
+              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">
+                Sin cliente
+              </span>
+            )}
+            {tel && <MessageCircle className="h-3.5 w-3.5 shrink-0 text-emerald-600" />}
           </span>
-          <CustomerPicker
-            customers={customers}
-            value={cliente}
-            onChange={onAsignarCliente}
-            placeholder="Asignar cliente"
-            excludeSystem
-            openUp={false}
-          />
-        </label>
-        <div className="grid grid-cols-2 gap-2">
-          <label className="block">
-            <span className="mb-1 block text-xs font-medium text-muted-foreground">Monto (MXN)</span>
-            <Input
-              value={monto}
-              onChange={(e) => setMonto(e.target.value)}
-              inputMode="decimal"
-              placeholder="0.00"
-              autoFocus
-            />
-          </label>
-          <label className="block">
-            <span className="mb-1 block text-xs font-medium text-muted-foreground">Método</span>
-            <Select value={metodo} onChange={(e) => setMetodo(e.target.value as PaymentMethod)}>
-              {PAYMENT_METHODS.map(([v, l]) => (
-                <option key={v} value={v}>
-                  {l}
-                </option>
-              ))}
-            </Select>
-          </label>
+          <span className="mt-0.5 block truncate text-xs text-muted-foreground tabular-nums">
+            {fechaCorta(loan.created_at)} · {edad(dias)}
+            {loan.vendedor && ` · ${loan.vendedor}`}
+            {loan.sale_items.length > 0 &&
+              ` · ${loan.sale_items.map((i) => i.products?.name ?? "Producto").join(", ")}`}
+          </span>
+        </button>
+
+        <div className="w-44 shrink-0">
+          {loan.pagado_cents > 0 ? (
+            <>
+              <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                <div className="h-full rounded-full bg-emerald-500" style={{ width: `${pct}%` }} />
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground tabular-nums">
+                Abonó {formatMXN(loan.pagado_cents)} de {formatMXN(loan.total_cents)}
+              </p>
+            </>
+          ) : (
+            <p className="text-xs text-muted-foreground">Sin abonos</p>
+          )}
         </div>
-        {metodo === "transferencia" && (
-          <div className="space-y-2 rounded-xl border border-border p-3">
-            <p className="text-xs font-medium text-muted-foreground">
-              Comprobante de la transferencia (opcional)
-            </p>
-            <Input
-              value={referencia}
-              onChange={(e) => setReferencia(e.target.value)}
-              placeholder="Referencia / clave de rastreo"
-            />
-            <AdjuntarImagen value={foto} onChange={setFoto} />
-            <CuentaPicker cuentas={cuentasAbono} value={cuentaAbono} onChange={setCuentaAbono} />
-          </div>
-        )}
-        <div className="flex justify-end gap-2 border-t border-border pt-3">
-          <Button variant="ghost" onClick={onClose} disabled={pending}>
-            Cancelar
+
+        <div className="shrink-0 text-right">
+          <p className="text-[11px] text-muted-foreground">Resta</p>
+          <p className={cn("text-xl font-bold tabular-nums", dias >= 15 && "text-red-700 dark:text-red-400")}>
+            {formatMXN(falta)}
+          </p>
+        </div>
+
+        <div className="flex shrink-0 gap-2">
+          <Button className="h-10" onClick={onCobrar}>
+            Cobrar
           </Button>
-          <Button onClick={save} loading={pending}>
-            Guardar abono
+          <Button variant="secondary" className="h-10" onClick={onAbrir}>
+            Abonar
+          </Button>
+          <Button
+            variant="secondary"
+            className="h-10 w-10 px-0"
+            aria-label={`Reimprimir ticket de ${quienDebe(loan)}`}
+            onClick={() => imprimirTicketNavegador(ticketDeNota(loan, pie))}
+          >
+            <Printer className="h-4 w-4" />
           </Button>
         </div>
       </div>
-    </Modal>
+    </div>
+  );
+}
+
+function Grupo({
+  nombre,
+  notas,
+  pie,
+  onAbrir,
+  onCobrar,
+}: {
+  nombre: string;
+  notas: Loan[];
+  pie: PieNota;
+  onAbrir: (l: Loan) => void;
+  onCobrar: (l: Loan) => void;
+}) {
+  const total = notas.reduce((s, l) => s + restaDe(l), 0);
+  const abonado = notas.reduce((s, l) => s + l.pagado_cents, 0);
+  const suma = notas.reduce((s, l) => s + l.total_cents, 0);
+  const pct = suma > 0 ? Math.min(100, Math.round((abonado / suma) * 100)) : 0;
+  const tel = notas[0].cliente?.telefono ?? null;
+  const dias = Math.max(...notas.map((l) => diasDe(l.created_at)));
+
+  return (
+    <div className="space-y-2.5 rounded-2xl border border-border p-3.5 sm:p-4">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+        <div className="min-w-0 flex-1">
+          <p className="flex flex-wrap items-center gap-2">
+            <span className="truncate font-semibold">{nombre}</span>
+            <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
+              {notas.length} notas
+            </span>
+            {tel && <MessageCircle className="h-3.5 w-3.5 shrink-0 text-emerald-600" />}
+          </p>
+          <p className="mt-0.5 text-xs text-muted-foreground tabular-nums">
+            La más vieja, {edad(dias)}
+            {tel && ` · ${tel}`}
+          </p>
+        </div>
+        <div className="w-44 shrink-0">
+          <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+            <div className="h-full rounded-full bg-emerald-500" style={{ width: `${pct}%` }} />
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground tabular-nums">
+            Abonó {formatMXN(abonado)} de {formatMXN(suma)}
+          </p>
+        </div>
+        <div className="shrink-0 text-right">
+          <p className="text-[11px] text-muted-foreground">Debe en total</p>
+          <p className="text-xl font-bold tabular-nums">{formatMXN(total)}</p>
+        </div>
+        <div className="flex shrink-0 gap-2">
+          <Button variant="secondary" className="h-10" onClick={() => onAbrir(notas[0])}>
+            Estado de cuenta
+          </Button>
+          {tel && (
+            <Button
+              variant="secondary"
+              className="h-10 w-10 px-0"
+              aria-label={`Recordar a ${nombre} por WhatsApp`}
+              onClick={() => window.open(waLink(tel, textoRecordatorio(notas[0])), "_blank")}
+            >
+              <MessageCircle className="h-4 w-4 text-emerald-600" />
+            </Button>
+          )}
+        </div>
+      </div>
+
+      <div className="space-y-2 sm:pl-4">
+        {notas.map((l) => (
+          <FilaNota key={l.id} loan={l} pie={pie} compacta onAbrir={() => onAbrir(l)} onCobrar={() => onCobrar(l)} />
+        ))}
+      </div>
+    </div>
   );
 }

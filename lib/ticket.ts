@@ -22,6 +22,11 @@ export type TicketData = {
   /** The shop's warranty terms, from Configuración → Tienda. The customer's
    *  copy of what was promised — the ticket is the proof of purchase. */
   garantia?: string | null;
+  /** A credit note reprinted after part of it was paid: what the customer has
+   *  already given and what is still owed. The total alone would read as a
+   *  demand for money they already handed over. */
+  abonado?: number | null;
+  resta?: number | null;
   /** Header lines (Configuración → Tienda). First is the big one. Empty keeps
    *  the brand's own name and tagline. */
   encabezado?: string[] | null;
@@ -114,6 +119,8 @@ export function buildTicketHTML(d: TicketData): string {
   <div class="row"><span>${esc(d.descuento.etiqueta)}</span><span class="amt">-${formatMXN(d.descuento.subtotal - d.total)}</span></div>` : ""}
   <div class="total"><span>TOTAL</span><span>${formatMXN(d.total)}</span></div>
   ${d.metodoPago && !esFiado ? `<div>Pago: ${PAGO[d.metodoPago] ?? d.metodoPago}</div>` : ""}
+  ${d.abonado != null && d.abonado > 0 ? `<div class="row"><span>Abonado</span><span class="amt">-${formatMXN(d.abonado)}</span></div>` : ""}
+  ${d.resta != null ? `<div class="total" style="font-size:14px"><span>${d.resta > 0 ? "RESTA" : "LIQUIDADO"}</span><span>${formatMXN(d.resta)}</span></div>` : ""}
   ${d.garantia ? `<div class="sep"></div><div class="terminos">${esc(d.garantia)}</div>` : ""}
   <div class="sep"></div>
   <div class="center foot">${esFiado ? "Comprobante de nota de crédito" : "¡Gracias por su compra!"}</div>
@@ -173,6 +180,8 @@ export function ticketDesdeVenta(args: {
   tipo?: "venta" | "fiado";
   fecha?: string;
   garantia?: string | null;
+  abonado?: number | null;
+  resta?: number | null;
 }): TicketData {
   return {
     folio: args.folio,
@@ -183,5 +192,7 @@ export function ticketDesdeVenta(args: {
     cliente: args.cliente ?? null,
     tipo: args.tipo ?? "venta",
     garantia: args.garantia ?? null,
+    abonado: args.abonado ?? null,
+    resta: args.resta ?? null,
   };
 }
