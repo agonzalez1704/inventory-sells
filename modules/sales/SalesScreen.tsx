@@ -145,8 +145,10 @@ function ProductCard({
       tabIndex={0}
       onClick={() => {
         if (consumioElTap()) return;
-        if (clickAbreDetalle) return onVerDetalle();
-        if (!soldOut && !maxed) onAdd();
+        // A piece at zero has nothing to add: the sheet is where it can be
+        // written down as asked-for, so the tap goes there.
+        if (clickAbreDetalle || soldOut) return onVerDetalle();
+        if (!maxed) onAdd();
       }}
       onKeyDown={(e) => e.key === "Enter" && e.target === e.currentTarget && onAdd()}
       {...handlers}
@@ -1010,6 +1012,29 @@ export function SalesScreen({
               )}
             </div>
           ) : (
+            <>
+            {!buscando && query.trim().length >= 2 && results.every((p) => p.quantity === 0) && (
+              <div className="mt-3 flex flex-wrap items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-3.5 dark:border-amber-900 dark:bg-amber-950/30">
+                <SearchX className="h-5 w-5 shrink-0 text-amber-700 dark:text-amber-400" />
+                <p className="min-w-48 flex-1 text-sm text-amber-900 dark:text-amber-200">
+                  Todo lo que coincide con «{query.trim()}» está agotado. Anótalo: la venta que se pierde también cuenta
+                  para el resurtido.
+                </p>
+                <Button
+                  variant="brand"
+                  className="h-10"
+                  onClick={() =>
+                    setAnotar({
+                      texto: results.length === 1 ? results[0].name : query.trim(),
+                      productId: results.length === 1 ? results[0].id : null,
+                    })
+                  }
+                >
+                  <Plus className="h-4 w-4" />
+                  Anotar que lo piden
+                </Button>
+              </div>
+            )}
             <div className={cn(
                 "mt-3 grid grid-cols-3 gap-2 transition-opacity sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8",
                 buscando && "opacity-60",
@@ -1026,6 +1051,7 @@ export function SalesScreen({
                 />
               ))}
             </div>
+            </>
           )}
         </div>
 
