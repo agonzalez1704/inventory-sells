@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { FileText, MessageCircle, Pencil, Printer, Receipt, Trash2, User, X } from "lucide-react";
+import { FileText, Globe, Lock, MessageCircle, Pencil, Printer, Receipt, Trash2, User, X } from "lucide-react";
 import { formatMXN } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,7 @@ import { useConfirm } from "@/components/ui/use-confirm";
 import { imprimirTicketNavegador } from "@/lib/ticket";
 import { CustomerPicker, type PickerCustomer } from "@/modules/customers/CustomerPicker";
 import { ItemSwapModal } from "@/modules/sales/ItemSwapModal";
-import { asignarClienteFiado, cambiarFiado, cancelLoan } from "@/modules/sales/actions";
+import { asignarClienteFiado, cambiarFiado, cancelLoan, setFiadoPublico } from "@/modules/sales/actions";
 import { CobrarPanel } from "./CobrarPanel";
 import {
   imprimirEstadoCuenta,
@@ -277,7 +277,29 @@ export function PanelNota({
               )}
 
               {esAdmin && (
-                <div className="flex flex-wrap gap-2 border-t border-border pt-4">
+                <div className="flex flex-wrap items-center gap-2 border-t border-border pt-4">
+                  <Button
+                    variant="ghost"
+                    disabled={pending}
+                    onClick={() =>
+                      start(async () => {
+                        try {
+                          await setFiadoPublico(v.id, !v.fiado_publico);
+                          toast.success(
+                            v.fiado_publico
+                              ? "Solo quien la hizo puede cobrarla"
+                              : "Cualquier vendedor puede cobrarla",
+                          );
+                          router.refresh();
+                        } catch (e) {
+                          toast.error(e instanceof Error ? e.message : "No se pudo cambiar");
+                        }
+                      })
+                    }
+                  >
+                    {v.fiado_publico ? <Globe className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
+                    {v.fiado_publico ? "La cobra cualquiera" : "Solo su vendedor"}
+                  </Button>
                   <Button variant="ghost" onClick={() => setEditar(true)} disabled={pending}>
                     <Pencil className="h-4 w-4" />
                     Editar productos
