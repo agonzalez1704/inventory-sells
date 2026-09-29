@@ -3,7 +3,15 @@
 
 export const BANCOS: Record<
   string,
-  { nombre: string; marca: string; bg: string; fg: string; logo?: string }
+  {
+    nombre: string;
+    marca: string;
+    bg: string;
+    fg: string;
+    logo?: string;
+    /** The logo is drawn in white, so the tile keeps the brand colour behind it. */
+    logoSobreMarca?: boolean;
+  }
 > = {
   bbva:        { nombre: "BBVA",         marca: "BBVA", bg: "#072146", fg: "#ffffff" },
   banorte:     { nombre: "Banorte",      marca: "Bnte", bg: "#eb0029", fg: "#ffffff" },
@@ -14,7 +22,7 @@ export const BANCOS: Record<
   banregio:    { nombre: "Banregio",     marca: "Breg", bg: "#f47920", fg: "#ffffff" },
   azteca:      { nombre: "Banco Azteca", marca: "Azt",  bg: "#00693c", fg: "#ffffff" },
   bancoppel:   { nombre: "BanCoppel",    marca: "Cop",  bg: "#0055b8", fg: "#ffd500" },
-  nu:          { nombre: "Nu",           marca: "Nu",   bg: "#820ad1", fg: "#ffffff", logo: "/bancos/nu.svg" },
+  nu:          { nombre: "Nu",           marca: "Nu",   bg: "#820ad1", fg: "#ffffff", logo: "/bancos/nu-blanco.svg", logoSobreMarca: true },
   klar:        { nombre: "Klar",         marca: "Klar", bg: "#101010", fg: "#ffffff" },
   hey:         { nombre: "Hey Banco",    marca: "Hey",  bg: "#0e1e2e", fg: "#3ddc97" },
   spin:        { nombre: "Spin by OXXO", marca: "Spin", bg: "#e10a17", fg: "#ffffff" },

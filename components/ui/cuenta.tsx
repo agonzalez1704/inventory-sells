@@ -21,9 +21,11 @@ export function BancoIcon({ banco, size = "md" }: { banco: string; size?: "sm" |
     return (
       <span
         className={cn(
-          "inline-flex shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white p-1 ring-1 ring-black/10",
+          "inline-flex shrink-0 items-center justify-center overflow-hidden rounded-lg p-1",
+          b.logoSobreMarca ? "p-1.5" : "bg-white ring-1 ring-black/10",
           px,
         )}
+        style={b.logoSobreMarca ? { backgroundColor: b.bg } : undefined}
         aria-hidden
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
