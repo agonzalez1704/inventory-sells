@@ -276,8 +276,11 @@ export function PanelNota({
                 </p>
               )}
 
-              {esAdmin && (
-                <div className="flex flex-wrap items-center gap-2 border-t border-border pt-4">
+              <div className="flex flex-wrap items-center gap-2 border-t border-border pt-4">
+                {/* Correcting a note is the counter's job — the seller who
+                    made the mistake is the one standing there. Only the
+                    public/private switch is the admin's. */}
+                {esAdmin && (
                   <Button
                     variant="ghost"
                     disabled={pending}
@@ -300,16 +303,16 @@ export function PanelNota({
                     {v.fiado_publico ? <Globe className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
                     {v.fiado_publico ? "La cobra cualquiera" : "Solo su vendedor"}
                   </Button>
-                  <Button variant="ghost" onClick={() => setEditar(true)} disabled={pending}>
-                    <Pencil className="h-4 w-4" />
-                    Editar productos
-                  </Button>
-                  <Button variant="ghost" onClick={cancelar} disabled={pending}>
-                    <Trash2 className="h-4 w-4 text-red-600 dark:text-red-400" />
-                    Cancelar nota
-                  </Button>
-                </div>
-              )}
+                )}
+                <Button variant="ghost" onClick={() => setEditar(true)} disabled={pending}>
+                  <Pencil className="h-4 w-4" />
+                  Editar productos
+                </Button>
+                <Button variant="ghost" onClick={cancelar} disabled={pending}>
+                  <Trash2 className="h-4 w-4 text-red-600 dark:text-red-400" />
+                  Cancelar nota
+                </Button>
+              </div>
             </div>
 
             <div className="flex gap-2.5 border-t border-border px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6">
