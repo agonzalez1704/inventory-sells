@@ -33,11 +33,37 @@ export type PiezaVehiculo = {
   quantity: number;
   familia: string | null;
   familia_nombre: string | null;
+  sistema: string | null;
+  sistema_nombre: string | null;
   /** "Versa 2012–2017" — what the counter reads back to the customer. */
   compat: string | null;
   anio_desde: number | null;
   anio_hasta: number | null;
 };
+
+export type ModeloVehiculo = {
+  marca: string;
+  modelo: string;
+  piezas: number;
+  anio_min: number | null;
+  anio_max: number | null;
+};
+
+/**
+ * Models by name, the make along for the ride.
+ *
+ * The counter says "un Versa", not "un Nissan Versa" — and model names are
+ * nearly unique anyway (1,549 names across 1,579 make+model pairs), so asking
+ * for the make first only cost a tap.
+ */
+export async function buscarModelos(q: string): Promise<ModeloVehiculo[]> {
+  await assertVerCatalogo();
+  const { data } = await insforgeAdmin.database.rpc("vehiculo_buscar_modelos", {
+    p_q: q.trim() || null,
+    p_limit: 40,
+  });
+  return (data ?? []) as ModeloVehiculo[];
+}
 
 export async function marcasDeVehiculo(): Promise<{ marca: string; piezas: number }[]> {
   await assertVerCatalogo();
@@ -62,6 +88,7 @@ export async function piezasDeVehiculo(input: {
   modelo?: string | null;
   anio?: number | null;
   familia?: string | null;
+  sistema?: string | null;
   soloStock?: boolean;
 }): Promise<PiezaVehiculo[]> {
   await assertVerCatalogo();
@@ -72,6 +99,7 @@ export async function piezasDeVehiculo(input: {
     p_modelo: input.modelo ?? null,
     p_anio: input.anio ?? null,
     p_familia: input.familia ?? null,
+    p_sistema: input.sistema ?? null,
     p_solo_stock: input.soloStock ?? false,
     p_limit: 300,
   });

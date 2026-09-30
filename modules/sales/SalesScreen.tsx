@@ -334,6 +334,7 @@ export function SalesScreen({
   const [modo, setModo] = useState<"texto" | "vehiculo">("texto");
   const [vehiculo, setVehiculo] = useState<Vehiculo | null>(null);
   const [familia, setFamilia] = useState<string | null>(null);
+  const [sistema, setSistema] = useState<string | null>(null);
   const [soloStock, setSoloStock] = useState(false);
   const [piezas, setPiezas] = useState<PiezaVehiculo[]>([]);
   const [cargandoVeh, setCargandoVeh] = useState(false);
@@ -524,10 +525,23 @@ export function SalesScreen({
     [inventariosAjenos],
   );
 
+  // Two levels, the way the counter asks: the system first ("dame suspensión"),
+  // its families inside it ("horquillas, amortiguadores").
+  const sistemas = useMemo(() => {
+    const cuenta = new Map<string, { id: string; nombre: string; n: number }>();
+    for (const p of piezas) {
+      const id = p.sistema ?? "otros";
+      const prev = cuenta.get(id);
+      cuenta.set(id, { id, nombre: p.sistema_nombre ?? "Otros", n: (prev?.n ?? 0) + 1 });
+    }
+    return [...cuenta.values()].sort((a, b) => b.n - a.n || a.nombre.localeCompare(b.nombre, "es"));
+  }, [piezas]);
+
   const familias = useMemo(() => {
     const cuenta = new Map<string, { id: string; nombre: string; n: number }>();
     for (const p of piezas) {
       if (!p.familia) continue;
+      if (sistema && (p.sistema ?? "otros") !== sistema) continue;
       const prev = cuenta.get(p.familia);
       cuenta.set(p.familia, {
         id: p.familia,
@@ -536,13 +550,21 @@ export function SalesScreen({
       });
     }
     return [...cuenta.values()].sort((a, b) => b.n - a.n || a.nombre.localeCompare(b.nombre, "es"));
-  }, [piezas]);
+  }, [piezas, sistema]);
 
   const piezasVisibles = useMemo(
-    () => (familia ? piezas.filter((p) => p.familia === familia) : piezas),
-    [piezas, familia],
+    () =>
+      piezas.filter(
+        (p) =>
+          (!sistema || (p.sistema ?? "otros") === sistema) && (!familia || p.familia === familia),
+      ),
+    [piezas, sistema, familia],
   );
-  const textoFamilia = familia ? (familias.find((f) => f.id === familia)?.nombre ?? "esa pieza") : "esa pieza";
+  const textoFamilia = familia
+    ? (familias.find((f) => f.id === familia)?.nombre ?? "esa pieza")
+    : sistema
+      ? (sistemas.find((x) => x.id === sistema)?.nombre ?? "esa pieza")
+      : "esa pieza";
 
   const buscarCompat = useCallback(
     async (modelo: string) => {
@@ -1073,7 +1095,7 @@ export function SalesScreen({
           {modo === "vehiculo" ? (
             !vehiculo ? (
               <div className="mt-4">
-                <VehiculoPicker onElegir={(v) => { setVehiculo(v); setFamilia(null); guardarReciente(v); }} />
+                <VehiculoPicker onElegir={(v) => { setVehiculo(v); setFamilia(null); setSistema(null); guardarReciente(v); }} />
               </div>
             ) : (
               <div className="mt-3 space-y-3">
@@ -1092,7 +1114,7 @@ export function SalesScreen({
                     </p>
                   </div>
                   <div className="flex-1" />
-                  <Button variant="secondary" className="h-10" onClick={() => { setVehiculo(null); setFamilia(null); }}>
+                  <Button variant="secondary" className="h-10" onClick={() => { setVehiculo(null); setFamilia(null); setSistema(null); }}>
                     Cambiar carro
                   </Button>
                   <button
@@ -1110,16 +1132,40 @@ export function SalesScreen({
                   </button>
                 </div>
 
-                {familias.length > 0 && (
-                  <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                    <Chip active={familia === null} onClick={() => setFamilia(null)}>
-                      Todas <span className="tabular-nums opacity-60">{piezas.length}</span>
-                    </Chip>
-                    {familias.map((f) => (
-                      <Chip key={f.id} active={familia === f.id} onClick={() => setFamilia(familia === f.id ? null : f.id)}>
-                        {f.nombre} <span className="tabular-nums opacity-60">{f.n}</span>
+                {sistemas.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                      <Chip active={sistema === null} onClick={() => { setSistema(null); setFamilia(null); }}>
+                        Todo el carro <span className="tabular-nums opacity-60">{piezas.length}</span>
                       </Chip>
-                    ))}
+                      {sistemas.map((x) => (
+                        <Chip
+                          key={x.id}
+                          active={sistema === x.id}
+                          onClick={() => {
+                            setSistema(sistema === x.id ? null : x.id);
+                            setFamilia(null);
+                          }}
+                        >
+                          {x.nombre} <span className="tabular-nums opacity-60">{x.n}</span>
+                        </Chip>
+                      ))}
+                    </div>
+                    {familias.length > 1 && (
+                      <div className="flex gap-2 overflow-x-auto pb-1 pl-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                        <span className="flex items-center pr-1 text-xs text-muted-foreground">
+                          {sistema ? sistemas.find((x) => x.id === sistema)?.nombre : "Pieza"}:
+                        </span>
+                        <Chip active={familia === null} onClick={() => setFamilia(null)}>
+                          Todas
+                        </Chip>
+                        {familias.map((f) => (
+                          <Chip key={f.id} active={familia === f.id} onClick={() => setFamilia(familia === f.id ? null : f.id)}>
+                            {f.nombre} <span className="tabular-nums opacity-60">{f.n}</span>
+                          </Chip>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
 
