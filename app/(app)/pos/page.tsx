@@ -7,6 +7,7 @@ import { fiadoExigeCliente, posClickAbreDetalle, comprobanteObligatorio } from "
 import { inventariosAjenos } from "@/modules/sucursales/guard";
 import { getTiendaInfo } from "@/modules/config/lib";
 import { encabezadoTicket, terminosGarantia } from "@/lib/tienda-info";
+import { hayVehiculos } from "@/modules/vehiculos/actions";
 
 
 // The register: search products, build the cart, cobrar. The sales history lives
@@ -43,12 +44,13 @@ export default async function PosPage() {
       listarCategorias(),
     ]);
 
-  const [precioBase, exigeCliente, clickDetalle, comprobanteOblig, tienda] = await Promise.all([
+  const [precioBase, exigeCliente, clickDetalle, comprobanteOblig, tienda, conVehiculos] = await Promise.all([
     getPrecioBasePos(),
     fiadoExigeCliente(),
     posClickAbreDetalle(),
     comprobanteObligatorio(),
     getTiendaInfo(),
+    hayVehiculos(),
   ]);
 
   const invName = new Map(
@@ -98,6 +100,7 @@ export default async function PosPage() {
       puedeCotizar={puedeCotizar}
       garantia={terminosGarantia(tienda)}
       encabezado={encabezadoTicket(tienda)}
+      porVehiculo={conVehiculos}
     />
   );
 }

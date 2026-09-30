@@ -14,6 +14,7 @@ import {
   Plus,
   Printer,
   QrCode,
+  Car,
   Search,
   SearchX,
   ShoppingCart,
@@ -41,6 +42,8 @@ import { saldoDeCliente } from "@/modules/garantias/cliente-actions";
 import { misInventariosAjenos } from "@/modules/sucursales/actions";
 import { crearCotizacion } from "@/modules/cotizaciones/actions";
 import { AnotarDemanda } from "@/modules/demanda/AnotarDemanda";
+import { VehiculoPicker, guardarReciente, nombreVehiculo } from "@/modules/vehiculos/VehiculoPicker";
+import { piezasDeVehiculo, type PiezaVehiculo, type Vehiculo } from "@/modules/vehiculos/actions";
 import { demandaReciente, type DemandaReciente } from "@/modules/demanda/actions";
 import { guardarComprobante } from "./comprobantes";
 import { PaymentSheet, type Comprobante } from "./PaymentSheet";
@@ -126,6 +129,7 @@ function ProductCard({
   onVerDetalle,
   precioBase,
   clickAbreDetalle,
+  compat = null,
 }: {
   p: SalesProduct;
   inCart: number;
@@ -133,6 +137,8 @@ function ProductCard({
   onVerDetalle: () => void;
   precioBase: PrecioBase;
   clickAbreDetalle: boolean;
+  /** "Versa 2012–2017": which car this piece matched. */
+  compat?: string | null;
 }) {
   const soldOut = p.quantity === 0;
   const maxed = inCart >= p.quantity;
@@ -197,6 +203,9 @@ function ProductCard({
         </p>
         <p className="line-clamp-2 text-xs leading-tight font-semibold">{p.name}</p>
         <p className="truncate text-[10px] leading-tight text-muted-foreground capitalize">{p.category || p.inventory_name}</p>
+        {compat && (
+          <p className="truncate text-[10px] leading-tight font-medium text-emerald-700 dark:text-emerald-400">{compat}</p>
+        )}
         <div className="mt-auto flex items-center justify-between gap-1 pt-1.5">
           {importe ? (
             <span className={cn("text-sm font-semibold tabular-nums", alCosto && "text-amber-700 dark:text-amber-400")}>
@@ -277,6 +286,7 @@ export function SalesScreen({
   puedeCotizar = false,
   garantia = null,
   encabezado = null,
+  porVehiculo = false,
 }: {
   /** First page of the catalog, rendered before any search runs. */
   products: SalesProduct[];
@@ -297,6 +307,8 @@ export function SalesScreen({
   garantia?: string | null;
   /** Ticket header lines (Configuración → Tienda). */
   encabezado?: string[] | null;
+  /** This shop sells parts by car (Ruli): offer the vehicle search. */
+  porVehiculo?: boolean;
 }) {
   const router = useRouter();
   const [confirmar, confirmDialog] = useConfirm();
@@ -318,6 +330,13 @@ export function SalesScreen({
   const [escaneando, setEscaneando] = useState(false);
   // "Lo piden y no lo tenemos": what the empty search becomes.
   const [anotar, setAnotar] = useState<{ texto: string; productId: string | null } | null>(null);
+  // Search by car: the counter's first question at Ruli.
+  const [modo, setModo] = useState<"texto" | "vehiculo">("texto");
+  const [vehiculo, setVehiculo] = useState<Vehiculo | null>(null);
+  const [familia, setFamilia] = useState<string | null>(null);
+  const [soloStock, setSoloStock] = useState(false);
+  const [piezas, setPiezas] = useState<PiezaVehiculo[]>([]);
+  const [cargandoVeh, setCargandoVeh] = useState(false);
   const [pedidosPrevios, setPedidosPrevios] = useState<DemandaReciente[]>([]);
   const [recibo, setRecibo] = useState<{ ticket: TicketData; usoSaldo: number; saldoRestante: number } | null>(null);
   const [ultima, setUltima] = useState<Ultima | null>(null);
@@ -448,6 +467,82 @@ export function SalesScreen({
       vivo = false;
     };
   }, [query, results.length, buscando]);
+
+  // The car decides the results while it is set; the text search is untouched
+  // behind it, so switching back finds what was already there.
+  useEffect(() => {
+    if (!vehiculo) {
+      setPiezas([]);
+      return;
+    }
+    let vivo = true;
+    setCargandoVeh(true);
+    piezasDeVehiculo({ marca: vehiculo.marca, modelo: vehiculo.modelo, anio: vehiculo.anio, soloStock })
+      .then((rows) => {
+        if (!vivo) return;
+        setPiezas(rows);
+        recordar(
+          rows.map((r) => ({
+            id: r.id,
+            inventory_id: r.inventory_id,
+            sku: r.sku,
+            name: r.name,
+            brand: null,
+            size: null,
+            category: r.familia_nombre,
+            price_cents: r.price_cents,
+            cost_cents: r.cost_cents,
+            quantity: r.quantity,
+            image_url: r.image_url,
+          })) as SalesProduct[],
+        );
+      })
+      .catch(() => vivo && setPiezas([]))
+      .finally(() => vivo && setCargandoVeh(false));
+    return () => {
+      vivo = false;
+    };
+  }, [vehiculo, soloStock, recordar, products]);
+
+  // A vehicle row is a product row: the cart, the sheet and the card all read
+  // the same shape they already know.
+  const comoProducto = useCallback(
+    (p: PiezaVehiculo): SalesProduct => ({
+      id: p.id,
+      inventory_id: p.inventory_id,
+      sku: p.sku,
+      name: p.name,
+      brand: null,
+      size: null,
+      category: p.familia_nombre,
+      price_cents: p.price_cents,
+      cost_cents: p.cost_cents,
+      quantity: p.quantity,
+      image_url: p.image_url,
+      sucursal_ajena: inventariosAjenos[p.inventory_id] ?? null,
+    }),
+    [inventariosAjenos],
+  );
+
+  const familias = useMemo(() => {
+    const cuenta = new Map<string, { id: string; nombre: string; n: number }>();
+    for (const p of piezas) {
+      if (!p.familia) continue;
+      const prev = cuenta.get(p.familia);
+      cuenta.set(p.familia, {
+        id: p.familia,
+        nombre: p.familia_nombre ?? p.familia,
+        n: (prev?.n ?? 0) + 1,
+      });
+    }
+    return [...cuenta.values()].sort((a, b) => b.n - a.n || a.nombre.localeCompare(b.nombre, "es"));
+  }, [piezas]);
+
+  const piezasVisibles = useMemo(
+    () => (familia ? piezas.filter((p) => p.familia === familia) : piezas),
+    [piezas, familia],
+  );
+  const textoFamilia = familia ? (familias.find((f) => f.id === familia)?.nombre ?? "esa pieza") : "esa pieza";
 
   const buscarCompat = useCallback(
     async (modelo: string) => {
@@ -899,8 +994,32 @@ export function SalesScreen({
 
       <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start lg:gap-5">
         <div>
+          {porVehiculo && (
+            <div className="mb-3 inline-flex rounded-xl bg-muted p-1 text-sm">
+              {(
+                [
+                  ["vehiculo", "Por vehículo"],
+                  ["texto", "Por código o nombre"],
+                ] as const
+              ).map(([k, label]) => (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => setModo(k)}
+                  className={cn(
+                    "inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg px-4 font-medium",
+                    modo === k ? "bg-background shadow-xs" : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {k === "vehiculo" ? <Car className="h-4 w-4" /> : <Search className="h-4 w-4" />}
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+
           <div className="flex gap-2.5">
-            <div className="relative flex-1">
+            <div className={cn("relative flex-1", modo === "vehiculo" && vehiculo && "hidden sm:block")}>
               <Search className="pointer-events-none absolute top-1/2 left-3.5 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
               <input
                 ref={buscador}
@@ -927,7 +1046,7 @@ export function SalesScreen({
             </Button>
           </div>
 
-          {categorias.length > 1 && (
+          {categorias.length > 1 && modo === "texto" && (
             <div className="mt-3 flex items-center gap-2">
               <div className="flex flex-1 gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 <Chip active={categoria === null} onClick={() => setCategoria(null)}>
@@ -951,7 +1070,105 @@ export function SalesScreen({
             </div>
           )}
 
-          {results.length === 0 ? (
+          {modo === "vehiculo" ? (
+            !vehiculo ? (
+              <div className="mt-4">
+                <VehiculoPicker onElegir={(v) => { setVehiculo(v); setFamilia(null); guardarReciente(v); }} />
+              </div>
+            ) : (
+              <div className="mt-3 space-y-3">
+                {/* El carro se queda a la vista toda la venta: es la pregunta
+                    que el mostrador acaba de hacer. */}
+                <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-brand/40 bg-brand-soft/40 p-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand text-brand-foreground">
+                    <Car className="h-5 w-5" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="font-semibold">{nombreVehiculo(vehiculo)}</p>
+                    <p className="text-xs text-muted-foreground tabular-nums">
+                      {cargandoVeh
+                        ? "Buscando…"
+                        : `${piezas.length} ${piezas.length === 1 ? "pieza" : "piezas"} · ${piezas.filter((x) => x.quantity > 0).length} en piso`}
+                    </p>
+                  </div>
+                  <div className="flex-1" />
+                  <Button variant="secondary" className="h-10" onClick={() => { setVehiculo(null); setFamilia(null); }}>
+                    Cambiar carro
+                  </Button>
+                  <button
+                    type="button"
+                    onClick={() => setSoloStock((v) => !v)}
+                    aria-pressed={soloStock}
+                    className={cn(
+                      "inline-flex h-10 cursor-pointer items-center gap-2 rounded-full border px-4 text-sm",
+                      soloStock
+                        ? "border-emerald-500 bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
+                        : "border-border bg-background",
+                    )}
+                  >
+                    Solo con existencia
+                  </button>
+                </div>
+
+                {familias.length > 0 && (
+                  <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    <Chip active={familia === null} onClick={() => setFamilia(null)}>
+                      Todas <span className="tabular-nums opacity-60">{piezas.length}</span>
+                    </Chip>
+                    {familias.map((f) => (
+                      <Chip key={f.id} active={familia === f.id} onClick={() => setFamilia(familia === f.id ? null : f.id)}>
+                        {f.nombre} <span className="tabular-nums opacity-60">{f.n}</span>
+                      </Chip>
+                    ))}
+                  </div>
+                )}
+
+                {piezasVisibles.length === 0 ? (
+                  <div className="rounded-2xl border border-border bg-background p-5 sm:p-6">
+                    <div className="flex items-start gap-4">
+                      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-brand-foreground">
+                        <SearchX className="h-5 w-5" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-lg font-semibold">
+                          {cargandoVeh ? "Buscando…" : `No tenemos ${textoFamilia} para ese ${vehiculo.modelo}`}
+                        </p>
+                        <p className="mt-0.5 text-sm text-muted-foreground">
+                          Anótalo con todo y carro: el resurtido pide la pieza del año correcto, no una pieza suelta.
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="brand"
+                      className="mt-4 h-12 rounded-xl px-5 text-base"
+                      onClick={() => setAnotar({ texto: `${textoFamilia} · ${nombreVehiculo(vehiculo)}`, productId: null })}
+                    >
+                      <Plus className="h-5 w-5" />
+                      Anotar que la piden
+                    </Button>
+                  </div>
+                ) : (
+                  <div className={cn(
+                      "grid grid-cols-3 gap-2 transition-opacity sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8",
+                      cargandoVeh && "opacity-60",
+                    )}>
+                    {piezasVisibles.map((p) => (
+                      <ProductCard
+                        key={p.id}
+                        p={comoProducto(p)}
+                        inCart={cart[p.id] ?? 0}
+                        onAdd={() => add(comoProducto(p))}
+                        onVerDetalle={() => setDetalle(comoProducto(p))}
+                        clickAbreDetalle={clickAbreDetalle}
+                        precioBase={precioBase}
+                        compat={p.compat}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          ) : results.length === 0 ? (
             <div className="mt-3 space-y-4">
               {buscando ? (
                 <p className="px-1 py-6 text-center text-sm text-muted-foreground">Buscando…</p>
