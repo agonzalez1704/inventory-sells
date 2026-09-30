@@ -4,10 +4,12 @@ import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Check, MessageCircleQuestion, PackageSearch, Truck, X } from "lucide-react";
+import { Check, FileDown, MessageCircleQuestion, PackageSearch, Truck, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { MARCA } from "@/lib/marca";
+import { pdfDemanda } from "@/lib/demanda-pdf";
 import { cerrarDemanda, type DemandaAgrupada } from "./actions";
 
 const TZ = "America/Mexico_City";
@@ -102,7 +104,18 @@ export function DemandaTab({ lista, dias, onDias }: { lista: DemandaAgrupada[]; 
         >
           Solo lo que no existe en catálogo
         </button>
-        <span className="ml-auto text-sm text-muted-foreground">
+        {/* Lo que está en pantalla es lo que sale en el PDF: el filtro de días
+            y el de catálogo ya son la decisión del comprador. */}
+        <Button
+          variant="secondary"
+          className="ml-auto h-10"
+          disabled={filas.length === 0}
+          onClick={() => pdfDemanda(filas, dias, MARCA.tienda.nombre).catch(() => toast.error("No se pudo generar el PDF"))}
+        >
+          <FileDown className="h-4 w-4" />
+          PDF
+        </Button>
+        <span className="text-sm text-muted-foreground">
           {piezas} {piezas === 1 ? "pieza pedida" : "piezas pedidas"}
           {esperando > 0 && ` · ${esperando} ${esperando === 1 ? "cliente espera" : "clientes esperan"}`}
         </span>

@@ -27,6 +27,8 @@
     "d3-array": "^3.2.4",
     "d3-scale": "^4.0.2",
     "framer-motion": "^13.1.0",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8",
     "jsqr": "^1.4.0",
     "lucide-react": "^1.21.0",
     "mcp-handler": "^1.1.0",
