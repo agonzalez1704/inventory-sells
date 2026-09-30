@@ -20,6 +20,8 @@ import { getPrecioBasePos } from "@/modules/sales/pos-prefs";
 import { PosPrefs } from "@/modules/sales/PosPrefs";
 import { PosModoClick } from "@/modules/config/PosModoClick";
 import { ComprobanteToggle } from "@/modules/config/ComprobanteToggle";
+import { hayVehiculos } from "@/modules/vehiculos/actions";
+import { VersionesConfig } from "@/modules/vehiculos/VersionesConfig";
 
 export default async function ConfiguracionPage() {
   const { userId } = await auth();
@@ -64,6 +66,8 @@ export default async function ConfiguracionPage() {
   }
   const [sucursales, equipos] = isAdmin ? await Promise.all([listarSucursales(), listarEquipos()]) : [[], []];
   const cuentas = isAdmin ? await listarCuentasAdmin() : [];
+  // Naming generations only makes sense where the catalog is sold by car.
+  const conVehiculos = isAdmin ? await hayVehiculos() : false;
   const aliAuthUrl = aliKey
     ? `https://api-sg.aliexpress.com/oauth/authorize?response_type=code&client_id=${aliKey}&redirect_uri=${encodeURIComponent("https://fiable.vercel.app/api/aliexpress/callback")}&force_auth=true`
     : null;
@@ -82,6 +86,8 @@ export default async function ConfiguracionPage() {
       {isAdmin && <SucursalesConfig sucursales={sucursales} equipos={equipos} />}
 
       {isAdmin && <CuentasNegocio cuentas={cuentas} isAdmin={isAdmin} />}
+
+      {conVehiculos && <VersionesConfig />}
 
       {isAdmin && aliAuthUrl && (
         <Card className="p-4">

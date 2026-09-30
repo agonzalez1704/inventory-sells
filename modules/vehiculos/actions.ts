@@ -1,6 +1,9 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { insforgeAdmin } from "@/lib/insforge/admin";
+import { createInsForgeServerClient } from "@/lib/insforge/server";
+import { attempt, type ActionResult } from "@/lib/errors";
 import { permisosDe } from "@/lib/auth/profile";
 import type { Permiso } from "@/lib/permissions";
 
@@ -20,7 +23,13 @@ async function assertVerCatalogo(): Promise<void> {
   if (!perms.has("admin_total") && !VER_CATALOGO.some((p) => perms.has(p))) throw new Error("Sin permiso");
 }
 
-export type Vehiculo = { marca: string; modelo: string; anio: number };
+/**
+ * The car at the counter: model plus either a named version or a year.
+ *
+ * A named version ("V-Drive", "2ª generación") already pins the generation, so
+ * the year is not asked for; a model nobody has named is still picked by year.
+ */
+export type Vehiculo = { marca: string; modelo: string; anio: number | null; version?: string | null };
 
 export type PiezaVehiculo = {
   id: string;
@@ -39,6 +48,7 @@ export type PiezaVehiculo = {
   compat: string | null;
   anio_desde: number | null;
   anio_hasta: number | null;
+  version: string | null;
 };
 
 export type ModeloVehiculo = {
@@ -89,6 +99,7 @@ export async function piezasDeVehiculo(input: {
   anio?: number | null;
   familia?: string | null;
   sistema?: string | null;
+  version?: string | null;
   soloStock?: boolean;
 }): Promise<PiezaVehiculo[]> {
   await assertVerCatalogo();
@@ -100,6 +111,7 @@ export async function piezasDeVehiculo(input: {
     p_anio: input.anio ?? null,
     p_familia: input.familia ?? null,
     p_sistema: input.sistema ?? null,
+    p_version: input.version ?? null,
     p_solo_stock: input.soloStock ?? false,
     p_limit: 300,
   });
@@ -117,4 +129,63 @@ export async function hayVehiculos(): Promise<boolean> {
     .not("veh_marca", "is", null)
     .limit(1);
   return (data ?? []).length > 0;
+}
+
+export type VersionVehiculo = {
+  version: string | null;
+  piezas: number;
+  anio_min: number | null;
+  anio_max: number | null;
+  etiquetas: number;
+};
+
+export type RangoVehiculo = {
+  anio_desde: number | null;
+  anio_hasta: number | null;
+  version: string | null;
+  piezas: number;
+  etiquetas: number;
+};
+
+/** The named versions of a model — empty of names until someone names them. */
+export async function versionesDeModelo(marca: string, modelo: string): Promise<VersionVehiculo[]> {
+  await assertVerCatalogo();
+  const { data } = await insforgeAdmin.database.rpc("vehiculo_versiones", {
+    p_marca: marca,
+    p_modelo: modelo,
+  });
+  return (data ?? []) as VersionVehiculo[];
+}
+
+/** Every year band of a model, for the screen that names them. */
+export async function rangosDeModelo(marca: string, modelo: string): Promise<RangoVehiculo[]> {
+  await assertVerCatalogo();
+  const { data } = await insforgeAdmin.database.rpc("vehiculo_rangos", {
+    p_marca: marca,
+    p_modelo: modelo,
+  });
+  return (data ?? []) as RangoVehiculo[];
+}
+
+/** Name one band: "2012–2019 → 2ª generación". Admin only, enforced in the RPC. */
+export async function nombrarVersion(input: {
+  marca: string;
+  modelo: string;
+  anioDesde: number | null;
+  anioHasta: number | null;
+  version: string;
+}): Promise<ActionResult<{ etiquetas: number }>> {
+  return attempt("nombrarVersion", async () => {
+    const insforge = await createInsForgeServerClient();
+    const { data, error } = await insforge.database.rpc("nombrar_version", {
+      p_marca: input.marca,
+      p_modelo: input.modelo,
+      p_anio_desde: input.anioDesde,
+      p_anio_hasta: input.anioHasta,
+      p_version: input.version,
+    });
+    if (error) throw new Error(error.message ?? "No se pudo guardar la versión");
+    revalidatePath("/configuracion");
+    return { etiquetas: Number(data ?? 0) };
+  });
 }

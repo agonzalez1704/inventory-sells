@@ -478,7 +478,13 @@ export function SalesScreen({
     }
     let vivo = true;
     setCargandoVeh(true);
-    piezasDeVehiculo({ marca: vehiculo.marca, modelo: vehiculo.modelo, anio: vehiculo.anio, soloStock })
+    piezasDeVehiculo({
+      marca: vehiculo.marca,
+      modelo: vehiculo.modelo,
+      anio: vehiculo.anio,
+      version: vehiculo.version ?? null,
+      soloStock,
+    })
       .then((rows) => {
         if (!vivo) return;
         setPiezas(rows);
