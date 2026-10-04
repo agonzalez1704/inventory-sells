@@ -78,7 +78,7 @@ export type Cuadre = {
   porPersona: { quien: string; entradasCents: number; salidasCents: number; otrosCents: number; otros: number }[];
   semana: DiaSemana[];
   /** Cash moved today by people with no check-in: in no drawer. */
-  sinSucursal: { n: number; montoCents: number };
+  sinSucursal: { n: number; montoCents: number; quienes: string[] };
 };
 
 const TZ = "America/Mexico_City";
@@ -253,10 +253,14 @@ export async function cuadreDelDia(fecha: string, sucursalId: string | null): Pr
   const sinCajon = hay ? delDia.filter((e) => e.sucursalId === null && esEfectivo(e)) : [];
 
   // Names for everyone on screen.
-  const ids = [...new Set([...eventos.map((e) => e.quienId), ...conteosRows.map((c) => c.created_by)].filter(Boolean))] as string[];
+  const ids = [
+    ...new Set(
+      [...eventos.map((e) => e.quienId), ...sinCajon.map((e) => e.quienId), ...conteosRows.map((c) => c.created_by)].filter(Boolean),
+    ),
+  ] as string[];
   const { data: profs } = ids.length ? await db.from("profiles").select("id, full_name").in("id", ids) : { data: [] };
   const nombre = new Map(((profs ?? []) as { id: string; full_name: string | null }[]).map((p) => [p.id, p.full_name?.trim() || "—"]));
-  for (const e of eventos) e.quien = e.quienId ? (nombre.get(e.quienId) ?? "—") : "—";
+  for (const e of [...eventos, ...sinCajon]) e.quien = e.quienId ? (nombre.get(e.quienId) ?? "—") : "—";
 
   const efectivo = eventos.filter(esEfectivo);
   const entradasCents = efectivo.filter((e) => e.montoCents > 0).reduce((s, e) => s + e.montoCents, 0);
@@ -428,7 +432,7 @@ export async function cuadreDelDia(fecha: string, sucursalId: string | null): Pr
     sos.push({
       clave: "sin-sucursal",
       titulo: "Efectivo de alguien sin check-in",
-      detalle: `${sinCajon.length} ${sinCajon.length === 1 ? "movimiento" : "movimientos"} que no entran a ningún cajón`,
+      detalle: `${[...new Set(sinCajon.map((e) => e.quien))].join(", ")}: ${sinCajon.length} ${sinCajon.length === 1 ? "movimiento" : "movimientos"} que no entran a ningún cajón`,
       meta: "Se ven en Caja → Sin sucursal",
       montoCents: monto,
       coincide: false,
@@ -480,6 +484,10 @@ export async function cuadreDelDia(fecha: string, sucursalId: string | null): Pr
     sospechosos: sos,
     porPersona: [...personas.values()].sort((a, b) => b.entradasCents - a.entradasCents),
     semana,
-    sinSucursal: { n: sinCajon.length, montoCents: sinCajon.reduce((s, e) => s + e.montoCents, 0) },
+    sinSucursal: {
+      n: sinCajon.length,
+      montoCents: sinCajon.reduce((s, e) => s + e.montoCents, 0),
+      quienes: [...new Set(sinCajon.map((e) => e.quien))],
+    },
   };
 }

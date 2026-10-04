@@ -13,6 +13,7 @@ import {
   ChevronRight,
   Landmark,
   MapPin,
+  UserX,
   NotebookText,
   ShoppingCart,
   Undo2,
@@ -250,6 +251,33 @@ export function CuadreView({
           </div>
         )}
       </div>
+
+      {/* El efectivo de quien no registró entrada no cae en ningún cajón: es
+          justo lo que hace que el corte global y este cuadre no empaten, así
+          que se dice aquí mismo, pegado a "Debería haber". */}
+      {c.sinSucursal.n > 0 && (
+        <div className="flex flex-wrap items-start gap-3 rounded-2xl border border-amber-300 bg-amber-50/70 p-3.5 dark:border-amber-800 dark:bg-amber-950/30">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200">
+            <UserX className="h-5 w-5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">
+              {formatMXN(c.sinSucursal.montoCents)} de hoy no está en ningún cajón
+            </p>
+            <p className="text-xs text-amber-900/80 dark:text-amber-200/80">
+              {c.sinSucursal.quienes.join(", ")} movió ese efectivo sin registrar entrada en una sucursal, así que sale en
+              el corte global pero no en este cuadre. {c.sinSucursal.n}{" "}
+              {c.sinSucursal.n === 1 ? "movimiento" : "movimientos"}.
+            </p>
+          </div>
+          <Link
+            href="/caja?sucursal=sin"
+            className="inline-flex h-9 shrink-0 items-center rounded-lg border border-amber-300 px-3 text-sm font-medium text-amber-900 hover:bg-amber-100 dark:border-amber-800 dark:text-amber-200 dark:hover:bg-amber-900/40"
+          >
+            Verlo
+          </Link>
+        </div>
+      )}
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_400px]">
         {/* Timeline */}
