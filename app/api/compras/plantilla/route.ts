@@ -1,6 +1,6 @@
 import * as XLSX from "xlsx";
 import { auth, currentUser } from "@clerk/nextjs/server";
-import { emailTieneAcceso } from "@/lib/auth/allowlist";
+import { usuarioTieneAcceso } from "@/lib/auth/allowlist";
 import { getPermisos } from "@/lib/auth/profile";
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { MARCA } from "@/lib/marca";
@@ -19,7 +19,7 @@ export async function GET(request: Request) {
   if (!userId) return new Response("Unauthorized", { status: 401 });
 
   const user = await currentUser();
-  if (!(await emailTieneAcceso(user?.primaryEmailAddress?.emailAddress))) {
+  if (!(await usuarioTieneAcceso(user))) {
     return new Response("Forbidden", { status: 403 });
   }
   const perms = await getPermisos(userId);

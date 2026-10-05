@@ -4,7 +4,7 @@ import { AppShell } from "@/components/app-shell";
 import { permisosParaNav } from "@/lib/auth/profile";
 import { redirect } from "next/navigation";
 import { ensureProfile } from "@/lib/auth/profile";
-import { emailTieneAcceso } from "@/lib/auth/allowlist";
+import { usuarioTieneAcceso } from "@/lib/auth/allowlist";
 import { getNegocioInfo } from "@/modules/config/lib";
 import { ConfigPrompt } from "@/modules/config/ConfigPrompt";
 import { PushBanner } from "@/components/push-banner";
@@ -27,7 +27,7 @@ async function Gate({ children }: { children: React.ReactNode }) {
   const user = await currentUser();
   const email = user?.primaryEmailAddress?.emailAddress ?? null;
   // Allow-listed (env bootstrap) or invited emails may use the app.
-  if (!(await emailTieneAcceso(email))) redirect("/sin-acceso");
+  if (!(await usuarioTieneAcceso(user))) redirect("/sin-acceso");
 
   const fullName =
     user && (user.firstName || user.lastName)

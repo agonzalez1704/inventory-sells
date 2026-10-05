@@ -35,3 +35,23 @@ export async function emailTieneAcceso(email: string | null | undefined): Promis
   const inv = data as { status: string } | null;
   return Boolean(inv && inv.status !== "revoked");
 }
+
+type CorreoClerk = { emailAddress: string; verification?: { status?: string | null } | null };
+
+/**
+ * Access by ANY verified address of the account, not only the primary one.
+ *
+ * Whoever is locked out of their mail — a provider that drops the sign-in code,
+ * a shared family address — is helped by adding a second address in Clerk, and
+ * that help must not end in "sin acceso" because the invite names the old one.
+ * Only verified addresses count: an unverified one is a claim, not a proof.
+ */
+export async function usuarioTieneAcceso(
+  user: { emailAddresses?: CorreoClerk[] | null } | null | undefined,
+): Promise<boolean> {
+  const correos = (user?.emailAddresses ?? [])
+    .filter((e) => (e.verification?.status ?? null) === "verified")
+    .map((e) => e.emailAddress);
+  for (const correo of correos) if (await emailTieneAcceso(correo)) return true;
+  return false;
+}
