@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { HandCoins, MessageCircle, Printer, Search, User } from "lucide-react";
+import { createContext, useContext, useEffect, useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { Globe, HandCoins, Lock, MessageCircle, Printer, Search, User } from "lucide-react";
 import { formatMXN } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
@@ -12,6 +14,7 @@ import type { PickerCustomer } from "@/modules/customers/CustomerPicker";
 import type { SwapProduct } from "@/modules/sales/ItemSwapModal";
 import { PanelNota } from "./PanelNota";
 import { CobrarPanel } from "./CobrarPanel";
+import { setFiadoPublico } from "@/modules/sales/actions";
 import {
   quienDebe,
   resta as restaDe,
@@ -148,6 +151,7 @@ export function LoansView({
     l.cliente && !l.cliente.is_system ? loans.filter((x) => x.cliente?.id === l.cliente?.id && x.id !== l.id) : [];
 
   return (
+    <EsAdmin.Provider value={esAdmin}>
     <section className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
@@ -264,6 +268,62 @@ export function LoansView({
         />
       )}
     </section>
+    </EsAdmin.Provider>
+  );
+}
+
+const EsAdmin = createContext(false);
+
+/**
+ * Who may collect the note: anyone at the counter (pública) or only the seller
+ * who made it (privada). Everyone sees which; only an admin flips it, right
+ * here, without opening the note.
+ */
+function Visibilidad({ loan }: { loan: Loan }) {
+  const esAdmin = useContext(EsAdmin);
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const publica = loan.fiado_publico ?? false;
+  const cls = cn(
+    "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold",
+    publica
+      ? "bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300"
+      : "bg-muted text-foreground/80",
+  );
+  const cuerpo = (
+    <>
+      {publica ? <Globe className="h-3 w-3" /> : <Lock className="h-3 w-3" />}
+      {publica ? "Pública" : "Privada"}
+    </>
+  );
+  const explica = publica ? "La cobra cualquier vendedor" : `Solo la cobra ${loan.vendedor ?? "quien la hizo"}`;
+  if (!esAdmin)
+    return (
+      <span className={cls} title={explica}>
+        {cuerpo}
+      </span>
+    );
+  return (
+    <button
+      type="button"
+      disabled={pending}
+      title={explica}
+      aria-label={`${publica ? "Pública" : "Privada"}: ${explica}. Cambiar`}
+      className={cn(cls, "cursor-pointer hover:opacity-80 disabled:opacity-50")}
+      onClick={() =>
+        start(async () => {
+          const r = await setFiadoPublico(loan.id, !publica);
+          if (!r.ok) {
+            toast.error(r.error);
+            return;
+          }
+          toast.success(publica ? "Ahora es privada: solo quien la hizo la cobra" : "Ahora es pública: la cobra cualquiera");
+          router.refresh();
+        })
+      }
+    >
+      {cuerpo}
+    </button>
   );
 }
 
@@ -345,6 +405,7 @@ function FilaNota({
               ` · ${loan.sale_items.map((i) => i.products?.name ?? "Producto").join(", ")}`}
           </span>
         </button>
+        <Visibilidad loan={loan} />
 
         <div className="w-44 shrink-0">
           {loan.pagado_cents > 0 ? (
@@ -529,9 +590,10 @@ function TarjetaNota({
         <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-soft text-[11px] font-bold text-brand-foreground">
           {(loan.vendedor ?? "?").charAt(0).toUpperCase()}
         </span>
-        <span className="min-w-0">
+        <span className="min-w-0 flex-1">
           Lo metió <b className="font-semibold text-foreground">{loan.vendedor ?? "—"}</b> · {fechaHora(loan.created_at)}
         </span>
+        <Visibilidad loan={loan} />
       </p>
 
       <div className="flex gap-2">
