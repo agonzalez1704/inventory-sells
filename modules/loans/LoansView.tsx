@@ -154,10 +154,10 @@ export function LoansView({
           <h1 className="text-2xl font-semibold tracking-tight">Notas de crédito</h1>
           <p className="mt-1 text-sm text-muted-foreground">Lo que te deben, de lo más viejo a lo más nuevo.</p>
         </div>
-        <div className="flex flex-wrap gap-2.5">
+        <div className="grid w-full grid-cols-3 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:gap-2.5">
           <Kpi label="Por cobrar" valor={porCobrar} />
           <Kpi label="Más de 15 días" valor={vencidoCents} tono="rojo" />
-          <Kpi label="Cobrado esta semana" valor={cobradoSemana} tono="verde" />
+          <Kpi label="Cobrado 7 días" valor={cobradoSemana} tono="verde" />
         </div>
       </div>
 
@@ -175,10 +175,11 @@ export function LoansView({
               <Input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                placeholder="Busca por nombre, seña, teléfono, pieza o vendedor…"
+                placeholder="Nombre, seña, pieza o quién la metió…"
                 className="h-11 pl-9"
               />
             </div>
+            <div className="flex w-full gap-2 overflow-x-auto sm:w-auto sm:flex-wrap sm:overflow-visible">
             {(
               [
                 ["todas", "Todas", loans.length],
@@ -200,6 +201,7 @@ export function LoansView({
                 {label} <b className="tabular-nums">{n}</b>
               </button>
             ))}
+            </div>
           </div>
 
           {sinCliente.length > 0 && filtro !== "sin-cliente" && (
@@ -269,7 +271,7 @@ function Kpi({ label, valor, tono = "normal" }: { label: string; valor: number; 
   return (
     <div
       className={cn(
-        "min-w-40 rounded-xl border px-4 py-2.5",
+        "min-w-0 rounded-xl border px-2.5 py-2 sm:min-w-40 sm:px-4 sm:py-2.5",
         tono === "rojo"
           ? "border-red-200 bg-red-50/60 dark:border-red-900 dark:bg-red-950/20"
           : tono === "verde"
@@ -277,10 +279,10 @@ function Kpi({ label, valor, tono = "normal" }: { label: string; valor: number; 
             : "border-border bg-background",
       )}
     >
-      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="text-[11px] text-muted-foreground sm:text-xs">{label}</p>
       <p
         className={cn(
-          "text-2xl font-semibold tabular-nums",
+          "text-[17px] font-semibold tabular-nums sm:text-2xl",
           tono === "rojo" && "text-red-700 dark:text-red-400",
           tono === "verde" && "text-emerald-700 dark:text-emerald-400",
         )}
@@ -311,9 +313,11 @@ function FilaNota({
   const tel = loan.cliente && !loan.cliente.is_system ? loan.cliente.telefono : null;
 
   return (
+    <>
+    <TarjetaNota loan={loan} pie={pie} onAbrir={onAbrir} onCobrar={onCobrar} compacta={compacta} />
     <div
       className={cn(
-        "rounded-2xl border p-3.5 sm:p-4",
+        "hidden rounded-2xl border p-3.5 sm:block sm:p-4",
         compacta
           ? "border-border bg-muted/20"
           : dias >= 15
@@ -382,6 +386,181 @@ function FilaNota({
         </div>
       </div>
     </div>
+    </>
+  );
+}
+
+const fechaHora = (iso: string) =>
+  new Date(iso).toLocaleString("es-MX", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
+
+const haceDias = (dias: number) => (dias === 0 ? "Hoy" : dias === 1 ? "Ayer" : `Hace ${dias} días`);
+
+/** What was taken, one line per piece: the name is the whole point, so it wraps instead of truncating. */
+function Piezas({ items }: { items: LoanItem[] }) {
+  const n = items.reduce((s, i) => s + i.qty, 0);
+  if (n === 0) return null;
+  return (
+    <div className="space-y-2 rounded-xl border border-border/70 bg-background px-3 py-2.5">
+      <p className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+        {n} {n === 1 ? "pieza" : "piezas"}
+      </p>
+      {items.map((i, k) => (
+        <div key={k} className="flex items-baseline gap-2.5 text-sm leading-snug">
+          <span className="shrink-0 text-muted-foreground tabular-nums">{i.qty}×</span>
+          <span className="min-w-0 flex-1 font-medium break-words">{i.products?.name ?? "Producto"}</span>
+          {i.unit_price_cents != null && (
+            <span className="shrink-0 text-muted-foreground tabular-nums">{formatMXN(i.unit_price_cents * i.qty)}</span>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function BarraAbonos({ abonado, total, detalle }: { abonado: number; total: number; detalle?: string }) {
+  const pct = total > 0 ? Math.min(100, Math.round((abonado / total) * 100)) : 0;
+  return (
+    <div>
+      <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+        <div className="h-full rounded-full bg-emerald-500" style={{ width: `${pct}%` }} />
+      </div>
+      <p className="mt-1.5 text-[13px] text-foreground/80 tabular-nums">
+        Abonó {formatMXN(abonado)} de {formatMXN(total)}
+        {detalle && ` · ${detalle}`}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * A note on a phone. The row it replaces put name, balance and three buttons
+ * on one line, so the name, the pieces and who sold it were cut to "ho…" —
+ * exactly what the counter needs to read before collecting. Here each gets its
+ * own line and nothing truncates.
+ */
+function TarjetaNota({
+  loan,
+  pie,
+  onAbrir,
+  onCobrar,
+  compacta,
+}: {
+  loan: Loan;
+  pie: PieNota;
+  onAbrir: () => void;
+  onCobrar: () => void;
+  compacta: boolean;
+}) {
+  const dias = diasDe(loan.created_at);
+  const falta = restaDe(loan);
+  const sinCliente = !loan.cliente || loan.cliente.is_system;
+  const tel = !sinCliente ? (loan.cliente?.telefono ?? null) : null;
+  const ultimo = [...loan.abonos].sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
+
+  return (
+    <div
+      className={cn(
+        "space-y-3 rounded-2xl border p-3.5 sm:hidden",
+        compacta
+          ? "rounded-xl border-border/70 bg-muted/30 p-3"
+          : dias >= 15
+            ? "border-red-200 bg-red-50/40 dark:border-red-900/70 dark:bg-red-950/20"
+            : dias >= 7
+              ? "border-amber-200 bg-amber-50/40 dark:border-amber-900/70 dark:bg-amber-950/20"
+              : "border-border bg-background",
+      )}
+    >
+      <button type="button" onClick={onAbrir} className="flex w-full cursor-pointer items-start gap-3 text-left">
+        <span className="min-w-0 flex-1">
+          {compacta ? (
+            <span className="block text-sm font-semibold">
+              {fechaCorta(loan.created_at)} · {haceDias(dias).toLowerCase()}
+            </span>
+          ) : (
+            <>
+              <span className="block text-[17px] leading-snug font-semibold break-words">{quienDebe(loan)}</span>
+              <span className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                <span
+                  className={cn(
+                    "rounded-full px-2 py-0.5 text-xs font-semibold",
+                    dias >= 15
+                      ? "bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-300"
+                      : dias >= 7
+                        ? "bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300"
+                        : "bg-muted text-foreground/80",
+                  )}
+                >
+                  {haceDias(dias)}
+                </span>
+                {sinCliente && (
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">
+                    Sin cliente · seña
+                  </span>
+                )}
+              </span>
+            </>
+          )}
+        </span>
+        <span className="shrink-0 text-right">
+          <span className="block text-[11px] text-muted-foreground">Resta</span>
+          <span
+            className={cn(
+              "block font-bold tabular-nums",
+              compacta ? "text-[17px]" : "text-[22px]",
+              !compacta && dias >= 15 && "text-red-700 dark:text-red-400",
+            )}
+          >
+            {formatMXN(falta)}
+          </span>
+        </span>
+      </button>
+
+      <Piezas items={loan.sale_items} />
+
+      {loan.pagado_cents > 0 && (
+        <BarraAbonos
+          abonado={loan.pagado_cents}
+          total={loan.total_cents}
+          detalle={ultimo ? `último ${fechaCorta(ultimo.created_at)}${ultimo.quien ? `, ${ultimo.quien}` : ""}` : undefined}
+        />
+      )}
+
+      <p className="flex items-center gap-2 text-[13px] text-foreground/80">
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-soft text-[11px] font-bold text-brand-foreground">
+          {(loan.vendedor ?? "?").charAt(0).toUpperCase()}
+        </span>
+        <span className="min-w-0">
+          Lo metió <b className="font-semibold text-foreground">{loan.vendedor ?? "—"}</b> · {fechaHora(loan.created_at)}
+        </span>
+      </p>
+
+      <div className="flex gap-2">
+        <Button className="h-11 flex-1" onClick={onCobrar}>
+          Cobrar
+        </Button>
+        <Button variant="secondary" className="h-11 flex-1" onClick={onAbrir}>
+          Abonar
+        </Button>
+        {tel && !compacta && (
+          <Button
+            variant="secondary"
+            className="h-11 w-11 shrink-0 px-0"
+            aria-label={`Recordar a ${quienDebe(loan)} por WhatsApp`}
+            onClick={() => window.open(waLink(tel, textoRecordatorio(loan)), "_blank")}
+          >
+            <MessageCircle className="h-4 w-4 text-emerald-600" />
+          </Button>
+        )}
+        <Button
+          variant="secondary"
+          className="h-11 w-11 shrink-0 px-0"
+          aria-label={`Reimprimir ticket de ${quienDebe(loan)}`}
+          onClick={() => imprimirTicketNavegador(ticketDeNota(loan, pie))}
+        >
+          <Printer className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
   );
 }
 
@@ -407,7 +586,42 @@ function Grupo({
 
   return (
     <div className="space-y-2.5 rounded-2xl border border-border p-3.5 sm:p-4">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+      <div className="space-y-3 sm:hidden">
+        <div className="flex items-start gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-[17px] leading-snug font-semibold break-words">{nombre}</p>
+            <p className="mt-1.5 flex flex-wrap gap-1.5">
+              <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-foreground/80">
+                {notas.length} notas
+              </span>
+              <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-foreground/80">
+                La más vieja, {edad(dias)}
+              </span>
+            </p>
+          </div>
+          <div className="shrink-0 text-right">
+            <p className="text-[11px] text-muted-foreground">Debe en total</p>
+            <p className="text-[22px] font-bold tabular-nums">{formatMXN(total)}</p>
+          </div>
+        </div>
+        {abonado > 0 && <BarraAbonos abonado={abonado} total={suma} />}
+        <div className="flex gap-2">
+          <Button variant="secondary" className="h-11 flex-1" onClick={() => onAbrir(notas[0])}>
+            Estado de cuenta
+          </Button>
+          {tel && (
+            <Button
+              variant="secondary"
+              className="h-11 w-11 shrink-0 px-0"
+              aria-label={`Recordar a ${nombre} por WhatsApp`}
+              onClick={() => window.open(waLink(tel, textoRecordatorio(notas[0])), "_blank")}
+            >
+              <MessageCircle className="h-4 w-4 text-emerald-600" />
+            </Button>
+          )}
+        </div>
+      </div>
+      <div className="hidden flex-wrap items-center gap-x-4 gap-y-3 sm:flex">
         <div className="min-w-0 flex-1">
           <p className="flex flex-wrap items-center gap-2">
             <span className="truncate font-semibold">{nombre}</span>
