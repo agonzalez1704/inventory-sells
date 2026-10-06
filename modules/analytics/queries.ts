@@ -271,7 +271,7 @@ export async function estadoInventario() {
   };
 }
 
-export async function buscarProducto(q: string) {
+export async function buscarProducto(q: string, limite = 15) {
   // The WhatsApp agent calls this several times per message — the forced
   // product lookup, then again per word while resolving a name to a SKU, then
   // once per compatible model. Loading the whole products table each time was
@@ -297,7 +297,7 @@ export async function buscarProducto(q: string) {
   ]);
   const ps = (data ?? []) as ProductRow[];
   return searchProducts(ps, q, {
-    limit: 15,
+    limit: limite,
     // In-stock first, then alphabetical — so the agent leads with what's sellable.
     tieBreak: (a, b) =>
       Number(b.quantity > 0) - Number(a.quantity > 0) || a.name.localeCompare(b.name),

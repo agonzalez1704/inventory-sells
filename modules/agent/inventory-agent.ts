@@ -3,6 +3,7 @@ import { generateText, tool, stepCountIs } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { z } from "zod";
 import { buscarProducto } from "@/modules/analytics/queries";
+import { PALABRAS_TIPO, soloModeloExacto } from "@/lib/search";
 import { getNegocioInfo } from "@/modules/config/lib";
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { MARCA } from "@/lib/marca";
@@ -290,7 +291,22 @@ Este número no está en el registro de clientes.
               q = q.replace(/\b\d{2}\b(?!\S)/, " ").replace(/\s+/g, " ").trim();
             }
           }
-          const rows = await buscarProducto(q || consulta);
+          // Wide on purpose: the exact-model filter below runs on these, and a
+          // cut at 15 let "13 Pro / Pro Max / Mini" crowd out the plain 13.
+          let rows = await buscarProducto(q || consulta, 80);
+          // "Display de Pixel 8": the word for the part type has to match the
+          // row's category, and a screen saved without one vanished behind it.
+          // Before saying there is none, look again by model alone.
+          if (rows.length === 0 && PALABRAS_TIPO.test(q || consulta)) {
+            const sinTipo = (q || consulta).replace(PALABRAS_TIPO, " ").replace(/\s+/g, " ").trim();
+            if (sinTipo) rows = await buscarProducto(sinTipo, 80);
+          }
+          PALABRAS_TIPO.lastIndex = 0;
+          // Only the exact model asked about: "iPhone 16" is not the 16 Pro.
+          // When the exact one does not exist, the variants stay, labeled.
+          const exactos = soloModeloExacto(rows, q || consulta, (r) => r.nombre);
+          const soloVariantes = exactos === null && rows.length > 0 && /\d/.test(q || consulta);
+          if (exactos) rows = exactos;
           // Too broad (brand/category, not a specific model): don't dump a list —
           // tell the agent to ask the customer for the exact model. A CONCRETE
           // model easily has ~10 rows (12/12 Pro/Mini/Pro Max × qualities), so the
@@ -348,6 +364,15 @@ Este número no está en el registro de clientes.
           const notaAnio = anioPedido
             ? `El cliente busca año ${anioPedido}: verifica que caiga dentro del rango de "compatible_con" de cada pieza antes de afirmar que le queda. Si cae fuera, dilo y ofrece que un asesor lo verifique.`
             : null;
+          if (soloVariantes) {
+            return {
+              items,
+              nota: [
+                "Ninguno es EXACTAMENTE el modelo que pidió el cliente: son variantes distintas (Pro, Plus, Max, E…). Dile que ese modelo exacto no lo tienes y ofrécele estas aclarando que son de OTRO modelo, nunca como si fueran el suyo.",
+                notaAnio,
+              ].filter(Boolean).join(" "),
+            };
+          }
           if (hayAgotados && hayDisponibles) {
             return {
               items,

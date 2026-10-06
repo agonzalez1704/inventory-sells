@@ -273,3 +273,57 @@ export function searchProducts<T extends Searchable>(
   const out = scored.map((s) => s.item);
   return opts?.limit ? out.slice(0, opts.limit) : out;
 }
+
+// Words that make a DIFFERENT model: an iPhone 16 Pro is not an iPhone 16.
+const VARIANTES = new Set(["pro", "max", "plus", "mini", "ultra", "lite", "fe", "core", "neo", "play", "power"]);
+// Single letters that are a variant only right after a model number: 16 E, A02 S.
+const VARIANTES_LETRA = new Set(["e", "s"]);
+
+// "+" is how this catalog writes Plus ("E4 +", "NOTE 13 PRO + 5G"), and a model
+// glued to its number or letter ("16e", "A02S", "iph16pro") reads apart.
+function piezasModelo(s: string): string[] {
+  return normalize(s.replace(/\+/g, " plus "))
+    .replace(/([a-z])(\d)/g, "$1 $2")
+    .replace(/(\d)([a-z])/g, "$1 $2")
+    .split(" ")
+    .filter(Boolean);
+}
+
+function variantesDe(tokens: string[]): Set<string> {
+  const out = new Set<string>();
+  tokens.forEach((t, i) => {
+    if (VARIANTES.has(t)) out.add(t);
+    else if (VARIANTES_LETRA.has(t) && i > 0 && /^\d+$/.test(tokens[i - 1])) out.add(t);
+  });
+  return out;
+}
+
+/**
+ * Only the products for exactly the model asked about.
+ *
+ * The search matches "16" against every name holding a 16, so "pantalla de
+ * iPhone 16" came back with 16 E, 16 Plus, 16 Pro and 16 Pro Max — different
+ * phones, different prices — and the agent listed them all. A row counts when
+ * one of its "/"-separated models has the asked numbers and exactly the asked
+ * variant words: "16/16 Plus" is an iPhone 16 part, "16 Pro" is not.
+ *
+ * null when the query names no model number or nothing matches exactly; the
+ * caller decides what to say then.
+ */
+export function soloModeloExacto<T>(rows: T[], consulta: string, nombre: (r: T) => string): T[] | null {
+  const q = piezasModelo(consulta);
+  const numeros = q.filter((t) => /^\d+$/.test(t));
+  if (!numeros.length) return null;
+  const pedidas = variantesDe(q);
+  const exactos = rows.filter((r) =>
+    nombre(r).split("/").some((seg) => {
+      const t = piezasModelo(seg);
+      const v = variantesDe(t);
+      return numeros.every((n) => t.includes(n)) && v.size === pedidas.size && [...v].every((x) => pedidas.has(x));
+    }),
+  );
+  return exactos.length ? exactos : null;
+}
+
+/** Product-type nouns a customer says that an uncategorized row cannot match. */
+export const PALABRAS_TIPO = /\b(pantallas?|displays?|modulos?|módulos?)\b/gi;
