@@ -77,6 +77,7 @@ const NOTA_ENLACE =
 const REGLAS_CELULARES = `- Si el cliente pregunta EN GENERAL (una marca o tipo SIN modelo, p. ej. "¿manejas pantallas de Xiaomi?"), o si la herramienta responde "demasiados", NO listes productos: confirma corto que SÍ y pregunta el MODELO. Ej: "¡Sí! ¿Qué modelo de Xiaomi buscas?".
 - Solo da disponibilidad detallada cuando el cliente dé un MODELO concreto (pocas coincidencias). NUNCA mandes listas largas.
 - Si aún no lo encuentras, usa buscar_compatibilidad: muchas pantallas sirven para VARIOS modelos. Si hay una pantalla compatible disponible, ofrécela y explica la compatibilidad.
+- EL NOMBRE ES EL DEL CATÁLOGO: nombra cada producto EXACTAMENTE como viene en "nombre". PROHIBIDO agregarle palabras que no traiga (versión, calidad, "diagnóstico", "original"). Si el cliente pide una versión que no aparece en los resultados, dile que ESA versión no la tienes y ofrécele la que sí.
 - EL MODELO EXACTO IMPORTA: "12", "12 Mini", "12 Pro" y "12 Pro Max" son productos DISTINTOS con precios distintos. PROHIBIDO dar el precio de una variante como si fuera otra. Cada precio va amarrado al nombre del producto tal como viene en "nombre".`;
 
 const REGLAS_AUTOPARTES = `- TU PÚBLICO SON MECÁNICOS: hablan coloquial, con modismos, y NO saben SKUs, códigos ni nombres técnicos. PROHIBIDO pedir "el SKU", "el código", "el modelo exacto" o "el nombre técnico" — lo único que puedes preguntar es: qué pieza, para qué carro y de qué año.
@@ -213,7 +214,9 @@ Este número no está en el registro de clientes.
   // before it can answer with real prices.
   const requiereBusquedaDeProducto = (ES_AUTOPARTES
     ? /\b(amortiguador|balata|suspensi[oó]n|ret[eé]n|buje|terminal|horquilla|clutch|bomba|birlo|maza|soporte|banda|radiador|cremallera|rodamiento|junta|tornillo|estabilizador|cubre ?polvo|mango|base|tsuru|jetta|aveo|versa|sentra|spark|march|vento|golf|pointer|chevy|nissan|volkswagen|chevrolet|toyota|honda|ford|renault|kia|hyundai|mazda|precios?|cu[aá]nto|cuestan?|valen?|vale)\b/i
-    : /\b(display|pantalla|bateria|batería|cargador|mica|flex|camara|cámara|moto|motorola|iphone|samsung|xiaomi|redmi|huawei|honor|oppo|realme|zte|precios?|cu[aá]nto|cuestan?|valen?|vale)\b/i
+    // Quality words too: "diagnóstico" or "oled" alone answers a list the
+    // model gave, and without a search it invents the product it names.
+    : /\b(display|pantalla|bateria|batería|cargador|mica|flex|camara|cámara|moto|motorola|iphone|samsung|xiaomi|redmi|huawei|honor|oppo|realme|zte|diagn[oó]stico|oled|incell|original|org|lcd|precios?|cu[aá]nto|cuestan?|valen?|vale)\b/i
   ).test(ultimoMensaje);
   // A goodbye triggers no tool on its own, so the model answers from the
   // text-only history — where the folio and link don't exist. A customer who
@@ -698,9 +701,26 @@ Este número no está en el registro de clientes.
       /^https?:\/\//.test(u) ? u : t,
     );
 
+  // A link the model wrote without having one — "[enlace de cotización]",
+  // "<enlace>" — must never reach the customer. Put the real one in when the
+  // quote exists; otherwise drop that line.
+  const RELLENO = /\[[^\]\n]*\b(enlace|link|url)\b[^\]\n]*\]|<\s*(enlace|link|url)[^>\n]*>/gi;
+  let final = sinMarkdown;
+  if (RELLENO.test(final)) {
+    const pedido = await cargarPedido(telefono);
+    final = pedido.shareToken
+      ? final.replace(RELLENO, urlCotizacion(pedido.shareToken))
+      : final
+          .split("\n")
+          .filter((l) => !new RegExp(RELLENO.source, "i").test(l))
+          .join("\n")
+          .replace(/\n{3,}/g, "\n\n")
+          .trim();
+  }
+
   return {
     texto:
-      sinMarkdown ||
+      final ||
       "Perdón, no pude encontrar esa información. ¿Me das el modelo o SKU exacto?",
     escalar,
   };
