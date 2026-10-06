@@ -70,6 +70,10 @@ async function modelosCompatibles(modelo: string): Promise<string[]> {
   }
 }
 
+// The link rule keys on whether the CUSTOMER has seen it in THIS conversation.
+const NOTA_ENLACE =
+  "Revisa TU historial de esta conversación: si NO le has enviado todavía el enlace de la cotización, pega el valor de \"url\" al FINAL de tu respuesta, tal cual, pelón, SIN corchetes ni [texto](url) — el cliente necesita verlo al menos una vez. Si ya se lo mandaste antes en esta misma conversación, no lo repitas. Luego pregunta si sería algo más.";
+
 const REGLAS_CELULARES = `- Si el cliente pregunta EN GENERAL (una marca o tipo SIN modelo, p. ej. "¿manejas pantallas de Xiaomi?"), o si la herramienta responde "demasiados", NO listes productos: confirma corto que SÍ y pregunta el MODELO. Ej: "¡Sí! ¿Qué modelo de Xiaomi buscas?".
 - Solo da disponibilidad detallada cuando el cliente dé un MODELO concreto (pocas coincidencias). NUNCA mandes listas largas.
 - Si aún no lo encuentras, usa buscar_compatibilidad: muchas pantallas sirven para VARIOS modelos. Si hay una pantalla compatible disponible, ofrécela y explica la compatibilidad.
@@ -138,7 +142,8 @@ Datos del negocio (envíos, pagos, transferencia, Uber, ubicación, horario):
 - Responde SOLO con la "Información del negocio" de abajo. Si la pregunta no está cubierta ahí, di que un asesor lo confirma; no inventes.
 
 Cotización VIVA (el pedido del cliente ES una cotización real desde el primer precio):
-- En cuanto des precio de producto(s) CONCRETOS disponibles (uno por modelo, sin ambigüedad de calidad), en ese MISMO turno usa agregar_al_pedido con esos SKU (qty 1 salvo que diga otra cosa). La primera vez esto crea su cotización: incluye el enlace AL FINAL de esa misma respuesta ("Aquí puedes ver tu cotización: <enlace>") y pregunta si sería algo más.
+- Todo producto CONCRETO que tengamos y por el que pregunte va a su cotización SIN preguntarle. Cuando buscar_producto encuentra uno solo, ya lo agrega por ti (verás "agregado"); si dio opciones y el cliente eligió, usa agregar_al_pedido en ese MISMO turno (qty 1 salvo que diga otra cosa). La primera vez esto crea su cotización: incluye el enlace AL FINAL de esa misma respuesta ("Aquí puedes ver tu cotización: <enlace>") y pregunta si sería algo más.
+- PROHIBIDO preguntar "¿quieres agregarlo a tu cotización?", "¿lo agrego?" o similar: suena a robot. Un vendedor de mostrador solo lo anota. Si no lo quiere, él te lo dirá y lo quitas con quitar_del_pedido.
 - NO agregues cuando lo que diste fue una LISTA de opciones/calidades y le preguntaste cuál quiere: espera su elección y entonces agrega la elegida.
 - La cotización se edita en todo momento con el MISMO enlace: más productos → agregar_al_pedido; cambia cantidad → agregar_al_pedido con la cantidad TOTAL nueva; ya no quiere algo → quitar_del_pedido; pregunta qué lleva o pide el enlace → ver_pedido.
 - El enlace se comparte la PRIMERA vez que lo agregas algo en esta conversación, cuando lo pida, y al cierre. Después no lo repitas en cada mensaje. Regla simple: el cliente debe haber visto su enlace al menos una vez en esta conversación.
@@ -364,6 +369,37 @@ Este número no está en el registro de clientes.
           const notaAnio = anioPedido
             ? `El cliente busca año ${anioPedido}: verifica que caiga dentro del rango de "compatible_con" de cada pieza antes de afirmar que le queda. Si cae fuera, dilo y ofrece que un asesor lo verifique.`
             : null;
+          // One concrete product we have goes into the quote now. Asking "¿te
+          // gustaría agregarlo a tu cotización?" is the line that gives the
+          // agent away — a person at the counter just writes it down.
+          const vendibles = items.filter((i) => i.disponible && i.precio_mxn > 0);
+          if (exactos && vendibles.length === 1) {
+            const elegido = vendibles[0];
+            const previo = await cargarPedido(telefono);
+            // Already in the quote: leave its quantity alone (qty is a TOTAL).
+            const sync = previo.items.some((i) => i.sku === elegido.sku)
+              ? null
+              : await agregarACotizacion(telefono, [{ sku: elegido.sku, qty: 1 }]);
+            if (!sync || !("error" in sync)) {
+              const pedido = sync ? await cargarPedido(telefono) : previo;
+              if (sync?.creada && pedido.cotizacionId) {
+                await notifyCotizacionSinAsignar(pedido.cotizacionId, "agente_whatsapp");
+              }
+              return {
+                items,
+                agregado: elegido.nombre,
+                pedido: pedido.items.map((i) => ({ nombre: i.nombre, qty: i.qty, unit_mxn: i.unit_mxn })),
+                total_mxn: pedido.items.reduce((t, i) => t + i.unit_mxn * i.qty, 0),
+                ...(sync ? { folio: sync.folio, url: sync.url } : {}),
+                nota: [
+                  `YA agregué "${elegido.nombre}" (1 pieza) a su cotización. Dale el precio y dile que ya va en su cotización. NO le preguntes si quiere agregarlo.`,
+                  hayAgotados ? "Si lo que pidió exactamente está agotado, dilo." : null,
+                  sync ? NOTA_ENLACE : "Pregunta si sería algo más.",
+                  notaAnio,
+                ].filter(Boolean).join(" "),
+              };
+            }
+          }
           if (soloVariantes) {
             return {
               items,
@@ -476,7 +512,7 @@ Este número no está en el registro de clientes.
           const nota =
             "error" in sync
               ? "NO menciones ningún enlace en esta respuesta. Confirma lo agregado y pregunta si sería algo más."
-              : "Revisa TU historial de esta conversación: si NO le has enviado todavía el enlace de la cotización, pega el valor de \"url\" al FINAL de tu respuesta, tal cual, pelón, SIN corchetes ni [texto](url) — el cliente necesita verlo al menos una vez. Si ya se lo mandaste antes en esta misma conversación, no lo repitas. Luego pregunta si sería algo más.";
+              : NOTA_ENLACE;
           if (!("error" in sync) && sync.creada && pedido.cotizacionId) {
             // A new quote IS a lead: ping sellers once, at creation.
             await notifyCotizacionSinAsignar(pedido.cotizacionId, "agente_whatsapp");
