@@ -68,7 +68,9 @@ export async function subirImagenProducto(
     const ext = MIME_EXT[file.type];
     if (!ext) throw new Error("Formato no válido (usa JPG, PNG o WebP)");
 
-    const key = `products/${productId}.${ext}`;
+    // Unique per upload: a swapped main photo keeps living in the gallery under
+    // its old key, so a fixed key here would delete it out from under it.
+    const key = `products/${productId}-${Date.now()}.${ext}`;
     // Replacing: drop the old object first (upload doesn't overwrite). Also
     // clear a prior key with a different extension, or it lingers orphaned.
     const { data: prev } = await insforgeAdmin.database
@@ -128,13 +130,24 @@ export async function quitarImagenProducto(
         .catch(() => {});
     }
 
+    // The next photo in line becomes the main one: a product that still has
+    // photos never shows up faceless on the cards and the store.
+    const { data: siguiente } = await insforgeAdmin.database
+      .from("product_images")
+      .select("id, url, key")
+      .eq("product_id", productId)
+      .order("orden", { ascending: true })
+      .limit(1);
+    const sig = ((siguiente ?? []) as { id: string; url: string; key: string }[])[0] ?? null;
+
     const insforge = await createInsForgeServerClient();
     const { error } = await insforge.database.rpc("set_product_image", {
       p_product_id: productId,
-      p_url: null,
-      p_key: null,
+      p_url: sig?.url ?? null,
+      p_key: sig?.key ?? null,
     });
     if (error) throw new Error(error.message ?? "No se pudo quitar la imagen");
+    if (sig) await insforgeAdmin.database.from("product_images").delete().eq("id", sig.id);
     updateTag("tienda");
     return null;
   });
@@ -286,6 +299,134 @@ export async function setEnlaceProveedor(
       .update({ enlace_proveedor: url.trim() || null })
       .eq("id", productId);
     if (error) throw new Error(error.message ?? "No se pudo guardar el enlace");
+    return null;
+  });
+}
+
+const MAX_FOTOS = 8;
+
+export type FotosProducto = {
+  principal: string | null;
+  extras: { id: string; url: string }[];
+};
+
+/** The main photo plus the extra views, in order — what the photo editor shows. */
+export async function fotosProducto(productId: string): Promise<FotosProducto> {
+  const { userId } = await auth();
+  if (!userId) return { principal: null, extras: [] };
+  const [{ data: prod }, { data: gal }] = await Promise.all([
+    insforgeAdmin.database.from("products").select("image_url").eq("id", productId).maybeSingle(),
+    insforgeAdmin.database
+      .from("product_images")
+      .select("id, url, orden")
+      .eq("product_id", productId)
+      .order("orden", { ascending: true }),
+  ]);
+  return {
+    principal: (prod as { image_url: string | null } | null)?.image_url ?? null,
+    extras: ((gal ?? []) as { id: string; url: string }[]).map((g) => ({ id: g.id, url: g.url })),
+  };
+}
+
+/**
+ * One more photo of a product. The first one becomes the main photo — every
+ * card, row and cart reads that column — and the rest go to the gallery the
+ * store and the product panel already show.
+ */
+export async function agregarFotoProducto(
+  productId: string,
+  form: FormData,
+): Promise<ActionResult<{ url: string; principal: boolean }>> {
+  return attempt("agregarFotoProducto", async () => {
+    const { userId } = await auth();
+    if (!userId) throw new Error("No autenticado");
+
+    const actuales = await fotosProducto(productId);
+    if (!actuales.principal) {
+      const r = await subirImagenProducto(productId, form);
+      if (!r.ok) throw new Error(r.error);
+      return { url: r.data.url, principal: true };
+    }
+    if (1 + actuales.extras.length >= MAX_FOTOS) throw new Error(`Máximo ${MAX_FOTOS} fotos por producto`);
+
+    const file = form.get("file");
+    if (!(file instanceof File)) throw new Error("Falta la imagen");
+    if (file.size === 0) throw new Error("Imagen vacía");
+    if (file.size > MAX_BYTES) throw new Error("La imagen pesa más de 5 MB");
+    const ext = MIME_EXT[file.type];
+    if (!ext) throw new Error("Formato no válido (usa JPG, PNG o WebP)");
+
+    const key = `products/${productId}/extra-${crypto.randomUUID()}.${ext}`;
+    const { data, error } = await insforgeAdmin.storage.from(BUCKET).upload(key, file);
+    if (error || !data) throw new Error(error?.message ?? "No se pudo subir");
+
+    const { data: ult } = await insforgeAdmin.database
+      .from("product_images")
+      .select("orden")
+      .eq("product_id", productId)
+      .order("orden", { ascending: false })
+      .limit(1);
+    const orden = Number(((ult ?? []) as { orden: number }[])[0]?.orden ?? -1) + 1;
+    const { error: insErr } = await insforgeAdmin.database
+      .from("product_images")
+      .insert([{ product_id: productId, url: data.url, key: data.key, orden }]);
+    if (insErr) {
+      await insforgeAdmin.storage.from(BUCKET).remove(data.key).catch(() => {});
+      throw new Error(insErr.message ?? "No se pudo guardar la foto");
+    }
+    updateTag("tienda");
+    return { url: data.url, principal: false };
+  });
+}
+
+/** Take one extra photo out of the gallery (the main photo has its own action). */
+export async function quitarFotoExtra(imageId: string): Promise<ActionResult<null>> {
+  return attempt("quitarFotoExtra", async () => {
+    const { userId } = await auth();
+    if (!userId) throw new Error("No autenticado");
+    const { data } = await insforgeAdmin.database
+      .from("product_images")
+      .select("key")
+      .eq("id", imageId)
+      .maybeSingle();
+    const key = (data as { key: string } | null)?.key;
+    if (key) await insforgeAdmin.storage.from(BUCKET).remove(key).catch(() => {});
+    const { error } = await insforgeAdmin.database.from("product_images").delete().eq("id", imageId);
+    if (error) throw new Error(error.message ?? "No se pudo quitar la foto");
+    updateTag("tienda");
+    return null;
+  });
+}
+
+/** Swap an extra photo with the main one: the old main joins the gallery. */
+export async function hacerFotoPrincipal(productId: string, imageId: string): Promise<ActionResult<null>> {
+  return attempt("hacerFotoPrincipal", async () => {
+    const { userId } = await auth();
+    if (!userId) throw new Error("No autenticado");
+    const db = insforgeAdmin.database;
+    const [{ data: img }, { data: prod }] = await Promise.all([
+      db.from("product_images").select("id, url, key, orden").eq("id", imageId).eq("product_id", productId).maybeSingle(),
+      db.from("products").select("image_url, image_key").eq("id", productId).maybeSingle(),
+    ]);
+    const nueva = img as { id: string; url: string; key: string; orden: number } | null;
+    if (!nueva) throw new Error("Esa foto ya no existe");
+    const vieja = prod as { image_url: string | null; image_key: string | null } | null;
+
+    const insforge = await createInsForgeServerClient();
+    const { error } = await insforge.database.rpc("set_product_image", {
+      p_product_id: productId,
+      p_url: nueva.url,
+      p_key: nueva.key,
+    });
+    if (error) throw new Error(error.message ?? "No se pudo cambiar la foto principal");
+
+    // The old main takes the promoted photo's place in the gallery.
+    if (vieja?.image_url && vieja.image_key) {
+      await db.from("product_images").update({ url: vieja.image_url, key: vieja.image_key }).eq("id", nueva.id);
+    } else {
+      await db.from("product_images").delete().eq("id", nueva.id);
+    }
+    updateTag("tienda");
     return null;
   });
 }

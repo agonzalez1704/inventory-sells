@@ -230,7 +230,7 @@ export function PanelProducto({
                         onFoto({ id: p.id, name: p.name, image_url: p.image_url });
                       }}
                     >
-                      {p.image_url ? "Cambiar foto" : "Agregar foto"}
+                      {p.image_url ? "Fotos" : "Agregar fotos"}
                     </MenuItem>
                     {puedeGestionar && (
                       <MenuItem icon={Copy} onClick={duplicar}>
