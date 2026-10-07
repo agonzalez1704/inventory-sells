@@ -16,7 +16,7 @@ const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 const MODEL = process.env.OPENAI_COMPAT_MODEL ?? "gpt-4.1-mini";
 
 // Bump when the model or prompt changes so stale cached answers are ignored.
-const CACHE_VERSION = "v4";
+const CACHE_VERSION = "v5";
 
 export type Compat = {
   modelos: string[];
@@ -36,28 +36,22 @@ const SIN_DATOS: Compat = { modelos: [], nota: null, fallo: false };
 /** We never got an answer. Callers must not cache or present this as "none". */
 const FALLO: Compat = { modelos: [], nota: null, fallo: true };
 
-const SYSTEM = `Eres experto en refacciones/pantallas de celular en México. BUSCA EN LA WEB.
-Los proveedores de pantallas agrupan modelos que usan EXACTAMENTE el mismo display
-(mismo panel y flex), aunque el fabricante no lo documente — a veces con el mismo
-número de parte/código. Tu trabajo es devolver ese grupo de compatibilidad de
-REFACCIÓN.
+const SYSTEM = `Eres experto en refacciones de celular en México. Usa la búsqueda web.
+Tu trabajo: decir qué OTROS modelos usan EXACTAMENTE la misma pantalla (mismo panel y
+flex) que el modelo dado, según listados de proveedores de refacciones ("pantalla
+compatible con", "display para X / Y / Z", el mismo número de parte).
 
 Reglas:
-- Incluye submodelos y equivalencias entre marcas/series que compartan pantalla
-  (ej. Honor X7b comparte display con Honor 90 Smart y Honor 20 Smart; Redmi/Poco
-  suelen compartir).
-- Apóyate en listados de proveedores: "pantalla compatible con", "display
-  compatible", el código de la placa (ej. CLK-LX1/2/3).
+- Cada modelo que incluyas DEBE llevar la URL de la página donde lo leíste. Sin
+  fuente, no lo incluyas.
+- Mismo tamaño o misma familia NO basta: un Galaxy Note 20 Ultra NO comparte
+  pantalla con un S20 Ultra. Ante la duda, no lo incluyas. Una lista vacía es una
+  respuesta correcta y frecuente.
 - Nombre comercial completo con marca. Máximo 8. No incluyas el propio modelo.
-- SOLO incluye un modelo si encontraste un listado de proveedor que diga que usa
-  EXACTAMENTE la misma pantalla. Mismo tamaño o misma familia NO basta: un Galaxy
-  Note 20 Ultra NO comparte pantalla con un S20 Ultra. Ante la duda, NO lo incluyas.
-- Una lista vacía es una respuesta correcta y frecuente: la mayoría de los modelos
-  de gama alta no comparten pantalla con ningún otro.
 - "nota" = una frase corta con la razón (sin URLs).
 
 Responde ÚNICAMENTE con JSON válido, sin texto antes ni después, sin markdown:
-{"modelos": ["Marca Modelo", ...], "nota": "..."}`;
+{"modelos": [{"modelo": "Marca Modelo", "fuente": "https://..."}], "nota": "..."}`;
 
 /** null = couldn't read an answer out of the response (caller treats as failure). */
 function parse(text: string): Compat | null {
@@ -71,12 +65,23 @@ function parse(text: string): Compat | null {
       modelos?: unknown;
       nota?: unknown;
     };
+    // A model without the page it was read on is a guess: dropped.
     const modelos = Array.isArray(json.modelos)
-      ? json.modelos
-          .filter((m): m is string => typeof m === "string" && m.trim().length > 1)
-          // Strip any trailing "(code)" the model adds, keep the model name.
-          .map((m) => m.replace(/\s*\([^)]*\)\s*$/, "").trim())
-          .slice(0, 8)
+      ? [
+          ...new Set(
+            json.modelos
+              .filter(
+                (m): m is { modelo: string; fuente: string } =>
+                  !!m &&
+                  typeof m === "object" &&
+                  typeof (m as { modelo?: unknown }).modelo === "string" &&
+                  /^https?:\/\//.test(String((m as { fuente?: unknown }).fuente ?? "")),
+              )
+              // Strip any trailing "(code)" the model adds, keep the model name.
+              .map((m) => m.modelo.replace(/\s*\([^)]*\)\s*$/, "").trim())
+              .filter((m) => m.length > 1),
+          ),
+        ].slice(0, 8)
       : [];
     const nota = typeof json.nota === "string" ? json.nota.trim() : null;
     return { modelos, nota, fallo: false };
@@ -119,14 +124,18 @@ export async function modelosCompatibles(query: string): Promise<Compat> {
       // passed straight through to the same provider that made it.
       tools: {
         web_search: openai.tools.webSearch({
-          searchContextSize: "medium",
+          searchContextSize: "high",
           userLocation: { type: "approximate", country: "MX" },
         }),
       } as unknown as Parameters<typeof generateText>[0]["tools"],
+      // Offered, the search was skipped and the answer came from memory. Forced
+      // — and phrased the way a technician searches — it lands on supplier
+      // listings.
+      toolChoice: { type: "tool", toolName: "web_search" },
       system: SYSTEM,
-      prompt: `Modelo buscado: "${query}"`,
+      prompt: `pantalla compatible ${query}: ¿qué otros modelos usan el mismo display?`,
       temperature: 0.2,
-      maxOutputTokens: 600, // web-grounded answers include more reasoning
+      maxOutputTokens: 800, // every model now carries its source URL
       abortSignal: AbortSignal.timeout(25_000), // web search is slower
     });
     result = parse(text);

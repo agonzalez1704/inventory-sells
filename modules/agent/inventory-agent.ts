@@ -5,6 +5,7 @@ import { z } from "zod";
 import { buscarProducto } from "@/modules/analytics/queries";
 import { PALABRAS_TIPO, soloModeloExacto } from "@/lib/search";
 import { modelosCompatibles } from "@/lib/compat";
+import { anotarDemandaAgente } from "@/modules/demanda/agente";
 import { getNegocioInfo } from "@/modules/config/lib";
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { MARCA } from "@/lib/marca";
@@ -293,6 +294,23 @@ Este número no está en el registro de clientes.
           const exactos = soloModeloExacto(rows, q || consulta, (r) => r.nombre);
           const soloVariantes = exactos === null && rows.length > 0 && /\d/.test(q || consulta);
           if (exactos) rows = exactos;
+          // What we could not sell goes on "Piden y no hay", like the counter
+          // writes it down: nothing at all, only other variants, or the exact
+          // model at zero.
+          const pedido = q || consulta;
+          const agotadoExacto = exactos?.length && !exactos.some((r) => r.stock > 0) ? exactos[0] : null;
+          if (rows.length === 0 || soloVariantes || agotadoExacto) {
+            let productId: string | null = null;
+            if (agotadoExacto) {
+              const { data } = await insforgeAdmin.database
+                .from("products")
+                .select("id")
+                .eq("sku", agotadoExacto.sku)
+                .maybeSingle();
+              productId = (data as { id: string } | null)?.id ?? null;
+            }
+            await anotarDemandaAgente({ texto: pedido, telefono, customerId: cliente?.id ?? null, productId });
+          }
           // Too broad (brand/category, not a specific model): don't dump a list —
           // tell the agent to ask the customer for the exact model. A CONCRETE
           // model easily has ~10 rows (12/12 Pro/Mini/Pro Max × qualities), so the
