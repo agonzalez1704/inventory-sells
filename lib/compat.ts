@@ -9,14 +9,14 @@ import { normalize } from "@/lib/search";
 // part, then re-search the catalog with those names.
 
 const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY! });
-// Compatibility is answered from the model's parametric knowledge (no web
-// search on the OpenAI provider). Good for common phones; obscure/very new
-// models may be missed — re-add web grounding via OpenAI's web_search tool if
-// accuracy on new models matters.
-const MODEL = process.env.OPENAI_COMPAT_MODEL ?? "gpt-4o";
+// Grounded in a real web search (OpenAI's web_search tool). From memory alone
+// the model told a customer a Note 20 Ultra screen fits an S20 Ultra — same
+// size class, different panel — and a wrong part is a return and a lost
+// customer, so the answer must come from supplier listings.
+const MODEL = process.env.OPENAI_COMPAT_MODEL ?? "gpt-4.1-mini";
 
 // Bump when the model or prompt changes so stale cached answers are ignored.
-const CACHE_VERSION = "v3";
+const CACHE_VERSION = "v4";
 
 export type Compat = {
   modelos: string[];
@@ -49,7 +49,11 @@ Reglas:
 - Apóyate en listados de proveedores: "pantalla compatible con", "display
   compatible", el código de la placa (ej. CLK-LX1/2/3).
 - Nombre comercial completo con marca. Máximo 8. No incluyas el propio modelo.
-- Solo si de verdad no existe compatibilidad, devuelve lista vacía.
+- SOLO incluye un modelo si encontraste un listado de proveedor que diga que usa
+  EXACTAMENTE la misma pantalla. Mismo tamaño o misma familia NO basta: un Galaxy
+  Note 20 Ultra NO comparte pantalla con un S20 Ultra. Ante la duda, NO lo incluyas.
+- Una lista vacía es una respuesta correcta y frecuente: la mayoría de los modelos
+  de gama alta no comparten pantalla con ningún otro.
 - "nota" = una frase corta con la razón (sin URLs).
 
 Responde ÚNICAMENTE con JSON válido, sin texto antes ni después, sin markdown:
@@ -109,7 +113,16 @@ export async function modelosCompatibles(query: string): Promise<Compat> {
   let result: Compat | null = null;
   try {
     const { text } = await generateText({
-      model: openai(MODEL),
+      model: openai.responses(MODEL),
+      // Cast: @ai-sdk/openai and ai ship different provider-utils versions, so
+      // the provider tool's schema type does not line up; at runtime it is
+      // passed straight through to the same provider that made it.
+      tools: {
+        web_search: openai.tools.webSearch({
+          searchContextSize: "medium",
+          userLocation: { type: "approximate", country: "MX" },
+        }),
+      } as unknown as Parameters<typeof generateText>[0]["tools"],
       system: SYSTEM,
       prompt: `Modelo buscado: "${query}"`,
       temperature: 0.2,

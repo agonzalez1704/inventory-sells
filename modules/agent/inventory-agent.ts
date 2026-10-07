@@ -4,6 +4,7 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { z } from "zod";
 import { buscarProducto } from "@/modules/analytics/queries";
 import { PALABRAS_TIPO, soloModeloExacto } from "@/lib/search";
+import { modelosCompatibles } from "@/lib/compat";
 import { getNegocioInfo } from "@/modules/config/lib";
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { MARCA } from "@/lib/marca";
@@ -45,29 +46,6 @@ function calidadDe(nombre: string): string | null {
   if (/\bAAA\b/.test(n)) return "AAA";
   if (/\bJK\b/.test(n)) return "JK";
   return null;
-}
-
-// Web-search (OpenRouter ":online") lookup of which other phone models share
-// the same display as `modelo`, so we can match the customer's model to a
-// compatible product we actually stock.
-async function modelosCompatibles(modelo: string): Promise<string[]> {
-  const webModel = process.env.OPENAI_WEB_MODEL ?? MODEL;
-  try {
-    const { text } = await generateText({
-      model: openai(webModel),
-      system:
-        "Eres experto en refacciones de celulares. Dado un modelo, lista TODOS los modelos cuyo display/pantalla es físicamente intercambiable (el mismo display sirve en todos), incluyendo equivalencias entre marcas (Oppo, Realme, OnePlus, etc.). Responde SOLO los nombres de los modelos separados por coma, sin explicación ni códigos.",
-      prompt: `Modelos con pantalla compatible/intercambiable con ${modelo}:`,
-      maxOutputTokens: 250,
-    });
-    return text
-      .split(/[,\n]/)
-      .map((s) => s.replace(/^[-*\d.\s]+/, "").trim())
-      .filter((s) => s.length >= 2 && s.length < 40)
-      .slice(0, 12);
-  } catch {
-    return [];
-  }
 }
 
 // The link rule keys on whether the CUSTOMER has seen it in THIS conversation.
@@ -655,12 +633,12 @@ Este número no está en el registro de clientes.
         : {
       buscar_compatibilidad: tool({
         description:
-          "Úsala SOLO cuando buscar_producto no encontró el modelo exacto. Busca en internet con qué otros modelos comparte pantalla y revisa cuáles de esos tenemos en inventario.",
+          "Úsala SOLO cuando buscar_producto no encontró el modelo exacto. Busca en listados de proveedores con qué otros modelos comparte EXACTAMENTE la pantalla y devuelve solo los productos compatibles que TENEMOS.",
         inputSchema: z.object({
           modelo: z.string().describe("modelo del celular, ej: Oppo A79 5G"),
         }),
         execute: async ({ modelo }) => {
-          const compatibles = await modelosCompatibles(modelo);
+          const { modelos: compatibles } = await modelosCompatibles(modelo);
           const vistos = new Set<string>();
           const encontrados: {
             nombre: string;
@@ -668,10 +646,12 @@ Este número no está en el registro de clientes.
             calidad: string | null;
             precio_mxn: number;
             disponible: boolean;
+            compatible_con: string;
           }[] = [];
-          for (const m of [modelo, ...compatibles]) {
-            const rows = await buscarProducto(m);
-            for (const r of rows) {
+          for (const m of compatibles) {
+            const rows = await buscarProducto(m, 80);
+            // Only that exact model: "S20" must not bring the S20 Ultra along.
+            for (const r of soloModeloExacto(rows, m, (x) => x.nombre) ?? []) {
               if (vistos.has(r.nombre)) continue;
               vistos.add(r.nombre);
               encontrados.push({
@@ -680,12 +660,26 @@ Este número no está en el registro de clientes.
                 calidad: calidadDe(r.nombre) ?? calidadDe(r.sku),
                 precio_mxn: r.precio_mxn,
                 disponible: r.stock > 0,
+                compatible_con: m,
               });
               if (encontrados.length >= 8) break;
             }
             if (encontrados.length >= 8) break;
           }
-          return { modelo, modelos_compatibles: compatibles, encontrados };
+          // The list of compatible MODELS never reaches the model: naming one
+          // we don't stock ("es compatible con la del S20 Ultra, ¿la busco?")
+          // is a claim with nothing to sell behind it.
+          return encontrados.length
+            ? {
+                modelo,
+                encontrados,
+                nota: "Ofrece SOLO estos productos. Di que según listados de proveedores la pantalla del modelo de \"compatible_con\" es la misma que la del suyo, y que un asesor lo confirma antes de enviarla. No menciones ningún otro modelo.",
+              }
+            : {
+                modelo,
+                encontrados: [],
+                nota: "No tenemos pantalla compatible. Dile que esa no la tienes por ahora. PROHIBIDO mencionar otros modelos o compatibilidades.",
+              };
         },
       }),
         }),
