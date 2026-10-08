@@ -23,8 +23,11 @@ import {
   Usb,
   Wallet,
   X,
+  FileDown,
+  FileSpreadsheet,
 } from "lucide-react";
 import { formatMXN } from "@/lib/money";
+import { exportarPdf, exportarXlsx, type ColumnaExport } from "@/lib/exportar-tabla";
 import { cn } from "@/lib/utils";
 import type { PaymentMethod, PaymentMethodStored } from "@/lib/types";
 import { imprimirCorteNavegador, type CorteData } from "@/lib/corte";
@@ -637,7 +640,12 @@ export function CajaView({ data }: { data: CajaData }) {
 
       <MovModal open={mov !== null} onClose={() => setMov(null)} tipo={mov ?? "gasto"} categorias={data.categorias} />
       <IngresosModal open={ventasOpen} onClose={() => setVentasOpen(false)} lineas={data.ingresosDetalle} total={data.ingresosTotal} />
-      <InventarioModal inv={invSel} isAdmin={data.isAdmin} onClose={() => setInvSel(null)} />
+      <InventarioModal
+        inv={invSel}
+        isAdmin={data.isAdmin}
+        periodo={{ from: data.from, to: data.to, etiqueta: rangoLabel }}
+        onClose={() => setInvSel(null)}
+      />
     </section>
   );
 }
@@ -660,16 +668,94 @@ function Seccion({ titulo, sub, extra, children }: { titulo: string; sub?: strin
 // Per-inventory sale detail. Modal on desktop, drawer on phones (the shared
 // Modal switches). Shows each line: product, human-readable date, quantity, the
 // price it sold at, and (admin) our unit cost + line profit.
+const LS_COLUMNAS = "corte_inventario_columnas_v1";
+
 function InventarioModal({
   inv,
   isAdmin,
+  periodo,
   onClose,
 }: {
   inv: InvAgg | null;
   isAdmin: boolean;
+  periodo: { from: string; to: string; etiqueta: string };
   onClose: () => void;
 }) {
+  // Which columns go into the file. Remembered per browser: whoever exports a
+  // corte usually wants the same columns every time.
+  const [elegidas, setElegidas] = useState<string[] | null>(null);
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem(LS_COLUMNAS);
+      if (v) setElegidas(JSON.parse(v) as string[]);
+    } catch {
+      // Blocked storage: every column, as on first use.
+    }
+  }, []);
+  const [exportando, setExportando] = useState<"pdf" | "xlsx" | null>(null);
+
   if (!inv) return null;
+
+  // Cost and profit stay admin-only in the file exactly as on screen.
+  const columnas: ColumnaExport<InvMov>[] = [
+    { id: "producto", titulo: "Producto", tipo: "texto", valor: (m) => m.producto },
+    { id: "sku", titulo: "SKU", tipo: "texto", valor: (m) => m.sku },
+    {
+      id: "fecha",
+      titulo: "Fecha de venta",
+      tipo: "texto",
+      valor: (m) =>
+        m.fecha
+          ? new Date(m.fecha).toLocaleString("es-MX", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
+          : "",
+    },
+    { id: "cant", titulo: "Cant.", tipo: "numero", valor: (m) => m.qty, total: inv.unidades },
+    { id: "precio", titulo: "Precio", tipo: "dinero", valor: (m) => m.precioCents / 100 },
+    { id: "importe", titulo: "Importe", tipo: "dinero", valor: (m) => (m.precioCents * m.qty) / 100, total: inv.ventaCents / 100 },
+    ...(isAdmin
+      ? ([
+          { id: "costo", titulo: "Costo", tipo: "dinero", valor: (m) => m.costoCents / 100,
+            total: inv.movimientos.reduce((t, m) => t + m.costoCents * m.qty, 0) / 100 },
+          { id: "ganancia", titulo: "Ganancia", tipo: "dinero", valor: (m) => ((m.precioCents - m.costoCents) * m.qty) / 100,
+            total: inv.gananciaCents / 100 },
+        ] satisfies ColumnaExport<InvMov>[])
+      : []),
+  ];
+  const activas = new Set(elegidas ?? columnas.map((c) => c.id));
+  const seleccion = columnas.filter((c) => activas.has(c.id));
+
+  function alternar(id: string) {
+    const sig = activas.has(id) ? [...activas].filter((x) => x !== id) : [...activas, id];
+    // Keep the screen's column order whatever order they were clicked in.
+    const orden = columnas.map((c) => c.id).filter((x) => sig.includes(x));
+    setElegidas(orden);
+    try {
+      localStorage.setItem(LS_COLUMNAS, JSON.stringify(orden));
+    } catch {
+      // Not remembered; still applies now.
+    }
+  }
+
+  async function exportar(formato: "pdf" | "xlsx") {
+    if (!inv || seleccion.length === 0) return;
+    setExportando(formato);
+    const archivo = `corte-${inv.nombre.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase()}-${periodo.from}${periodo.to !== periodo.from ? `_${periodo.to}` : ""}`;
+    try {
+      if (formato === "pdf")
+        await exportarPdf({
+          archivo,
+          titulo: `Corte por inventario · ${inv.nombre}`,
+          subtitulo: `${periodo.etiqueta} · ${inv.unidades} ${inv.unidades === 1 ? "unidad" : "unidades"} · ${formatMXN(inv.ventaCents)}`,
+          columnas: seleccion,
+          filas: inv.movimientos,
+        });
+      else await exportarXlsx({ archivo, hoja: inv.nombre, columnas: seleccion, filas: inv.movimientos });
+    } catch {
+      toast.error("No se pudo generar el archivo");
+    } finally {
+      setExportando(null);
+    }
+  }
   const fmtFecha = (iso: string) =>
     iso
       ? new Date(iso).toLocaleString("es-MX", {
@@ -695,6 +781,39 @@ function InventarioModal({
             +{formatMXN(inv.gananciaCents)} ganancia
           </span>
         )}
+      </div>
+
+      <div className="mb-3 space-y-2 rounded-xl border border-border bg-muted/20 p-3">
+        <p className="text-xs font-medium text-muted-foreground">Columnas a exportar</p>
+        <div className="flex flex-wrap gap-1.5">
+          {columnas.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              aria-pressed={activas.has(c.id)}
+              onClick={() => alternar(c.id)}
+              className={cn(
+                "inline-flex h-9 cursor-pointer items-center rounded-full border px-3 text-xs font-medium",
+                activas.has(c.id)
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-background text-muted-foreground hover:bg-muted",
+              )}
+            >
+              {c.titulo}
+            </button>
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-2 pt-1">
+          <Button variant="secondary" size="sm" disabled={!seleccion.length || exportando !== null} onClick={() => exportar("pdf")}>
+            <FileDown className="h-4 w-4" />
+            {exportando === "pdf" ? "Generando…" : "PDF"}
+          </Button>
+          <Button variant="secondary" size="sm" disabled={!seleccion.length || exportando !== null} onClick={() => exportar("xlsx")}>
+            <FileSpreadsheet className="h-4 w-4" />
+            {exportando === "xlsx" ? "Generando…" : "Excel"}
+          </Button>
+          {!seleccion.length && <span className="self-center text-xs text-muted-foreground">Elige al menos una columna.</span>}
+        </div>
       </div>
 
       <div className="-mx-1 overflow-x-auto">
