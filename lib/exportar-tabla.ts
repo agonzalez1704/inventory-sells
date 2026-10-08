@@ -13,6 +13,8 @@ export type ColumnaExport<T> = {
   valor: (fila: T) => string | number;
   /** The total row's cell; omitted = blank. */
   total?: number | string;
+  /** Shown beside the column's name in the picker. */
+  nota?: string;
 };
 
 /** Header, body and total rows as plain values — what both formats print. */

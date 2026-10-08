@@ -163,19 +163,24 @@ function Hoja({
   title,
   children,
   className,
+  acciones,
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   children: React.ReactNode;
   className?: string;
+  acciones?: React.ReactNode;
 }) {
   return (
     <Drawer open={open} onOpenChange={(o) => !o && onClose()} showSwipeHandle>
       <DrawerPrimitive.VirtualKeyboardProvider>
         <DrawerContent className={className}>
           <DrawerHeader className="pb-2">
-            <DrawerTitle className="text-sm">{title}</DrawerTitle>
+            <div className="flex items-center justify-between gap-2">
+              <DrawerTitle className="text-sm">{title}</DrawerTitle>
+              {acciones}
+            </div>
           </DrawerHeader>
           <div
             data-base-ui-swipe-ignore

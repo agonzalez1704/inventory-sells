@@ -23,11 +23,10 @@ import {
   Usb,
   Wallet,
   X,
-  FileDown,
-  FileSpreadsheet,
 } from "lucide-react";
 import { formatMXN } from "@/lib/money";
-import { exportarPdf, exportarXlsx, type ColumnaExport } from "@/lib/exportar-tabla";
+import { type ColumnaExport } from "@/lib/exportar-tabla";
+import { ExportarMenu } from "@/components/exportar-menu";
 import { cn } from "@/lib/utils";
 import type { PaymentMethod, PaymentMethodStored } from "@/lib/types";
 import { imprimirCorteNavegador, type CorteData } from "@/lib/corte";
@@ -668,8 +667,6 @@ function Seccion({ titulo, sub, extra, children }: { titulo: string; sub?: strin
 // Per-inventory sale detail. Modal on desktop, drawer on phones (the shared
 // Modal switches). Shows each line: product, human-readable date, quantity, the
 // price it sold at, and (admin) our unit cost + line profit.
-const LS_COLUMNAS = "corte_inventario_columnas_v1";
-
 function InventarioModal({
   inv,
   isAdmin,
@@ -681,20 +678,12 @@ function InventarioModal({
   periodo: { from: string; to: string; etiqueta: string };
   onClose: () => void;
 }) {
-  // Which columns go into the file. Remembered per browser: whoever exports a
-  // corte usually wants the same columns every time.
-  const [elegidas, setElegidas] = useState<string[] | null>(null);
-  useEffect(() => {
-    try {
-      const v = localStorage.getItem(LS_COLUMNAS);
-      if (v) setElegidas(JSON.parse(v) as string[]);
-    } catch {
-      // Blocked storage: every column, as on first use.
-    }
-  }, []);
-  const [exportando, setExportando] = useState<"pdf" | "xlsx" | null>(null);
-
   if (!inv) return null;
+  const fmtFecha = (iso: string) =>
+    iso
+      ? new Date(iso).toLocaleString("es-MX", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })
+      : "—";
+  const costoTotal = inv.movimientos.reduce((s, m) => s + m.costoCents * m.qty, 0);
 
   // Cost and profit stay admin-only in the file exactly as on screen.
   const columnas: ColumnaExport<InvMov>[] = [
@@ -709,170 +698,107 @@ function InventarioModal({
           ? new Date(m.fecha).toLocaleString("es-MX", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
           : "",
     },
-    { id: "cant", titulo: "Cant.", tipo: "numero", valor: (m) => m.qty, total: inv.unidades },
-    { id: "precio", titulo: "Precio", tipo: "dinero", valor: (m) => m.precioCents / 100 },
-    { id: "importe", titulo: "Importe", tipo: "dinero", valor: (m) => (m.precioCents * m.qty) / 100, total: inv.ventaCents / 100 },
+    { id: "cant", titulo: "Cantidad", tipo: "numero", valor: (m) => m.qty, total: inv.unidades },
+    { id: "precio", titulo: "Precio unitario", tipo: "dinero", valor: (m) => m.precioCents / 100 },
+    { id: "importe", titulo: "Importe", tipo: "dinero", nota: "precio × cant.", valor: (m) => (m.precioCents * m.qty) / 100, total: inv.ventaCents / 100 },
     ...(isAdmin
       ? ([
-          { id: "costo", titulo: "Costo", tipo: "dinero", valor: (m) => m.costoCents / 100,
-            total: inv.movimientos.reduce((t, m) => t + m.costoCents * m.qty, 0) / 100 },
-          { id: "ganancia", titulo: "Ganancia", tipo: "dinero", valor: (m) => ((m.precioCents - m.costoCents) * m.qty) / 100,
-            total: inv.gananciaCents / 100 },
+          { id: "costo", titulo: "Costo", tipo: "dinero", nota: "admin", valor: (m) => m.costoCents / 100, total: costoTotal / 100 },
+          { id: "ganancia", titulo: "Ganancia", tipo: "dinero", nota: "admin", valor: (m) => ((m.precioCents - m.costoCents) * m.qty) / 100, total: inv.gananciaCents / 100 },
         ] satisfies ColumnaExport<InvMov>[])
       : []),
   ];
-  const activas = new Set(elegidas ?? columnas.map((c) => c.id));
-  const seleccion = columnas.filter((c) => activas.has(c.id));
-
-  function alternar(id: string) {
-    const sig = activas.has(id) ? [...activas].filter((x) => x !== id) : [...activas, id];
-    // Keep the screen's column order whatever order they were clicked in.
-    const orden = columnas.map((c) => c.id).filter((x) => sig.includes(x));
-    setElegidas(orden);
-    try {
-      localStorage.setItem(LS_COLUMNAS, JSON.stringify(orden));
-    } catch {
-      // Not remembered; still applies now.
-    }
-  }
-
-  async function exportar(formato: "pdf" | "xlsx") {
-    if (!inv || seleccion.length === 0) return;
-    setExportando(formato);
-    const archivo = `corte-${inv.nombre.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase()}-${periodo.from}${periodo.to !== periodo.from ? `_${periodo.to}` : ""}`;
-    try {
-      if (formato === "pdf")
-        await exportarPdf({
-          archivo,
-          titulo: `Corte por inventario · ${inv.nombre}`,
-          subtitulo: `${periodo.etiqueta} · ${inv.unidades} ${inv.unidades === 1 ? "unidad" : "unidades"} · ${formatMXN(inv.ventaCents)}`,
-          columnas: seleccion,
-          filas: inv.movimientos,
-        });
-      else await exportarXlsx({ archivo, hoja: inv.nombre, columnas: seleccion, filas: inv.movimientos });
-    } catch {
-      toast.error("No se pudo generar el archivo");
-    } finally {
-      setExportando(null);
-    }
-  }
-  const fmtFecha = (iso: string) =>
-    iso
-      ? new Date(iso).toLocaleString("es-MX", {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-        })
-      : "—";
+  const archivo = `corte-${inv.nombre.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase()}-${periodo.from}${periodo.to !== periodo.from ? `_${periodo.to}` : ""}`;
 
   return (
-    <Modal open onClose={onClose} title={`Ventas · ${inv.nombre}`} className="max-w-2xl">
-      <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-        <span className="text-muted-foreground">
-          {inv.unidades} {inv.unidades === 1 ? "unidad" : "unidades"} ·{" "}
-          <span className="font-mono font-semibold text-foreground">
-            {formatMXN(inv.ventaCents)}
-          </span>
-        </span>
+    <Modal
+      open
+      onClose={onClose}
+      title={`Ventas · ${inv.nombre}`}
+      className="max-w-2xl"
+      acciones={
+        <ExportarMenu
+          columnas={columnas}
+          filas={inv.movimientos}
+          archivo={archivo}
+          titulo={`Corte por inventario · ${inv.nombre}`}
+          subtitulo={`${inv.nombre} · ${periodo.etiqueta}`}
+          hoja={inv.nombre}
+          recordar="corte_inventario_export_v2"
+        />
+      }
+    >
+      {/* The three numbers first; the detail follows. */}
+      <div
+        className={cn(
+          "-mx-5 mb-1 grid gap-px border-y border-border bg-border",
+          isAdmin ? "grid-cols-3" : "grid-cols-2",
+        )}
+      >
+        <div className="bg-background px-5 py-3">
+          <p className="text-xs text-muted-foreground">Unidades</p>
+          <p className="mt-0.5 font-mono text-lg font-semibold tabular-nums">{inv.unidades}</p>
+        </div>
+        <div className="bg-background px-5 py-3">
+          <p className="text-xs text-muted-foreground">Venta</p>
+          <p className="mt-0.5 font-mono text-lg font-semibold tabular-nums">{formatMXN(inv.ventaCents)}</p>
+        </div>
         {isAdmin && (
-          <span className="font-mono text-sm font-semibold text-emerald-600 dark:text-emerald-400">
-            +{formatMXN(inv.gananciaCents)} ganancia
-          </span>
+          <div className="bg-background px-5 py-3">
+            <p className="text-xs text-muted-foreground">Ganancia</p>
+            <p className="mt-0.5 font-mono text-lg font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
+              +{formatMXN(inv.gananciaCents)}
+            </p>
+          </div>
         )}
       </div>
 
-      <div className="mb-3 space-y-2 rounded-xl border border-border bg-muted/20 p-3">
-        <p className="text-xs font-medium text-muted-foreground">Columnas a exportar</p>
-        <div className="flex flex-wrap gap-1.5">
-          {columnas.map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              aria-pressed={activas.has(c.id)}
-              onClick={() => alternar(c.id)}
-              className={cn(
-                "inline-flex h-9 cursor-pointer items-center rounded-full border px-3 text-xs font-medium",
-                activas.has(c.id)
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border bg-background text-muted-foreground hover:bg-muted",
-              )}
-            >
-              {c.titulo}
-            </button>
-          ))}
-        </div>
-        <div className="flex flex-wrap gap-2 pt-1">
-          <Button variant="secondary" size="sm" disabled={!seleccion.length || exportando !== null} onClick={() => exportar("pdf")}>
-            <FileDown className="h-4 w-4" />
-            {exportando === "pdf" ? "Generando…" : "PDF"}
-          </Button>
-          <Button variant="secondary" size="sm" disabled={!seleccion.length || exportando !== null} onClick={() => exportar("xlsx")}>
-            <FileSpreadsheet className="h-4 w-4" />
-            {exportando === "xlsx" ? "Generando…" : "Excel"}
-          </Button>
-          {!seleccion.length && <span className="self-center text-xs text-muted-foreground">Elige al menos una columna.</span>}
-        </div>
-      </div>
-
-      <div className="-mx-1 overflow-x-auto">
+      <div className="-mx-5 overflow-x-auto">
         <table className="w-full min-w-136 text-sm">
           <thead>
-            <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
-              <th className="px-2 py-2 font-medium">Producto</th>
-              <th className="px-2 py-2 font-medium">Fecha de venta</th>
-              <th className="px-2 py-2 text-right font-medium">Cant.</th>
-              <th className="px-2 py-2 text-right font-medium">Precio</th>
-              {isAdmin && <th className="px-2 py-2 text-right font-medium">Costo</th>}
-              {isAdmin && <th className="px-2 py-2 text-right font-medium">Ganancia</th>}
+            <tr className="text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+              <th className="px-5 pt-3 pb-2 font-medium">Producto</th>
+              <th className="px-2 pt-3 pb-2 font-medium">Fecha de venta</th>
+              <th className="px-2 pt-3 pb-2 text-right font-medium">Cant.</th>
+              <th className="px-2 pt-3 pb-2 text-right font-medium">Precio</th>
+              {isAdmin && <th className="px-2 pt-3 pb-2 text-right font-medium">Costo</th>}
+              {isAdmin && <th className="py-2 pt-3 pr-5 pl-2 text-right font-medium">Ganancia</th>}
             </tr>
           </thead>
           <tbody>
-            {inv.movimientos.map((m, i) => {
-              const ganLinea = (m.precioCents - m.costoCents) * m.qty;
-              return (
-                <tr key={i} className="border-b border-border/60 last:border-0">
-                  <td className="px-2 py-2">
-                    <span className="font-medium">{m.producto}</span>
-                    <span className="ml-1.5 font-mono text-xs text-muted-foreground">{m.sku}</span>
+            {inv.movimientos.map((m, i) => (
+              <tr key={i} className="border-t border-border/70">
+                <td className="px-5 py-2.5">
+                  <p className="font-medium">{m.producto}</p>
+                  <p className="mt-0.5 font-mono text-xs text-muted-foreground">{m.sku}</p>
+                </td>
+                <td className="whitespace-nowrap px-2 py-2.5 text-muted-foreground">{fmtFecha(m.fecha)}</td>
+                <td className="px-2 py-2.5 text-right font-mono tabular-nums">{m.qty}</td>
+                <td className="px-2 py-2.5 text-right font-mono tabular-nums">{formatMXN(m.precioCents)}</td>
+                {isAdmin && (
+                  <td className="px-2 py-2.5 text-right font-mono tabular-nums text-muted-foreground">
+                    {formatMXN(m.costoCents)}
                   </td>
-                  <td className="whitespace-nowrap px-2 py-2 text-muted-foreground">
-                    {fmtFecha(m.fecha)}
+                )}
+                {isAdmin && (
+                  <td className="py-2.5 pr-5 pl-2 text-right font-mono tabular-nums text-emerald-600 dark:text-emerald-400">
+                    +{formatMXN((m.precioCents - m.costoCents) * m.qty)}
                   </td>
-                  <td className="px-2 py-2 text-right font-mono tabular-nums">{m.qty}</td>
-                  <td className="px-2 py-2 text-right font-mono tabular-nums">
-                    {formatMXN(m.precioCents)}
-                  </td>
-                  {isAdmin && (
-                    <td className="px-2 py-2 text-right font-mono tabular-nums text-muted-foreground">
-                      {formatMXN(m.costoCents)}
-                    </td>
-                  )}
-                  {isAdmin && (
-                    <td className="px-2 py-2 text-right font-mono tabular-nums text-emerald-600 dark:text-emerald-400">
-                      +{formatMXN(ganLinea)}
-                    </td>
-                  )}
-                </tr>
-              );
-            })}
+                )}
+              </tr>
+            ))}
           </tbody>
           <tfoot>
-            <tr className="border-t-2 border-border bg-muted/30 text-sm font-semibold">
-              <td className="px-2 py-2.5">Total</td>
+            <tr className="border-t border-border bg-muted/40 font-semibold">
+              <td className="px-5 py-2.5">Total</td>
               <td className="px-2 py-2.5" />
               <td className="px-2 py-2.5 text-right font-mono tabular-nums">{inv.unidades}</td>
-              <td className="px-2 py-2.5 text-right font-mono tabular-nums">
-                {formatMXN(inv.ventaCents)}
-              </td>
+              <td className="px-2 py-2.5 text-right font-mono tabular-nums">{formatMXN(inv.ventaCents)}</td>
               {isAdmin && (
-                <td className="px-2 py-2.5 text-right font-mono tabular-nums text-muted-foreground">
-                  {formatMXN(inv.movimientos.reduce((s, m) => s + m.costoCents * m.qty, 0))}
-                </td>
+                <td className="px-2 py-2.5 text-right font-mono tabular-nums text-muted-foreground">{formatMXN(costoTotal)}</td>
               )}
               {isAdmin && (
-                <td className="px-2 py-2.5 text-right font-mono tabular-nums text-emerald-600 dark:text-emerald-400">
+                <td className="py-2.5 pr-5 pl-2 text-right font-mono tabular-nums text-emerald-600 dark:text-emerald-400">
                   +{formatMXN(inv.gananciaCents)}
                 </td>
               )}
