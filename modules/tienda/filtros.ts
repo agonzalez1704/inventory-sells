@@ -4,7 +4,7 @@
 
 export type Facet = { value: string; n: number };
 
-export const LISTAS = ["cat", "marca", "cal", "marco", "tag"] as const;
+export const LISTAS = ["cat", "marca", "cal", "marco", "tag", "sis"] as const;
 type Lista = (typeof LISTAS)[number];
 
 /** "Ordenar". Null = the default: relevance when searching, stock-first when browsing. */
@@ -15,18 +15,20 @@ export type Filtros = Record<Lista, string[]> & {
   vmarca: string | null;
   vmodelo: string | null;
   anio: number | null;
+  /** "V-Drive", "2ª generación": only where a model has more than one. */
+  version: string | null;
   stock: boolean;
   orden: Orden | null;
 };
 
-export type Facetas = Record<Lista | "vmarca" | "vmodelo" | "anio", Facet[]> & {
+export type Facetas = Record<Lista | "vmarca" | "vmodelo" | "anio" | "version", Facet[]> & {
   total: number;
   stock: number;
 };
 
 export const SIN_FILTROS: Filtros = {
-  cat: [], marca: [], cal: [], marco: [], tag: [],
-  vmarca: null, vmodelo: null, anio: null, stock: false, orden: null,
+  cat: [], marca: [], cal: [], marco: [], tag: [], sis: [],
+  vmarca: null, vmodelo: null, anio: null, version: null, stock: false, orden: null,
 };
 
 type SP = Record<string, string | string[] | undefined>;
@@ -48,9 +50,11 @@ export function leerFiltros(sp: SP): Filtros {
     cal: lista("cal"),
     marco: lista("marco"),
     tag: lista("tag"),
+    sis: lista("sis"),
     vmarca,
     vmodelo,
     anio: vmodelo && Number.isInteger(anio) && anio >= 1900 && anio <= 2100 ? anio : null,
+    version: vmodelo ? primero(sp.version) : null,
     stock: primero(sp.stock) === "1",
     orden: ORDENES.find((o) => o === primero(sp.orden)) ?? null,
   };
@@ -63,6 +67,7 @@ export function filtrosSQL(f: Filtros): Record<string, unknown> {
   if (f.vmarca) o.vmarca = f.vmarca;
   if (f.vmodelo) o.vmodelo = f.vmodelo;
   if (f.anio) o.anio = f.anio;
+  if (f.version) o.version = f.version;
   if (f.stock) o.stock = true;
   if (f.orden) o.orden = f.orden;
   return o;
@@ -75,6 +80,7 @@ export function urlTienda(f: Filtros, q: string): string {
   if (f.vmarca) sp.set("vmarca", f.vmarca);
   if (f.vmodelo) sp.set("vmodelo", f.vmodelo);
   if (f.anio) sp.set("anio", String(f.anio));
+  if (f.version) sp.set("version", f.version);
   if (f.stock) sp.set("stock", "1");
   if (f.orden) sp.set("orden", f.orden);
   const s = sp.toString();
@@ -84,7 +90,7 @@ export function urlTienda(f: Filtros, q: string): string {
 export function cuantosFiltros(f: Filtros): number {
   return (
     LISTAS.reduce((n, k) => n + f[k].length, 0) +
-    (f.vmarca ? 1 : 0) + (f.vmodelo ? 1 : 0) + (f.anio ? 1 : 0) + (f.stock ? 1 : 0)
+    (f.vmarca ? 1 : 0) + (f.vmodelo ? 1 : 0) + (f.anio ? 1 : 0) + (f.version ? 1 : 0) + (f.stock ? 1 : 0)
   );
 }
 
@@ -96,8 +102,8 @@ export function leerFacetas(filas: unknown): Facetas {
       .map((r) => ({ value: r.valor as string, n: Number(r.n) }));
   const num = (tipo: string) => Number(rows.find((r) => r.tipo === tipo)?.n ?? 0);
   return {
-    cat: de("cat"), marca: de("marca"), cal: de("cal"), marco: de("marco"), tag: de("tag"),
-    vmarca: de("vmarca"), vmodelo: de("vmodelo"), anio: de("anio"),
+    cat: de("cat"), marca: de("marca"), cal: de("cal"), marco: de("marco"), tag: de("tag"), sis: de("sis"),
+    vmarca: de("vmarca"), vmodelo: de("vmodelo"), anio: de("anio"), version: de("version"),
     total: num("total"),
     stock: num("stock"),
   };

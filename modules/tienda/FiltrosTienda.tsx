@@ -80,14 +80,14 @@ export function PanelFiltros({
               label="Marca"
               valor={filtros.vmarca}
               opciones={facetas.vmarca}
-              onElegir={(v) => set({ vmarca: v, vmodelo: null, anio: null })}
+              onElegir={(v) => set({ vmarca: v, vmodelo: null, anio: null, version: null })}
             />
             <Selector
               label="Modelo"
               valor={filtros.vmodelo}
               opciones={facetas.vmodelo}
               deshabilitado={!filtros.vmarca}
-              onElegir={(v) => set({ vmodelo: v, anio: null })}
+              onElegir={(v) => set({ vmodelo: v, anio: null, version: null })}
             />
             <Selector
               label="Año"
@@ -95,9 +95,27 @@ export function PanelFiltros({
               opciones={facetas.anio}
               deshabilitado={!filtros.vmodelo}
               numerico
-              onElegir={(v) => set({ anio: v ? Number(v) : null })}
+              onElegir={(v) => set({ anio: v ? Number(v) : null, version: null })}
             />
+            {conVersiones(facetas, filtros) && (
+              <Selector
+                label="Versión"
+                valor={filtros.version}
+                opciones={facetas.version}
+                onElegir={(v) => set({ version: v })}
+              />
+            )}
           </div>
+        </Seccion>
+      )}
+
+      {util(facetas.sis, filtros.sis) && (
+        <Seccion titulo="Sistema">
+          <ListaCheck
+            opciones={facetas.sis}
+            activos={filtros.sis}
+            onAlternar={(v) => set({ sis: alternar(filtros.sis, v) })}
+          />
         </Seccion>
       )}
 
@@ -112,7 +130,8 @@ export function PanelFiltros({
       )}
 
       {util(facetas.marca, filtros.marca) && (
-        <Seccion titulo="Marca">
+        // With a vehicle filter above, "Marca" alone would read as the car's.
+        <Seccion titulo={facetas.vmarca.length > 0 ? "Marca de refacción" : "Marca"}>
           <ListaCheck
             opciones={facetas.marca}
             activos={filtros.marca}
@@ -186,7 +205,7 @@ export function BarraVehiculo({
           label="Marca"
           valor={filtros.vmarca}
           opciones={facetas.vmarca}
-          onElegir={(v) => set({ vmarca: v, vmodelo: null, anio: null })}
+          onElegir={(v) => set({ vmarca: v, vmodelo: null, anio: null, version: null })}
         />
       </div>
       <div className="w-56">
@@ -195,7 +214,7 @@ export function BarraVehiculo({
           valor={filtros.vmodelo}
           opciones={facetas.vmodelo}
           deshabilitado={!filtros.vmarca}
-          onElegir={(v) => set({ vmodelo: v, anio: null })}
+          onElegir={(v) => set({ vmodelo: v, anio: null, version: null })}
         />
       </div>
       <div className="w-44">
@@ -205,15 +224,25 @@ export function BarraVehiculo({
           opciones={facetas.anio}
           deshabilitado={!filtros.vmodelo}
           numerico
-          onElegir={(v) => set({ anio: v ? Number(v) : null })}
+          onElegir={(v) => set({ anio: v ? Number(v) : null, version: null })}
         />
       </div>
+      {conVersiones(facetas, filtros) && (
+        <div className="w-52">
+          <Selector
+            label="Versión"
+            valor={filtros.version}
+            opciones={facetas.version}
+            onElegir={(v) => set({ version: v })}
+          />
+        </div>
+      )}
       {filtros.vmarca && (
         <>
           <span className="text-sm text-muted-foreground">Solo te mostramos piezas que le quedan</span>
           <button
             type="button"
-            onClick={() => set({ vmarca: null, vmodelo: null, anio: null })}
+            onClick={() => set({ vmarca: null, vmodelo: null, anio: null, version: null })}
             className="ml-auto h-11 cursor-pointer text-sm font-medium text-tienda-700 hover:underline"
           >
             Quitar vehículo
@@ -334,6 +363,14 @@ function Pildoras({
     </div>
   );
 }
+
+/**
+ * The version only asks when it decides something: a model with two or more
+ * versions in the chosen year ("Versa 2021": V-Drive or 2ª generación). Once
+ * chosen it stays visible so it can be changed back.
+ */
+const conVersiones = (facetas: Facetas, filtros: Filtros) =>
+  !!filtros.vmodelo && (facetas.version.length > 1 || !!filtros.version);
 
 const sinAcentos = (t: string) =>
   t
@@ -511,8 +548,8 @@ function chipsActivos(filtros: Filtros): { label: string; sin: Filtros }[] {
   }
   if (filtros.vmarca) {
     chips.push({
-      label: [filtros.vmarca, filtros.vmodelo, filtros.anio].filter(Boolean).join(" "),
-      sin: { ...filtros, vmarca: null, vmodelo: null, anio: null },
+      label: [filtros.vmarca, filtros.vmodelo, filtros.version, filtros.anio].filter(Boolean).join(" "),
+      sin: { ...filtros, vmarca: null, vmodelo: null, anio: null, version: null },
     });
   }
   if (filtros.stock) chips.push({ label: "Con existencia", sin: { ...filtros, stock: false } });
