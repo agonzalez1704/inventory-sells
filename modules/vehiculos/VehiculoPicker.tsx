@@ -1,10 +1,17 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Car, Check, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import {
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+} from "@/components/ui/combobox";
 import {
   aniosDeModelo,
   buscarModelos,
@@ -75,7 +82,6 @@ export function VehiculoPicker({
   const [porAnio, setPorAnio] = useState(false);
   const [cargando, setCargando] = useState(true);
   const [recientes, setRecientes] = useState<Vehiculo[]>([]);
-  const buscador = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setRecientes(leerRecientes());
@@ -144,45 +150,50 @@ export function VehiculoPicker({
 
       {!elegido ? (
         <>
-          <div className="relative">
-            <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              ref={buscador}
+          {/* shadcn's combobox, like the store's vehicle filter: type "vers"
+              and Versa is there; the list opens on focus with the models
+              this shop stocks most. The server already filters, so the
+              combobox does not filter again. */}
+          <Combobox
+            items={modelos}
+            value={null}
+            onValueChange={(m) => m && setElegido(m as ModeloVehiculo)}
+            inputValue={q}
+            onInputValueChange={(v) => setQ(v)}
+            filter={null}
+            itemToStringLabel={(m: ModeloVehiculo) => m.modelo}
+            isItemEqualToValue={(a: ModeloVehiculo, b: ModeloVehiculo) => a.marca === b.marca && a.modelo === b.modelo}
+            autoHighlight
+            openOnInputClick
+          >
+            <ComboboxInput
               autoFocus
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
+              aria-label="Modelo del carro"
               placeholder="Escribe el modelo: versa, aveo, jetta…"
-              className="h-12 pl-9 text-base"
-            />
-          </div>
-
-          <div className="grid max-h-80 grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-3">
-            {cargando && modelos.length === 0 ? (
-              <p className="col-span-full py-6 text-center text-sm text-muted-foreground">Buscando modelos…</p>
-            ) : modelos.length === 0 ? (
-              <p className="col-span-full py-6 text-center text-sm text-muted-foreground">
-                Ningún modelo coincide con «{q.trim()}».
-              </p>
-            ) : (
-              modelos.map((m) => (
-                <button
-                  key={`${m.marca}-${m.modelo}`}
-                  type="button"
-                  onClick={() => setElegido(m)}
-                  className="flex cursor-pointer flex-col gap-0.5 rounded-xl border border-border px-3 py-2.5 text-left hover:border-primary hover:bg-muted"
-                >
-                  <span className="flex items-baseline gap-2">
-                    <span className="truncate font-semibold">{m.modelo}</span>
-                    <span className="truncate text-xs text-muted-foreground">{m.marca}</span>
-                  </span>
-                  <span className="text-xs text-muted-foreground tabular-nums">
-                    {m.anio_min && m.anio_max ? `${m.anio_min}–${m.anio_max} · ` : ""}
-                    {m.piezas} {m.piezas === 1 ? "pieza" : "piezas"}
-                  </span>
-                </button>
-              ))
-            )}
-          </div>
+              className="h-12"
+            >
+              <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+            </ComboboxInput>
+            <ComboboxContent>
+              <ComboboxEmpty>{cargando ? "Buscando modelos…" : `Ningún modelo coincide con «${q.trim()}».`}</ComboboxEmpty>
+              <ComboboxList>
+                {(m: ModeloVehiculo) => (
+                  <ComboboxItem key={`${m.marca}-${m.modelo}`} value={m} className="h-auto py-2 lg:h-auto">
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-baseline gap-2">
+                        <span className="truncate font-semibold">{m.modelo}</span>
+                        <span className="truncate text-xs text-muted-foreground">{m.marca}</span>
+                      </span>
+                      <span className="block text-xs text-muted-foreground tabular-nums">
+                        {m.anio_min && m.anio_max ? `${m.anio_min}–${m.anio_max} · ` : ""}
+                        {m.piezas} {m.piezas === 1 ? "pieza" : "piezas"}
+                      </span>
+                    </span>
+                  </ComboboxItem>
+                )}
+              </ComboboxList>
+            </ComboboxContent>
+          </Combobox>
 
           {recientes.length > 0 && !q.trim() && (
             <div className="space-y-2 border-t border-border pt-3">
@@ -208,7 +219,7 @@ export function VehiculoPicker({
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
-              onClick={() => setElegido(null)}
+              onClick={() => { setElegido(null); setQ(""); }}
               className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-full border border-border px-4 text-sm hover:bg-muted"
             >
               <span className="font-semibold">{elegido.modelo}</span>
