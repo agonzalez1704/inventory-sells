@@ -217,7 +217,7 @@ export function BarraVehiculo({
           onElegir={(v) => set({ vmodelo: v, anio: null, version: null })}
         />
       </div>
-      <div className="w-44">
+      <div className="w-52">
         <Selector
           label="Año"
           valor={filtros.anio ? String(filtros.anio) : null}
