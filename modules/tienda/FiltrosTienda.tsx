@@ -2,8 +2,15 @@
 
 import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
 import { useEffect, useState } from "react";
-import { Check, ChevronDown, Loader2, SlidersHorizontal, X } from "lucide-react";
-import { Combobox } from "@base-ui/react/combobox";
+import { Check, Loader2, SlidersHorizontal, X } from "lucide-react";
+import {
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+} from "@/components/ui/combobox";
 import { cn } from "@/lib/utils";
 import { CALIDADES } from "@/lib/calidad";
 import {
@@ -335,7 +342,7 @@ const sinAcentos = (t: string) =>
     .replace(/[\u0300-\u036f]/g, "");
 
 /**
- * A combobox: type "nis" and Nissan is there.
+ * shadcn's combobox: type "nis" and Nissan is there.
  *
  * It replaced a native select, which on a phone means scrolling a wheel of 75
  * makes to reach the one you could have typed in three letters. The list still
@@ -366,7 +373,7 @@ function Selector({
   const valores = lista.map((o) => o.value);
 
   return (
-    <Combobox.Root
+    <Combobox
       items={valores}
       value={valor}
       onValueChange={(v) => onElegir((v as string | null) ?? null)}
@@ -374,61 +381,29 @@ function Selector({
       filter={(item: string, q: string) => sinAcentos(item).includes(sinAcentos(q.trim()))}
       autoHighlight
     >
-      <Combobox.InputGroup
-        className={cn(
-          "flex h-11 items-center gap-2 rounded-xl border border-border bg-background pr-1 pl-3 focus-within:border-tienda-500",
-          deshabilitado && "opacity-50",
-        )}
+      <ComboboxInput
+        placeholder={deshabilitado ? "—" : "Cualquiera"}
+        inputMode={numerico ? "numeric" : "text"}
+        aria-label={label}
+        disabled={deshabilitado}
+        showClear={!!valor && !deshabilitado}
+        inputClassName="font-medium placeholder:font-normal"
+        className="focus-within:border-tienda-500"
       >
-        <Combobox.Label className="w-14 shrink-0 text-xs text-muted-foreground">{label}</Combobox.Label>
-        <Combobox.Input
-          placeholder={deshabilitado ? "—" : "Cualquiera"}
-          inputMode={numerico ? "numeric" : "text"}
-          // 16px on phones: anything smaller makes iOS zoom the page on focus.
-          className="h-full min-w-0 flex-1 bg-transparent text-base font-medium outline-hidden placeholder:font-normal placeholder:text-muted-foreground disabled:cursor-not-allowed lg:text-sm"
-        />
-        {valor && !deshabilitado && (
-          <Combobox.Clear
-            aria-label={`Quitar ${label.toLowerCase()}`}
-            className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-muted-foreground hover:bg-muted"
-          >
-            <X className="h-4 w-4" />
-          </Combobox.Clear>
-        )}
-        <Combobox.Trigger
-          aria-label={`Ver ${label.toLowerCase()}s`}
-          className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-muted-foreground hover:bg-muted disabled:cursor-not-allowed"
-        >
-          <ChevronDown className="h-4 w-4" />
-        </Combobox.Trigger>
-      </Combobox.InputGroup>
-
-      <Combobox.Portal>
-        {/* Above the filters drawer it opens from. */}
-        <Combobox.Positioner sideOffset={6} collisionPadding={12} className="z-[60]">
-          <Combobox.Popup className="max-h-[min(20rem,var(--available-height))] w-(--anchor-width) overflow-y-auto overscroll-contain rounded-xl border border-border bg-background p-1 shadow-pop">
-            <Combobox.Empty className="px-3 py-6 text-center text-sm text-muted-foreground empty:hidden">
-              Ninguna coincide
-            </Combobox.Empty>
-            <Combobox.List>
-              {(v: string) => (
-                <Combobox.Item
-                  key={v}
-                  value={v}
-                  className="flex h-11 cursor-pointer items-center gap-2 rounded-lg px-3 text-base outline-hidden select-none data-highlighted:bg-muted lg:h-10 lg:text-sm"
-                >
-                  <Combobox.ItemIndicator className="w-4 shrink-0">
-                    <Check className="h-4 w-4 text-tienda-600" />
-                  </Combobox.ItemIndicator>
-                  <span className="min-w-0 flex-1 truncate">{v}</span>
-                  <span className="shrink-0 text-xs text-muted-foreground tabular-nums">{cuantos.get(v) ?? 0}</span>
-                </Combobox.Item>
-              )}
-            </Combobox.List>
-          </Combobox.Popup>
-        </Combobox.Positioner>
-      </Combobox.Portal>
-    </Combobox.Root>
+        <span className="w-14 shrink-0 text-xs text-muted-foreground">{label}</span>
+      </ComboboxInput>
+      <ComboboxContent>
+        <ComboboxEmpty>Ninguna coincide</ComboboxEmpty>
+        <ComboboxList>
+          {(v: string) => (
+            <ComboboxItem key={v} value={v}>
+              <span className="min-w-0 flex-1 truncate">{v}</span>
+              <span className="shrink-0 text-xs text-muted-foreground tabular-nums">{cuantos.get(v) ?? 0}</span>
+            </ComboboxItem>
+          )}
+        </ComboboxList>
+      </ComboboxContent>
+    </Combobox>
   );
 }
 
