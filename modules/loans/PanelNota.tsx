@@ -329,6 +329,7 @@ export function PanelNota({
               loan={v}
               pie={pie}
               comprobanteObligatorio={comprobanteObligatorio}
+              verComision={esAdmin}
               onClose={() => setCobrando(false)}
               onListo={() => {
                 setCobrando(false);

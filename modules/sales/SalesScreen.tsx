@@ -1431,6 +1431,7 @@ export function SalesScreen({
 
       <ApartarPanel
         open={apartarOpen}
+        verComision={esAdmin}
         lineas={lines.map((l) => ({
           productId: l.product.id,
           nombre: l.product.name,

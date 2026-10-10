@@ -131,14 +131,14 @@ export default async function CajaPage({
     insforge.database
       .from("sale_pagos")
       .select(
-        "sale_id, monto_cents, metodo, created_at, created_by, sales(customer_name, total_cents, sale_items(qty, unit_price_cents, costo_total_cents, products(etiqueta, cost_cents, name, sku, inventory_id)))",
+        "sale_id, monto_cents, metodo, created_at, created_by, terminal_id, terminal_comision_pct, sales(customer_name, total_cents, sale_items(qty, unit_price_cents, costo_total_cents, products(etiqueta, cost_cents, name, sku, inventory_id)))",
       )
       .gte("created_at", startISO)
       .lt("created_at", endISO),
     insforge.database
       .from("adelanto_pagos")
       .select(
-        "adelanto_id, monto_cents, metodo, tipo, created_at, created_by, adelantos(cliente, descripcion, qty, products(name))",
+        "adelanto_id, monto_cents, metodo, tipo, created_at, created_by, terminal_id, terminal_comision_pct, adelantos(cliente, descripcion, qty, products(name))",
       )
       .gte("created_at", startISO)
       .lt("created_at", endISO),
@@ -169,6 +169,8 @@ export default async function CajaPage({
   let devoluciones = (devolucionesData ?? []) as Devolucion[];
   let salePagos = (salePagosData ?? []) as unknown as {
     sale_id: string;
+    terminal_id?: string | null;
+    terminal_comision_pct?: number | string | null;
     created_by: string | null;
     monto_cents: number;
     // A split sale can settle part of itself with store credit.
@@ -182,6 +184,8 @@ export default async function CajaPage({
   }[];
   let adelantoPagos = (adelantoPagosData ?? []) as unknown as {
     adelanto_id: string;
+    terminal_id?: string | null;
+    terminal_comision_pct?: number | string | null;
     created_by: string | null;
     monto_cents: number;
     metodo: PaymentMethod;
@@ -620,13 +624,9 @@ export default async function CajaPage({
   let porDestino: PorDestino[] = [];
   if (tarjDirectas.length + tarjAbonos.length + tarjAdel.length + tarjExtra.length > 0) {
     const saleIds = [...new Set([...tarjDirectas.map((v) => v.id), ...tarjAbonos.map((p) => p.sale_id)])].filter(Boolean) as string[];
-    const adelIds = [...new Set(tarjAdel.map((p) => p.adelanto_id))];
-    const [{ data: termSales }, { data: termAdel }, { data: termData }] = await Promise.all([
+    const [{ data: termSales }, { data: termData }] = await Promise.all([
       saleIds.length
         ? insforgeAdmin.database.from("sales").select("id, terminal_id, terminal_comision_pct").in("id", saleIds)
-        : Promise.resolve({ data: [] }),
-      adelIds.length
-        ? insforgeAdmin.database.from("adelantos").select("id, terminal_id, terminal_comision_pct").in("id", adelIds)
         : Promise.resolve({ data: [] }),
       insforgeAdmin.database
         .from("terminales_pago")
@@ -634,7 +634,6 @@ export default async function CajaPage({
     ]);
     type Asig = { id: string; terminal_id: string | null; terminal_comision_pct: number | string | null };
     const asigVenta = new Map(((termSales ?? []) as Asig[]).map((a) => [a.id, a]));
-    const asigAdel = new Map(((termAdel ?? []) as Asig[]).map((a) => [a.id, a]));
     type CuentaRow = { id: string; banco: string; alias: string };
     const terminalPorId = new Map(
       ((termData ?? []) as unknown as {
@@ -680,8 +679,12 @@ export default async function CajaPage({
       agg.set(key, a);
     };
     for (const v of tarjDirectas) sumar(asigVenta.get(v.id as string), v.total_cents);
-    for (const p of tarjAbonos) sumar(asigVenta.get(p.sale_id), p.monto_cents);
-    for (const p of tarjAdel) sumar(asigAdel.get(p.adelanto_id), p.monto_cents);
+    // An abono carries its own terminal; a POS split's card part falls back to
+    // the sale's.
+    const propia = (p: { terminal_id?: string | null; terminal_comision_pct?: number | string | null }): Asig | undefined =>
+      p.terminal_id ? { id: "", terminal_id: p.terminal_id, terminal_comision_pct: p.terminal_comision_pct ?? null } : undefined;
+    for (const p of tarjAbonos) sumar(propia(p) ?? asigVenta.get(p.sale_id), p.monto_cents);
+    for (const p of tarjAdel) sumar(propia(p), p.monto_cents);
     for (const i of tarjExtra) sumar(undefined, i.monto_cents);
     // Terminals by amount; "sin terminal" last.
     porTerminal = [...agg.values()].sort((x, y) => (!x.terminal ? 1 : !y.terminal ? -1 : y.cobrado - x.cobrado));

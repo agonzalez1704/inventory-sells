@@ -24,6 +24,8 @@ import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { guardarComprobanteAdelanto } from "@/modules/sales/comprobantes";
+import { asignarTerminalPago } from "@/modules/config/terminales";
+import { recordarTerminal, TerminalPicker, useTerminalElegida, useTerminales } from "@/components/terminal-picker";
 import { AdjuntarImagen } from "@/components/ui/adjuntar-imagen";
 import { CuentaPicker, useCuentas, SIN_CUENTAS_MSG } from "@/components/ui/cuenta";
 import {
@@ -252,6 +254,9 @@ function AbonarModal({
   const [cuentaAbono, setCuentaAbono] = useState<string | null>(null);
   const cuentasAbono = useCuentas() ?? [];
   const [pending, start] = useTransition();
+  const terminales = useTerminales();
+  const [terminalId, setTerminalId] = useTerminalElegida(terminales, a.id);
+  const pideTerminal = metodo === "tarjeta" && (terminales?.length ?? 0) > 0;
 
   function save() {
     const pesos = Number(monto.replace(",", "."));
@@ -261,9 +266,15 @@ function AbonarModal({
       return toast.error(SIN_CUENTAS_MSG);
     if (metodo === "transferencia" && !cuentaAbono)
       return toast.error("Elige a cuál cuenta llegó la transferencia");
+    if (pideTerminal && !terminalId) return toast.error("Elige en qué terminal se pasó la tarjeta");
     start(async () => {
       try {
         await abonarAdelanto(a.id, pesos, metodo);
+        if (pideTerminal && terminalId) {
+          recordarTerminal(terminalId);
+          const rt = await asignarTerminalPago({ adelantoId: a.id }, terminalId);
+          if (!rt.ok) toast.error(`Abono ok, pero la terminal no se registró: ${rt.error}`);
+        }
         if (metodo === "transferencia" && (referencia.trim() || foto || cuentaAbono)) {
           let form: FormData | undefined;
           if (foto) {
@@ -318,6 +329,14 @@ function AbonarModal({
         >
           Abonar el resto ({formatMXN(resta)})
         </button>
+        {pideTerminal && terminales && (
+          <TerminalPicker
+            terminales={terminales}
+            value={terminalId}
+            onChange={setTerminalId}
+            montoCents={Math.round((Number(monto.replace(",", ".")) || 0) * 100)}
+          />
+        )}
         {metodo === "transferencia" && (
           <div className="space-y-2 rounded-xl border border-border p-3">
             <p className="text-xs font-medium text-muted-foreground">
@@ -364,6 +383,8 @@ function CrearModal({
   const [fotoPago, setFotoPago] = useState<File | null>(null);
   const [cuentaPago, setCuentaPago] = useState<string | null>(null);
   const cuentasPago = useCuentas() ?? [];
+  const terminalesPago = useTerminales();
+  const [terminalPago, setTerminalPago] = useTerminalElegida(terminalesPago, null);
   const [pending, start] = useTransition();
 
   // Searched in the database — the whole catalog used to be loaded just to
@@ -415,6 +436,8 @@ function CrearModal({
       return toast.error(SIN_CUENTAS_MSG);
     if (abonoNum > 0 && metodo === "transferencia" && !cuentaPago)
       return toast.error("Elige a cuál cuenta llegó la transferencia");
+    const pideTerminal = abonoNum > 0 && metodo === "tarjeta" && (terminalesPago?.length ?? 0) > 0;
+    if (pideTerminal && !terminalPago) return toast.error("Elige en qué terminal se pasó la tarjeta");
     start(async () => {
       try {
         const { id } = await crearAdelanto({
@@ -427,6 +450,11 @@ function CrearModal({
           abono: abonoNum,
           abonoMetodo: metodo,
         });
+        if (pideTerminal && terminalPago) {
+          recordarTerminal(terminalPago);
+          const rt = await asignarTerminalPago({ adelantoId: id }, terminalPago);
+          if (!rt.ok) toast.error(`Apartado ok, pero la terminal no se registró: ${rt.error}`);
+        }
         if (abonoNum > 0 && metodo === "transferencia" && (refPago.trim() || fotoPago || cuentaPago)) {
           let form: FormData | undefined;
           if (fotoPago) {
@@ -586,6 +614,14 @@ function CrearModal({
           </div>
         </div>
 
+        {abonoNum > 0 && metodo === "tarjeta" && terminalesPago && terminalesPago.length > 0 && (
+          <TerminalPicker
+            terminales={terminalesPago}
+            value={terminalPago}
+            onChange={setTerminalPago}
+            montoCents={Math.round(abonoNum * 100)}
+          />
+        )}
         {Number(abono.replace(",", ".")) > 0 && metodo === "transferencia" && (
           <div className="space-y-2 rounded-xl border border-border p-3">
             <p className="text-xs font-medium text-muted-foreground">

@@ -263,6 +263,7 @@ export function LoansView({
           loan={cobrar}
           pie={pie}
           comprobanteObligatorio={comprobanteObligatorio}
+          verComision={esAdmin}
           onClose={() => setCobrar(null)}
           onListo={() => setCobrar(null)}
         />

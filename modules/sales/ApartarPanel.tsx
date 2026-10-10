@@ -14,6 +14,8 @@ import { useIsMobile } from "@/components/use-is-mobile";
 import { CuentaPicker, useCuentas, SinCuentasAviso } from "@/components/ui/cuenta";
 import { crearAdelanto } from "@/modules/adelantos/actions";
 import { guardarComprobanteAdelanto } from "./comprobantes";
+import { asignarTerminalPago } from "@/modules/config/terminales";
+import { recordarTerminal, TerminalPicker, useTerminalElegida, useTerminales } from "@/components/terminal-picker";
 
 const METODOS: [PaymentMethod, string][] = [
   ["efectivo", "Efectivo"],
@@ -34,12 +36,15 @@ export function ApartarPanel({
   open,
   lineas,
   clienteInicial,
+  verComision = false,
   onClose,
   onListo,
 }: {
   open: boolean;
   lineas: LineaApartado[];
   clienteInicial: string;
+  /** Show the terminal's commission and what lands in the account. */
+  verComision?: boolean;
   onClose: () => void;
   onListo: () => void;
 }) {
@@ -53,6 +58,8 @@ export function ApartarPanel({
   const cuentas = useCuentas();
   const sinCuentas = cuentas !== null && cuentas.length === 0;
   const [pending, start] = useTransition();
+  const terminales = useTerminales();
+  const [terminalId, setTerminalId] = useTerminalElegida(terminales, open);
 
   useEffect(() => {
     if (!open) return;
@@ -66,7 +73,9 @@ export function ApartarPanel({
   const total = lineas.reduce((s, l) => s + l.unit * l.qty, 0);
   const abonoCents = Math.round((Number(abono.replace(",", ".")) || 0) * 100);
   const faltaCuenta = abonoCents > 0 && metodo === "transferencia" && !cuentaId;
-  const listo = cliente.trim().length >= 3 && abonoCents <= total && !faltaCuenta && lineas.length > 0;
+  const pideTerminal = abonoCents > 0 && metodo === "tarjeta" && (terminales?.length ?? 0) > 0;
+  const faltaTerminal = pideTerminal && !terminalId;
+  const listo = cliente.trim().length >= 3 && abonoCents <= total && !faltaCuenta && !faltaTerminal && lineas.length > 0;
 
   function guardar() {
     if (!listo) return;
@@ -89,6 +98,11 @@ export function ApartarPanel({
             abonoMetodo: metodo,
           });
           hechos++;
+          // Each line's share of a card payment carries the terminal.
+          if (parte > 0 && pideTerminal && terminalId) {
+            const rt = await asignarTerminalPago({ adelantoId: id }, terminalId);
+            if (!rt.ok) toast.error(`Apartado ok, pero la terminal no se registró: ${rt.error}`);
+          }
           if (parte > 0 && metodo === "transferencia" && (referencia.trim() || cuentaId)) {
             const rc = await guardarComprobanteAdelanto(id, referencia.trim() || null, undefined, cuentaId);
             if (!rc.ok) toast.error(`Apartado ok, pero el comprobante no se guardó: ${rc.error}`);
@@ -102,6 +116,7 @@ export function ApartarPanel({
         if (hechos) router.refresh();
         return;
       }
+      if (pideTerminal) recordarTerminal(terminalId);
       toast.success(`Apartado para ${cliente.trim()}${abonoCents ? ` · abonó ${formatMXN(abonoCents)}` : ""}`, {
         action: { label: "Ver apartados", onClick: () => router.push("/adelantos") },
       });
@@ -183,6 +198,15 @@ export function ApartarPanel({
                   </button>
                 ))}
               </div>
+              {pideTerminal && terminales && (
+                <TerminalPicker
+                  terminales={terminales}
+                  value={terminalId}
+                  onChange={setTerminalId}
+                  montoCents={abonoCents}
+                  verComision={verComision}
+                />
+              )}
               {metodo === "transferencia" && (
                 <div className="space-y-2 pt-1">
                   <CuentaPicker cuentas={cuentas ?? []} value={cuentaId} onChange={setCuentaId} label="¿A qué cuenta llegó?" />

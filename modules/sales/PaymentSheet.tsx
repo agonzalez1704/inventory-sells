@@ -21,9 +21,8 @@ import { Input } from "@/components/ui/input";
 import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
 import { useIsMobile } from "@/components/use-is-mobile";
 import { AdjuntarImagen } from "@/components/ui/adjuntar-imagen";
-import { BancoIcon, CuentaPicker, useCuentas, SinCuentasAviso } from "@/components/ui/cuenta";
-import { listarTerminales } from "@/modules/config/terminales";
-import { comisionCents, comisionEfectiva, textoComision, type Terminal } from "@/lib/terminales";
+import { CuentaPicker, useCuentas, SinCuentasAviso } from "@/components/ui/cuenta";
+import { recordarTerminal, TerminalPicker, useTerminalElegida, useTerminales } from "@/components/terminal-picker";
 
 type Metodo = PaymentMethodVenta | "dividir";
 
@@ -53,17 +52,6 @@ export type Comprobante = { referencia: string | null; foto: File | null; cuenta
  * the common case, so it opens there with the keypad, and the change is the
  * biggest number on screen — it is what the seller says out loud.
  */
-const LS_TERMINAL = "pos_terminal_v1";
-
-/** Card terminals, fetched once per sheet. Null while loading. */
-function useTerminales(): Terminal[] | null {
-  const [t, setT] = useState<Terminal[] | null>(null);
-  useEffect(() => {
-    listarTerminales().then(setT).catch(() => setT([]));
-  }, []);
-  return t;
-}
-
 export function PaymentSheet({
   open,
   onClose,
@@ -105,7 +93,7 @@ export function PaymentSheet({
   const [cuentaId, setCuentaId] = useState<string | null>(null);
   const cuentas = useCuentas();
   const terminales = useTerminales();
-  const [terminalId, setTerminalId] = useState<string | null>(null);
+  const [terminalId, setTerminalId] = useTerminalElegida(terminales, open);
   const listaCuentas = cuentas ?? [];
   const sinCuentas = cuentas !== null && cuentas.length === 0;
 
@@ -120,19 +108,6 @@ export function PaymentSheet({
     setCuentaId(null);
   }, [open]);
 
-  // The last terminal this device used, or the only one there is.
-  useEffect(() => {
-    if (!open || !terminales?.length) return;
-    let ultima: string | null = null;
-    try {
-      ultima = localStorage.getItem(LS_TERMINAL);
-    } catch {
-      // Blocked storage: no memory, the counter picks.
-    }
-    setTerminalId(
-      terminales.some((t) => t.id === ultima) ? ultima : terminales.length === 1 ? terminales[0].id : null,
-    );
-  }, [open, terminales]);
 
   const dividir = metodo === "dividir";
   const pagos = PARTES.map((m) => ({ metodo: m.value, monto_cents: aCentavos(montos[m.value] ?? "") })).filter(
@@ -163,8 +138,6 @@ export function PaymentSheet({
   const montoTarjeta = dividir ? (pagos.find((p) => p.metodo === "tarjeta")?.monto_cents ?? 0) : metodo === "tarjeta" ? total : 0;
   const pideTerminal = montoTarjeta > 0 && (terminales?.length ?? 0) > 0;
   const faltaTerminal = pideTerminal && !terminalId;
-  const terminal = terminales?.find((t) => t.id === terminalId) ?? null;
-  const comision = terminal ? comisionCents(montoTarjeta, comisionEfectiva(terminal)) : 0;
   const puedeCobrar =
     (dividir ? splitCuadra : puedeSimple) && !faltaComprobante && !faltaCuenta && !faltaTerminal && !pending;
 
@@ -187,13 +160,7 @@ export function PaymentSheet({
     if (!puedeCobrar) return;
     const comp = referencia.trim() || foto || cuentaId ? { referencia: referencia.trim() || null, foto, cuentaId } : undefined;
     const term = pideTerminal ? terminalId : null;
-    if (term) {
-      try {
-        localStorage.setItem(LS_TERMINAL, term);
-      } catch {
-        // Not remembered; this charge still records it.
-      }
-    }
+    recordarTerminal(term);
     if (dividir) onConfirm("mixto" as PaymentMethodVenta, pagos, comp, term);
     else onConfirm(metodo, metodo === "saldo" ? [{ metodo, monto_cents: total }] : undefined, comp, term);
   }
@@ -419,50 +386,13 @@ export function PaymentSheet({
           )}
 
           {pideTerminal && terminales && (
-            <div className="space-y-2 rounded-xl border border-border bg-muted/30 p-3">
-              <p className="text-sm font-semibold">¿En qué terminal se pasó?</p>
-              <div className="grid gap-1.5">
-                {terminales.map((t) => {
-                  const activa = t.id === terminalId;
-                  return (
-                    <button
-                      key={t.id}
-                      type="button"
-                      aria-pressed={activa}
-                      onClick={() => setTerminalId(t.id)}
-                      className={cn(
-                        "flex min-h-12 cursor-pointer items-center gap-2.5 rounded-xl border bg-background px-3 py-2 text-left",
-                        activa ? "border-ring ring-1 ring-ring" : "border-border hover:border-ring/40",
-                      )}
-                    >
-                      <BancoIcon banco={t.procesador} />
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-sm font-semibold">{t.nombre}</span>
-                        {verComision && (
-                          <span className="block text-xs text-muted-foreground">
-                            {textoComision(t)}
-                            {t.cuenta ? ` · deposita en ${t.cuenta.alias}` : ""}
-                          </span>
-                        )}
-                      </span>
-                      {activa && <Check className="h-4 w-4 text-green-600 dark:text-green-400" />}
-                    </button>
-                  );
-                })}
-              </div>
-              {verComision && terminal && comision > 0 && (
-                <div className="space-y-1 rounded-lg bg-background px-3 py-2 text-sm">
-                  <div className="flex justify-between text-muted-foreground">
-                    <span>Comisión {terminal.nombre} ({textoComision(terminal)})</span>
-                    <span className="font-mono tabular-nums text-red-600 dark:text-red-400">−{formatMXN(comision)}</span>
-                  </div>
-                  <div className="flex justify-between font-semibold">
-                    <span>Llega{terminal.cuenta ? ` a ${terminal.cuenta.alias}` : ""}</span>
-                    <span className="font-mono tabular-nums">{formatMXN(montoTarjeta - comision)}</span>
-                  </div>
-                </div>
-              )}
-            </div>
+            <TerminalPicker
+              terminales={terminales}
+              value={terminalId}
+              onChange={setTerminalId}
+              montoCents={montoTarjeta}
+              verComision={verComision}
+            />
           )}
 
           {hayTransferencia && (

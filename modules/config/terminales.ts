@@ -106,3 +106,45 @@ export async function asignarTerminalVenta(saleId: string, terminalId: string): 
     return null;
   });
 }
+
+/**
+ * Record the terminal of an abono to a credit note, or of an apartado
+ * payment: the latest card payment of that note or apartado still without
+ * one, right after it was registered. Commission frozen as for a sale.
+ */
+export async function asignarTerminalPago(
+  dueno: { saleId: string } | { adelantoId: string },
+  terminalId: string,
+): Promise<ActionResult<null>> {
+  return attempt("asignarTerminalPago", async () => {
+    const { userId } = await auth();
+    if (!userId) throw new Error("No autenticado");
+    const tabla = "saleId" in dueno ? "sale_pagos" : "adelanto_pagos";
+    const campo = "saleId" in dueno ? "sale_id" : "adelanto_id";
+    const id = "saleId" in dueno ? dueno.saleId : dueno.adelantoId;
+    const [{ data: pago }, { data: term }] = await Promise.all([
+      insforgeAdmin.database
+        .from(tabla)
+        .select("id")
+        .eq(campo, id)
+        .eq("metodo", "tarjeta")
+        .is("terminal_id", null)
+        .order("created_at", { ascending: false })
+        .limit(1),
+      insforgeAdmin.database.from("terminales_pago").select("comision_pct, iva_comision").eq("id", terminalId).maybeSingle(),
+    ]);
+    const fila = ((pago ?? []) as { id: string }[])[0];
+    if (!fila) throw new Error("No encontré el pago con tarjeta");
+    const t = term as { comision_pct: number | string; iva_comision: boolean } | null;
+    if (!t) throw new Error("Esa terminal ya no existe");
+    const { error } = await insforgeAdmin.database
+      .from(tabla)
+      .update({
+        terminal_id: terminalId,
+        terminal_comision_pct: comisionEfectiva({ comision_pct: Number(t.comision_pct), iva_comision: t.iva_comision }),
+      })
+      .eq("id", fila.id);
+    if (error) throw new Error(error.message ?? "No se pudo registrar la terminal");
+    return null;
+  });
+}

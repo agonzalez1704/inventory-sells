@@ -15,6 +15,8 @@ import { AdjuntarImagen } from "@/components/ui/adjuntar-imagen";
 import { CuentaPicker, useCuentas, SinCuentasAviso } from "@/components/ui/cuenta";
 import { imprimirTicketNavegador } from "@/lib/ticket";
 import { guardarComprobante } from "@/modules/sales/comprobantes";
+import { asignarTerminalPago } from "@/modules/config/terminales";
+import { recordarTerminal, TerminalPicker, useTerminalElegida, useTerminales } from "@/components/terminal-picker";
 import { abonarFiado, settleLoan } from "@/modules/sales/actions";
 import { quienDebe, resta as restaDe, ticketDeAbono, type PieNota } from "./estado-cuenta";
 import type { Loan } from "./LoansView";
@@ -40,6 +42,7 @@ export function CobrarPanel({
   loan,
   pie,
   comprobanteObligatorio = false,
+  verComision = false,
   onClose,
   onListo,
 }: {
@@ -47,6 +50,8 @@ export function CobrarPanel({
   loan: Loan;
   pie: PieNota;
   comprobanteObligatorio?: boolean;
+  /** Show the terminal's commission and what lands in the account. */
+  verComision?: boolean;
   onClose: () => void;
   onListo: () => void;
 }) {
@@ -65,6 +70,8 @@ export function CobrarPanel({
   const listaCuentas = cuentas ?? [];
   const sinCuentas = cuentas !== null && cuentas.length === 0;
   const [pending, start] = useTransition();
+  const terminales = useTerminales();
+  const [terminalId, setTerminalId] = useTerminalElegida(terminales, open);
 
   useEffect(() => {
     if (!open) return;
@@ -84,7 +91,9 @@ export function CobrarPanel({
   const insuficiente = metodo === "efectivo" && recibido.trim() !== "" && recibidoCents < cobro;
   const faltaCuenta = metodo === "transferencia" && (listaCuentas.length > 0 ? !cuentaId : sinCuentas);
   const faltaComprobante = comprobanteObligatorio && metodo === "transferencia" && !referencia.trim() && !foto;
-  const puede = cobro > 0 && !insuficiente && !faltaCuenta && !faltaComprobante && !pending;
+  const pideTerminal = metodo === "tarjeta" && (terminales?.length ?? 0) > 0;
+  const faltaTerminal = pideTerminal && !terminalId;
+  const puede = cobro > 0 && !insuficiente && !faltaCuenta && !faltaComprobante && !faltaTerminal && !pending;
 
   const sugerencias = useMemo(() => {
     const paso = [10000, 20000, 50000];
@@ -98,6 +107,13 @@ export function CobrarPanel({
       try {
         if (liquida) await settleLoan(loan.id, metodo);
         else await abonarFiado(loan.id, cobro / 100, metodo);
+
+        // The abono's terminal, recorded after it like a transfer's proof.
+        if (pideTerminal && terminalId) {
+          recordarTerminal(terminalId);
+          const rt = await asignarTerminalPago({ saleId: loan.id }, terminalId);
+          if (!rt.ok) toast.error(`Cobro ok, pero la terminal no se registró: ${rt.error}`);
+        }
 
         if (metodo === "transferencia" && (referencia.trim() || foto || cuentaId)) {
           let form: FormData | undefined;
@@ -264,6 +280,16 @@ export function CobrarPanel({
                 </span>
               </div>
             </div>
+          )}
+
+          {pideTerminal && terminales && (
+            <TerminalPicker
+              terminales={terminales}
+              value={terminalId}
+              onChange={setTerminalId}
+              montoCents={cobro}
+              verComision={verComision}
+            />
           )}
 
           {metodo === "transferencia" && (
