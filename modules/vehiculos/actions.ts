@@ -49,6 +49,8 @@ export type PiezaVehiculo = {
   anio_desde: number | null;
   anio_hasta: number | null;
   version: string | null;
+  /** The part's brand (GROB, YOKOMITSU) from the owner's sheet. */
+  brand: string | null;
 };
 
 export type ModeloVehiculo = {

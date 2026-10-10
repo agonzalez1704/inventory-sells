@@ -272,6 +272,8 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
   );
 }
 
+const SIN_SISTEMA = "_sin";
+
 export function SalesScreen({
   products,
   categorias,
@@ -335,6 +337,7 @@ export function SalesScreen({
   const [vehiculo, setVehiculo] = useState<Vehiculo | null>(null);
   const [familia, setFamilia] = useState<string | null>(null);
   const [sistema, setSistema] = useState<string | null>(null);
+  const [marcaPieza, setMarcaPieza] = useState<string | null>(null);
   const [soloStock, setSoloStock] = useState(false);
   const [piezas, setPiezas] = useState<PiezaVehiculo[]>([]);
   const [cargandoVeh, setCargandoVeh] = useState(false);
@@ -536,9 +539,9 @@ export function SalesScreen({
   const sistemas = useMemo(() => {
     const cuenta = new Map<string, { id: string; nombre: string; n: number }>();
     for (const p of piezas) {
-      const id = p.sistema ?? "otros";
+      const id = p.sistema ?? SIN_SISTEMA;
       const prev = cuenta.get(id);
-      cuenta.set(id, { id, nombre: p.sistema_nombre ?? "Otros", n: (prev?.n ?? 0) + 1 });
+      cuenta.set(id, { id, nombre: p.sistema_nombre ?? "Sin sistema", n: (prev?.n ?? 0) + 1 });
     }
     return [...cuenta.values()].sort((a, b) => b.n - a.n || a.nombre.localeCompare(b.nombre, "es"));
   }, [piezas]);
@@ -547,7 +550,7 @@ export function SalesScreen({
     const cuenta = new Map<string, { id: string; nombre: string; n: number }>();
     for (const p of piezas) {
       if (!p.familia) continue;
-      if (sistema && (p.sistema ?? "otros") !== sistema) continue;
+      if (sistema && (p.sistema ?? SIN_SISTEMA) !== sistema) continue;
       const prev = cuenta.get(p.familia);
       cuenta.set(p.familia, {
         id: p.familia,
@@ -558,13 +561,28 @@ export function SalesScreen({
     return [...cuenta.values()].sort((a, b) => b.n - a.n || a.nombre.localeCompare(b.nombre, "es"));
   }, [piezas, sistema]);
 
+  // The part's brand (GROB, YOKOMITSU), counted inside the system and family
+  // already chosen; offered only when there is a choice to make.
+  const marcasPieza = useMemo(() => {
+    const cuenta = new Map<string, number>();
+    for (const p of piezas) {
+      if (!p.brand) continue;
+      if (sistema && (p.sistema ?? SIN_SISTEMA) !== sistema) continue;
+      if (familia && p.familia !== familia) continue;
+      cuenta.set(p.brand, (cuenta.get(p.brand) ?? 0) + 1);
+    }
+    return [...cuenta].map(([nombre, n]) => ({ nombre, n })).sort((a, b) => b.n - a.n);
+  }, [piezas, sistema, familia]);
+
   const piezasVisibles = useMemo(
     () =>
       piezas.filter(
         (p) =>
-          (!sistema || (p.sistema ?? "otros") === sistema) && (!familia || p.familia === familia),
+          (!sistema || (p.sistema ?? SIN_SISTEMA) === sistema) &&
+          (!familia || p.familia === familia) &&
+          (!marcaPieza || p.brand === marcaPieza),
       ),
-    [piezas, sistema, familia],
+    [piezas, sistema, familia, marcaPieza],
   );
   const textoFamilia = familia
     ? (familias.find((f) => f.id === familia)?.nombre ?? "esa pieza")
@@ -1101,7 +1119,7 @@ export function SalesScreen({
           {modo === "vehiculo" ? (
             !vehiculo ? (
               <div className="mt-4">
-                <VehiculoPicker onElegir={(v) => { setVehiculo(v); setFamilia(null); setSistema(null); guardarReciente(v); }} />
+                <VehiculoPicker onElegir={(v) => { setVehiculo(v); setFamilia(null); setSistema(null); setMarcaPieza(null); guardarReciente(v); }} />
               </div>
             ) : (
               <div className="mt-3 space-y-3">
@@ -1120,7 +1138,7 @@ export function SalesScreen({
                     </p>
                   </div>
                   <div className="flex-1" />
-                  <Button variant="secondary" className="h-10" onClick={() => { setVehiculo(null); setFamilia(null); setSistema(null); }}>
+                  <Button variant="secondary" className="h-10" onClick={() => { setVehiculo(null); setFamilia(null); setSistema(null); setMarcaPieza(null); }}>
                     Cambiar carro
                   </Button>
                   <button
@@ -1168,6 +1186,23 @@ export function SalesScreen({
                         {familias.map((f) => (
                           <Chip key={f.id} active={familia === f.id} onClick={() => setFamilia(familia === f.id ? null : f.id)}>
                             {f.nombre} <span className="tabular-nums opacity-60">{f.n}</span>
+                          </Chip>
+                        ))}
+                      </div>
+                    )}
+                    {(marcasPieza.length > 1 || marcaPieza) && (
+                      <div className="flex gap-2 overflow-x-auto pb-1 pl-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                        <span className="flex items-center pr-1 text-xs text-muted-foreground">Marca:</span>
+                        <Chip active={marcaPieza === null} onClick={() => setMarcaPieza(null)}>
+                          Todas
+                        </Chip>
+                        {marcasPieza.map((m) => (
+                          <Chip
+                            key={m.nombre}
+                            active={marcaPieza === m.nombre}
+                            onClick={() => setMarcaPieza(marcaPieza === m.nombre ? null : m.nombre)}
+                          >
+                            {m.nombre} <span className="tabular-nums opacity-60">{m.n}</span>
                           </Chip>
                         ))}
                       </div>

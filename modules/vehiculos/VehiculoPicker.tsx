@@ -45,7 +45,7 @@ export function guardarReciente(v: Vehiculo): void {
 }
 
 export const nombreVehiculo = (v: Vehiculo) =>
-  `${v.marca} ${v.modelo} ${v.version ?? v.anio ?? ""}`.trim();
+  [v.marca, v.modelo, v.version, v.anio].filter(Boolean).join(" ");
 
 const aniosDeVersion = (v: VersionVehiculo) =>
   v.anio_min && v.anio_max && v.anio_min !== v.anio_max
@@ -53,7 +53,8 @@ const aniosDeVersion = (v: VersionVehiculo) =>
     : (v.anio_min ?? v.anio_max ?? "").toString();
 
 /**
- * "¿Qué carro trae?" — the model, then the version or the year.
+ * "¿Qué carro trae?" — the model, the year, and the version only when that
+ * year has more than one.
  *
  * The make is not asked for: the counter says "un Versa", and model names are
  * nearly unique across the catalog, so the make rides along as context instead
@@ -79,7 +80,8 @@ export function VehiculoPicker({
   const [elegido, setElegido] = useState<ModeloVehiculo | null>(null);
   const [versiones, setVersiones] = useState<VersionVehiculo[]>([]);
   const [anios, setAnios] = useState<{ anio: number; piezas: number }[]>([]);
-  const [porAnio, setPorAnio] = useState(false);
+  // The year picked when that year has two or more versions to choose from.
+  const [anioDudoso, setAnioDudoso] = useState<number | null>(null);
   const [cargando, setCargando] = useState(true);
   const [recientes, setRecientes] = useState<Vehiculo[]>([]);
 
@@ -110,7 +112,7 @@ export function VehiculoPicker({
     if (!elegido) return;
     let vivo = true;
     setCargando(true);
-    setPorAnio(false);
+    setAnioDudoso(null);
     Promise.all([
       versionesDeModelo(elegido.marca, elegido.modelo).catch(() => []),
       aniosDeModelo(elegido.marca, elegido.modelo).catch(() => []),
@@ -132,7 +134,17 @@ export function VehiculoPicker({
   }
 
   const nombradas = versiones.filter((v) => v.version);
-  const pasoVersion = !porAnio && nombradas.length > 0;
+  // Marca → Modelo → Año, and the version only when that year is ambiguous:
+  // a Versa 2015 is a V-Drive, a Versa 2021 can be V-Drive or 2ª generación.
+  const versionesDe = (anio: number) =>
+    nombradas.filter((v) => (v.anio_min ?? -Infinity) <= anio && anio <= (v.anio_max ?? Infinity));
+  const pasoVersion = anioDudoso !== null;
+
+  function elegirAnio(anio: number) {
+    if (!elegido) return;
+    if (versionesDe(anio).length >= 2) setAnioDudoso(anio);
+    else elegir({ marca: elegido.marca, modelo: elegido.modelo, anio });
+  }
 
   return (
     <div className={cn("flex flex-col gap-4", !compacto && "rounded-2xl border border-border bg-background p-5")}>
@@ -226,18 +238,28 @@ export function VehiculoPicker({
               <span className="text-muted-foreground">{elegido.marca}</span>
               <X className="h-3.5 w-3.5 text-muted-foreground" />
             </button>
+            {anioDudoso !== null && (
+              <button
+                type="button"
+                onClick={() => setAnioDudoso(null)}
+                className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-full border border-border px-4 text-sm font-semibold tabular-nums hover:bg-muted"
+              >
+                {anioDudoso}
+                <X className="h-3.5 w-3.5 text-muted-foreground" />
+              </button>
+            )}
             <span className="text-sm text-muted-foreground">{pasoVersion ? "¿Qué versión?" : "¿De qué año?"}</span>
           </div>
 
           {pasoVersion ? (
             <>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                {nombradas.map((v) => (
+                {versionesDe(anioDudoso ?? 0).map((v) => (
                   <button
                     key={v.version}
                     type="button"
                     onClick={() =>
-                      elegir({ marca: elegido.marca, modelo: elegido.modelo, anio: null, version: v.version })
+                      elegir({ marca: elegido.marca, modelo: elegido.modelo, anio: anioDudoso, version: v.version })
                     }
                     className="flex cursor-pointer flex-col gap-0.5 rounded-xl border border-border px-3 py-2.5 text-left hover:border-primary hover:bg-muted"
                   >
@@ -251,10 +273,10 @@ export function VehiculoPicker({
               </div>
               <button
                 type="button"
-                onClick={() => setPorAnio(true)}
+                onClick={() => elegir({ marca: elegido.marca, modelo: elegido.modelo, anio: anioDudoso })}
                 className="cursor-pointer self-start text-sm font-medium text-brand-foreground underline-offset-4 hover:underline"
               >
-                No sé la versión, buscar por año
+                No sé la versión: ver todas las de {anioDudoso}
               </button>
             </>
           ) : (
@@ -271,7 +293,7 @@ export function VehiculoPicker({
                     <button
                       key={a.anio}
                       type="button"
-                      onClick={() => elegir({ marca: elegido.marca, modelo: elegido.modelo, anio: a.anio })}
+                      onClick={() => elegirAnio(a.anio)}
                       className="flex h-12 cursor-pointer flex-col items-center justify-center rounded-xl border border-border text-sm hover:border-primary hover:bg-muted"
                     >
                       <span className="font-semibold tabular-nums">{a.anio}</span>
