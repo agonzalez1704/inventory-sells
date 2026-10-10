@@ -27,6 +27,9 @@ export const BANCOS: Record<
   hey:         { nombre: "Hey Banco",    marca: "Hey",  bg: "#0e1e2e", fg: "#3ddc97" },
   spin:        { nombre: "Spin by OXXO", marca: "Spin", bg: "#e10a17", fg: "#ffffff" },
   mercadopago: { nombre: "Mercado Pago", marca: "MP",   bg: "#009ee3", fg: "#ffffff", logo: "/bancos/mercadopago.svg" },
+  // Card processors, for terminals; no CLABE ever resolves to them.
+  clip:        { nombre: "Clip",         marca: "Clip", bg: "#ff5f00", fg: "#ffffff" },
+  getnet:      { nombre: "Getnet",       marca: "Gnet", bg: "#e30613", fg: "#ffffff" },
   stp:         { nombre: "STP",          marca: "STP",  bg: "#20315f", fg: "#ffffff" },
   otro:        { nombre: "Otro",         marca: "$",    bg: "#6b7280", fg: "#ffffff" },
 };

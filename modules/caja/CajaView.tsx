@@ -23,6 +23,7 @@ import {
   Usb,
   Wallet,
   X,
+  CreditCard,
 } from "lucide-react";
 import { formatMXN } from "@/lib/money";
 import { type ColumnaExport } from "@/lib/exportar-tabla";
@@ -107,6 +108,8 @@ export type CajaData = {
   porInventario: InvAgg[];
   /** Transfer income split by receiving business account (via comprobantes). */
   porCuenta: PorCuenta[];
+  porTerminal: PorTerminal[];
+  porDestino: PorDestino[];
   /** Active branches; empty for shops without sucursales (UI stays as-is). */
   sucursales: { id: string; nombre: string }[];
   /** Branch this corte is scoped to; null = global; "sin" = unattributed. */
@@ -118,6 +121,23 @@ export type CajaData = {
 export type PorCuenta = {
   cuenta: { id: string; banco: string; alias: string } | null;
   monto: number;
+};
+
+export type PorTerminal = {
+  terminal: { id: string; nombre: string; procesador: string; comision: string } | null;
+  cuenta: { id: string; banco: string; alias: string } | null;
+  cobros: number;
+  cobrado: number;
+  comision: number;
+  neto: number;
+};
+
+export type PorDestino = {
+  cuenta: { id: string; banco: string; alias: string };
+  tarjeta: number;
+  transferencias: number;
+  /** "Clip mostrador $4,072.52", "transferencias $1,860.00" */
+  detalle: string[];
 };
 
 export type InvMov = {
@@ -584,6 +604,64 @@ export function CajaView({ data }: { data: CajaData }) {
                       <span className={cn("font-semibold tabular-nums", !su.ingresos && "text-muted-foreground")}>{formatMXN(su.ingresos)}</span>
                       <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                     </button>
+                  </li>
+                ))}
+              </ul>
+            </Seccion>
+          )}
+
+          {data.porTerminal.length > 0 && (
+            <Seccion titulo="Tarjeta por terminal" sub="Lo que cobró cada terminal, su comisión y lo que debe llegar">
+              <ul>
+                {data.porTerminal.map((t) => (
+                  <li
+                    key={t.terminal?.id ?? "sin"}
+                    className={cn(
+                      "flex items-center gap-2.5 border-t border-border/70 px-4 py-2.5 text-sm",
+                      !t.terminal && "bg-amber-50/60 dark:bg-amber-950/20",
+                    )}
+                  >
+                    {t.terminal ? <BancoIcon banco={t.terminal.procesador} size="sm" /> : <CreditCard className="h-4 w-4 text-amber-600" />}
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-medium">{t.terminal ? t.terminal.nombre : "Sin terminal"}</span>
+                      <span className="block truncate text-xs text-muted-foreground">
+                        {t.cobros} {t.cobros === 1 ? "cobro" : "cobros"} · {formatMXN(t.cobrado)}
+                        {t.terminal ? ` · ${t.terminal.comision}${t.cuenta ? ` → ${t.cuenta.alias}` : ""}` : " · sin terminal registrada"}
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-right">
+                      {t.terminal ? (
+                        <>
+                          <span className="block font-semibold tabular-nums">{formatMXN(t.neto)}</span>
+                          <span className="block text-xs tabular-nums text-red-600 dark:text-red-400">−{formatMXN(t.comision)}</span>
+                        </>
+                      ) : (
+                        <span className="block font-semibold tabular-nums">{formatMXN(t.cobrado)}</span>
+                      )}
+                    </span>
+                  </li>
+                ))}
+                <li className="flex items-center gap-2.5 border-t border-border bg-muted/40 px-4 py-2.5 text-sm font-semibold">
+                  <span className="flex-1">Comisiones</span>
+                  <span className="tabular-nums text-red-600 dark:text-red-400">
+                    −{formatMXN(data.porTerminal.reduce((s, t) => s + t.comision, 0))}
+                  </span>
+                </li>
+              </ul>
+            </Seccion>
+          )}
+
+          {data.porDestino.length > 0 && (
+            <Seccion titulo="Debe llegar a cada cuenta" sub="Tarjeta neta de comisión más transferencias, para cotejar con el banco">
+              <ul>
+                {data.porDestino.map((d) => (
+                  <li key={d.cuenta.id} className="flex items-center gap-2.5 border-t border-border/70 px-4 py-2.5 text-sm">
+                    <BancoIcon banco={d.cuenta.banco} size="sm" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-medium">{d.cuenta.alias}</span>
+                      <span className="block truncate text-xs text-muted-foreground">{d.detalle.join(" · ")}</span>
+                    </span>
+                    <span className="shrink-0 font-semibold tabular-nums">{formatMXN(d.tarjeta + d.transferencias)}</span>
                   </li>
                 ))}
               </ul>

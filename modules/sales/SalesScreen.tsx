@@ -46,6 +46,7 @@ import { VehiculoPicker, guardarReciente, nombreVehiculo } from "@/modules/vehic
 import { piezasDeVehiculo, type PiezaVehiculo, type Vehiculo } from "@/modules/vehiculos/actions";
 import { demandaReciente, type DemandaReciente } from "@/modules/demanda/actions";
 import { guardarComprobante } from "./comprobantes";
+import { asignarTerminalVenta } from "@/modules/config/terminales";
 import { PaymentSheet, type Comprobante } from "./PaymentSheet";
 import { ApartarPanel } from "./ApartarPanel";
 import { ReciboImpreso } from "./ReciboImpreso";
@@ -712,7 +713,7 @@ export function SalesScreen({
     };
   }, [customer.id, customer.is_system]);
 
-  function submit(metodo?: PaymentMethodVenta, pagos?: PagoSplit[], comprobante?: Comprobante) {
+  function submit(metodo?: PaymentMethodVenta, pagos?: PagoSplit[], comprobante?: Comprobante, terminalId?: string | null) {
     if (!canSubmit) return;
     const items = lines.map((l) => ({ product_id: l.product.id, qty: l.qty }));
     const esFiado = mode === "prestamo";
@@ -751,6 +752,11 @@ export function SalesScreen({
           }
           const rc = await guardarComprobante(saleId, comprobante.referencia, form, comprobante.cuentaId);
           if (!rc.ok) toast.error(`Venta ok, pero el comprobante no se guardó: ${rc.error}`);
+        }
+        // Same for the card terminal: recorded after the charge, never undoing it.
+        if (terminalId && !esFiado) {
+          const rt = await asignarTerminalVenta(saleId, terminalId);
+          if (!rt.ok) toast.error(`Venta ok, pero la terminal no se registró: ${rt.error}`);
         }
         const ticket: TicketData = { folio: saleId, fecha: new Date().toISOString(), ...ticketBase };
         const usoSaldo = (pagos ?? []).find((p) => p.metodo === "saldo")?.monto_cents ?? 0;
@@ -1419,7 +1425,8 @@ export function SalesScreen({
         pending={pending}
         comprobanteObligatorio={comprobanteObligatorio}
         saldoDisponible={saldo}
-        onConfirm={(metodo, pagos, comprobante) => submit(metodo, pagos, comprobante)}
+        verComision={esAdmin}
+        onConfirm={(metodo, pagos, comprobante, terminalId) => submit(metodo, pagos, comprobante, terminalId)}
       />
 
       <ApartarPanel

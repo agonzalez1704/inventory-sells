@@ -9,6 +9,8 @@ import { listarEquipos, listarSucursales } from "@/modules/sucursales/actions";
 import { SucursalesConfig } from "@/modules/sucursales/SucursalesConfig";
 import { listarCuentasAdmin } from "@/modules/config/cuentas";
 import { CuentasNegocio } from "@/modules/config/CuentasNegocio";
+import { listarTerminales } from "@/modules/config/terminales";
+import { TerminalesConfig } from "@/modules/config/TerminalesConfig";
 import { Plane } from "lucide-react";
 import { PushToggle } from "@/components/push-toggle";
 import { NotifRoles } from "@/modules/notifications/NotifRoles";
@@ -65,7 +67,7 @@ export default async function ConfiguracionPage() {
     );
   }
   const [sucursales, equipos] = isAdmin ? await Promise.all([listarSucursales(), listarEquipos()]) : [[], []];
-  const cuentas = isAdmin ? await listarCuentasAdmin() : [];
+  const [cuentas, terminales] = isAdmin ? await Promise.all([listarCuentasAdmin(), listarTerminales()]) : [[], []];
   // Naming generations only makes sense where the catalog is sold by car.
   const conVehiculos = isAdmin ? await hayVehiculos() : false;
   const aliAuthUrl = aliKey
@@ -86,6 +88,8 @@ export default async function ConfiguracionPage() {
       {isAdmin && <SucursalesConfig sucursales={sucursales} equipos={equipos} />}
 
       {isAdmin && <CuentasNegocio cuentas={cuentas} isAdmin={isAdmin} />}
+
+      {isAdmin && <TerminalesConfig terminales={terminales} cuentas={cuentas} />}
 
       {conVehiculos && <VersionesConfig />}
 

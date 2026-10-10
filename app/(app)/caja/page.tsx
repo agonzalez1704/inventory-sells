@@ -10,7 +10,11 @@ import {
   type Devolucion,
   type IngresoLinea,
   type PorCuenta,
+  type PorTerminal,
+  type PorDestino,
 } from "@/modules/caja/CajaView";
+import { comisionCents, comisionEfectiva, textoComision } from "@/lib/terminales";
+import { formatMXN } from "@/lib/money";
 import type { PaymentMethodStored, PaymentMethod, PaymentMethodVenta } from "@/lib/types";
 
 
@@ -604,6 +608,108 @@ export default async function CajaPage({
     if (porCuenta.length === 1 && !porCuenta[0].cuenta) porCuenta = [];
   }
 
+  // Card money per terminal: what each one took, the commission it keeps
+  // (frozen on the sale at the time of the charge) and what should reach its
+  // account. Card events without a terminal stay in "sin terminal", so the
+  // rows always sum to the Tarjeta income line.
+  const tarjDirectas = directasV.filter((v) => v.payment_method === "tarjeta");
+  const tarjAbonos = salePagos.filter((p) => p.metodo === "tarjeta");
+  const tarjAdel = adelantoPagos.filter((p) => p.tipo === "abono" && p.metodo === "tarjeta");
+  const tarjExtra = ingresos.filter((i) => i.metodo === "tarjeta");
+  let porTerminal: PorTerminal[] = [];
+  let porDestino: PorDestino[] = [];
+  if (tarjDirectas.length + tarjAbonos.length + tarjAdel.length + tarjExtra.length > 0) {
+    const saleIds = [...new Set([...tarjDirectas.map((v) => v.id), ...tarjAbonos.map((p) => p.sale_id)])].filter(Boolean) as string[];
+    const adelIds = [...new Set(tarjAdel.map((p) => p.adelanto_id))];
+    const [{ data: termSales }, { data: termAdel }, { data: termData }] = await Promise.all([
+      saleIds.length
+        ? insforgeAdmin.database.from("sales").select("id, terminal_id, terminal_comision_pct").in("id", saleIds)
+        : Promise.resolve({ data: [] }),
+      adelIds.length
+        ? insforgeAdmin.database.from("adelantos").select("id, terminal_id, terminal_comision_pct").in("id", adelIds)
+        : Promise.resolve({ data: [] }),
+      insforgeAdmin.database
+        .from("terminales_pago")
+        .select("id, nombre, procesador, comision_pct, iva_comision, cuentas_negocio(id, banco, alias)"),
+    ]);
+    type Asig = { id: string; terminal_id: string | null; terminal_comision_pct: number | string | null };
+    const asigVenta = new Map(((termSales ?? []) as Asig[]).map((a) => [a.id, a]));
+    const asigAdel = new Map(((termAdel ?? []) as Asig[]).map((a) => [a.id, a]));
+    type CuentaRow = { id: string; banco: string; alias: string };
+    const terminalPorId = new Map(
+      ((termData ?? []) as unknown as {
+        id: string;
+        nombre: string;
+        procesador: string;
+        comision_pct: number | string;
+        iva_comision: boolean;
+        cuentas_negocio: CuentaRow | CuentaRow[] | null;
+      }[]).map((t) => [
+        t.id,
+        {
+          id: t.id,
+          nombre: t.nombre,
+          procesador: t.procesador,
+          comision_pct: Number(t.comision_pct),
+          iva_comision: t.iva_comision,
+          cuenta: Array.isArray(t.cuentas_negocio) ? (t.cuentas_negocio[0] ?? null) : t.cuentas_negocio,
+        },
+      ]),
+    );
+
+    const agg = new Map<string, PorTerminal>();
+    const sumar = (asig: Asig | undefined, monto: number) => {
+      const t = asig?.terminal_id ? terminalPorId.get(asig.terminal_id) : undefined;
+      const key = t?.id ?? "—";
+      const a =
+        agg.get(key) ??
+        ({
+          terminal: t ? { id: t.id, nombre: t.nombre, procesador: t.procesador, comision: textoComision(t) } : null,
+          cuenta: t?.cuenta ?? null,
+          cobros: 0,
+          cobrado: 0,
+          comision: 0,
+          neto: 0,
+        } satisfies PorTerminal);
+      const pct = t ? (asig?.terminal_comision_pct != null ? Number(asig.terminal_comision_pct) : comisionEfectiva(t)) : 0;
+      const c = t ? comisionCents(monto, pct) : 0;
+      a.cobros += 1;
+      a.cobrado += monto;
+      a.comision += c;
+      a.neto += monto - c;
+      agg.set(key, a);
+    };
+    for (const v of tarjDirectas) sumar(asigVenta.get(v.id as string), v.total_cents);
+    for (const p of tarjAbonos) sumar(asigVenta.get(p.sale_id), p.monto_cents);
+    for (const p of tarjAdel) sumar(asigAdel.get(p.adelanto_id), p.monto_cents);
+    for (const i of tarjExtra) sumar(undefined, i.monto_cents);
+    // Terminals by amount; "sin terminal" last.
+    porTerminal = [...agg.values()].sort((x, y) => (!x.terminal ? 1 : !y.terminal ? -1 : y.cobrado - x.cobrado));
+    // Only "sin terminal" says nothing: hidden until the shop registers terminals.
+    if (porTerminal.length === 1 && !porTerminal[0].terminal) porTerminal = [];
+
+    // What should reach each account: card money net of commission plus the
+    // day's tagged transfers — the figure to check against the bank.
+    if (porTerminal.some((t) => t.terminal && t.cuenta)) {
+      const dest = new Map<string, PorDestino>();
+      for (const t of porTerminal) {
+        if (!t.terminal || !t.cuenta) continue;
+        const d = dest.get(t.cuenta.id) ?? { cuenta: t.cuenta, tarjeta: 0, transferencias: 0, detalle: [] };
+        d.tarjeta += t.neto;
+        d.detalle.push(`${t.terminal.nombre} ${formatMXN(t.neto)}`);
+        dest.set(t.cuenta.id, d);
+      }
+      for (const c of porCuenta) {
+        if (!c.cuenta) continue;
+        const d = dest.get(c.cuenta.id) ?? { cuenta: c.cuenta, tarjeta: 0, transferencias: 0, detalle: [] };
+        d.transferencias += c.monto;
+        d.detalle.push(`transferencias ${formatMXN(c.monto)}`);
+        dest.set(c.cuenta.id, d);
+      }
+      porDestino = [...dest.values()].sort((a, b) => b.tarjeta + b.transferencias - (a.tarjeta + a.transferencias));
+    }
+  }
+
   return (
     <CajaView
       data={{
@@ -628,6 +734,8 @@ export default async function CajaPage({
         ingresosDetalle,
         porInventario,
         porCuenta,
+        porTerminal,
+        porDestino,
         sucursales: sucursalesActivas,
         sucursalSel,
         porSucursal,
