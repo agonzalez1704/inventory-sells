@@ -371,12 +371,20 @@ function Selector({
   if (valor && !lista.some((o) => o.value === valor)) lista.unshift({ value: valor, n: 0 });
   const cuantos = new Map(lista.map((o) => [o.value, o.n]));
   const valores = lista.map((o) => o.value);
+  // The filter lives in the URL, and the navigation takes a moment: the pick
+  // shows at once instead of the field blanking until the page answers.
+  const [elegido, setElegido] = useState(valor);
+  useEffect(() => setElegido(valor), [valor]);
 
   return (
     <Combobox
       items={valores}
-      value={valor}
-      onValueChange={(v) => onElegir((v as string | null) ?? null)}
+      value={elegido}
+      onValueChange={(v) => {
+        const nuevo = (v as string | null) ?? null;
+        setElegido(nuevo);
+        onElegir(nuevo);
+      }}
       disabled={deshabilitado}
       filter={(item: string, q: string) => sinAcentos(item).includes(sinAcentos(q.trim()))}
       autoHighlight
@@ -386,7 +394,7 @@ function Selector({
         inputMode={numerico ? "numeric" : "text"}
         aria-label={label}
         disabled={deshabilitado}
-        showClear={!!valor && !deshabilitado}
+        showClear={!!elegido && !deshabilitado}
         inputClassName="font-medium placeholder:font-normal"
         className="focus-within:border-tienda-500"
       >

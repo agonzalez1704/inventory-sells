@@ -60,7 +60,7 @@ function ComboboxInput({
     <ComboboxPrimitive.InputGroup
       data-slot="combobox-input-group"
       className={cn(
-        "flex h-11 items-center gap-2 rounded-xl border border-border bg-background pr-1 pl-3 transition-colors focus-within:border-ring",
+        "flex h-11 w-full min-w-0 items-center gap-2 rounded-xl border border-border bg-background pr-1 pl-3 transition-colors focus-within:border-ring",
         disabled && "opacity-50",
         className,
       )}
@@ -71,7 +71,7 @@ function ComboboxInput({
         disabled={disabled}
         // 16px on phones: anything smaller makes iOS zoom the page on focus.
         className={cn(
-          "h-full min-w-0 flex-1 bg-transparent text-base outline-hidden placeholder:text-muted-foreground disabled:cursor-not-allowed lg:text-sm",
+          "h-full w-0 min-w-0 flex-1 bg-transparent text-base outline-hidden placeholder:text-muted-foreground disabled:cursor-not-allowed lg:text-sm",
           inputClassName,
         )}
         {...props}
