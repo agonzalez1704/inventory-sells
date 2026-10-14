@@ -213,3 +213,48 @@ export async function registrarPiezaDeFuera(input: PiezaFueraInput): Promise<Act
     return { product: { ...prod, inventory_name: inv?.name ?? INVENTARIO }, qty, saleId, gastoFallo };
   });
 }
+
+export type PrecioDeFuera = {
+  pieza: string;
+  vecinoId: string;
+  vecino: string;
+  costo_cents: number;
+  fecha: string;
+};
+
+/**
+ * What this part cost last time, and at which neighbour: every pieza de fuera
+ * is a received purchase, so the history is already there. Newest first.
+ */
+export async function preciosDeFuera(nombre: string): Promise<PrecioDeFuera[]> {
+  const q = nombre.trim();
+  if (q.length < 3) return [];
+  const rows = await buscarProductos({ query: q, limit: 20 });
+  const ids = rows.filter((r) => /^piezas de fuera$/i.test(r.inventory_name ?? "")).map((r) => r.id);
+  if (!ids.length) return [];
+  const { data } = await insforgeAdmin.database
+    .from("compra_items")
+    .select("costo_unitario_cents, created_at, products(name), compras(fecha_ingreso, proveedor_id, estado, proveedores(nombre))")
+    .in("product_id", ids)
+    .order("created_at", { ascending: false })
+    .limit(12);
+  type Uno<T> = T | T[] | null;
+  const uno = <T,>(v: Uno<T>): T | null => (Array.isArray(v) ? (v[0] ?? null) : v);
+  const vistos = new Set<string>();
+  const out: PrecioDeFuera[] = [];
+  for (const r of (data ?? []) as unknown as {
+    costo_unitario_cents: number;
+    products: Uno<{ name: string }>;
+    compras: Uno<{ fecha_ingreso: string; proveedor_id: string; estado: string; proveedores: Uno<{ nombre: string }> }>;
+  }[]) {
+    const c = uno(r.compras);
+    const prov = c ? uno(c.proveedores) : null;
+    if (!c || !prov || c.estado !== "recibida") continue;
+    // One line per neighbour: the last price each one gave.
+    if (vistos.has(c.proveedor_id)) continue;
+    vistos.add(c.proveedor_id);
+    out.push({ pieza: uno(r.products)?.name ?? q, vecinoId: c.proveedor_id, vecino: prov.nombre, costo_cents: r.costo_unitario_cents, fecha: c.fecha_ingreso });
+    if (out.length >= 4) break;
+  }
+  return out;
+}

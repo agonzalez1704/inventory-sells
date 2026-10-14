@@ -21,9 +21,11 @@ import { CustomerPicker, type PickerCustomer } from "@/modules/customers/Custome
 import {
   crearVecino,
   listarVecinos,
+  preciosDeFuera,
   referenciaCatalogo,
   registrarPiezaDeFuera,
   type PiezaFueraResult,
+  type PrecioDeFuera,
   type Referencia,
   type Vecino,
 } from "./pieza-fuera";
@@ -67,6 +69,7 @@ export function PiezaFueraPanel({
   const [precioTocado, setPrecioTocado] = useState(false);
   const [entrega, setEntrega] = useState<"nota" | "pagar">("nota");
   const [ref, setRef] = useState<Referencia | null>(null);
+  const [previos, setPrevios] = useState<PrecioDeFuera[]>([]);
 
   useEffect(() => {
     if (!open) return;
@@ -80,10 +83,12 @@ export function PiezaFueraPanel({
     setPrecioTocado(false);
     setEntrega("nota");
     setRef(null);
+    setPrevios([]);
     listarVecinos().then(setVecinos).catch(() => setVecinos([]));
   }, [open, clienteInicial]);
 
-  // Our own catalog, as the name is typed: the price not to undercharge.
+  // As the name is typed: our own price (not to undercharge) and what the
+  // neighbours charged last time (not to ask again).
   useEffect(() => {
     if (!open) return;
     let vivo = true;
@@ -91,12 +96,33 @@ export function PiezaFueraPanel({
       referenciaCatalogo(nombre)
         .then((r) => vivo && setRef(r))
         .catch(() => vivo && setRef(null));
+      preciosDeFuera(nombre)
+        .then((p) => vivo && setPrevios(p))
+        .catch(() => vivo && setPrevios([]));
     }, 300);
     return () => {
       vivo = false;
       clearTimeout(t);
     };
   }, [nombre, open]);
+
+  // The most recent neighbour price fills in cost and neighbour until the
+  // seller types their own.
+  useEffect(() => {
+    const u = previos[0];
+    if (!u || costo.trim() !== "" || vecino) return;
+    setCosto(aPesos(u.costo_cents));
+    const v = vecinos.find((x) => x.id === u.vecinoId);
+    if (v) setVecino(v);
+  }, [previos, vecinos, costo, vecino]);
+
+  function usarPrevio(u: PrecioDeFuera) {
+    setNombre(u.pieza);
+    setCosto(aPesos(u.costo_cents));
+    const v = vecinos.find((x) => x.id === u.vecinoId);
+    if (v) setVecino(v);
+    setPrecioTocado(false);
+  }
 
   const costoC = aCentavos(costo);
   const precioC = aCentavos(precio);
@@ -201,6 +227,31 @@ export function PiezaFueraPanel({
               <Input inputMode="numeric" value={qty} onChange={(e) => setQty(e.target.value)} className="h-11 text-center font-mono text-base sm:text-sm" />
             </label>
           </div>
+
+          {previos.length > 0 && (
+            <div className="space-y-1.5 rounded-xl border border-border/70 bg-muted/30 p-3">
+              <p className="text-xs font-medium text-muted-foreground">Ya la has comprado · toca para usar ese precio</p>
+              <div className="grid gap-1.5">
+                {previos.map((u) => (
+                  <button
+                    key={u.vecinoId}
+                    type="button"
+                    onClick={() => usarPrevio(u)}
+                    className={cn(
+                      "flex cursor-pointer items-center gap-3 rounded-lg border bg-background px-3 py-2 text-left text-sm hover:border-ring/40",
+                      vecino?.id === u.vecinoId && costoC === u.costo_cents ? "border-ring" : "border-border",
+                    )}
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-medium">{u.vecino}</span>
+                      <span className="block truncate text-xs text-muted-foreground">{u.pieza} · {new Date(`${u.fecha}T12:00:00`).toLocaleDateString("es-MX", { day: "numeric", month: "short" })}</span>
+                    </span>
+                    <span className="shrink-0 font-mono font-semibold tabular-nums">{formatMXN(u.costo_cents)}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="space-y-1.5">
             <span className="text-xs font-medium text-muted-foreground">¿A quién se le compró?</span>
