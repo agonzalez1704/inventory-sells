@@ -133,3 +133,23 @@ export async function setComprobanteObligatorio(valor: boolean): Promise<void> {
     .eq("id", 1);
   if (error) throw new Error(error.message ?? "No se pudo guardar");
 }
+
+/** Does the register offer "Pieza de fuera" (buying next door with drawer cash)? */
+export async function piezaFueraActiva(): Promise<boolean> {
+  const { userId } = await auth();
+  if (!userId) return false;
+  const insforge = await createInsForgeServerClient();
+  const { data } = await insforge.database.from("config_negocio").select("pieza_fuera").eq("id", 1).maybeSingle();
+  return (data as { pieza_fuera: boolean } | null)?.pieza_fuera ?? false;
+}
+
+/** Turn "Pieza de fuera" on or off for the whole shop. Admin only. */
+export async function setPiezaFueraActiva(valor: boolean): Promise<void> {
+  const { userId } = await auth();
+  if (!userId) throw new Error("No autenticado");
+  const profile = await getProfile(userId);
+  if (profile?.role !== "admin") throw new Error("Solo administradores");
+  const insforge = await createInsForgeServerClient();
+  const { error } = await insforge.database.from("config_negocio").update({ pieza_fuera: valor }).eq("id", 1);
+  if (error) throw new Error(error.message ?? "No se pudo guardar");
+}

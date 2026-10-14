@@ -1,7 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { getProfile } from "@/lib/auth/profile";
 import { getNegocioInfo, getAsesoresRaw, getValorBase, getTiendaInfo } from "@/modules/config/lib";
-import { fiadoExigeCliente, posClickAbreDetalle, comprobanteObligatorio } from "@/modules/config/negocio";
+import { fiadoExigeCliente, posClickAbreDetalle, comprobanteObligatorio, piezaFueraActiva } from "@/modules/config/negocio";
 import { ConfigView } from "@/modules/config/ConfigView";
 import { Card } from "@/components/ui/card";
 import { insforgeAdmin } from "@/lib/insforge/admin";
@@ -22,6 +22,7 @@ import { getPrecioBasePos } from "@/modules/sales/pos-prefs";
 import { PosPrefs } from "@/modules/sales/PosPrefs";
 import { PosModoClick } from "@/modules/config/PosModoClick";
 import { ComprobanteToggle } from "@/modules/config/ComprobanteToggle";
+import { PiezaFueraToggle } from "@/modules/config/PiezaFueraToggle";
 import { hayVehiculos } from "@/modules/vehiculos/actions";
 import { VersionesConfig } from "@/modules/vehiculos/VersionesConfig";
 
@@ -39,7 +40,7 @@ export default async function ConfiguracionPage() {
   const verCostos = Boolean(
     perms && (perms.has("admin_total") || perms.has("costos_ver")),
   );
-  const [info, asesores, valorBase, tienda, fiadoExige, posDetalle, comprobanteOblig, notifRoles, precioBasePos] = await Promise.all([
+  const [info, asesores, valorBase, tienda, fiadoExige, posDetalle, comprobanteOblig, notifRoles, precioBasePos, piezaFuera] = await Promise.all([
     getNegocioInfo(),
     getAsesoresRaw(),
     getValorBase(),
@@ -49,6 +50,7 @@ export default async function ConfiguracionPage() {
     comprobanteObligatorio(),
     puedeGestionarUsuarios ? notificacionesPorRol() : null,
     getPrecioBasePos(),
+    piezaFueraActiva(),
   ]);
 
   // AliExpress connection status + authorize link. Only offered when the app
@@ -145,6 +147,10 @@ export default async function ConfiguracionPage() {
                 Comprobante en pagos por transferencia (referencia o captura).
               </p>
               <ComprobanteToggle inicial={comprobanteOblig} />
+              <p className="mb-2 mt-4 text-xs text-muted-foreground">
+                Piezas de fuera: comprar al vecino con efectivo del cajón desde el POS.
+              </p>
+              <PiezaFueraToggle inicial={piezaFuera} />
             </div>
           )}
           {verCostos && (

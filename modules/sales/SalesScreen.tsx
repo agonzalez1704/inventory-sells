@@ -293,6 +293,7 @@ export function SalesScreen({
   garantia = null,
   encabezado = null,
   porVehiculo = false,
+  piezaFuera = false,
 }: {
   /** First page of the catalog, rendered before any search runs. */
   products: SalesProduct[];
@@ -315,6 +316,8 @@ export function SalesScreen({
   encabezado?: string[] | null;
   /** This shop sells parts by car (Ruli): offer the vehicle search. */
   porVehiculo?: boolean;
+  /** Shop setting: offer buying a part next door with drawer cash. */
+  piezaFuera?: boolean;
 }) {
   const router = useRouter();
   const [confirmar, confirmDialog] = useConfirm();
@@ -1014,9 +1017,11 @@ export function SalesScreen({
           <Button variant="secondary" className="h-10 flex-1" onClick={() => setApartarOpen(true)} disabled={!lines.length || mode === "prestamo"}>
             <Wallet className="h-4 w-4" /> Apartar
           </Button>
-          <Button variant="secondary" className="h-10 flex-1" onClick={() => setPiezaFueraOpen(true)} title="Comprar al vecino con efectivo del cajón">
-            <Store className="h-4 w-4" /> De fuera
-          </Button>
+          {piezaFuera && (
+            <Button variant="secondary" className="h-10 flex-1" onClick={() => setPiezaFueraOpen(true)} title="Comprar al vecino con efectivo del cajón">
+              <Store className="h-4 w-4" /> De fuera
+            </Button>
+          )}
           <Button variant="secondary" className="h-10 w-11 px-0" aria-label="Vaciar venta" onClick={pedirLimpiar} disabled={!lines.length}>
             <Trash2 className="h-4 w-4 text-red-700 dark:text-red-400" />
           </Button>
@@ -1290,10 +1295,12 @@ export function SalesScreen({
                       <Plus className="h-5 w-5" />
                       Anotar que lo piden
                     </Button>
-                    <Button variant="secondary" className="h-12 rounded-xl px-5 text-base" onClick={() => setPiezaFueraOpen(true)}>
-                      <Store className="h-5 w-5" />
-                      Comprarla al vecino
-                    </Button>
+                    {piezaFuera && (
+                      <Button variant="secondary" className="h-12 rounded-xl px-5 text-base" onClick={() => setPiezaFueraOpen(true)}>
+                        <Store className="h-5 w-5" />
+                        Comprarla al vecino
+                      </Button>
+                    )}
                     <span className="text-xs text-muted-foreground">
                       Se guarda con fecha, hora, sucursal y quién atendió.
                     </span>
@@ -1459,7 +1466,7 @@ export function SalesScreen({
       />
 
       <PiezaFueraPanel
-        open={piezaFueraOpen}
+        open={piezaFuera && piezaFueraOpen}
         customers={customers}
         clienteInicial={customer}
         onClose={() => setPiezaFueraOpen(false)}

@@ -3,7 +3,7 @@ import { requirePagePermiso, getPermisos } from "@/lib/auth/profile";
 import { getPrecioBasePos } from "@/modules/sales/pos-prefs";
 import { SalesScreen, type SalesProduct } from "@/modules/sales/SalesScreen";
 import { listarCategorias } from "@/modules/inventory/buscar";
-import { fiadoExigeCliente, posClickAbreDetalle, comprobanteObligatorio } from "@/modules/config/negocio";
+import { fiadoExigeCliente, posClickAbreDetalle, comprobanteObligatorio, piezaFueraActiva } from "@/modules/config/negocio";
 import { inventariosAjenos } from "@/modules/sucursales/guard";
 import { getTiendaInfo } from "@/modules/config/lib";
 import { encabezadoTicket, terminosGarantia } from "@/lib/tienda-info";
@@ -44,13 +44,14 @@ export default async function PosPage() {
       listarCategorias(),
     ]);
 
-  const [precioBase, exigeCliente, clickDetalle, comprobanteOblig, tienda, conVehiculos] = await Promise.all([
+  const [precioBase, exigeCliente, clickDetalle, comprobanteOblig, tienda, conVehiculos, piezaFuera] = await Promise.all([
     getPrecioBasePos(),
     fiadoExigeCliente(),
     posClickAbreDetalle(),
     comprobanteObligatorio(),
     getTiendaInfo(),
     hayVehiculos(),
+    piezaFueraActiva(),
   ]);
 
   const invName = new Map(
@@ -95,6 +96,7 @@ export default async function PosPage() {
       fiadoExigeCliente={exigeCliente}
       clickAbreDetalle={clickDetalle}
       comprobanteObligatorio={comprobanteOblig}
+      piezaFuera={piezaFuera}
       inventariosAjenos={ajenos}
       esAdmin={esAdmin}
       puedeCotizar={puedeCotizar}
