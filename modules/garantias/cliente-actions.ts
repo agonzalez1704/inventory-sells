@@ -206,6 +206,8 @@ export type GarantiaCliente = {
   /** Set once the shop has filed the claim upstream. */
   garantia_proveedor_id: string | null;
   proveedor: string | null;
+  /** The part the customer left with, on a "cambio". */
+  cambio_pieza: string | null;
 };
 
 /** Pending first — those are the ones somebody still has to act on. */
@@ -234,6 +236,8 @@ export async function resolverGarantia(
   motivo: string | null,
   /** Put the part back on the shelf now (it stays linked to this warranty). */
   reingresa = false,
+  /** On a "cambio": the part handed over — it leaves stock here. */
+  cambioProductId: string | null = null,
 ): Promise<ActionResult<null>> {
   return attempt("resolverGarantia", async () => {
     const { userId } = await auth();
@@ -244,8 +248,25 @@ export async function resolverGarantia(
       p_resolucion: resolucion,
       p_motivo: motivo,
       p_reingresa: reingresa,
+      p_cambio_product_id: resolucion === "cambio" ? cambioProductId : null,
     });
     if (error) throw new Error(error.message ?? "No se pudo resolver");
+    return null;
+  });
+}
+
+/**
+ * A warranty taken in by mistake (wrong sale, wrong part). Only while it is
+ * pending: the unit the registration put back on the shelf comes off again
+ * and the row goes away.
+ */
+export async function cancelarGarantia(id: string): Promise<ActionResult<null>> {
+  return attempt("cancelarGarantia", async () => {
+    const { userId } = await auth();
+    if (!userId) throw new Error("No autenticado");
+    const insforge = await createInsForgeServerClient();
+    const { error } = await insforge.database.rpc("cancelar_garantia_cliente", { p_id: id });
+    if (error) throw new Error(error.message ?? "No se pudo cancelar");
     return null;
   });
 }

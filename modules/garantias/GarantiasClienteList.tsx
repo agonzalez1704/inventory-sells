@@ -4,7 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import Link from "next/link";
-import { ShieldCheck, PackageX, PackageCheck } from "lucide-react";
+import { ShieldCheck, PackageX, PackageCheck, Search, Trash2 } from "lucide-react";
 import { formatMXN } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { unwrap } from "@/lib/errors";
@@ -15,8 +15,10 @@ import { Input, Select } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { proveedoresDelProducto, type ProveedorDelProducto } from "@/modules/cardex/actions";
+import { buscarProductos, type ProductoBuscado } from "@/modules/inventory/buscar";
 import {
   resolverGarantia,
+  cancelarGarantia,
   reclamarAProveedor,
   type GarantiaCliente,
   type ResolucionGarantia,
@@ -124,6 +126,26 @@ function Fila({
   onReclamar?: () => void;
   resaltar?: boolean;
 }) {
+  const router = useRouter();
+  const [cancelando, startCancelar] = useTransition();
+  // Same gate as resolving: whoever can decide it can also say it never
+  // should have existed. Only while pending and not yet claimed upstream.
+  const puedeCancelar = !!onResolver && g.estado === "pendiente" && !g.garantia_proveedor_id;
+  function cancelar() {
+    const aviso = g.reingresa_stock
+      ? `Se borra la garantía de ${g.cliente} y ${g.qty > 1 ? `las ${g.qty} piezas que reingresaron salen` : "la pieza que reingresó sale"} otra vez de existencias. ¿Seguro?`
+      : `Se borra la garantía de ${g.cliente}. ¿Seguro?`;
+    if (!window.confirm(aviso)) return;
+    startCancelar(async () => {
+      try {
+        unwrap(await cancelarGarantia(g.id));
+        toast.success("Garantía cancelada");
+        router.refresh();
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "No se pudo cancelar");
+      }
+    });
+  }
   // Only when the part did NOT go back on the shelf. Claiming one the shop
   // still has and can sell is asking the supplier to pay for stock — the
   // database refuses it, and offering the button would be offering a dead end.
@@ -171,6 +193,12 @@ function Fila({
               {PIDE[g.resolucion_propuesta]}
             </p>
           )}
+          {g.resolucion === "cambio" && g.cambio_pieza && (
+            <p className="mt-1 text-sm">
+              Se llevó <span className="font-medium">{g.cambio_pieza}</span>
+              {g.qty > 1 && ` × ${g.qty}`}
+            </p>
+          )}
           <p className="mt-0.5 text-xs text-muted-foreground">
             {fecha(g.created_at)}
             {g.reportada_por ? ` · reportó ${g.reportada_por}` : ""}
@@ -203,6 +231,18 @@ function Fila({
               Resolver
             </Button>
           )}
+          {puedeCancelar && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={cancelar}
+              loading={cancelando}
+              aria-label="Cancelar garantía"
+              title="Cancelar garantía (se registró por error)"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       </div>
     </Card>
@@ -215,8 +255,13 @@ function ResolverModal({ g, onClose }: { g: GarantiaCliente; onClose: () => void
   const [resolucion, setResolucion] = useState<ResolucionGarantia | "rechazar">("saldo");
   const [motivo, setMotivo] = useState(g.motivo ?? "");
   const [reingresa, setReingresa] = useState(false);
+  const [cambio, setCambio] = useState<ProductoBuscado | null>(null);
 
   function guardar() {
+    if (resolucion === "cambio" && !cambio) {
+      toast.error("Di qué pieza se lleva el cliente");
+      return;
+    }
     start(async () => {
       try {
         unwrap(
@@ -225,6 +270,7 @@ function ResolverModal({ g, onClose }: { g: GarantiaCliente; onClose: () => void
             resolucion === "rechazar" ? null : resolucion,
             motivo || null,
             resolucion !== "rechazar" && reingresa,
+            cambio?.id ?? null,
           ),
         );
         toast.success(
@@ -270,6 +316,11 @@ function ResolverModal({ g, onClose }: { g: GarantiaCliente; onClose: () => void
               Se abonan {formatMXN(g.monto_cents)} a {g.cliente}.
             </span>
           )}
+          {resolucion === "cambio" && (
+            <span className="mt-1.5 block text-xs text-muted-foreground">
+              La pieza que se lleva sale de existencias ahora, ligada a esta venta.
+            </span>
+          )}
           {resolucion === "efectivo" && (
             <span className="mt-1.5 block text-xs text-muted-foreground">
               Salen {formatMXN(g.monto_cents)} de caja: quedan registrados como
@@ -283,6 +334,10 @@ function ResolverModal({ g, onClose }: { g: GarantiaCliente; onClose: () => void
             </span>
           )}
         </label>
+
+        {resolucion === "cambio" && (
+          <PiezaDeCambio qty={g.qty} sugerida={g.pieza} elegida={cambio} onElegir={setCambio} />
+        )}
 
         {!g.reingresa_stock && resolucion !== "rechazar" && (
           <label className="flex cursor-pointer items-start gap-2 text-sm">
@@ -321,6 +376,106 @@ function ResolverModal({ g, onClose }: { g: GarantiaCliente; onClose: () => void
         </div>
       </div>
     </Modal>
+  );
+}
+
+/** Which part leaves with the customer. Starts on the same part's name. */
+function PiezaDeCambio({
+  qty,
+  sugerida,
+  elegida,
+  onElegir,
+}: {
+  qty: number;
+  sugerida: string;
+  elegida: ProductoBuscado | null;
+  onElegir: (p: ProductoBuscado | null) => void;
+}) {
+  const [query, setQuery] = useState(sugerida);
+  const [rows, setRows] = useState<ProductoBuscado[]>([]);
+
+  useEffect(() => {
+    if (elegida) return;
+    let cancelado = false;
+    const t = setTimeout(async () => {
+      try {
+        const r = await buscarProductos({ query, limit: 8 });
+        if (!cancelado) setRows(r);
+      } catch {
+        if (!cancelado) setRows([]);
+      }
+    }, 180);
+    return () => {
+      cancelado = true;
+      clearTimeout(t);
+    };
+  }, [query, elegida]);
+
+  return (
+    <div className="block">
+      <span className="mb-1 block text-xs font-medium text-muted-foreground">
+        ¿Qué pieza se lleva?
+      </span>
+      {elegida ? (
+        <div className="flex items-center justify-between gap-2 rounded-xl border border-border p-3 text-sm">
+          <div className="min-w-0">
+            <p className="truncate font-medium">{elegida.name}</p>
+            <p className="text-xs text-muted-foreground">
+              <span className="font-mono uppercase">{elegida.sku}</span> · {elegida.quantity} en
+              existencia{elegida.inventory_name ? ` · ${elegida.inventory_name}` : ""}
+            </p>
+          </div>
+          <Button variant="secondary" size="sm" onClick={() => onElegir(null)}>
+            Cambiar
+          </Button>
+        </div>
+      ) : (
+        <>
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              autoFocus
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Busca la pieza por nombre o SKU"
+              className="pl-9"
+            />
+          </div>
+          <ul className="mt-1 max-h-56 divide-y divide-border overflow-y-auto rounded-xl border border-border">
+            {rows.length === 0 && (
+              <li className="p-3 text-xs text-muted-foreground">Sin resultados</li>
+            )}
+            {rows.map((p) => {
+              const alcanza = p.quantity >= qty;
+              return (
+                <li key={p.id}>
+                  <button
+                    type="button"
+                    disabled={!alcanza}
+                    onClick={() => onElegir(p)}
+                    className={cn(
+                      "flex w-full items-center justify-between gap-2 p-3 text-left text-sm hover:bg-muted",
+                      !alcanza && "cursor-not-allowed opacity-50",
+                    )}
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate font-medium">{p.name}</span>
+                      <span className="block text-xs text-muted-foreground">
+                        <span className="font-mono uppercase">{p.sku}</span>
+                        {p.inventory_name ? ` · ${p.inventory_name}` : ""}
+                      </span>
+                    </span>
+                    <span className={cn("shrink-0 text-xs tabular-nums", alcanza ? "text-muted-foreground" : "text-destructive")}>
+                      {p.quantity} en existencia
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      )}
+    </div>
   );
 }
 
