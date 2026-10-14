@@ -1010,19 +1010,19 @@ export function SalesScreen({
         </Button>
         <div className="flex gap-2 pt-0.5">
           {puedeCotizar && (
-            <Button variant="secondary" className="h-10 flex-1" onClick={cotizar} loading={cotizando} disabled={!lines.length}>
-              <FileText className="h-4 w-4" /> Cotizar
+            <Button variant="secondary" className="h-10 min-w-0 flex-1 px-2" onClick={cotizar} loading={cotizando} disabled={!lines.length}>
+              <FileText className="h-4 w-4 shrink-0" /> <span className="truncate">Cotizar</span>
             </Button>
           )}
-          <Button variant="secondary" className="h-10 flex-1" onClick={() => setApartarOpen(true)} disabled={!lines.length || mode === "prestamo"}>
-            <Wallet className="h-4 w-4" /> Apartar
+          <Button variant="secondary" className="h-10 min-w-0 flex-1 px-2" onClick={() => setApartarOpen(true)} disabled={!lines.length || mode === "prestamo"}>
+            <Wallet className="h-4 w-4 shrink-0" /> <span className="truncate">Apartar</span>
           </Button>
           {piezaFuera && (
-            <Button variant="secondary" className="h-10 flex-1" onClick={() => setPiezaFueraOpen(true)} title="Comprar al vecino con efectivo del cajón">
-              <Store className="h-4 w-4" /> De fuera
+            <Button variant="secondary" className="h-10 min-w-0 flex-1 px-2" onClick={() => setPiezaFueraOpen(true)} title="Comprar al vecino con efectivo del cajón">
+              <Store className="h-4 w-4 shrink-0" /> <span className="truncate">De fuera</span>
             </Button>
           )}
-          <Button variant="secondary" className="h-10 w-11 px-0" aria-label="Vaciar venta" onClick={pedirLimpiar} disabled={!lines.length}>
+          <Button variant="secondary" className="h-10 w-11 shrink-0 px-0" aria-label="Vaciar venta" onClick={pedirLimpiar} disabled={!lines.length}>
             <Trash2 className="h-4 w-4 text-red-700 dark:text-red-400" />
           </Button>
         </div>
