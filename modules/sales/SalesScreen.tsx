@@ -19,6 +19,7 @@ import {
   SearchX,
   ShoppingCart,
   Tag,
+  Store,
   Trash2,
   Wallet,
 } from "lucide-react";
@@ -49,6 +50,8 @@ import { guardarComprobante } from "./comprobantes";
 import { asignarTerminalVenta } from "@/modules/config/terminales";
 import { PaymentSheet, type Comprobante } from "./PaymentSheet";
 import { ApartarPanel } from "./ApartarPanel";
+import { PiezaFueraPanel } from "./PiezaFueraPanel";
+import type { PiezaFueraResult } from "./pieza-fuera";
 import { ReciboImpreso } from "./ReciboImpreso";
 import { ProductoSheet } from "./ProductoSheet";
 import { CategoriaSheet } from "./CategoriaSheet";
@@ -329,6 +332,7 @@ export function SalesScreen({
   const [catsAbiertas, setCatsAbiertas] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [apartarOpen, setApartarOpen] = useState(false);
+  const [piezaFueraOpen, setPiezaFueraOpen] = useState(false);
   const [carritoOpen, setCarritoOpen] = useState(false);
   const [escaneando, setEscaneando] = useState(false);
   // "Lo piden y no lo tenemos": what the empty search becomes.
@@ -1010,6 +1014,9 @@ export function SalesScreen({
           <Button variant="secondary" className="h-10 flex-1" onClick={() => setApartarOpen(true)} disabled={!lines.length || mode === "prestamo"}>
             <Wallet className="h-4 w-4" /> Apartar
           </Button>
+          <Button variant="secondary" className="h-10 flex-1" onClick={() => setPiezaFueraOpen(true)} title="Comprar al vecino con efectivo del cajón">
+            <Store className="h-4 w-4" /> De fuera
+          </Button>
           <Button variant="secondary" className="h-10 w-11 px-0" aria-label="Vaciar venta" onClick={pedirLimpiar} disabled={!lines.length}>
             <Trash2 className="h-4 w-4 text-red-700 dark:text-red-400" />
           </Button>
@@ -1283,6 +1290,10 @@ export function SalesScreen({
                       <Plus className="h-5 w-5" />
                       Anotar que lo piden
                     </Button>
+                    <Button variant="secondary" className="h-12 rounded-xl px-5 text-base" onClick={() => setPiezaFueraOpen(true)}>
+                      <Store className="h-5 w-5" />
+                      Comprarla al vecino
+                    </Button>
                     <span className="text-xs text-muted-foreground">
                       Se guarda con fecha, hora, sucursal y quién atendió.
                     </span>
@@ -1444,6 +1455,26 @@ export function SalesScreen({
           setApartarOpen(false);
           setCarritoOpen(false);
           limpiar();
+        }}
+      />
+
+      <PiezaFueraPanel
+        open={piezaFueraOpen}
+        customers={customers}
+        clienteInicial={customer}
+        onClose={() => setPiezaFueraOpen(false)}
+        onNota={() => {
+          setPiezaFueraOpen(false);
+          router.refresh();
+        }}
+        onPagar={(r: PiezaFueraResult) => {
+          // Bought and in stock: it goes to the cart and the usual charge
+          // follows. Qty straight in — add() would step it one by one.
+          setPiezaFueraOpen(false);
+          recordar([r.product]);
+          setCart((c) => ({ ...c, [r.product.id]: r.qty }));
+          setMode("venta");
+          setPaymentOpen(true);
         }}
       />
 

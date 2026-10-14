@@ -101,6 +101,19 @@ export default async function FiadosPage({
     fiado_publico: l.fiado_publico ?? false,
   })) as Loan[];
 
+  // A note that repays a drawer withdrawal (a "pieza de fuera") says so.
+  const idsNotas = loans.map((l) => l.id);
+  const { data: retiros } = idsNotas.length
+    ? await insforge.database.from("gastos").select("sale_id, monto_cents, concepto").in("sale_id", idsNotas)
+    : { data: [] };
+  const retiroDe = new Map(
+    ((retiros ?? []) as { sale_id: string; monto_cents: number; concepto: string }[]).map((g) => [
+      g.sale_id,
+      { monto_cents: g.monto_cents, vecino: g.concepto.split(" · ").pop() ?? "" },
+    ]),
+  );
+  for (const l of loans) l.retiro = retiroDe.get(l.id) ?? null;
+
   const customers = (customerData ?? []) as PickerCustomer[];
 
   return (

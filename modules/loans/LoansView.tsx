@@ -52,6 +52,8 @@ export type Loan = {
   cliente: PickerCustomer | null;
   credito_dias: number | null;
   fiado_publico?: boolean;
+  /** Set when the note repays cash taken from the drawer to buy the part next door. */
+  retiro?: { monto_cents: number; vecino: string } | null;
 };
 
 const DIA = 86_400_000;
@@ -397,6 +399,11 @@ function FilaNota({
                 Sin cliente
               </span>
             )}
+            {loan.retiro && (
+              <span className="rounded-full bg-brand-soft px-2 py-0.5 text-[11px] font-semibold text-brand-foreground">
+                Pieza de fuera · repone {formatMXN(loan.retiro.monto_cents)}
+              </span>
+            )}
             {tel && <MessageCircle className="h-3.5 w-3.5 shrink-0 text-emerald-600" />}
           </span>
           <span className="mt-0.5 block truncate text-xs text-muted-foreground tabular-nums">
@@ -559,6 +566,11 @@ function TarjetaNota({
                     Sin cliente · seña
                   </span>
                 )}
+                {loan.retiro && (
+                  <span className="rounded-full bg-brand-soft px-2 py-0.5 text-xs font-semibold text-brand-foreground">
+                    Pieza de fuera · repone {formatMXN(loan.retiro.monto_cents)} del cajón
+                  </span>
+                )}
               </span>
             </>
           )}
@@ -592,6 +604,7 @@ function TarjetaNota({
           {(loan.vendedor ?? "?").charAt(0).toUpperCase()}
         </span>
         <span className="min-w-0 flex-1">
+          {loan.retiro && <>Comprada a <b className="font-semibold text-foreground">{loan.retiro.vecino}</b> · </>}
           Lo metió <b className="font-semibold text-foreground">{loan.vendedor ?? "—"}</b> · {fechaHora(loan.created_at)}
         </span>
         <Visibilidad loan={loan} />
