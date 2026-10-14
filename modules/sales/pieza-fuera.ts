@@ -164,10 +164,15 @@ export async function registrarPiezaDeFuera(input: PiezaFueraInput): Promise<Act
       .single();
     if (ce || !compra) throw new Error(ce?.message ?? "No se pudo registrar la compra");
     const compraId = (compra as { id: string }).id;
+    // line_total_cents is computed by the table (qty × cost): never sent.
     const { error: ie } = await insforgeAdmin.database
       .from("compra_items")
-      .insert([{ compra_id: compraId, product_id: productId, qty, qty_pedida: qty, costo_unitario_cents: costo, line_total_cents: costo * qty }]);
-    if (ie) throw new Error(ie.message ?? "No se pudo registrar la compra");
+      .insert([{ compra_id: compraId, product_id: productId, qty, qty_pedida: qty, costo_unitario_cents: costo }]);
+    if (ie) {
+      // A draft with no lines would sit in Compras forever: take it back out.
+      await insforgeAdmin.database.from("compras").delete().eq("id", compraId);
+      throw new Error(ie.message ?? "No se pudo registrar la compra");
+    }
     const insforge = await createInsForgeServerClient();
     const { error: re } = await insforge.database.rpc("confirmar_compra", { p_id: compraId });
     if (re) throw new Error(re.message ?? "No se pudo recibir la pieza");
