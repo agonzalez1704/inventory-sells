@@ -11,19 +11,26 @@ export default async function MovimientosPage() {
   const userId = await requirePagePermiso("caja_movimientos");
   const { startISO, endISO } = rangoUTC(mxHoy(), mxHoy());
 
-  const mios = (tabla: "gastos" | "ingresos") =>
-    insforgeAdmin.database
-      .from(tabla)
-      // cuenta_id only exists on gastos (a deposit's destination account).
-      .select(`id, concepto, monto_cents, metodo, categoria, created_at${tabla === "gastos" ? ", cuenta_id" : ""}`)
+  const mios = {
+    // cuenta_id only exists on gastos (a deposit's destination account).
+    gastos: insforgeAdmin.database
+      .from("gastos")
+      .select("id, concepto, monto_cents, metodo, categoria, created_at, cuenta_id")
       .eq("created_by", userId)
       .gte("created_at", startISO)
       .lt("created_at", endISO)
-      .order("created_at", { ascending: false });
-
+      .order("created_at", { ascending: false }),
+    ingresos: insforgeAdmin.database
+      .from("ingresos")
+      .select("id, concepto, monto_cents, metodo, categoria, created_at")
+      .eq("created_by", userId)
+      .gte("created_at", startISO)
+      .lt("created_at", endISO)
+      .order("created_at", { ascending: false }),
+  };
   const [{ data: gastos }, { data: ingresos }, { data: sucs }, { data: chk }] = await Promise.all([
-    mios("gastos"),
-    mios("ingresos"),
+    mios.gastos,
+    mios.ingresos,
     insforgeAdmin.database.from("sucursales").select("id, nombre").eq("is_active", true),
     insforgeAdmin.database
       .from("checkins")
