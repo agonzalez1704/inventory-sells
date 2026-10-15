@@ -11,7 +11,7 @@ import { rangoUTC } from "@/lib/caja-range";
 // extra, gastos, returns. A movement belongs to the drawer of the sucursal
 // where its registrar checked in that day.
 
-export type TipoEvento = "venta" | "cobro_fiado" | "adelanto" | "devolucion_adelanto" | "ingreso" | "gasto" | "devolucion";
+export type TipoEvento = "venta" | "cobro_fiado" | "adelanto" | "devolucion_adelanto" | "ingreso" | "gasto" | "deposito" | "devolucion";
 
 export type EventoCaja = {
   id: string;
@@ -125,7 +125,7 @@ async function eventosRango(from: string, to: string) {
       .gte("created_at", startISO)
       .lt("created_at", endISO),
     db.from("ingresos").select("id, concepto, monto_cents, metodo, categoria, created_at, created_by").gte("created_at", startISO).lt("created_at", endISO),
-    db.from("gastos").select("id, concepto, monto_cents, metodo, categoria, created_at, created_by").gte("created_at", startISO).lt("created_at", endISO),
+    db.from("gastos").select("id, concepto, monto_cents, metodo, categoria, created_at, created_by, cuenta_id").gte("created_at", startISO).lt("created_at", endISO),
     db.from("devoluciones").select("id, sale_id, monto_cents, metodo, motivo, created_at, created_by").gte("created_at", startISO).lt("created_at", endISO),
     db.from("checkins").select("profile_id, sucursal_id, created_at").gte("created_at", startISO).lt("created_at", endISO).order("created_at"),
   ]);
@@ -198,8 +198,8 @@ async function eventosRango(from: string, to: string) {
   }
   for (const m of (ingresos.data ?? []) as Mov[])
     ev.push({ ...base(m.created_by, m.created_at), id: `i:${m.id}`, tipo: "ingreso", metodo: m.metodo, montoCents: m.monto_cents, titulo: m.concepto, detalle: m.categoria, saleId: null });
-  for (const m of (gastos.data ?? []) as Mov[])
-    ev.push({ ...base(m.created_by, m.created_at), id: `g:${m.id}`, tipo: "gasto", metodo: m.metodo, montoCents: -m.monto_cents, titulo: m.concepto, detalle: m.categoria, saleId: null });
+  for (const m of (gastos.data ?? []) as (Mov & { cuenta_id: string | null })[])
+    ev.push({ ...base(m.created_by, m.created_at), id: `g:${m.id}`, tipo: m.cuenta_id ? "deposito" : "gasto", metodo: m.metodo, montoCents: -m.monto_cents, titulo: m.concepto, detalle: m.cuenta_id ? null : m.categoria, saleId: null });
   for (const d of (devoluciones.data ?? []) as Dv[])
     ev.push({ ...base(d.created_by, d.created_at), id: `d:${d.id}`, tipo: "devolucion", metodo: d.metodo, montoCents: -d.monto_cents, titulo: d.motivo || "Devolución", detalle: null, saleId: d.sale_id });
 

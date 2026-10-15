@@ -14,7 +14,7 @@ export default async function MovimientosPage() {
   const mios = (tabla: "gastos" | "ingresos") =>
     insforgeAdmin.database
       .from(tabla)
-      .select("id, concepto, monto_cents, metodo, categoria, created_at")
+      .select("id, concepto, monto_cents, metodo, categoria, created_at, cuenta_id")
       .eq("created_by", userId)
       .gte("created_at", startISO)
       .lt("created_at", endISO)

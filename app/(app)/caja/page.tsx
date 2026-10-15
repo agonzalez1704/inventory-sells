@@ -110,7 +110,7 @@ export default async function CajaPage({
       .lt("settled_at", endISO),
     insforge.database
       .from("gastos")
-      .select("id, concepto, monto_cents, metodo, categoria, created_at, created_by")
+      .select("id, concepto, monto_cents, metodo, categoria, created_at, created_by, cuenta_id, referencia, comprobante_key, cuentas_negocio(id, banco, alias)")
       .gte("created_at", startISO)
       .lt("created_at", endISO)
       .order("created_at", { ascending: false }),
@@ -164,7 +164,15 @@ export default async function CajaPage({
 
   let directasV = (directas ?? []) as unknown as VentaRow[];
   let fiadosComp2 = (fiadosComp ?? []) as { id: string; sold_by: string | null; settled_at: string }[];
-  let gastos = (gastosData ?? []) as Gasto[];
+  // Deposits travel in the gastos table (cash leaves the drawer) but are not
+  // expenses: split them off here so every total below stays honest.
+  type GastoRow = Gasto & { cuenta_id: string | null; referencia: string | null; comprobante_key: string | null; cuentas_negocio: { id: string; banco: string; alias: string } | { id: string; banco: string; alias: string }[] | null };
+  let todosGastos = ((gastosData ?? []) as unknown as GastoRow[]).map(({ cuentas_negocio, comprobante_key, ...g }) => ({
+    ...g,
+    cuenta: Array.isArray(cuentas_negocio) ? (cuentas_negocio[0] ?? null) : cuentas_negocio,
+    comprobante: !!comprobante_key,
+  })) as Gasto[];
+  let gastos = todosGastos.filter((g) => !g.cuenta_id);
   let ingresos = (ingresosData ?? []) as Ingreso[];
   let devoluciones = (devolucionesData ?? []) as Devolucion[];
   let salePagos = (salePagosData ?? []) as unknown as {
@@ -262,6 +270,7 @@ export default async function CajaPage({
     salePagos = salePagos.filter((pg) => enSucursal(pg.created_by, pg.created_at));
     adelantoPagos = adelantoPagos.filter((pg) => enSucursal(pg.created_by, pg.created_at));
     gastos = gastos.filter((g) => enSucursal((g as { created_by?: string | null }).created_by, g.created_at));
+    todosGastos = todosGastos.filter((g) => enSucursal((g as { created_by?: string | null }).created_by, g.created_at));
     ingresos = ingresos.filter((g) => enSucursal((g as { created_by?: string | null }).created_by, g.created_at));
     devoluciones = devoluciones.filter((d) => enSucursal((d as { created_by?: string | null }).created_by, d.created_at));
     fiadosComp2 = fiadosComp2.filter((f) => enSucursal(f.sold_by, f.settled_at));
@@ -463,6 +472,8 @@ export default async function CajaPage({
     gastosPorMetodo[g.metodo] += g.monto_cents;
     gastosTotal += g.monto_cents;
   }
+  const depositos = todosGastos.filter((g) => g.cuenta_id);
+  const depositosTotal = depositos.reduce((s, g) => s + g.monto_cents, 0);
 
   // --- Cash out (by day/method): sale returns + adelanto refunds ---
   const devolucionesPorMetodo = cero();
@@ -697,21 +708,34 @@ export default async function CajaPage({
       const dest = new Map<string, PorDestino>();
       for (const t of porTerminal) {
         if (!t.terminal || !t.cuenta) continue;
-        const d = dest.get(t.cuenta.id) ?? { cuenta: t.cuenta, tarjeta: 0, transferencias: 0, detalle: [] };
+        const d = dest.get(t.cuenta.id) ?? { cuenta: t.cuenta, tarjeta: 0, transferencias: 0, depositos: 0, detalle: [] };
         d.tarjeta += t.neto;
         d.detalle.push(`${t.terminal.nombre} ${formatMXN(t.neto)}`);
         dest.set(t.cuenta.id, d);
       }
       for (const c of porCuenta) {
         if (!c.cuenta) continue;
-        const d = dest.get(c.cuenta.id) ?? { cuenta: c.cuenta, tarjeta: 0, transferencias: 0, detalle: [] };
+        const d = dest.get(c.cuenta.id) ?? { cuenta: c.cuenta, tarjeta: 0, transferencias: 0, depositos: 0, detalle: [] };
         d.transferencias += c.monto;
         d.detalle.push(`transferencias ${formatMXN(c.monto)}`);
         dest.set(c.cuenta.id, d);
       }
-      porDestino = [...dest.values()].sort((a, b) => b.tarjeta + b.transferencias - (a.tarjeta + a.transferencias));
+      porDestino = [...dest.values()];
     }
   }
+  // Cash deposited from the drawer lands in an account too.
+  if (depositos.length) {
+    const dest = new Map(porDestino.map((d) => [d.cuenta.id, d]));
+    for (const g of depositos) {
+      if (!g.cuenta) continue;
+      const d = dest.get(g.cuenta.id) ?? { cuenta: g.cuenta, tarjeta: 0, transferencias: 0, depositos: 0, detalle: [] };
+      d.depositos += g.monto_cents;
+      dest.set(g.cuenta.id, d);
+    }
+    for (const d of dest.values()) if (d.depositos) d.detalle.push(`depósitos ${formatMXN(d.depositos)}`);
+    porDestino = [...dest.values()];
+  }
+  porDestino.sort((a, b) => b.tarjeta + b.transferencias + b.depositos - (a.tarjeta + a.transferencias + a.depositos));
 
   return (
     <CajaView
@@ -730,6 +754,8 @@ export default async function CajaPage({
         gastosTotal,
         devolucionesTotal,
         gastos,
+        depositos,
+        depositosTotal,
         ingresos,
         devoluciones,
         etiquetado,

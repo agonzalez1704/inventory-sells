@@ -41,9 +41,10 @@ const TITULO: Record<EventoCaja["tipo"], string> = {
   devolucion_adelanto: "Devolución de adelanto",
   ingreso: "Ingreso extra",
   gasto: "Gasto",
+  deposito: "Depósito a cuenta",
   devolucion: "Devolución",
 };
-const ICONO = { venta: ShoppingCart, cobro_fiado: NotebookText, adelanto: NotebookText, ingreso: ArrowUpRight, gasto: ArrowDownRight, devolucion: Undo2, devolucion_adelanto: Undo2 };
+const ICONO = { venta: ShoppingCart, cobro_fiado: NotebookText, adelanto: NotebookText, ingreso: ArrowUpRight, gasto: ArrowDownRight, deposito: Landmark, devolucion: Undo2, devolucion_adelanto: Undo2 };
 
 type Fila = { k: "ev"; e: EventoCaja; saldo: number | null } | { k: "conteo"; c: ConteoCaja };
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, TrendingDown, TrendingUp } from "lucide-react";
+import { Landmark, Plus, TrendingDown, TrendingUp } from "lucide-react";
 import { formatMXN } from "@/lib/money";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,6 +30,7 @@ export function MovimientosView({
   const [contar, setContar] = useState<"conteo" | "cierre" | null>(null);
   const [gastoOpen, setGastoOpen] = useState(false);
   const [ingresoOpen, setIngresoOpen] = useState(false);
+  const [depositoOpen, setDepositoOpen] = useState(false);
 
   const filas = [
     ...gastos.map((g) => ({ ...g, tipo: "gasto" as const })),
@@ -42,11 +43,15 @@ export function MovimientosView({
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Movimientos de caja</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Registra gastos e ingresos extra. Aquí abajo aparecen los que TÚ
-            capturaste hoy.
+            Registra gastos, depósitos a cuenta e ingresos extra. Aquí abajo
+            aparecen los que TÚ capturaste hoy.
           </p>
         </div>
         <div className="flex gap-2">
+          <Button variant="secondary" onClick={() => setDepositoOpen(true)}>
+            <Landmark className="h-4 w-4" />
+            Depósito
+          </Button>
           <Button variant="secondary" onClick={() => setIngresoOpen(true)}>
             <Plus className="h-4 w-4" />
             Ingreso extra
@@ -101,7 +106,9 @@ export function MovimientosView({
                       : "flex h-8 w-8 items-center justify-center rounded-lg bg-accent-soft text-accent"
                   }
                 >
-                  {f.tipo === "gasto" ? (
+                  {f.tipo === "gasto" && f.cuenta_id ? (
+                    <Landmark className="h-4 w-4" />
+                  ) : f.tipo === "gasto" ? (
                     <TrendingDown className="h-4 w-4" />
                   ) : (
                     <TrendingUp className="h-4 w-4" />
@@ -134,6 +141,7 @@ export function MovimientosView({
 
       <MovModal open={gastoOpen} onClose={() => setGastoOpen(false)} tipo="gasto" />
       <MovModal open={ingresoOpen} onClose={() => setIngresoOpen(false)} tipo="ingreso" />
+      <MovModal open={depositoOpen} onClose={() => setDepositoOpen(false)} tipo="deposito" />
       {cajon && (
         <ContarEfectivo
           open={contar !== null}

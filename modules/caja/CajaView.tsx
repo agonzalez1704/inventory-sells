@@ -24,6 +24,7 @@ import {
   Wallet,
   X,
   CreditCard,
+  Receipt,
 } from "lucide-react";
 import { formatMXN } from "@/lib/money";
 import { type ColumnaExport } from "@/lib/exportar-tabla";
@@ -40,7 +41,10 @@ import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
 import { useIsMobile } from "@/components/use-is-mobile";
-import { registrarGasto, eliminarGasto, registrarIngreso, eliminarIngreso } from "./actions";
+import { AdjuntarImagen } from "@/components/ui/adjuntar-imagen";
+import { listarCuentas } from "@/modules/config/cuentas";
+import type { Cuenta } from "@/lib/bancos";
+import { registrarGasto, eliminarGasto, registrarIngreso, eliminarIngreso, registrarDeposito, urlComprobanteGasto } from "./actions";
 
 const METODOS: [PaymentMethod, string][] = [
   ["efectivo", "Efectivo"],
@@ -59,6 +63,12 @@ export type Gasto = {
   metodo: PaymentMethod;
   categoria: string | null;
   created_at: string;
+  /** Set on a deposit: the account the cash went to. */
+  cuenta_id?: string | null;
+  cuenta?: { id: string; banco: string; alias: string } | null;
+  referencia?: string | null;
+  /** A slip image is attached (served on demand through a signed URL). */
+  comprobante?: boolean;
 };
 export type Ingreso = Gasto;
 export type Devolucion = {
@@ -96,6 +106,9 @@ export type CajaData = {
   gastosTotal: number;
   devolucionesTotal: number;
   gastos: Gasto[];
+  /** Cash moved from the drawer to a bank account — not spent. */
+  depositos: Gasto[];
+  depositosTotal: number;
   ingresos: Ingreso[];
   devoluciones: Devolucion[];
   etiquetado: {
@@ -136,6 +149,7 @@ export type PorDestino = {
   cuenta: { id: string; banco: string; alias: string };
   tarjeta: number;
   transferencias: number;
+  depositos: number;
   /** "Clip mostrador $4,072.52", "transferencias $1,860.00" */
   detalle: string[];
 };
@@ -231,7 +245,7 @@ export function CajaView({ data }: { data: CajaData }) {
   const [invSel, setInvSel] = useState<InvAgg | null>(null);
   const [usbOk, setUsbOk] = useState(false);
   const [usbBusy, setUsbBusy] = useState(false);
-  const [filtroMov, setFiltroMov] = useState<"todo" | "gasto" | "ingreso" | "devolucion">("todo");
+  const [filtroMov, setFiltroMov] = useState<"todo" | "gasto" | "deposito" | "ingreso" | "devolucion">("todo");
 
   useEffect(() => {
     setUsbOk(webUsbDisponible());
@@ -254,7 +268,7 @@ export function CajaView({ data }: { data: CajaData }) {
 
   const balance = data.ingresosTotal - data.gastosTotal - data.devolucionesTotal;
   const efectivoCaja =
-    (data.ingresosPorMetodo.efectivo ?? 0) - (data.gastosPorMetodo.efectivo ?? 0) - (data.devolucionesPorMetodo.efectivo ?? 0);
+    (data.ingresosPorMetodo.efectivo ?? 0) - (data.gastosPorMetodo.efectivo ?? 0) - (data.devolucionesPorMetodo.efectivo ?? 0) - data.depositosTotal;
   const sucursalNombre =
     data.sucursalSel === "sin" ? "Sin sucursal" : (data.sucursales.find((su) => su.id === data.sucursalSel)?.nombre ?? null);
   const rangoLabel = (data.from === data.to ? data.from : `${data.from} → ${data.to}`) + (sucursalNombre ? ` · ${sucursalNombre}` : " · Global");
@@ -293,10 +307,11 @@ export function CajaView({ data }: { data: CajaData }) {
   // Gastos, ingresos extra and returns as one list, newest first.
   const movimientos = [
     ...data.gastos.map((m) => ({ tipo: "gasto" as const, id: m.id, concepto: m.concepto, detalle: m.categoria, metodo: m.metodo, monto: -m.monto_cents, fecha: m.created_at })),
+    ...data.depositos.map((m) => ({ tipo: "deposito" as const, id: m.id, concepto: m.concepto, detalle: m.referencia ? `ref. ${m.referencia}` : null, metodo: m.metodo, monto: -m.monto_cents, fecha: m.created_at, comprobante: !!m.comprobante })),
     ...data.ingresos.map((m) => ({ tipo: "ingreso" as const, id: m.id, concepto: m.concepto, detalle: m.categoria, metodo: m.metodo, monto: m.monto_cents, fecha: m.created_at })),
     ...data.devoluciones.map((d) => ({ tipo: "devolucion" as const, id: d.id, concepto: d.motivo || "Devolución", detalle: null, metodo: d.metodo, monto: -d.monto_cents, fecha: d.created_at })),
   ].sort((a, b) => b.fecha.localeCompare(a.fecha));
-  const cuenta = { todo: movimientos.length, gasto: data.gastos.length, ingreso: data.ingresos.length, devolucion: data.devoluciones.length };
+  const cuenta = { todo: movimientos.length, gasto: data.gastos.length, deposito: data.depositos.length, ingreso: data.ingresos.length, devolucion: data.devoluciones.length };
   const movsVisibles = filtroMov === "todo" ? movimientos : movimientos.filter((m) => m.tipo === filtroMov);
   const maxInv = Math.max(1, ...data.porInventario.map((i) => i.ventaCents));
   const unDia = data.from === data.to;
@@ -423,7 +438,7 @@ export function CajaView({ data }: { data: CajaData }) {
           icon={Wallet}
           label="Efectivo en caja"
           value={formatMXN(efectivoCaja)}
-          sub="Lo que debe haber en el cajón"
+          sub={data.depositosTotal ? `Ya depositados ${formatMXN(data.depositosTotal)}` : "Lo que debe haber en el cajón"}
           tone="caja"
           href={unDia ? `/caja/cuadre?dia=${data.from}${data.sucursalSel && data.sucursalSel !== "sin" ? `&sucursal=${data.sucursalSel}` : ""}` : undefined}
         />
@@ -541,6 +556,7 @@ export function CajaView({ data }: { data: CajaData }) {
                 [
                   ["todo", "Todo"],
                   ["gasto", "Gastos"],
+                  ["deposito", "Depósitos"],
                   ["ingreso", "Ingresos extra"],
                   ["devolucion", "Devoluciones"],
                 ] as const
@@ -652,7 +668,7 @@ export function CajaView({ data }: { data: CajaData }) {
           )}
 
           {data.porDestino.length > 0 && (
-            <Seccion titulo="Debe llegar a cada cuenta" sub="Tarjeta neta de comisión más transferencias, para cotejar con el banco">
+            <Seccion titulo="Debe llegar a cada cuenta" sub="Tarjeta neta de comisión, transferencias y depósitos de caja, para cotejar con el banco">
               <ul>
                 {data.porDestino.map((d) => (
                   <li key={d.cuenta.id} className="flex items-center gap-2.5 border-t border-border/70 px-4 py-2.5 text-sm">
@@ -661,7 +677,7 @@ export function CajaView({ data }: { data: CajaData }) {
                       <span className="block truncate font-medium">{d.cuenta.alias}</span>
                       <span className="block truncate text-xs text-muted-foreground">{d.detalle.join(" · ")}</span>
                     </span>
-                    <span className="shrink-0 font-semibold tabular-nums">{formatMXN(d.tarjeta + d.transferencias)}</span>
+                    <span className="shrink-0 font-semibold tabular-nums">{formatMXN(d.tarjeta + d.transferencias + d.depositos)}</span>
                   </li>
                 ))}
               </ul>
@@ -981,13 +997,14 @@ function IngresosModal({
 }
 
 type MovLista = {
-  tipo: "gasto" | "ingreso" | "devolucion";
+  tipo: "gasto" | "deposito" | "ingreso" | "devolucion";
   id: string;
   concepto: string;
   detalle: string | null;
   metodo: string;
   monto: number;
   fecha: string;
+  comprobante?: boolean;
 };
 
 function MovRow({ m, isAdmin }: { m: MovLista; isAdmin: boolean }) {
@@ -996,9 +1013,21 @@ function MovRow({ m, isAdmin }: { m: MovLista; isAdmin: boolean }) {
   const [confirmar, dialogoConfirm] = useConfirm();
   const entra = m.monto > 0;
   const borrable = isAdmin && m.tipo !== "devolucion";
+  const [abriendo, startAbrir] = useTransition();
+
+  function verFicha() {
+    startAbrir(async () => {
+      const r = await urlComprobanteGasto(m.id);
+      if (!r.ok) {
+        toast.error(r.error);
+        return;
+      }
+      window.open(r.data, "_blank", "noopener");
+    });
+  }
 
   async function borrar() {
-    if (!(await confirmar({ title: `¿Eliminar este ${m.tipo === "gasto" ? "gasto" : "ingreso"}?`, description: "Queda registrado en el cuadre del día como movimiento borrado.", confirmLabel: "Eliminar", tone: "danger" })))
+    if (!(await confirmar({ title: `¿Eliminar este ${m.tipo === "gasto" ? "gasto" : m.tipo === "deposito" ? "depósito" : "ingreso"}?`, description: "Queda registrado en el cuadre del día como movimiento borrado.", confirmLabel: "Eliminar", tone: "danger" })))
       return;
     start(async () => {
       try {
@@ -1020,13 +1049,13 @@ function MovRow({ m, isAdmin }: { m: MovLista; isAdmin: boolean }) {
           entra ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" : "bg-red-50 text-red-600 dark:bg-red-950/40 dark:text-red-400",
         )}
       >
-        {m.tipo === "devolucion" ? <Undo2 className="h-4 w-4" /> : entra ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}
+        {m.tipo === "devolucion" ? <Undo2 className="h-4 w-4" /> : m.tipo === "deposito" ? <Landmark className="h-4 w-4" /> : entra ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}
       </span>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-semibold">{m.concepto}</p>
         <p className="truncate text-xs text-muted-foreground">
           {[
-            m.tipo === "gasto" ? "Gasto" : m.tipo === "ingreso" ? "Ingreso extra" : "Devolución",
+            m.tipo === "gasto" ? "Gasto" : m.tipo === "deposito" ? "Depósito a cuenta" : m.tipo === "ingreso" ? "Ingreso extra" : "Devolución",
             LABEL[m.metodo] ?? m.metodo,
             m.detalle,
             new Date(m.fecha).toLocaleString("es-MX", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }),
@@ -1035,7 +1064,19 @@ function MovRow({ m, isAdmin }: { m: MovLista; isAdmin: boolean }) {
             .join(" · ")}
         </p>
       </div>
-      <span className={cn("shrink-0 text-sm font-semibold tabular-nums", entra ? "text-emerald-700 dark:text-emerald-400" : "text-red-600 dark:text-red-400")}>
+      {m.comprobante && (
+        <button
+          type="button"
+          onClick={verFicha}
+          disabled={abriendo}
+          aria-label="Ver ficha de depósito"
+          title="Ver ficha de depósito"
+          className="shrink-0 cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        >
+          <Receipt className="h-4 w-4" />
+        </button>
+      )}
+      <span className={cn("shrink-0 text-sm font-semibold tabular-nums", entra ? "text-emerald-700 dark:text-emerald-400" : m.tipo === "deposito" ? "text-foreground" : "text-red-600 dark:text-red-400")}>
         {entra ? "+" : "−"}
         {formatMXN(Math.abs(m.monto))}
       </span>
@@ -1067,7 +1108,7 @@ export function MovModal({
 }: {
   open: boolean;
   onClose: () => void;
-  tipo: "gasto" | "ingreso";
+  tipo: "gasto" | "ingreso" | "deposito";
   categorias?: { gasto: string[]; ingreso: string[] };
 }) {
   const router = useRouter();
@@ -1078,8 +1119,14 @@ export function MovModal({
   const [metodo, setMetodo] = useState<PaymentMethod>("efectivo");
   const [categoria, setCategoria] = useState("");
   const [otra, setOtra] = useState(false);
+  // Deposit: where it went and the proof.
+  const [cuentas, setCuentas] = useState<Cuenta[] | null>(null);
+  const [cuentaId, setCuentaId] = useState("");
+  const [referencia, setReferencia] = useState("");
+  const [foto, setFoto] = useState<File | null>(null);
   const [pending, start] = useTransition();
   const esIngreso = tipo === "ingreso";
+  const esDeposito = tipo === "deposito";
 
   useEffect(() => {
     if (!open) return;
@@ -1089,14 +1136,44 @@ export function MovModal({
     setMetodo("efectivo");
     setCategoria("");
     setOtra(false);
+    setCuentaId("");
+    setReferencia("");
+    setFoto(null);
   }, [open, tipoInicial]);
 
+  useEffect(() => {
+    if (!open || !esDeposito || cuentas) return;
+    listarCuentas().then((c) => {
+      setCuentas(c);
+      if (c.length === 1) setCuentaId(c[0].id);
+    });
+  }, [open, esDeposito, cuentas]);
+
   const pesos = Number(monto.replace(",", "."));
-  const listo = concepto.trim() && Number.isFinite(pesos) && pesos > 0;
+  const montoOk = Number.isFinite(pesos) && pesos > 0;
+  const listo = esDeposito ? montoOk && !!cuentaId && (!!referencia.trim() || !!foto) : !!concepto.trim() && montoOk;
   const sugeridas = (esIngreso ? categorias?.ingreso : categorias?.gasto) ?? [];
 
   function save() {
     if (!listo) return;
+    if (esDeposito) {
+      const form = new FormData();
+      form.set("monto_cents", String(Math.round(pesos * 100)));
+      form.set("cuenta_id", cuentaId);
+      form.set("referencia", referencia.trim());
+      if (foto) form.set("file", foto);
+      start(async () => {
+        const r = await registrarDeposito(form);
+        if (!r.ok) {
+          toast.error(r.error);
+          return;
+        }
+        toast.success("Depósito registrado");
+        onClose();
+        router.refresh();
+      });
+      return;
+    }
     const payload = { concepto, monto_cents: Math.round(pesos * 100), metodo, categoria: categoria.trim() || null };
     start(async () => {
       try {
@@ -1120,11 +1197,12 @@ export function MovModal({
           </Button>
         </div>
         <div data-base-ui-swipe-ignore className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-4 pb-4 sm:px-6">
-          <div className="grid grid-cols-2 rounded-xl bg-muted p-1">
+          <div className="grid grid-cols-3 rounded-xl bg-muted p-1">
             {(
               [
                 ["gasto", "Gasto", ArrowDownRight, "text-red-600"],
-                ["ingreso", "Ingreso extra", ArrowUpRight, "text-emerald-600"],
+                ["ingreso", "Ingreso", ArrowUpRight, "text-emerald-600"],
+                ["deposito", "Depósito", Landmark, "text-foreground"],
               ] as const
             ).map(([k, label, Icon, color]) => (
               <button
@@ -1156,6 +1234,41 @@ export function MovModal({
             </div>
           </label>
 
+          {esDeposito ? (
+            <>
+              <fieldset className="space-y-2">
+                <legend className="mb-2 text-sm font-semibold">¿A qué cuenta?</legend>
+                {cuentas === null ? (
+                  <p className="text-xs text-muted-foreground">Cargando cuentas…</p>
+                ) : cuentas.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No hay cuentas registradas: un admin las da de alta en Configuración → Cuentas.</p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {cuentas.map((c) => (
+                      <Chip key={c.id} activo={cuentaId === c.id} onClick={() => setCuentaId(c.id)}>
+                        <BancoIcon banco={c.banco} size="sm" /> {c.alias}
+                      </Chip>
+                    ))}
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground">Sale del efectivo del cajón; en el corte aparece como depósito, no como gasto.</p>
+              </fieldset>
+
+              <fieldset className="space-y-2">
+                <legend className="mb-2 text-sm font-semibold">
+                  Comprobante <span className="font-normal text-muted-foreground">· ficha o referencia, al menos uno</span>
+                </legend>
+                <Input
+                  value={referencia}
+                  onChange={(e) => setReferencia(e.target.value)}
+                  placeholder="Referencia o folio del depósito"
+                  className="h-11 text-base sm:text-sm"
+                />
+                <AdjuntarImagen value={foto} onChange={setFoto} />
+              </fieldset>
+            </>
+          ) : (
+            <>
           <label className="block space-y-2">
             <span className="text-sm font-semibold">Concepto</span>
             <Input
@@ -1198,13 +1311,15 @@ export function MovModal({
               <Input autoFocus value={categoria} onChange={(e) => setCategoria(e.target.value)} placeholder={esIngreso ? "Instalación, reparación…" : "Renta, proveedor, sueldos…"} className="h-11 text-base sm:text-sm" />
             )}
           </fieldset>
+            </>
+          )}
         </div>
         <div className="flex gap-2.5 border-t border-border px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 sm:px-6">
           <Button variant="secondary" className="hidden h-12 flex-1 sm:inline-flex" onClick={onClose} disabled={pending}>
             Cancelar
           </Button>
           <Button className="h-12 flex-2 text-base sm:text-sm" onClick={save} loading={pending} disabled={!listo}>
-            {esIngreso ? "Registrar ingreso" : "Registrar gasto"}
+            {esIngreso ? "Registrar ingreso" : esDeposito ? "Registrar depósito" : "Registrar gasto"}
             {listo && ` de ${formatMXN(Math.round(pesos * 100))}`}
           </Button>
         </div>
