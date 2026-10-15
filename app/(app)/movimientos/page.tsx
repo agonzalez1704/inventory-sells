@@ -14,7 +14,8 @@ export default async function MovimientosPage() {
   const mios = (tabla: "gastos" | "ingresos") =>
     insforgeAdmin.database
       .from(tabla)
-      .select("id, concepto, monto_cents, metodo, categoria, created_at, cuenta_id")
+      // cuenta_id only exists on gastos (a deposit's destination account).
+      .select(`id, concepto, monto_cents, metodo, categoria, created_at${tabla === "gastos" ? ", cuenta_id" : ""}`)
       .eq("created_by", userId)
       .gte("created_at", startISO)
       .lt("created_at", endISO)
