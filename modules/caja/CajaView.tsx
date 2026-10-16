@@ -109,6 +109,8 @@ export type CajaData = {
   /** Cash moved from the drawer to a bank account — not spent. */
   depositos: Gasto[];
   depositosTotal: number;
+  /** Guarantee cash received minus returned in the range: in the drawer, not income. */
+  importesNetoCents: number;
   ingresos: Ingreso[];
   devoluciones: Devolucion[];
   etiquetado: {
@@ -268,7 +270,7 @@ export function CajaView({ data }: { data: CajaData }) {
 
   const balance = data.ingresosTotal - data.gastosTotal - data.devolucionesTotal;
   const efectivoCaja =
-    (data.ingresosPorMetodo.efectivo ?? 0) - (data.gastosPorMetodo.efectivo ?? 0) - (data.devolucionesPorMetodo.efectivo ?? 0) - data.depositosTotal;
+    (data.ingresosPorMetodo.efectivo ?? 0) - (data.gastosPorMetodo.efectivo ?? 0) - (data.devolucionesPorMetodo.efectivo ?? 0) - data.depositosTotal + data.importesNetoCents;
   const sucursalNombre =
     data.sucursalSel === "sin" ? "Sin sucursal" : (data.sucursales.find((su) => su.id === data.sucursalSel)?.nombre ?? null);
   const rangoLabel = (data.from === data.to ? data.from : `${data.from} → ${data.to}`) + (sucursalNombre ? ` · ${sucursalNombre}` : " · Global");
@@ -438,7 +440,14 @@ export function CajaView({ data }: { data: CajaData }) {
           icon={Wallet}
           label="Efectivo en caja"
           value={formatMXN(efectivoCaja)}
-          sub={data.depositosTotal ? `Ya depositados ${formatMXN(data.depositosTotal)}` : "Lo que debe haber en el cajón"}
+          sub={
+            [
+              data.depositosTotal ? `ya depositados ${formatMXN(data.depositosTotal)}` : null,
+              data.importesNetoCents ? `importes retenidos ${formatMXN(data.importesNetoCents)}` : null,
+            ]
+              .filter(Boolean)
+              .join(" · ") || "Lo que debe haber en el cajón"
+          }
           tone="caja"
           href={unDia ? `/caja/cuadre?dia=${data.from}${data.sucursalSel && data.sucursalSel !== "sin" ? `&sucursal=${data.sucursalSel}` : ""}` : undefined}
         />

@@ -328,6 +328,8 @@ export function SalesScreen({
   const [mode, setMode] = useState<"venta" | "prestamo">("venta");
   const [customer, setCustomer] = useState<PosCustomer>(mostrador);
   const [note, setNote] = useState("");
+  // "Importe": cash guarantee left with a credit note. Pesos as typed.
+  const [importe, setImporte] = useState("");
   const [descManual, setDescManual] = useState<number | null>(null);
   const [editDesc, setEditDesc] = useState(false);
   const [detalle, setDetalle] = useState<SalesProduct | null>(null);
@@ -652,6 +654,7 @@ export function SalesScreen({
     setCart({});
     setCustomer(mostrador);
     setNote("");
+    setImporte("");
     setDescManual(null);
     setEditDesc(false);
     setMode("venta");
@@ -706,7 +709,10 @@ export function SalesScreen({
   const aMostrador = mode === "prestamo" && customer.is_system;
   const faltaCliente = aMostrador && fiadoExigeCliente;
   const faltaNota = aMostrador && !fiadoExigeCliente && note.trim().length < 5;
-  const canSubmit = lines.length > 0 && !faltaCliente && !faltaNota && !pending;
+  const importeCents = mode === "prestamo" && importe.trim() ? Math.round(Number(importe.replace(",", ".")) * 100) : 0;
+  const importeInvalido = importe.trim() !== "" && (!Number.isFinite(importeCents) || importeCents <= 0);
+  const importeCorto = importeCents > 0 && importeCents < total;
+  const canSubmit = lines.length > 0 && !faltaCliente && !faltaNota && !importeInvalido && !importeCorto && !pending;
 
   useEffect(() => {
     setSaldo(0);
@@ -746,7 +752,7 @@ export function SalesScreen({
     startTransition(async () => {
       try {
         const { saleId } = esFiado
-          ? await registerLoan(items, customer.is_system ? null : customer.id, note, manual)
+          ? await registerLoan(items, customer.is_system ? null : customer.id, note, manual, importeCents || null)
           : await registerSale(items, pm, customer.id, pagos, manual);
 
         // Transfer proof rides AFTER the sale: its failure downgrades a toast,
@@ -927,6 +933,26 @@ export function SalesScreen({
                 placeholder={aMostrador ? "¿Quién debe? Nombre, teléfono o seña" : "¿Qué se acordó? Plazo, referencia…"}
                 className="h-10 bg-background text-base sm:text-sm"
               />
+              <div className="flex items-center gap-2">
+                <span className="shrink-0 text-xs font-medium text-amber-900 dark:text-amber-200">Importe</span>
+                <div className={cn("flex h-10 flex-1 items-center gap-1 rounded-lg border bg-background px-3", importeCorto || importeInvalido ? "border-red-400" : "border-border")}>
+                  <span className="text-muted-foreground">$</span>
+                  <input
+                    inputMode="decimal"
+                    value={importe}
+                    onChange={(e) => setImporte(e.target.value.replace(/[^\d.,]/g, ""))}
+                    placeholder="Garantía en efectivo (opcional)"
+                    className="w-full min-w-0 bg-transparent text-base tabular-nums outline-hidden sm:text-sm"
+                  />
+                </div>
+              </div>
+              {importeCorto ? (
+                <p className="text-xs text-red-700 dark:text-red-400">El importe debe cubrir la nota: mínimo {formatMXN(total)}.</p>
+              ) : importeCents > 0 ? (
+                <p className="text-xs text-amber-800 dark:text-amber-300">
+                  Entra {formatMXN(importeCents)} al cajón como garantía. Al cobrar se le regresan {formatMXN(importeCents - total)}; si devuelve la pieza, todo.
+                </p>
+              ) : null}
               {faltaCliente && <p className="text-xs text-amber-800 dark:text-amber-300">Un crédito necesita cliente registrado. Elige o crea uno arriba.</p>}
               {aMostrador && !fiadoExigeCliente && (
                 <p className="text-xs text-amber-800 dark:text-amber-300">Sin cliente registrado, la nota es lo único que dirá quién debe.</p>

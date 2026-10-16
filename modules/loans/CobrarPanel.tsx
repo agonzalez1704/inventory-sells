@@ -17,7 +17,7 @@ import { imprimirTicketNavegador } from "@/lib/ticket";
 import { guardarComprobante } from "@/modules/sales/comprobantes";
 import { asignarTerminalPago } from "@/modules/config/terminales";
 import { recordarTerminal, TerminalPicker, useTerminalElegida, useTerminales } from "@/components/terminal-picker";
-import { abonarFiado, settleLoan } from "@/modules/sales/actions";
+import { abonarFiado, settleLoan, aplicarImporte } from "@/modules/sales/actions";
 import { quienDebe, resta as restaDe, ticketDeAbono, type PieNota } from "./estado-cuenta";
 import type { Loan } from "./LoansView";
 
@@ -94,6 +94,31 @@ export function CobrarPanel({
   const pideTerminal = metodo === "tarjeta" && (terminales?.length ?? 0) > 0;
   const faltaTerminal = pideTerminal && !terminalId;
   const puede = cobro > 0 && !insuficiente && !faltaCuenta && !faltaComprobante && !faltaTerminal && !pending;
+  // An importe covers the note: applying it is the whole collection.
+  const importe = loan.importe_cents ?? 0;
+  const conImporte = importe > 0 && importe >= falta;
+
+  function aplicar() {
+    start(async () => {
+      try {
+        const { cambioCents } = await aplicarImporte(loan.id);
+        if (imprimir) {
+          imprimirTicketNavegador(
+            ticketDeAbono(loan, { monto_cents: falta, metodo: "efectivo", created_at: new Date().toISOString() }, 0, pie),
+          );
+        }
+        toast.success(
+          cambioCents > 0
+            ? `Liquidado con el importe · regresa ${formatMXN(cambioCents)} a ${quienDebe(loan)}`
+            : `Liquidado con el importe · ${quienDebe(loan)} ya no debe nada`,
+        );
+        onListo();
+        router.refresh();
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "No se pudo aplicar el importe");
+      }
+    });
+  }
 
   const sugerencias = useMemo(() => {
     const paso = [10000, 20000, 50000];
@@ -168,6 +193,25 @@ export function CobrarPanel({
         </div>
 
         <div data-base-ui-swipe-ignore className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 pb-4 sm:px-6">
+          {conImporte && (
+            <div className="space-y-3 rounded-xl border border-emerald-300 bg-emerald-50 p-4 dark:border-emerald-900 dark:bg-emerald-950/30">
+              <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-200">Dejó importe de {formatMXN(importe)}</p>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <p className="text-xs text-muted-foreground">Se cobra de ahí</p>
+                  <p className="font-semibold tabular-nums">{formatMXN(falta)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Le regresas</p>
+                  <p className="text-xl font-bold tabular-nums text-emerald-800 dark:text-emerald-300">{formatMXN(importe - falta)}</p>
+                </div>
+              </div>
+              <Button className="h-12 w-full text-base sm:text-sm" onClick={aplicar} loading={pending}>
+                <Banknote className="h-4 w-4" /> Aplicar importe y liquidar
+              </Button>
+              <p className="text-xs text-muted-foreground">¿Devolvió la pieza? Cancela la nota desde su panel: se le regresa el importe completo.</p>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-2.5">
             {(
               [

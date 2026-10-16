@@ -129,6 +129,8 @@ export async function registerLoan(
   customerId: string | null,
   note: string | null,
   descuentoPct?: number | null,
+  /** "Importe": cash left as guarantee, at least the note's total. */
+  importeCents?: number | null,
 ): Promise<{ saleId: string }> {
   const { userId } = await auth();
   if (!userId) throw new Error("No autenticado");
@@ -145,6 +147,7 @@ export async function registerLoan(
     p_customer_id: customerId ?? null,
     p_note: note?.trim() || null,
     ...(descuentoPct != null ? { p_descuento_pct: descuentoPct } : {}),
+    ...(importeCents ? { p_importe_cents: Math.round(importeCents) } : {}),
   });
 
   if (error) throw new Error(error.message ?? "Error al registrar la nota de crédito");
@@ -188,6 +191,20 @@ export async function abonarFiado(
   });
   if (error) throw new Error(error.message ?? "Error al abonar");
   after(() => notifyAbono(saleId));
+}
+
+/**
+ * The customer keeps the part: the importe they left pays the note and the
+ * difference goes back to them. Returns that change, in cents.
+ */
+export async function aplicarImporte(saleId: string): Promise<{ cambioCents: number }> {
+  const { userId } = await auth();
+  if (!userId) throw new Error("No autenticado");
+  const insforge = await createInsForgeServerClient();
+  const { data, error } = await insforge.database.rpc("aplicar_importe", { p_sale_id: saleId });
+  if (error) throw new Error(error.message ?? "No se pudo aplicar el importe");
+  after(() => notifyAbono(saleId));
+  return { cambioCents: Number(data ?? 0) };
 }
 
 // Collect a pending loan → becomes a completed sale (revenue counts now).

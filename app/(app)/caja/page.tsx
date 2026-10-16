@@ -475,6 +475,17 @@ export default async function CajaPage({
   const depositos = todosGastos.filter((g) => g.cuenta_id);
   const depositosTotal = depositos.reduce((s, g) => s + g.monto_cents, 0);
 
+  // Importes: guarantee cash sitting in the drawer. In when the note is made,
+  // out when applied or returned; the net is cash the corte must expect.
+  type Imp = { id: string; importe_cents: number; created_at: string; sold_by: string | null; importe_devuelto_at: string | null; importe_devuelto_por: string | null };
+  const [{ data: impIn }, { data: impOut }] = await Promise.all([
+    insforge.database.from("sales").select("id, importe_cents, created_at, sold_by, importe_devuelto_at, importe_devuelto_por").not("importe_cents", "is", null).gte("created_at", startISO).lt("created_at", endISO),
+    insforge.database.from("sales").select("id, importe_cents, created_at, sold_by, importe_devuelto_at, importe_devuelto_por").not("importe_cents", "is", null).gte("importe_devuelto_at", startISO).lt("importe_devuelto_at", endISO),
+  ]);
+  let importesNetoCents = 0;
+  for (const v of (impIn ?? []) as Imp[]) if (!sucursalSel || enSucursal(v.sold_by, v.created_at)) importesNetoCents += v.importe_cents;
+  for (const v of (impOut ?? []) as Imp[]) if (!sucursalSel || enSucursal(v.importe_devuelto_por, v.importe_devuelto_at!)) importesNetoCents -= v.importe_cents;
+
   // --- Cash out (by day/method): sale returns + adelanto refunds ---
   const devolucionesPorMetodo = cero();
   let devolucionesTotal = 0;
@@ -756,6 +767,7 @@ export default async function CajaPage({
         gastos,
         depositos,
         depositosTotal,
+        importesNetoCents,
         ingresos,
         devoluciones,
         etiquetado,

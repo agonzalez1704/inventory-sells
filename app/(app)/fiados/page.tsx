@@ -28,7 +28,7 @@ export default async function FiadosPage({
   let fiadosQuery = insforge.database
     .from("sales")
     .select(
-      "id, total_cents, note, created_at, sold_by, fiado_publico, customer_id, customers(id, nombre, telefono, is_system, credito_dias), sale_items(product_id, qty, unit_price_cents, products(name, sku)), sale_pagos(id, monto_cents, metodo, created_at, created_by)",
+      "id, total_cents, note, created_at, sold_by, fiado_publico, importe_cents, customer_id, customers(id, nombre, telefono, is_system, credito_dias), sale_items(product_id, qty, unit_price_cents, products(name, sku)), sale_pagos(id, monto_cents, metodo, created_at, created_by)",
     )
     .eq("status", "pending")
     .order("created_at", { ascending: true });

@@ -90,7 +90,9 @@ export function PanelNota({
     if (!v) return;
     const ok = await confirmar({
       title: "¿Cancelar la nota?",
-      description: "Las piezas vuelven al inventario y la deuda se borra.",
+      description: v.importe_cents
+        ? `Las piezas vuelven al inventario, la deuda se borra y se le regresan los ${formatMXN(v.importe_cents)} de importe.`
+        : "Las piezas vuelven al inventario y la deuda se borra.",
       confirmLabel: "Sí, cancelar",
       tone: "danger",
     });

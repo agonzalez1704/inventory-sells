@@ -11,7 +11,7 @@ import { rangoUTC } from "@/lib/caja-range";
 // extra, gastos, returns. A movement belongs to the drawer of the sucursal
 // where its registrar checked in that day.
 
-export type TipoEvento = "venta" | "cobro_fiado" | "adelanto" | "devolucion_adelanto" | "ingreso" | "gasto" | "deposito" | "devolucion";
+export type TipoEvento = "venta" | "cobro_fiado" | "adelanto" | "devolucion_adelanto" | "ingreso" | "gasto" | "deposito" | "devolucion" | "importe" | "importe_devuelto";
 
 export type EventoCaja = {
   id: string;
@@ -106,7 +106,7 @@ const nombres = (items: Item[] | null | undefined) =>
 async function eventosRango(from: string, to: string) {
   const { startISO, endISO } = rangoUTC(from, to);
   const db = insforgeAdmin.database;
-  const [ventas, pagos, adelPagos, ingresos, gastos, devoluciones, checkins] = await Promise.all([
+  const [ventas, pagos, adelPagos, ingresos, gastos, devoluciones, checkins, importesIn, importesOut] = await Promise.all([
     db
       .from("sales")
       .select("id, total_cents, payment_method, created_at, sold_by, customer_name, sale_items(qty, products(name))")
@@ -128,6 +128,10 @@ async function eventosRango(from: string, to: string) {
     db.from("gastos").select("id, concepto, monto_cents, metodo, categoria, created_at, created_by, cuenta_id").gte("created_at", startISO).lt("created_at", endISO),
     db.from("devoluciones").select("id, sale_id, monto_cents, metodo, motivo, created_at, created_by").gte("created_at", startISO).lt("created_at", endISO),
     db.from("checkins").select("profile_id, sucursal_id, created_at").gte("created_at", startISO).lt("created_at", endISO).order("created_at"),
+    // Importes: cash guarantees held with a credit note (in at the note,
+    // out when applied or the part comes back).
+    db.from("sales").select("id, importe_cents, created_at, sold_by, customer_name, sale_items(qty, products(name))").not("importe_cents", "is", null).gte("created_at", startISO).lt("created_at", endISO),
+    db.from("sales").select("id, importe_cents, importe_devuelto_at, importe_devuelto_por, status, customer_name, sale_items(qty, products(name))").not("importe_cents", "is", null).gte("importe_devuelto_at", startISO).lt("importe_devuelto_at", endISO),
   ]);
 
   const checkinDe = new Map<string, string>();
@@ -196,6 +200,12 @@ async function eventosRango(from: string, to: string) {
       saleId: null,
     });
   }
+  type Imp = { id: string; importe_cents: number; created_at: string; sold_by: string | null; customer_name: string | null; sale_items: Item[] };
+  for (const v of (importesIn.data ?? []) as unknown as Imp[])
+    ev.push({ ...base(v.sold_by, v.created_at), id: `imp:${v.id}`, tipo: "importe", metodo: "efectivo", montoCents: v.importe_cents, titulo: nombres(v.sale_items), detalle: v.customer_name?.trim() || null, saleId: v.id });
+  type ImpOut = { id: string; importe_cents: number; importe_devuelto_at: string; importe_devuelto_por: string | null; status: string; customer_name: string | null; sale_items: Item[] };
+  for (const v of (importesOut.data ?? []) as unknown as ImpOut[])
+    ev.push({ ...base(v.importe_devuelto_por, v.importe_devuelto_at), id: `impd:${v.id}`, tipo: "importe_devuelto", metodo: "efectivo", montoCents: -v.importe_cents, titulo: nombres(v.sale_items), detalle: `${v.customer_name?.trim() || "cliente"} · ${v.status === "void" ? "devolvió la pieza" : "se cobró de ahí"}`, saleId: v.id });
   for (const m of (ingresos.data ?? []) as Mov[])
     ev.push({ ...base(m.created_by, m.created_at), id: `i:${m.id}`, tipo: "ingreso", metodo: m.metodo, montoCents: m.monto_cents, titulo: m.concepto, detalle: m.categoria, saleId: null });
   for (const m of (gastos.data ?? []) as (Mov & { cuenta_id: string | null })[])
