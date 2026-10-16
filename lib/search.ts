@@ -327,3 +327,9 @@ export function soloModeloExacto<T>(rows: T[], consulta: string, nombre: (r: T) 
 
 /** Product-type nouns a customer says that an uncategorized row cannot match. */
 export const PALABRAS_TIPO = /\b(pantallas?|displays?|modulos?|módulos?)\b/gi;
+
+/**
+ * Quality words. "OLED de S20 FE" must still find "S20 FE ORG C/M": the model
+ * is the question, the quality is what the agent offers alternatives to.
+ */
+export const PALABRAS_CALIDAD = /\b(oled|amoled|incell|incel|original|orig|org|aaa|jk|lcd|gen[eé]ricas?|econ[oó]micas?)\b/gi;

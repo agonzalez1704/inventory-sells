@@ -3,7 +3,7 @@ import { generateText, tool, stepCountIs } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { z } from "zod";
 import { buscarProducto } from "@/modules/analytics/queries";
-import { PALABRAS_TIPO, soloModeloExacto } from "@/lib/search";
+import { PALABRAS_CALIDAD, PALABRAS_TIPO, soloModeloExacto } from "@/lib/search";
 import { modelosCompatibles } from "@/lib/compat";
 import { anotarDemandaAgente } from "@/modules/demanda/agente";
 import { getNegocioInfo } from "@/modules/config/lib";
@@ -289,6 +289,15 @@ Este número no está en el registro de clientes.
             if (sinTipo) rows = await buscarProducto(sinTipo, 80);
           }
           PALABRAS_TIPO.lastIndex = 0;
+          // "OLED de S20 FE" when only the ORG exists: the quality word hid the
+          // model. Search the model alone; the prompt makes the agent offer the
+          // quality that IS there instead of a bare "no".
+          if (rows.length === 0 && PALABRAS_CALIDAD.test(q || consulta)) {
+            const sinCalidad = (q || consulta).replace(PALABRAS_CALIDAD, " ").replace(PALABRAS_TIPO, " ").replace(/\s+/g, " ").trim();
+            PALABRAS_TIPO.lastIndex = 0;
+            if (sinCalidad) rows = await buscarProducto(sinCalidad, 80);
+          }
+          PALABRAS_CALIDAD.lastIndex = 0;
           // Only the exact model asked about: "iPhone 16" is not the 16 Pro.
           // When the exact one does not exist, the variants stay, labeled.
           const exactos = soloModeloExacto(rows, q || consulta, (r) => r.nombre);

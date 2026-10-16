@@ -45,3 +45,15 @@ assert.deepEqual(nombres(soloModeloExacto(sam, "a02s", (r) => r.name)), ["SAM A0
 assert.equal(soloModeloExacto(iphone16, "iphone x", (r) => r.name), null);
 assert.equal(soloModeloExacto(iphone16, "iphone 16 mini", (r) => r.name), null);
 console.log("✓ búsqueda del agente: solo el modelo exacto");
+
+// "Pantalla OLED de S20 FE" when only the ORG exists: stripping the quality
+// word must leave a query that finds the model, so the agent can offer it.
+import { PALABRAS_CALIDAD, PALABRAS_TIPO } from "../lib/search.ts";
+const s20 = [{ sku: "S20FE-ORG", name: "S20 FE ORG C/M", brand: "SAMSUNG", category: "pantallas" }];
+const pregunta = "Pantalla oled de s20 fe?";
+assert.deepEqual(searchProducts(s20, pregunta), [], "con la calidad puesta no debe encontrar el ORG");
+const sinCalidad = pregunta.replace(PALABRAS_CALIDAD, " ").replace(PALABRAS_TIPO, " ").replace(/\s+/g, " ").trim();
+PALABRAS_CALIDAD.lastIndex = 0;
+PALABRAS_TIPO.lastIndex = 0;
+assert.deepEqual(searchProducts(s20, sinCalidad).map((p) => p.sku), ["S20FE-ORG"], "sin la calidad debe encontrar S20 FE ORG C/M");
+console.log("✓ búsqueda del agente: calidad pedida que no hay → encuentra el modelo");
