@@ -4,7 +4,10 @@ import { insforgeAdmin } from "@/lib/insforge/admin";
 import { assertPermiso } from "@/lib/auth/profile";
 import { attempt, type ActionResult } from "@/lib/errors";
 import { enviarTexto } from "@/lib/kapso";
-import { guardarMensaje } from "./memoria";
+import { cargarHistorial, guardarMensaje } from "./memoria";
+import { estadoConversacion, marcarAsesor } from "./handoff";
+import { detectarCliente } from "./cliente";
+import { responderMensaje } from "./inventory-agent";
 
 export type ConversacionBandeja = {
   clave: string;
@@ -91,19 +94,7 @@ export async function responder(
     const cuerpo = texto.trim();
     if (!cuerpo) throw new Error("Escribe un mensaje");
 
-    const { data } = await insforgeAdmin.database
-      .from("wa_identidades")
-      .select("telefono, bsuid")
-      .eq("clave", clave)
-      .maybeSingle();
-    const id = data as { telefono: string | null; bsuid: string | null } | null;
-    // Conversations that predate identity tracking only have the key, which was
-    // seeded from the phone number — so it is still a usable address.
-    const telefono = id?.telefono ?? (/^\d{10,15}$/.test(clave) ? clave : "");
-    const bsuid = id?.bsuid ?? "";
-    if (!telefono && !bsuid) {
-      throw new Error("No tengo cómo contactar a este número desde la app");
-    }
+    const { telefono, bsuid } = await contactoDe(clave);
 
     await insforgeAdmin.database.rpc("wa_tomar", {
       p_clave: clave,
@@ -111,10 +102,56 @@ export async function responder(
       p_motivo: "Un asesor respondió desde la app",
     });
 
-    const phoneNumberId = process.env.KAPSO_PHONE_NUMBER_ID ?? "";
-    if (!phoneNumberId) throw new Error("Falta configurar el número de WhatsApp");
-    await enviarTexto(phoneNumberId, telefono, cuerpo, bsuid || undefined);
+    await enviarTexto(numeroWhatsApp(), telefono, cuerpo, bsuid || undefined);
     await guardarMensaje(clave, "asesor", cuerpo);
     return null;
+  });
+}
+
+// Where to send from, and to whom. Conversations that predate identity tracking
+// only have the key, which was seeded from the phone number — so it is still a
+// usable address.
+async function contactoDe(clave: string): Promise<{ telefono: string; bsuid: string }> {
+  const { data } = await insforgeAdmin.database
+    .from("wa_identidades")
+    .select("telefono, bsuid")
+    .eq("clave", clave)
+    .maybeSingle();
+  const id = data as { telefono: string | null; bsuid: string | null } | null;
+  const telefono = id?.telefono ?? (/^\d{10,15}$/.test(clave) ? clave : "");
+  const bsuid = id?.bsuid ?? "";
+  if (!telefono && !bsuid) throw new Error("No tengo cómo contactar a este número desde la app");
+  return { telefono, bsuid };
+}
+
+function numeroWhatsApp(): string {
+  const id = process.env.KAPSO_PHONE_NUMBER_ID ?? "";
+  if (!id) throw new Error("Falta configurar el número de WhatsApp");
+  return id;
+}
+
+/**
+ * Answer the customer's last message again, after teaching the agent what it
+ * missed — "Guardar y contestar". Same path as a webhook reply: the agent
+ * reads what it was just taught, the answer goes out through Kapso and into
+ * the thread.
+ */
+export async function contestarDeNuevo(clave: string): Promise<ActionResult<{ texto: string }>> {
+  return attempt("contestarDeNuevo", async () => {
+    await assertPermiso("admin_total");
+    if ((await estadoConversacion(clave)) === "asesor")
+      throw new Error("La conversación la tiene un asesor: devuélvela al bot para que conteste");
+    const { telefono, bsuid } = await contactoDe(clave);
+    const historial = await cargarHistorial(clave, 10);
+    // Re-answer the customer's message, not continue after the miss.
+    while (historial.length && historial.at(-1)!.role === "assistant") historial.pop();
+    const ultimo = historial.at(-1)?.content;
+    if (!ultimo) throw new Error("No hay mensaje reciente del cliente que contestar (más de 6 horas)");
+    const cliente = await detectarCliente(telefono);
+    const { texto, escalar } = await responderMensaje(historial, clave, cliente, { correccion: true });
+    await enviarTexto(numeroWhatsApp(), telefono, texto, bsuid || undefined);
+    await guardarMensaje(clave, "assistant", texto);
+    if (escalar) await marcarAsesor(clave, escalar.motivo, ultimo);
+    return { texto };
   });
 }

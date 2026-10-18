@@ -1,4 +1,4 @@
-import { requirePagePermiso } from "@/lib/auth/profile";
+import { permisosDe, requirePagePermiso } from "@/lib/auth/profile";
 import { listarConversaciones } from "@/modules/agent/bandeja-actions";
 import { BandejaView } from "@/modules/agent/BandejaView";
 
@@ -7,7 +7,7 @@ export default async function AsesorPage() {
   // This page had no guard at all: any signed-in session could read every
   // customer's WhatsApp conversation. Sellers and admins, as agreed.
   await requirePagePermiso("pos_vender");
-  const inicial = await listarConversaciones();
+  const [inicial, perms] = await Promise.all([listarConversaciones(), permisosDe()]);
 
   return (
     <section className="space-y-5">
@@ -18,7 +18,7 @@ export default async function AsesorPage() {
           detiene solo.
         </p>
       </div>
-      <BandejaView inicial={inicial} />
+      <BandejaView inicial={inicial} puedeEnsenar={perms.has("admin_total")} />
     </section>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Bot, Send, User, Hand, MessageSquare, Loader2 } from "lucide-react";
+import { Bot, Send, User, Hand, MessageSquare, Loader2, Lightbulb } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,7 @@ import {
   type ConversacionBandeja,
   type MensajeBandeja,
 } from "./bandeja-actions";
+import { EnsenarDrawer } from "./EnsenarDrawer";
 
 // How often the open thread and the list re-read. Polling rather than a
 // realtime subscription: a shop has a handful of live conversations, and this
@@ -35,12 +36,21 @@ const fecha = (iso: string) => {
     : d.toLocaleDateString("es-MX", { day: "2-digit", month: "short" });
 };
 
-export function BandejaView({ inicial }: { inicial: ConversacionBandeja[] }) {
+export function BandejaView({
+  inicial,
+  puedeEnsenar = false,
+}: {
+  inicial: ConversacionBandeja[];
+  /** Admins can teach the agent from any of its replies. */
+  puedeEnsenar?: boolean;
+}) {
   const [convs, setConvs] = useState(inicial);
   const [sel, setSel] = useState<string | null>(inicial[0]?.clave ?? null);
   const [hilo, setHilo] = useState<MensajeBandeja[]>([]);
   const [texto, setTexto] = useState("");
   const [enviando, setEnviando] = useState(false);
+  // The agent reply being taught from, if the panel is open.
+  const [ensenar, setEnsenar] = useState<string | null>(null);
   const finRef = useRef<HTMLDivElement>(null);
 
   const actual = convs.find((c) => c.clave === sel) ?? null;
@@ -190,7 +200,7 @@ export function BandejaView({ inicial }: { inicial: ConversacionBandeja[] }) {
 
             <div className="flex-1 space-y-2.5 overflow-y-auto bg-page p-4">
               {hilo.map((m) => (
-                <Burbuja key={m.id} m={m} />
+                <Burbuja key={m.id} m={m} onEnsenar={puedeEnsenar && m.rol === "assistant" ? () => setEnsenar(m.id) : undefined} />
               ))}
               <div ref={finRef} />
             </div>
@@ -222,6 +232,17 @@ export function BandejaView({ inicial }: { inicial: ConversacionBandeja[] }) {
           </>
         )}
       </Card>
+      {actual && puedeEnsenar && (
+        <EnsenarDrawer
+          clave={actual.clave}
+          mensajeId={ensenar}
+          onClose={() => setEnsenar(null)}
+          onListo={() => {
+            setEnsenar(null);
+            refrescar();
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -262,7 +283,7 @@ const VOZ = {
   },
 } as const;
 
-function Burbuja({ m }: { m: MensajeBandeja }) {
+function Burbuja({ m, onEnsenar }: { m: MensajeBandeja; onEnsenar?: () => void }) {
   const delCliente = m.rol === "user";
   const v = VOZ[m.rol] ?? VOZ.assistant;
   const { Icono } = v;
@@ -280,6 +301,18 @@ function Burbuja({ m }: { m: MensajeBandeja }) {
           {v.etiqueta} · {hora(m.created_at)}
         </p>
       </div>
+      {onEnsenar && (
+        // Under every agent reply: teach it right where it missed.
+        <button
+          type="button"
+          onClick={onEnsenar}
+          aria-label="Enseñarle al agente a partir de esta respuesta"
+          className="ml-1.5 flex h-9 shrink-0 cursor-pointer items-center gap-1 self-end rounded-full border border-brand/60 bg-background px-2.5 text-xs font-semibold text-brand-foreground hover:bg-brand-soft"
+        >
+          <Lightbulb className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">Enseñarle</span>
+        </button>
+      )}
     </div>
   );
 }

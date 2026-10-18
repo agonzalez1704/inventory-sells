@@ -13,6 +13,7 @@ import {
   HandCoins,
   BarChart3,
   Settings,
+  Lightbulb,
   Headset,
   Calculator,
   Wallet,
@@ -96,6 +97,7 @@ const GRUPOS: {
     label: "Sistema",
     links: [
       { href: "/usuarios", label: "Usuarios", icon: ShieldCheck, permiso: "usuarios_gestionar" },
+      { href: "/agente", label: "Lo que sabe el agente", icon: Lightbulb, permiso: "admin_total" },
       // No permiso: everyone needs their own device push + notification prefs.
       { href: "/configuracion", label: "Configuración", icon: Settings },
     ],

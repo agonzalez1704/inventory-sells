@@ -3,7 +3,7 @@ import { generateText, tool, stepCountIs } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { z } from "zod";
 import { buscarProducto } from "@/modules/analytics/queries";
-import { PALABRAS_CALIDAD, PALABRAS_TIPO, soloModeloExacto } from "@/lib/search";
+import { PALABRAS_CALIDAD, PALABRAS_TIPO, aplicarSinonimos, normalize, soloModeloExacto, type Sinonimo } from "@/lib/search";
 import { modelosCompatibles } from "@/lib/compat";
 import { anotarDemandaAgente } from "@/modules/demanda/agente";
 import { getNegocioInfo } from "@/modules/config/lib";
@@ -12,6 +12,7 @@ import { MARCA } from "@/lib/marca";
 import { notifyCotizacionSinAsignar } from "@/lib/push";
 import type { Turno } from "./memoria";
 import { detectarCliente, type ClienteDetectado } from "./cliente";
+import { armarJuego, cargarSaberes, juegosEn, seccionSaberes } from "./saberes";
 import {
   cargarPedido,
   agregarACotizacion,
@@ -125,6 +126,7 @@ Cotización VIVA (el pedido del cliente ES una cotización real desde el primer 
 - Todo producto CONCRETO que tengamos y por el que pregunte va a su cotización SIN preguntarle. Cuando buscar_producto encuentra uno solo, ya lo agrega por ti (verás "agregado"); si dio opciones y el cliente eligió, usa agregar_al_pedido en ese MISMO turno (qty 1 salvo que diga otra cosa). La primera vez esto crea su cotización: incluye el enlace AL FINAL de esa misma respuesta ("Aquí puedes ver tu cotización: <enlace>") y pregunta si sería algo más.
 - PROHIBIDO preguntar "¿quieres agregarlo a tu cotización?", "¿lo agrego?" o similar: suena a robot. Un vendedor de mostrador solo lo anota. Si no lo quiere, él te lo dirá y lo quitas con quitar_del_pedido.
 - NO agregues cuando lo que diste fue una LISTA de opciones/calidades y le preguntaste cuál quiere: espera su elección y entonces agrega la elegida.
+- Cuando des VARIAS opciones, cierra con "¿Cuál te anoto?". PROHIBIDO "¿Te gustaría agregar…?" o "¿Quieres que agregue…?".
 - La cotización se edita en todo momento con el MISMO enlace: más productos → agregar_al_pedido; cambia cantidad → agregar_al_pedido con la cantidad TOTAL nueva; ya no quiere algo → quitar_del_pedido; pregunta qué lleva o pide el enlace → ver_pedido.
 - El enlace se comparte la PRIMERA vez que lo agregas algo en esta conversación, cuando lo pida, y al cierre. Después no lo repitas en cada mensaje. Regla simple: el cliente debe haber visto su enlace al menos una vez en esta conversación.
 - La cotización puede venir de un rato antes con productos ya dentro. Si al agregar algo el pedido trae MÁS productos de los que acabas de agregar, dile la lista completa de lo que lleva (no solo el total), para que no se confunda con el monto.
@@ -151,8 +153,11 @@ export async function responderMensaje(
   messages: Turno[],
   telefono: string,
   cliente: ClienteDetectado | null = null,
+  /** Answering again after the shop taught it something: the last answer missed. */
+  opciones: { correccion?: boolean } = {},
 ): Promise<RespuestaAgente> {
-  const info = await getNegocioInfo();
+  const [info, saberes] = await Promise.all([getNegocioInfo(), cargarSaberes()]);
+  const sinonimos: Sinonimo[] = saberes.filter((s) => s.tipo === "sinonimo");
   // The frame is shared; the product rules are the shop's. Auto parts drop the
   // screen-quality and frame blocks entirely — noise that invites the model to
   // ask a Tsuru owner which "calidad de pantalla" they want.
@@ -184,9 +189,23 @@ Este número no está en el registro de clientes.
 - Solo el nombre: NO pidas correo, dirección ni más datos.`;
   }
 
+  // What the shop taught: the synonyms and sets this conversation mentions,
+  // and every note. Read fresh each message, so a lesson applies to the next one.
+  const conversacion = messages.filter((m) => m.role === "user").map((m) => m.content).join("\n");
+  const aprendido = seccionSaberes(saberes, conversacion);
+  if (aprendido) system += `\n\n${aprendido}`;
+  if (opciones.correccion) {
+    system += `\n\n=== Vuelves a contestar ===\nTu respuesta anterior a este cliente no le sirvió y el negocio ya te enseñó lo que faltaba. Contesta su último mensaje desde cero, empezando con "Perdón, ahora sí:".`;
+  }
+
   // Set by the pasar_a_asesor tool if the agent decides it needs a human.
   let escalar: { motivo: string } | null = null;
   const ultimoMensaje = messages.at(-1)?.content ?? "";
+  // A set the customer just named ("la suspensión completa de un vento") is
+  // quoted as a set, before any single-part search can answer "no encontré".
+  const juegosPedidos = juegosEn(ultimoMensaje, saberes);
+  // "la pila del 11" reads as "la bateria del 11" for the product check too.
+  const ultimoTraducido = `${ultimoMensaje} ${aplicarSinonimos(ultimoMensaje, sinonimos) ?? ""}`;
   // Product mention OR a price/availability ask ("¿en cuánto?", "precio de
   // todas") — the latter refers to a product from earlier turns whose tool
   // results are NOT in the text-only history, so the model must re-search
@@ -196,7 +215,7 @@ Este número no está en el registro de clientes.
     // Quality words too: "diagnóstico" or "oled" alone answers a list the
     // model gave, and without a search it invents the product it names.
     : /\b(display|pantalla|bateria|batería|cargador|mica|flex|camara|cámara|moto|motorola|iphone|samsung|xiaomi|redmi|huawei|honor|oppo|realme|zte|diagn[oó]stico|oled|incell|original|org|lcd|precios?|cu[aá]nto|cuestan?|valen?|vale)\b/i
-  ).test(ultimoMensaje);
+  ).test(ultimoTraducido);
   // A goodbye triggers no tool on its own, so the model answers from the
   // text-only history — where the folio and link don't exist. A customer who
   // says "gracias" would walk away never knowing where their quote lives.
@@ -218,6 +237,11 @@ Este número no está en el registro de clientes.
     // write its answer. Subsequent steps may use the rest of the tools normally.
     prepareStep: ({ stepNumber }) => {
       if (stepNumber !== 0) return undefined;
+      if (juegosPedidos.length)
+        return {
+          activeTools: ["cotizar_juego"],
+          toolChoice: { type: "tool", toolName: "cotizar_juego" },
+        };
       if (requiereBusquedaDeProducto)
         return {
           activeTools: ["buscar_producto"],
@@ -258,7 +282,12 @@ Este número no está en el registro de clientes.
           consulta: z.string().describe("nombre o SKU del producto"),
         }),
         // Customer-facing: availability only — never the quantity or cost.
-        execute: async ({ consulta }) => {
+        execute: async ({ consulta: dicha }) => {
+          // The shop's synonyms first: "cristal" is searched as "glass". When
+          // the catalog spells it the customer's way after all, the original
+          // words get their turn below.
+          const traducida = aplicarSinonimos(dicha, sinonimos);
+          const consulta = traducida ?? dicha;
           // Auto parts: tags carry year RANGES ("Kia Seltos 2020-2024"), so a
           // point year ("2022") matches nothing textually and zeroes searches
           // for parts we DO stock. Strip years from the query; the model
@@ -281,6 +310,7 @@ Este número no está en el registro de clientes.
           // Wide on purpose: the exact-model filter below runs on these, and a
           // cut at 15 let "13 Pro / Pro Max / Mini" crowd out the plain 13.
           let rows = await buscarProducto(q || consulta, 80);
+          if (rows.length === 0 && traducida) rows = await buscarProducto(dicha, 80);
           // "Display de Pixel 8": the word for the part type has to match the
           // row's category, and a screen saved without one vanished behind it.
           // Before saying there is none, look again by model alone.
@@ -438,6 +468,81 @@ Este número no está en el registro de clientes.
             };
           }
           return notaAnio ? { items, nota: notaAnio } : items;
+        },
+      }),
+      cotizar_juego: tool({
+        description:
+          "Cotiza un JUEGO de piezas que el negocio te enseñó (ej. \"suspensión completa\"): busca cada pieza para el vehículo/modelo, agrega a su cotización las que hay con precio y anota las que faltan. Úsala en vez de buscar pieza por pieza.",
+        inputSchema: z.object({
+          juego: z.string().describe("nombre del juego, como aparece en \"Lo que te enseñó el negocio\""),
+          vehiculo: z
+            .string()
+            .describe(ES_AUTOPARTES ? "carro y año como lo dijo el cliente, ej: \"vento 2017\"; vacío si no lo ha dicho" : "modelo del celular, ej: \"iPhone 11 Pro Max\"; vacío si no lo ha dicho"),
+        }),
+        execute: async ({ juego, vehiculo }) => {
+          const juegos = saberes.filter((s) => s.tipo === "juego");
+          const saber =
+            juegos.find((s) => normalize(s.nombre) === normalize(juego)) ??
+            juegosEn(juego, juegos)[0] ??
+            juegosPedidos[0];
+          if (!saber) return { ok: false, nota: "Ese juego no existe. Busca las piezas con buscar_producto." };
+          const armado = await armarJuego(saber.piezas, vehiculo);
+          if (armado.faltaVehiculo)
+            return {
+              ok: false,
+              juego: saber.nombre,
+              nota: ES_AUTOPARTES
+                ? `Para armar "${saber.nombre}" necesitas el carro y el año. Pregúntaselos corto ("¿Para qué carro y de qué año?"). Si ya los dio y aun así no lo encontré, dile que ese carro no lo manejamos y ofrece que un asesor lo revise.`
+                : `Para armar "${saber.nombre}" necesitas el modelo exacto. Pregúntaselo corto.`,
+            };
+          const obligatorias = armado.piezas.filter((p) => p.pieza.obligatoria);
+          const aAgregar = obligatorias.flatMap((p) =>
+            p.productos.filter((x) => x.disponible && x.precio_mxn > 0).map((x) => ({ sku: x.sku, qty: x.qty })),
+          );
+          const sync = aAgregar.length ? await agregarACotizacion(telefono, aAgregar) : null;
+          const ok = sync && !("error" in sync) ? sync : null;
+          const pedido = await cargarPedido(telefono);
+          if (ok?.creada && pedido.cotizacionId) await notifyCotizacionSinAsignar(pedido.cotizacionId, "agente_whatsapp");
+          // What could not go in is written down, like any part we did not have.
+          const faltan = obligatorias.filter((p) => p.estado !== "ok" || p.soloLado);
+          await Promise.all(
+            faltan
+              .filter((p) => p.estado === "agotada" || p.estado === "no_hay" || p.soloLado)
+              .map((p) => anotarDemandaAgente({ texto: `${p.pieza.nombre} ${armado.vehiculo}`, telefono, customerId: cliente?.id ?? null })),
+          );
+          const motivo = (p: (typeof faltan)[number]) =>
+            p.soloLado
+              ? `solo tengo el lado ${p.soloLado === "izq" ? "izquierdo" : "derecho"}`
+              : p.estado === "agotada"
+                ? "agotada — ya la anoté para conseguirla"
+                : p.estado === "sin_precio"
+                  ? "la tengo pero el precio lo confirma un asesor"
+                  : "no la manejo para ese vehículo — ya la anoté";
+          const opcionales = armado.piezas
+            .filter((p) => !p.pieza.obligatoria && p.estado === "ok")
+            .map((p) => ({ pieza: p.pieza.nombre, productos: p.productos.map((x) => ({ nombre: x.nombre, precio_mxn: x.precio_mxn })) }));
+          return {
+            juego: saber.nombre,
+            vehiculo: armado.vehiculo,
+            en_cotizacion: obligatorias.flatMap((p) =>
+              p.productos.filter((x) => x.disponible && x.precio_mxn > 0).map((x) => ({ pieza: p.pieza.nombre, nombre: x.nombre, qty: x.qty, precio_mxn: x.precio_mxn })),
+            ),
+            faltan: faltan.map((p) => ({ pieza: p.pieza.nombre, motivo: motivo(p) })),
+            opcionales,
+            pedido: pedido.items.map((i) => ({ nombre: i.nombre, qty: i.qty, unit_mxn: i.unit_mxn })),
+            total_mxn: pedido.items.reduce((t, i) => t + i.unit_mxn * i.qty, 0),
+            ...(ok ? { folio: ok.folio, url: ok.url } : {}),
+            nota: [
+              aAgregar.length
+                ? `YA agregué el juego a su cotización. Dile para qué vehículo es y lista cada pieza de "en_cotizacion" con su cantidad y precio (nombres claros, sin abreviaturas). Luego, una línea por cada una de "faltan" con su motivo. NO le preguntes si quiere agregarlo.`
+                : `No pude agregar ninguna pieza del juego. Dile cuáles de "faltan" y su motivo; si alguna tiene precio por confirmar, usa pasar_a_asesor.`,
+              opcionales.length ? `En UNA línea ofrécele aparte las de "opcionales" ("también tengo…, por si las cambias de una vez"); NO van en la cotización.` : null,
+              ok ? NOTA_ENLACE : null,
+              aAgregar.length ? `Cierra con "¿La dejamos así o le quito alguna pieza?".` : null,
+            ]
+              .filter(Boolean)
+              .join(" "),
+          };
         },
       }),
       agregar_al_pedido: tool({

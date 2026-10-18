@@ -333,3 +333,104 @@ export const PALABRAS_TIPO = /\b(pantallas?|displays?|modulos?|módulos?)\b/gi;
  * is the question, the quality is what the agent offers alternatives to.
  */
 export const PALABRAS_CALIDAD = /\b(oled|amoled|incell|incel|original|orig|org|aaa|jk|lcd|gen[eé]ricas?|econ[oó]micas?)\b/gi;
+
+// ============================================================
+// What the shop taught the agent ("Lo que sabe el agente").
+// Pure text helpers, shared by the agent and the screen that tests them.
+// ============================================================
+
+/** A taught synonym: the customer's phrases → what the catalog calls it. */
+export type Sinonimo = { frases: string[]; nombre: string };
+
+// Whole words only, on normalized text: "pila" must not fire inside "pilar".
+const enFrase = (frase: string) => new RegExp(`(^| )${frase}(?= |$)`, "g");
+
+/**
+ * "cuanto el cristal del 11" → "cuanto el glass del 11".
+ *
+ * Normalized text out, or null when no phrase matched — the caller keeps the
+ * original query then. Longest phrase first, so "tapa de atras" wins over a
+ * shorter phrase inside it.
+ */
+export function aplicarSinonimos(texto: string, sinonimos: Sinonimo[]): string | null {
+  const pares = sinonimos
+    .flatMap((s) => s.frases.map((f) => [normalize(f), normalize(s.nombre)] as const))
+    .filter(([f, a]) => f && a && f !== a)
+    .sort((x, y) => y[0].length - x[0].length);
+  let t = normalize(texto);
+  let cambio = false;
+  for (const [frase, a] of pares) {
+    if (!enFrase(frase).test(t)) continue;
+    t = t.replace(enFrase(frase), `$1${a}`);
+    cambio = true;
+  }
+  return cambio ? t : null;
+}
+
+/** Does the text say any of these phrases, as whole words? */
+export function dicePalabras(texto: string, frases: string[]): boolean {
+  const t = normalize(texto);
+  return frases.some((f) => {
+    const n = normalize(f);
+    return n.length > 0 && enFrase(n).test(t);
+  });
+}
+
+/**
+ * A catalog name matches a set piece's search text when every word of it opens
+ * a word of the name: "amortiguador del" is "Amortiguador Del. A1 11-18", not
+ * "Amortiguador Tras.".
+ *
+ * The piece's noun must open the name (or follow a "JGO"): "amortiguador tras"
+ * is not "BASE DE AMORTIGUADOR TRAS", which is a base. Not the shop search
+ * either: that drops "del" as filler, and here "del" is delantero.
+ */
+export function nombreCoincide(nombre: string, busca: string): boolean {
+  const palabras = normalize(nombre).split(" ");
+  const pedidas = normalize(busca).split(" ").filter(Boolean);
+  if (!pedidas.length || !palabras.slice(0, 2).some((w) => w.startsWith(pedidas[0]))) return false;
+  return pedidas.every((p) => palabras.some((w) => w.startsWith(p)));
+}
+
+const IZQ = new Set(["izq", "izquierda", "izquierdo", "izqda"]);
+const DER = new Set(["der", "derecha", "derecho", "dcha"]);
+
+/** Which side a part is for, read off its name. "DER/IZQ" fits both. */
+export function ladoDe(nombre: string): "izq" | "der" | "ambos" | null {
+  const w = normalize(nombre).split(" ");
+  const i = w.some((x) => IZQ.has(x));
+  const d = w.some((x) => DER.has(x));
+  return i && d ? "ambos" : i ? "izq" : d ? "der" : null;
+}
+
+// Words that say WHICH part, after its noun: kept when grouping names.
+const DESCRIPTORES: Record<string, string> = {
+  del: "delantero", delantero: "delantero", delantera: "delantera",
+  tras: "trasero", trasero: "trasero", trasera: "trasera",
+  inf: "inferior", inferior: "inferior", sup: "superior", superior: "superior",
+  int: "interior", interior: "interior", ext: "exterior", exterior: "exterior",
+  doble: "doble",
+};
+
+/**
+ * The kind of part a catalog name is, for suggesting a set's pieces:
+ * "Amortiguador Del. A1 11-18 Ibiza" → busca "amortiguador del", nombre
+ * "Amortiguador delantero".
+ *
+ * The noun, the word after it, then position words — stopping at the first
+ * code, year or side. ponytail: a heuristic over free-typed names; it can keep
+ * a model ("Buje Tsuru"), which the owner fixes in the editor.
+ */
+export function familiaDe(nombre: string): { busca: string; nombre: string } | null {
+  const w = normalize(nombre).split(" ").filter((x) => x && x !== "de" && x !== "para");
+  const out: string[] = [];
+  for (const x of w) {
+    if (/\d/.test(x) || IZQ.has(x) || DER.has(x)) break;
+    if (out.length === 0 || out.length === 1 || x in DESCRIPTORES) out.push(x);
+    else break;
+    if (out.length === 3) break;
+  }
+  if (!out.length) return null;
+  const legible = out.map((x, i) => (i === 0 ? x.charAt(0).toUpperCase() + x.slice(1) : (DESCRIPTORES[x] ?? x)));
+  return { busca: out.join(" "), nombre: legible.join(" ") };
+}
