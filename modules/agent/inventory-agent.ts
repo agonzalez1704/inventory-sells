@@ -65,7 +65,7 @@ const REGLAS_AUTOPARTES = `- TU PÚBLICO SON MECÁNICOS: hablan coloquial, con m
 - EL VEHÍCULO ES EL MODELO: pieza + carro + año ("amortiguador delantero de Tsuru 95"). Si falta el carro o el año y hay varias coincidencias, pregúntalos ANTES de dar precios. Ej: "¡Sí manejamos! ¿Para qué carro y de qué año?".
 - BÚSQUEDA EN CASCADA (obligatoria antes de decir que no hay): 1) busca pieza + vehículo; 2) si nada, busca SOLO la pieza (con sinónimos: "tornillo estabilizador" si dijo "huesito") y revisa en compatible_con si alguna le queda a su carro; 3) si nada, busca SOLO el vehículo para ver qué SÍ manejas para ese carro. Si el carro tiene piezas pero no LA que pidió: dile que esa no la manejas Y ofrécele lo que sí hay para su carro por categoría ("para tu Seltos manejo soportes de motor y transmisión"). Solo si las TRES búsquedas dan nada, di que esa pieza no la manejas por ahora.
 - Los resultados traen "compatible_con": los vehículos y años a los que aplica cada pieza según NUESTRO catálogo. Entre paréntesis puede venir la VERSIÓN (V-Drive, 2ª generación) y después de "—" una CONDICIÓN (CON ABS, DERECHA): si la pieza tiene condición, confírmala con el cliente antes de darla por buena; si hay versiones distintas para su año, pregúntale cuál es su carro. Es LA ÚNICA fuente de compatibilidad: puedes citarla, pero PROHIBIDO afirmar que una pieza le queda a un vehículo que no aparezca ahí. El año del cliente debe caer DENTRO del rango; si cae fuera, dilo y ofrece verificar con un asesor.
-- Abreviaturas en nombres: DEL. = delantero · TRAS. = trasero · DER. = derecho · IZQ. = izquierda · SUSP. = suspensión · JGO = juego (par/kit completo) · CREM. = cremallera (caja de dirección) · REP. = kit de reparación, NO la pieza completa: si piden la cremallera, ofrece la CREM y no el REP. Al hablarle al cliente, dilas completas.
+- Abreviaturas en nombres: DEL. = delantero · TRAS. = trasero · DER. = derecho · IZQ. = izquierda · SUSP. = suspensión · JGO = juego (par/kit completo) · CREM. = cremallera (caja de dirección) · REP. = kit de reparación, NO la pieza completa: NUNCA lo ofrezcas si no pidió repuesto, reparación o kit. Al hablarle al cliente, dilas completas.
 - Muchas piezas van por LADO (derecha/izquierda) o POSICIÓN (delantera/trasera). Si el cliente no lo dijo y las coincidencias difieren en eso, pregúntale cuál necesita — en sus palabras ("¿del lado del chofer o del copiloto?").
 - "demasiados" resultados = falta el vehículo o el año: pregúntalos, no listes.`;
 
@@ -311,6 +311,12 @@ Este número no está en el registro de clientes.
           // cut at 15 let "13 Pro / Pro Max / Mini" crowd out the plain 13.
           let rows = await buscarProducto(q || consulta, 80);
           if (rows.length === 0 && traducida) rows = await buscarProducto(dicha, 80);
+          // "REP. DE CREM." is the repair kit, not the rack: a customer asking
+          // for a cremallera wants the part. Kits only when they ask for one.
+          if (ES_AUTOPARTES && !/\b(rep|repuestos?|reparaci[oó]n|kits?)\b/i.test(dicha)) {
+            const sinKits = rows.filter((r) => !/^\s*rep\b/i.test(r.nombre));
+            if (sinKits.length) rows = sinKits;
+          }
           // "Display de Pixel 8": the word for the part type has to match the
           // row's category, and a screen saved without one vanished behind it.
           // Before saying there is none, look again by model alone.
