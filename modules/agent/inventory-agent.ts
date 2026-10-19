@@ -3,7 +3,7 @@ import { generateText, tool, stepCountIs } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { z } from "zod";
 import { buscarProducto } from "@/modules/analytics/queries";
-import { PALABRAS_CALIDAD, PALABRAS_TIPO, aplicarSinonimos, normalize, soloModeloExacto, type Sinonimo } from "@/lib/search";
+import { PALABRAS_CALIDAD, PALABRAS_TIPO, aniosEnNombre, aplicarSinonimos, normalize, soloModeloExacto, type Sinonimo } from "@/lib/search";
 import { modelosCompatibles } from "@/lib/compat";
 import { anotarDemandaAgente } from "@/modules/demanda/agente";
 import { getNegocioInfo } from "@/modules/config/lib";
@@ -334,6 +334,31 @@ Este número no está en el registro de clientes.
             if (sinCalidad) rows = await buscarProducto(sinCalidad, 80);
           }
           PALABRAS_CALIDAD.lastIndex = 0;
+          // The customer's year must fall in the part's range — by its vehicle
+          // tags, or by the years in its name when it has none. Left to the
+          // model, a Versa 2015 got offered the 20-22 rack next to the 12-19.
+          if (ES_AUTOPARTES && anioPedido && rows.length) {
+            const anio = Number(anioPedido);
+            const { data } = await insforgeAdmin.database
+              .from("products")
+              .select("sku, product_tags(tags(veh_anio_desde, veh_anio_hasta))")
+              .in("sku", rows.map((r) => r.sku));
+            const rangos = new Map(
+              ((data ?? []) as unknown as {
+                sku: string;
+                product_tags: { tags: { veh_anio_desde: number | null; veh_anio_hasta: number | null } | null }[];
+              }[]).map((p) => [
+                p.sku,
+                p.product_tags
+                  .filter((t) => t.tags?.veh_anio_desde != null)
+                  .map((t) => [t.tags!.veh_anio_desde!, t.tags!.veh_anio_hasta ?? t.tags!.veh_anio_desde!] as [number, number]),
+              ]),
+            );
+            rows = rows.filter((r) => {
+              const rs = rangos.get(r.sku)?.length ? rangos.get(r.sku)! : aniosEnNombre(r.nombre);
+              return !rs.length || rs.some(([d, h]) => anio >= d && anio <= h);
+            });
+          }
           // Only the exact model asked about: "iPhone 16" is not the 16 Pro.
           // When the exact one does not exist, the variants stay, labeled.
           const exactos = soloModeloExacto(rows, q || consulta, (r) => r.nombre);

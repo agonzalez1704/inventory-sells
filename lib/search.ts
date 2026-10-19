@@ -434,3 +434,21 @@ export function familiaDe(nombre: string): { busca: string; nombre: string } | n
   const legible = out.map((x, i) => (i === 0 ? x.charAt(0).toUpperCase() + x.slice(1) : (DESCRIPTORES[x] ?? x)));
   return { busca: out.join(" "), nombre: legible.join(" ") };
 }
+
+/**
+ * The year ranges a catalog name spells out: "CREM ELECTRO KICKS 17-20 (VERSA
+ * 20-22)" → [[2017, 2020], [2020, 2022]]. Two-digit years above 50 are 1900s;
+ * an open range ("Polo 18-") runs to next year.
+ *
+ * For parts with no vehicle tags, the name is the only fitment there is.
+ */
+export function aniosEnNombre(nombre: string, hoy = new Date().getFullYear()): [number, number][] {
+  const anio = (s: string) => (s.length === 4 ? Number(s) : Number(s) > 50 ? 1900 + Number(s) : 2000 + Number(s));
+  const out: [number, number][] = [];
+  for (const m of nombre.matchAll(/(?<![\d.])((?:19|20)\d{2}|\d{2})\s*-\s*((?:19|20)\d{2}|\d{2})?(?![\d.])/g)) {
+    const desde = anio(m[1]);
+    const hasta = m[2] ? anio(m[2]) : hoy + 1;
+    if (hasta >= desde && hasta - desde <= 40) out.push([desde, hasta]);
+  }
+  return out;
+}

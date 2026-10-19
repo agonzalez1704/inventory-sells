@@ -38,3 +38,13 @@ assert.deepEqual(familiaDe("BASE DE AMORTIGUADOR TRAS"), { busca: "base amortigu
 assert.deepEqual(familiaDe("HORQUILLA INF. IZQ. FRONTIER"), { busca: "horquilla inf", nombre: "Horquilla inferior" });
 assert.deepEqual(familiaDe("Vieleta Int. Polo 18-22 Vento 14-22"), { busca: "vieleta int", nombre: "Vieleta interior" });
 console.log("✓ familia de una pieza");
+
+// A part fits the customer's year only if one of its ranges covers it.
+import { aniosEnNombre } from "../lib/search.ts";
+assert.deepEqual(aniosEnNombre("CREM ELECTRO KICKS 17-20 (VERSA 20-22)"), [[2017, 2020], [2020, 2022]]);
+assert.deepEqual(aniosEnNombre("CREM ELECTRO VERSA 12-19 V-DRIVE/NOTE 14-19, MARCH"), [[2012, 2019], [2014, 2019]]);
+assert.deepEqual(aniosEnNombre("Amortiguador Tras. Toledo 13-19 Polo 18-", 2026), [[2013, 2019], [2018, 2027]]);
+assert.deepEqual(aniosEnNombre("ROTULA INF DER HID POINTER 98-09"), [[1998, 2009]]);
+assert.deepEqual(aniosEnNombre("CREM ELECTRO VERSA,MARCH 1.6 11-20"), [[2011, 2020]]);
+assert.deepEqual(aniosEnNombre("CAJA DE DIRECCION HID"), []);
+console.log("✓ años en el nombre");
