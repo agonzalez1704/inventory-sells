@@ -337,7 +337,10 @@ Este número no está en el registro de clientes.
           // writes it down: nothing at all, only other variants, or the exact
           // model at zero.
           const pedido = q || consulta;
-          const agotadoExacto = exactos?.length && !exactos.some((r) => r.stock > 0) ? exactos[0] : null;
+          // Out of stock counts with or without a model number: "flecha platina"
+          // has none, and its two sides at zero went unrecorded.
+          const candidatos = exactos ?? (soloVariantes ? [] : rows);
+          const agotadoExacto = candidatos.length && !candidatos.some((r) => r.stock > 0) ? candidatos[0] : null;
           if (rows.length === 0 || soloVariantes || agotadoExacto) {
             let productId: string | null = null;
             if (agotadoExacto) {
