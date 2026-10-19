@@ -30,7 +30,8 @@ const CARPETAS = [
   "/Users/antoniogonzalez/MEGA/APYMSA",
   "/Users/antoniogonzalez/MEGA/imágenes",
   "/Users/antoniogonzalez/MEGA/BATTERY CENTER/FOTOS",
-  "/Users/antoniogonzalez/MEGA/Optimo cat01",
+  // Cut out of the Yokomitsu/Optimo PDF catalogs by extraer-catalogo-optimo.py.
+  "/Users/antoniogonzalez/Downloads/yokomitzu/fotos",
 ];
 // View-suffix priority: the front view is the card/detail photo when it exists.
 const VISTA = /_(FRO|BOT|OTH|RIT|LEF|BAC)$/i;
@@ -77,6 +78,11 @@ function escanear() {
     else porSku.set(sku, [item]);
   };
   for (const base of CARPETAS) {
+    // A folder that is not on this machine just contributes nothing.
+    if (!existsSync(base)) {
+      console.warn(`(sin carpeta: ${base})`);
+      continue;
+    }
     for (const entry of readdirSync(base)) {
       const p = path.join(base, entry);
       if (statSync(p).isDirectory()) {
@@ -126,9 +132,19 @@ async function main() {
   const local = escanear();
   console.log(`SKUs con foto local: ${local.size}`);
 
-  const pendientes = await rawsql(
-    "SELECT id, sku FROM products WHERE image_url IS NULL",
-  );
+  // Through the SDK, paged: the unrestricted rawsql endpoint now answers 403.
+  const pendientes = [];
+  for (let desde = 0; ; desde += 1000) {
+    const { data, error } = await admin.database
+      .from("products")
+      .select("id, sku")
+      .is("image_url", null)
+      .order("id")
+      .range(desde, desde + 999);
+    if (error) throw new Error(error.message ?? "no se pudo leer products");
+    pendientes.push(...(data ?? []));
+    if (!data || data.length < 1000) break;
+  }
   const trabajo = [];
   for (const p of pendientes) {
     const list = local.get(p.sku.toLowerCase());
@@ -159,13 +175,13 @@ async function main() {
     // and a clear-after-await would silently drop their rows.
     const batch = hechos.splice(0);
     if (!batch.length) return;
-    const values = batch
-      .map((h) => `('${h.id}'::uuid, '${h.url}', '${h.key}')`)
-      .join(",");
-    await rawsql(
-      `UPDATE products p SET image_url = v.url, image_key = v.key
-       FROM (VALUES ${values}) AS v(id, url, key) WHERE p.id = v.id`,
-    );
+    for (const h of batch) {
+      const { error } = await admin.database
+        .from("products")
+        .update({ image_url: h.url, image_key: h.key })
+        .eq("id", h.id);
+      if (error) fallas.push({ sku: h.id, error: `BD: ${error.message}` });
+    }
   }
 
   async function procesar(t) {
