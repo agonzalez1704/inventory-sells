@@ -34,7 +34,7 @@ export default async function PosPage() {
         .order("quantity", { ascending: false })
         .order("name", { ascending: true })
         .limit(30),
-      insforge.database.from("inventories").select("id, name"),
+      insforge.database.from("inventories").select("id, name, sucursales(nombre)"),
       insforge.database
         .from("customers")
         .select("id, nombre, telefono, is_system, descuento_pct")
@@ -54,8 +54,10 @@ export default async function PosPage() {
     piezaFueraActiva(),
   ]);
 
-  const invName = new Map(
-    ((invData ?? []) as { id: string; name: string }[]).map((i) => [i.id, i.name]),
+  type Inv = { id: string; name: string; sucursales: { nombre: string } | { nombre: string }[] | null };
+  const invName = new Map(((invData ?? []) as unknown as Inv[]).map((i) => [i.id, i.name]));
+  const invSucursal = new Map(
+    ((invData ?? []) as unknown as Inv[]).map((i) => [i.id, (Array.isArray(i.sucursales) ? i.sucursales[0] : i.sucursales)?.nombre ?? null]),
   );
   // The cost is fetched but dropped before this reaches a browser that may not
   // see it. This first screenful renders before any search runs, so leaving it
@@ -72,6 +74,7 @@ export default async function PosPage() {
     ...p,
     cost_cents: verCostos ? p.cost_cents : undefined,
     inventory_name: invName.get(p.inventory_id) ?? null,
+    sucursal_name: invSucursal.get(p.inventory_id) ?? null,
   }));
 
   const customers = (customerData ?? []) as {

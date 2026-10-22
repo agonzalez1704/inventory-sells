@@ -45,12 +45,20 @@ async function sinCostosSiNoPuede<T extends { cost_cents: number }>(
 /** Attach each row's inventory name (7-row lookup — cheap, cached by PG). */
 async function conNombreDeInventario<T extends { inventory_id: string }>(
   rows: T[],
-): Promise<(T & { inventory_name: string | null })[]> {
+): Promise<(T & { inventory_name: string | null; sucursal_name: string | null })[]> {
   if (rows.length === 0) return [];
   const insforge = await createInsForgeServerClient();
-  const { data } = await insforge.database.from("inventories").select("id, name");
-  const nombre = new Map(((data ?? []) as { id: string; name: string }[]).map((i) => [i.id, i.name]));
-  return rows.map((r) => ({ ...r, inventory_name: nombre.get(r.inventory_id) ?? null }));
+  // The branch rides along: on a phone, "¿lo tengo en Panorama?" is answered
+  // by the card, not by remembering which inventory sits where.
+  const { data } = await insforge.database.from("inventories").select("id, name, sucursales(nombre)");
+  type Inv = { id: string; name: string; sucursales: { nombre: string } | { nombre: string }[] | null };
+  const inv = new Map(
+    ((data ?? []) as unknown as Inv[]).map((i) => [
+      i.id,
+      { name: i.name, sucursal: (Array.isArray(i.sucursales) ? i.sucursales[0] : i.sucursales)?.nombre ?? null },
+    ]),
+  );
+  return rows.map((r) => ({ ...r, inventory_name: inv.get(r.inventory_id)?.name ?? null, sucursal_name: inv.get(r.inventory_id)?.sucursal ?? null }));
 }
 
 // Columns the register and the inventory table need. Deliberately not `*`:
@@ -65,6 +73,8 @@ export type ProductoBuscado = {
   /** Which shelf this row lives on — the POS shows it so a seller at a branch
    *  picks the RIGHT card when the same SKU exists in several inventories. */
   inventory_name?: string | null;
+  /** The sucursal that inventory belongs to, when it has one. */
+  sucursal_name?: string | null;
   sku: string;
   name: string;
   brand: string | null;

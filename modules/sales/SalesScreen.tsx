@@ -65,6 +65,9 @@ export type SalesProduct = Pick<
 > & {
   inventory_id?: string;
   inventory_name?: string | null;
+  /** The sucursal that inventory belongs to; the card says it so a phone
+   *  answers "¿lo tengo en Panorama?" without opening the product. */
+  sucursal_name?: string | null;
   /** Set when this stock sits at another sucursal: shown, not sellable here. */
   sucursal_ajena?: string | null;
   image_url?: string | null;
@@ -206,7 +209,10 @@ function ProductCard({
           )}
         </p>
         <p className="line-clamp-2 text-xs leading-tight font-semibold">{p.name}</p>
-        <p className="truncate text-[10px] leading-tight text-muted-foreground capitalize">{p.category || p.inventory_name}</p>
+        <p className="truncate text-[10px] leading-tight text-muted-foreground capitalize">
+          {p.sucursal_name && !p.sucursal_ajena ? `${p.sucursal_name} · ` : ""}
+          {p.category || p.inventory_name}
+        </p>
         {compat && (
           <p className="truncate text-[10px] leading-tight font-medium text-emerald-700 dark:text-emerald-400">{compat}</p>
         )}
