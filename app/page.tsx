@@ -5,6 +5,7 @@ import { SignInButton } from "@clerk/nextjs";
 import { Camera, Boxes, ShoppingCart, ArrowRight } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { HeaderPublico } from "@/components/app-shell";
+import { rutaDeInicio } from "@/modules/dashboards/inicio";
 
 const features = [
   {
@@ -34,7 +35,8 @@ import { Suspense } from "react";
  */
 async function RedirigirSiEntrado() {
   const { userId } = await auth();
-  if (userId) redirect("/inventario");
+  // Their chosen home dashboard, if they picked one.
+  if (userId) redirect(await rutaDeInicio(userId, "/inventario"));
   return null;
 }
 

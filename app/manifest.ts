@@ -7,7 +7,8 @@ export default function manifest(): MetadataRoute.Manifest {
     name: MARCA.nombre,
     short_name: MARCA.corto,
     description: MARCA.descripcion,
-    start_url: "/pos",
+    // /inicio sends each user to their home dashboard, or the register.
+    start_url: "/inicio",
     display: "standalone",
     background_color: "#ffffff",
     theme_color: MARCA.themeColor,
