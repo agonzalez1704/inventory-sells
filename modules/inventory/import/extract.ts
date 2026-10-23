@@ -1,10 +1,8 @@
 import "server-only";
 import { generateObject } from "ai";
-import { createOpenRouter } from "@openrouter/ai-sdk-provider";
+import { modeloIA, opcionesIA } from "@/lib/ia";
 import { AIExtractionSchema, type ExtractedRow } from "./schema";
 
-const openrouter = createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY! });
-const MODEL = process.env.OPENROUTER_CHAT_MODEL ?? "anthropic/claude-sonnet-4.6";
 
 const PROMPT = `Extrae el inventario de productos de este documento (lista, hoja o foto).
 Devuelve una fila por producto/variante vendible.
@@ -29,10 +27,11 @@ async function extract(
   >,
 ): Promise<ExtractedRow[]> {
   const { object } = await generateObject({
-    model: openrouter(MODEL),
+    model: modeloIA,
+    providerOptions: opcionesIA,
     schema: AIExtractionSchema,
-    // Extraction output is small; cap it (cheaper, and avoids the model's
-    // 64k default max_tokens tripping OpenRouter credit limits).
+    // Extraction output is small; cap it (cheaper, and a runaway answer
+    // cannot eat the key's credit).
     maxOutputTokens: 8192,
     messages: [{ role: "user", content }],
   });

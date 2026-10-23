@@ -1,10 +1,8 @@
 import "server-only";
 import { generateObject } from "ai";
-import { createOpenRouter } from "@openrouter/ai-sdk-provider";
+import { modeloIA, opcionesIA } from "@/lib/ia";
 import { z } from "zod";
 
-const openrouter = createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY! });
-const MODEL = process.env.OPENROUTER_CHAT_MODEL ?? "anthropic/claude-sonnet-4.6";
 
 // A separate prompt from the catalog extractor on purpose.
 //
@@ -60,7 +58,8 @@ async function extraer(
   >,
 ): Promise<FacturaExtraida> {
   const { object } = await generateObject({
-    model: openrouter(MODEL),
+    model: modeloIA,
+    providerOptions: opcionesIA,
     schema: FacturaSchema,
     maxOutputTokens: 8192,
     messages: [{ role: "user", content }],

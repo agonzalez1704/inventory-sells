@@ -1,11 +1,9 @@
 import "server-only";
 import { generateObject } from "ai";
-import { createOpenRouter } from "@openrouter/ai-sdk-provider";
+import { modeloIA, opcionesIA } from "@/lib/ia";
 import { z } from "zod";
 import { sanear, type Criterio } from "./criterio";
 
-const openrouter = createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY! });
-const MODEL = process.env.OPENROUTER_CHAT_MODEL ?? "anthropic/claude-sonnet-4.6";
 
 /**
  * The part of a requisition that is not arithmetic.
@@ -104,7 +102,8 @@ export async function pedirCriterio(filas: Fila[]): Promise<Criterio> {
     .join("\n");
 
   const { object } = await generateObject({
-    model: openrouter(MODEL),
+    model: modeloIA,
+    providerOptions: opcionesIA,
     schema: Schema,
     prompt: `${PROMPT}\n\nFilas de la requisición:\n${tabla}`,
   });

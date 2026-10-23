@@ -32,7 +32,7 @@ export function GET() {
       push: Boolean(
         process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY,
       ),
-      openrouter: Boolean(process.env.OPENROUTER_API_KEY),
+      openai: Boolean(process.env.OPENAI_API_KEY),
       whatsapp: Boolean(process.env.KAPSO_API_KEY),
     },
   });
