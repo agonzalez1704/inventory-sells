@@ -1,6 +1,6 @@
 import { streamText, tool, stepCountIs, convertToModelMessages, type UIMessage } from "ai";
 import { z } from "zod";
-import { createOpenRouter } from "@openrouter/ai-sdk-provider";
+import { createOpenAI } from "@ai-sdk/openai";
 import { assertPermiso, permisosDe } from "@/lib/auth/profile";
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { MARCA } from "@/lib/marca";
@@ -16,8 +16,10 @@ import { dashboardSpecSchema, operacionSchema, aplicarOperaciones } from "@/modu
 
 export const maxDuration = 60;
 
-const openrouter = createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY! });
-const MODEL = process.env.OPENROUTER_CHAT_MODEL ?? "anthropic/claude-sonnet-4.6";
+// OpenAI with the shop's own key (the WhatsApp agent's), since the OpenRouter
+// key hit its spend cap and the assistant went silent.
+const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY! });
+const MODEL = process.env.OPENAI_ASISTENTE_MODEL ?? "gpt-4.1";
 
 const periodo = z.enum(["hoy", "7d", "30d"]);
 const DB = insforgeAdmin.database;
@@ -43,7 +45,7 @@ export async function POST(req: Request) {
   }
 
   const result = streamText({
-    model: openrouter(MODEL),
+    model: openai(MODEL),
     system: `Eres el asistente interno de ${MARCA.nombre}, un punto de venta en México. Hoy es ${new Date().toLocaleDateString("es-MX", { dateStyle: "long", timeZone: "America/Mexico_City" })}.
 Respondes en español, directo y con números concretos. Usa las herramientas para TODO dato del negocio — nunca inventes cifras. Montos en MXN.
 ${costosVer ? "" : "Este usuario NO tiene permiso de costos: no uses la métrica ganancia ni reveles costos."}
