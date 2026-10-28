@@ -64,7 +64,7 @@ const REGLAS_AUTOPARTES = `- TU PÚBLICO SON MECÁNICOS: hablan coloquial, con m
 - Modismos que debes entender: "pastillas" = balatas · "huesitos" = tornillos/bieletas del estabilizador · "bases" = bases de amortiguador · "terminales" = terminales de dirección · "rótulas" = rótulas/horquillas · "cebolla/soportes" = soportes de motor. Tradúcelos tú al buscar; nunca corrijas al cliente.
 - EL VEHÍCULO ES EL MODELO: pieza + carro + año ("amortiguador delantero de Tsuru 95"). Si falta el carro o el año y hay varias coincidencias, pregúntalos ANTES de dar precios. Ej: "¡Sí manejamos! ¿Para qué carro y de qué año?".
 - BÚSQUEDA EN CASCADA (obligatoria antes de decir que no hay): 1) busca pieza + vehículo; 2) si nada, busca SOLO la pieza (con sinónimos: "tornillo estabilizador" si dijo "huesito") y revisa en compatible_con si alguna le queda a su carro; 3) si nada, busca SOLO el vehículo para ver qué SÍ manejas para ese carro. Si el carro tiene piezas pero no LA que pidió: dile que esa no la manejas Y ofrécele lo que sí hay para su carro por categoría ("para tu Seltos manejo soportes de motor y transmisión"). Solo si las TRES búsquedas dan nada, di que esa pieza no la manejas por ahora.
-- Los resultados traen "compatible_con": los vehículos y años a los que aplica cada pieza según NUESTRO catálogo. Entre paréntesis puede venir la VERSIÓN (V-Drive, 2ª generación) y después de "—" una CONDICIÓN (CON ABS, DERECHA): si la pieza tiene condición, confírmala con el cliente antes de darla por buena; si hay versiones distintas para su año, pregúntale cuál es su carro. Es LA ÚNICA fuente de compatibilidad: puedes citarla, pero PROHIBIDO afirmar que una pieza le queda a un vehículo que no aparezca ahí. El año del cliente debe caer DENTRO del rango; si cae fuera, dilo y ofrece verificar con un asesor.
+- Los resultados traen "compatible_con": los vehículos y años a los que aplica cada pieza según NUESTRO catálogo. Entre paréntesis puede venir la VERSIÓN (V-Drive, 2ª generación), luego la CILINDRADA del motor (1.6L) y después de "—" una CONDICIÓN (CON ABS, DERECHA): si la pieza tiene condición, confírmala con el cliente antes de darla por buena; si hay versiones o cilindradas distintas para su año, pregúntale cuál es su carro ("¿es 1.6 o 2.0?"). Es LA ÚNICA fuente de compatibilidad: puedes citarla, pero PROHIBIDO afirmar que una pieza le queda a un vehículo que no aparezca ahí. El año del cliente debe caer DENTRO del rango; si cae fuera, dilo y ofrece verificar con un asesor.
 - Abreviaturas en nombres: DEL. = delantero · TRAS. = trasero · DER. = derecho · IZQ. = izquierda · SUSP. = suspensión · JGO = juego (par/kit completo) · CREM. = cremallera (caja de dirección) · REP. = kit de reparación, NO la pieza completa: NUNCA lo ofrezcas si no pidió repuesto, reparación o kit. Al hablarle al cliente, dilas completas.
 - Muchas piezas van por LADO (derecha/izquierda) o POSICIÓN (delantera/trasera). Si el cliente no lo dijo y las coincidencias difieren en eso, pregúntale cuál necesita — en sus palabras ("¿del lado del chofer o del copiloto?").
 - "demasiados" resultados = falta el vehículo o el año: pregúntalos, no listes.`;
@@ -403,13 +403,14 @@ Este número no está en el registro de clientes.
           if (ES_AUTOPARTES && rows.length > 0) {
             const { data: tagData } = await insforgeAdmin.database
               .from("products")
-              .select("sku, product_tags(condicion, tags(nombre, veh_version))")
+              .select("sku, product_tags(condicion, cilindrada, tags(nombre, veh_version))")
               .in("sku", rows.map((r) => r.sku));
             tagsPorSku = new Map(
               ((tagData ?? []) as unknown as {
                 sku: string;
                 product_tags: {
                   condicion: string | null;
+                  cilindrada: string | null;
                   tags: { nombre: string; veh_version: string | null } | null;
                 }[];
               }[]).map((p) => [
@@ -420,7 +421,7 @@ Este número no está en el registro de clientes.
                   .filter((t) => t.tags)
                   .map(
                     (t) =>
-                      `${t.tags!.nombre}${t.tags!.veh_version ? ` (${t.tags!.veh_version})` : ""}${t.condicion ? ` — ${t.condicion}` : ""}`,
+                      `${t.tags!.nombre}${t.tags!.veh_version ? ` (${t.tags!.veh_version})` : ""}${t.cilindrada ? ` ${t.cilindrada}` : ""}${t.condicion ? ` — ${t.condicion}` : ""}`,
                   )
                   .slice(0, 6),
               ]),
