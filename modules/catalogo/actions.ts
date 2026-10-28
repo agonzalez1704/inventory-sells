@@ -188,7 +188,8 @@ function limpiarCarro(c: Carro): Carro {
   const modelo = titulo(c.modelo);
   const desde = Math.round(Number(c.desde));
   const hasta = Math.round(Number(c.hasta || c.desde));
-  if (!marca || !modelo) throw new Error("Cada carro necesita armadora y modelo");
+  if (!modelo) throw new Error("Cada carro necesita modelo");
+  if (!marca) throw new Error(`Elige de qué armadora es el ${modelo}`);
   if (!(desde >= 1950 && desde <= ANIO_MAX) || !(hasta >= desde && hasta <= ANIO_MAX))
     throw new Error(`Revisa los años de ${marca} ${modelo}: sin años no aparece en las búsquedas`);
   const txt = (v: string | null) => (v ?? "").trim().replace(/\s+/g, " ") || null;

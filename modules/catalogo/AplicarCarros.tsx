@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { unwrap } from "@/lib/errors";
 import { aplicarCarros, detallePieza, type Carro, type PiezaDetalle } from "./actions";
-import { FilaCarro, carroVacio, type CarroUI } from "./PiezaPanel";
+import { FilaCarro, ListasCarro, carroVacio, type CarroUI } from "./PiezaPanel";
 
 type Fila = { carro: Carro; tienen: Set<string>; marcadas: Set<string>; nueva: boolean };
 const clave = (c: Carro) => `${c.marca}|${c.modelo}|${c.desde}|${c.hasta}`.toLowerCase();
@@ -70,7 +70,7 @@ export function AplicarCarros({
   function agregar() {
     const desde = Number(nuevo.desde);
     if (!nuevo.marca.trim() || !nuevo.modelo.trim() || !desde) {
-      toast.error("Pon armadora, modelo y años");
+      toast.error(nuevo.modelo.trim() && !nuevo.marca.trim() ? "Elige de qué armadora es" : "Pon modelo y años");
       return;
     }
     const carro: Carro = { ...nuevo, desde, hasta: Number(nuevo.hasta || nuevo.desde) };
@@ -156,11 +156,10 @@ export function AplicarCarros({
           </div>
 
           <div className="space-y-2 rounded-xl bg-muted/40 p-3">
-            <datalist id="catalogo-armadoras">{Object.keys(vehiculos).map((a) => <option key={a} value={a} />)}</datalist>
+            <ListasCarro vehiculos={vehiculos} />
             <FilaCarro
               c={nuevo}
-              armadoras={Object.keys(vehiculos)}
-              modelos={vehiculos[nuevo.marca] ?? []}
+              vehiculos={vehiculos}
               editable
               onChange={(p) => setNuevo((x) => ({ ...x, ...p }))}
               onQuitar={() => setNuevo(carroVacio())}
