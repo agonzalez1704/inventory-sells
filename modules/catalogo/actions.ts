@@ -114,6 +114,7 @@ export type Carro = {
 export type PiezaDetalle = {
   sku: string;
   name: string;
+  descripcion: string | null;
   familia: string | null;
   sistema: string | null;
   brand: string | null;
@@ -133,11 +134,11 @@ export async function detallePieza(sku: string): Promise<ActionResult<PiezaDetal
   return attempt("detallePieza", async () => {
     await puedeVer();
     const { data } = await DB.from("products")
-      .select("id, sku, name, familia, sistema, brand, price_cents, quantity, conversion_grupo, numeros_originales, product_tags(condicion, cilindrada, tags(veh_marca, veh_modelo, veh_version, veh_anio_desde, veh_anio_hasta))")
+      .select("id, sku, name, descripcion, familia, sistema, brand, price_cents, quantity, conversion_grupo, numeros_originales, product_tags(condicion, cilindrada, tags(veh_marca, veh_modelo, veh_version, veh_anio_desde, veh_anio_hasta))")
       .eq("sku", sku)
       .order("quantity", { ascending: false });
     type Fila = {
-      id: string; sku: string; name: string; familia: string | null; sistema: string | null; brand: string | null;
+      id: string; sku: string; name: string; descripcion: string | null; familia: string | null; sistema: string | null; brand: string | null;
       price_cents: number; quantity: number; conversion_grupo: string | null; numeros_originales: string[] | null;
       product_tags: { condicion: string | null; cilindrada: string | null; tags: { veh_marca: string | null; veh_modelo: string | null; veh_version: string | null; veh_anio_desde: number | null; veh_anio_hasta: number | null } | null }[];
     };
@@ -171,7 +172,7 @@ export async function detallePieza(sku: string): Promise<ActionResult<PiezaDetal
       conversiones = ((otros ?? []) as PiezaDetalle["conversiones"]).filter((o) => !ya.has(o.sku) && ya.add(o.sku));
     }
     return {
-      sku: p.sku, name: p.name, familia: p.familia, sistema: p.sistema, brand: p.brand,
+      sku: p.sku, name: p.name, descripcion: p.descripcion, familia: p.familia, sistema: p.sistema, brand: p.brand,
       price_cents: p.price_cents, quantity: filas.reduce((s, f) => s + f.quantity, 0),
       carros, conversiones, numeros: p.numeros_originales ?? [],
     };
@@ -279,6 +280,8 @@ async function ponerCampos(skus: string[], campos: { familia?: string | null; si
 
 export async function guardarPieza(input: {
   sku: string;
+  name: string;
+  descripcion: string | null;
   familia: string | null;
   sistema: string | null;
   brand: string | null;
@@ -289,6 +292,12 @@ export async function guardarPieza(input: {
     await assertPermiso("inventario_gestionar");
     const ids = await idsDeSku(input.sku);
     if (!ids.length) throw new Error("No encontré esa pieza");
+    const name = input.name.replace(/\s+/g, " ").trim();
+    if (!name) throw new Error("La pieza necesita nombre");
+    const { error } = await DB.from("products")
+      .update({ name: name.slice(0, 200), descripcion: input.descripcion?.trim().slice(0, 4000) || null })
+      .in("id", ids);
+    if (error) throw new Error(error.message ?? "No se pudo guardar");
     await ponerCampos([input.sku], { familia: input.familia, sistema: input.sistema, brand: input.brand });
     const numeros = [...new Set(input.numeros.map((n) => n.trim().toUpperCase()).filter(Boolean))].slice(0, 30);
     await DB.from("products").update({ numeros_originales: numeros }).in("id", ids);
@@ -385,6 +394,12 @@ export async function desligarConversion(sku: string, otro: string): Promise<Act
 }
 
 /** What the POS sheet shows: the same part under other claves. */
+export async function descripcionDe(productId: string): Promise<string | null> {
+  await puedeVer();
+  const { data } = await DB.from("products").select("descripcion").eq("id", productId).maybeSingle();
+  return (data as { descripcion: string | null } | null)?.descripcion ?? null;
+}
+
 export async function conversionesDe(productId: string): Promise<PiezaDetalle["conversiones"]> {
   await puedeVer();
   const { data } = await DB.from("products").select("sku, conversion_grupo").eq("id", productId).maybeSingle();

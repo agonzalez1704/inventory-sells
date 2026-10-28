@@ -14,10 +14,10 @@ export async function generateMetadata({
   const { id } = await params;
   const { data } = await insforgeAdmin.database
     .from("products")
-    .select("name, brand, category, is_active")
+    .select("name, descripcion, brand, category, is_active")
     .eq("id", id)
     .maybeSingle();
-  const p = data as Pick<Row, "name" | "brand" | "category" | "is_active"> | null;
+  const p = data as Pick<Row, "name" | "descripcion" | "brand" | "category" | "is_active"> | null;
   if (!p || !p.is_active) return { robots: { index: false, follow: false } };
 
   const titulo = [p.name, p.brand].filter(Boolean).join(" · ");
@@ -25,9 +25,9 @@ export async function generateMetadata({
   // that one is the internal app name and the customer has never heard it.
   return {
     title: titulo,
-    description: [p.name, p.brand, p.category, "Consulta disponibilidad y precio."]
-      .filter(Boolean)
-      .join(" · "),
+    description:
+      p.descripcion?.slice(0, 160) ||
+      [p.name, p.brand, p.category, "Consulta disponibilidad y precio."].filter(Boolean).join(" · "),
     openGraph: { title: titulo, type: "website" },
   };
 }
@@ -35,6 +35,7 @@ export async function generateMetadata({
 type Row = {
   id: string;
   name: string;
+  descripcion: string | null;
   modelo: string;
   brand: string | null;
   category: string | null;
@@ -81,7 +82,7 @@ export default async function ProductoPage({
 
   const { data, error } = await insforgeAdmin.database
     .from("products")
-    .select("id, name, modelo, brand, category, price_cents, quantity, is_active, image_url")
+    .select("id, name, descripcion, modelo, brand, category, price_cents, quantity, is_active, image_url")
     .eq("id", id)
     .maybeSingle();
   if (error) throw new Error(`producto: ${error.message}`);
@@ -154,6 +155,7 @@ export default async function ProductoPage({
       vistas={vistas}
       relacionados={relacionados}
       compatibles={compatibles}
+      descripcion={row.descripcion}
       whatsapp={process.env.STORE_WHATSAPP ?? null}
     />
   );

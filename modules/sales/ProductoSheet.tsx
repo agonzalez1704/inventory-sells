@@ -18,7 +18,7 @@ import {
   type ProductoCompatible,
 } from "@/modules/tags/actions";
 import { garantiasEnStock, type GarantiaEnStock } from "@/modules/garantias/cliente-actions";
-import { conversionesDe } from "@/modules/catalogo/actions";
+import { conversionesDe, descripcionDe } from "@/modules/catalogo/actions";
 import { MARCA } from "@/lib/marca";
 
 // Everything the register knows about a product, for the seller who is holding
@@ -47,6 +47,7 @@ export function ProductoSheet({
   const [compatibles, setCompatibles] = useState<ProductoCompatible[]>([]);
   const [garantias, setGarantias] = useState<GarantiaEnStock[]>([]);
   const [conversiones, setConversiones] = useState<Awaited<ReturnType<typeof conversionesDe>>>([]);
+  const [descripcion, setDescripcion] = useState<string | null>(null);
   // The product changes while the sheet is open (tapping another card): a
   // stale fullscreen — or the previous part's gallery — must not survive it.
   useEffect(() => {
@@ -58,6 +59,7 @@ export function ProductoSheet({
     setCompatibles([]);
     setGarantias([]);
     setConversiones([]);
+    setDescripcion(null);
     if (!p?.id) return;
     let on = true;
     galeriaProducto(p.id)
@@ -74,6 +76,9 @@ export function ProductoSheet({
       .catch(() => {});
     conversionesDe(p.id)
       .then((c) => on && setConversiones(c))
+      .catch(() => {});
+    descripcionDe(p.id)
+      .then((d) => on && setDescripcion(d))
       .catch(() => {});
     return () => {
       on = false;
@@ -212,6 +217,8 @@ export function ProductoSheet({
           ))}
         </div>
       )}
+
+      {descripcion && <p className="mt-4 whitespace-pre-line text-sm leading-relaxed text-muted-foreground">{descripcion}</p>}
 
       {conversiones.length > 0 && (
         <div className="mt-4 rounded-xl border border-indigo-200 bg-indigo-50 p-3 dark:border-indigo-900 dark:bg-indigo-950/30">

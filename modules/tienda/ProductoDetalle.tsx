@@ -22,6 +22,7 @@ export function ProductoDetalle({
   vistas,
   relacionados,
   compatibles = [],
+  descripcion,
   whatsapp,
 }: {
   modelo: ModeloTienda;
@@ -32,6 +33,7 @@ export function ProductoDetalle({
   relacionados: RelacionadoProducto[];
   /** Products sharing a compatibility tag — the strongest recommendation. */
   compatibles?: RelacionadoProducto[];
+  descripcion?: string | null;
   whatsapp: string | null;
 }) {
   return (
@@ -40,6 +42,12 @@ export function ProductoDetalle({
       <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_280px] xl:gap-8">
         <div className="min-w-0">
           <ModeloCompra modelo={modelo} inicial={inicial} vistas={vistas} whatsapp={whatsapp} />
+          {descripcion && (
+            <section className="mt-8 max-w-prose">
+              <h2 className="text-base font-semibold tracking-tight text-foreground">Descripción</h2>
+              <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-muted-foreground">{descripcion}</p>
+            </section>
+          )}
         </div>
         <aside className="hidden xl:sticky xl:top-20 xl:block xl:self-start">
           <RielPedido />

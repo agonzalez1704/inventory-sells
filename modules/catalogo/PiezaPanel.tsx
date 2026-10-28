@@ -48,6 +48,8 @@ export function PiezaPanel({
 }) {
   const isMobile = useIsMobile();
   const [p, setP] = useState<PiezaDetalle | null>(null);
+  const [nombre, setNombre] = useState("");
+  const [descripcion, setDescripcion] = useState("");
   const [familia, setFamilia] = useState("");
   const [sistema, setSistema] = useState("");
   const [brand, setBrand] = useState("");
@@ -60,6 +62,8 @@ export function PiezaPanel({
     try {
       const d = unwrap(await detallePieza(s));
       setP(d);
+      setNombre(d.name);
+      setDescripcion(d.descripcion ?? "");
       setFamilia(d.familia ?? "");
       setSistema(d.sistema ?? "");
       setBrand(d.brand ?? "");
@@ -85,6 +89,8 @@ export function PiezaPanel({
       unwrap(
         await guardarPieza({
           sku: p.sku,
+          name: nombre,
+          descripcion: descripcion || null,
           familia: familia || null,
           sistema: sistema || null,
           brand: brand || null,
@@ -119,7 +125,17 @@ export function PiezaPanel({
           <>
             <DrawerHeader className="gap-0 pb-0 pt-4">
               <div className="font-mono text-xs font-bold text-brand-foreground">{p.sku}</div>
-              <DrawerTitle className="text-base font-bold leading-snug">{p.name}</DrawerTitle>
+              <DrawerTitle className="sr-only">{p.name}</DrawerTitle>
+              {puedeEditar ? (
+                <input
+                  aria-label="Nombre"
+                  value={nombre}
+                  onChange={(e) => setNombre(e.target.value)}
+                  className="-mx-2 h-10 rounded-lg border border-transparent bg-transparent px-2 text-base font-bold outline-hidden hover:border-border focus:border-ring"
+                />
+              ) : (
+                <p className="text-base font-bold leading-snug">{p.name}</p>
+              )}
               <p className="text-xs text-muted-foreground">
                 {p.price_cents ? formatMXN(p.price_cents) : "Sin precio"} · {p.quantity} en existencia · el precio llega del SAE
               </p>
@@ -145,6 +161,19 @@ export function PiezaPanel({
                     className="h-10 w-full rounded-lg border border-border bg-background px-3 text-base outline-hidden focus:border-ring lg:text-sm"
                   />
                   <datalist id="catalogo-marcas">{opciones.marcas.map((m) => <option key={m} value={m} />)}</datalist>
+                </Campo>
+              </div>
+              <div className="mt-2">
+                <Campo label="Descripción">
+                  <textarea
+                    value={descripcion}
+                    disabled={!puedeEditar}
+                    onChange={(e) => setDescripcion(e.target.value)}
+                    rows={2}
+                    maxLength={4000}
+                    placeholder={puedeEditar ? "Medidas, material, qué incluye… sale en la tienda y en el POS" : "Sin descripción"}
+                    className="field-sizing-content max-h-40 min-h-16 w-full resize-none rounded-lg border border-border bg-background px-3 py-2 text-base outline-hidden focus:border-ring disabled:opacity-70 lg:text-sm"
+                  />
                 </Campo>
               </div>
               <div role="tablist" className="mt-3 flex gap-5 border-b border-border">
