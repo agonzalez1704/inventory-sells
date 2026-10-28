@@ -83,11 +83,12 @@ export async function opcionesCatalogo(): Promise<OpcionesCatalogo> {
     DB.from("familias").select("id, nombre, sistema").order("nombre"),
     DB.rpc("catalogo_pendientes", {}),
     DB.rpc("catalogo_marcas", {}),
-    ES_AUTOPARTES ? DB.rpc("catalogo_vehiculos", {}) : Promise.resolve({ data: [] }),
+    // One jsonb value: as rows (1,646) the API's 1,000-row cap dropped Nissan on.
+    ES_AUTOPARTES ? DB.rpc("catalogo_vehiculos_mapa", {}) : Promise.resolve({ data: {} }),
   ]);
   const p = ((pend.data ?? []) as Record<string, number | string>[])[0] ?? {};
-  const vehiculos: Record<string, string[]> = {};
-  for (const r of (veh.data ?? []) as { marca: string; modelo: string }[]) (vehiculos[r.marca] ??= []).push(r.modelo);
+  const crudo = Array.isArray(veh.data) ? (veh.data[0] as Record<string, unknown> | undefined)?.catalogo_vehiculos_mapa : veh.data;
+  const vehiculos = (crudo && typeof crudo === "object" ? crudo : {}) as Record<string, string[]>;
   return {
     sistemas: (sis.data ?? []) as OpcionesCatalogo["sistemas"],
     familias: (fam.data ?? []) as OpcionesCatalogo["familias"],

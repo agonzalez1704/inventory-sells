@@ -296,7 +296,8 @@ export function FilaCarro({
 
   const sugArmadora = c.marca ? quisoDecir(c.marca, armadoras) : null;
   const sugModelo = c.modelo && !sugArmadora && !duenos.length ? quisoDecir(c.modelo, modelos) : null;
-  const sinAnios = !c.desde;
+  // Years only turn red once the car has a name: an empty new row is not an error.
+  const sinAnios = !c.desde && Boolean(c.marca || c.modelo);
   const lista = `modelos-${c.key}`;
   return (
     <div className={cn("rounded-xl border p-2", sugArmadora || sugModelo ? "border-amber-300 bg-amber-50/60 dark:bg-amber-950/20" : "border-border")}>
@@ -342,7 +343,7 @@ export function FilaCarro({
           ?
         </p>
       )}
-      {sinAnios && (c.marca || c.modelo) && <p className="mt-1.5 text-xs text-red-700 dark:text-red-300">Sin años no aparece en las búsquedas por carro.</p>}
+      {sinAnios && <p className="mt-1.5 text-xs text-red-700 dark:text-red-300">Sin años no aparece en las búsquedas por carro.</p>}
     </div>
   );
 }
