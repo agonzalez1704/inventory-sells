@@ -95,6 +95,18 @@ export function cuantosFiltros(f: Filtros): number {
   );
 }
 
+// 'vmm' comes as ONE row of "Marca|Modelo|n" lines (as rows it would pass the
+// API's 1,000-row cap); back to one facet per pair, value "Marca|Modelo".
+function pares(rows: { tipo: string; valor: string | null }[]): Facet[] {
+  return (rows.find((r) => r.tipo === "vmm")?.valor ?? "")
+    .split("\n")
+    .filter(Boolean)
+    .map((l) => {
+      const i = l.lastIndexOf("|");
+      return { value: l.slice(0, i), n: Number(l.slice(i + 1)) };
+    });
+}
+
 export function leerFacetas(filas: unknown): Facetas {
   const rows = (Array.isArray(filas) ? filas : []) as { tipo: string; valor: string | null; n: number | string }[];
   const de = (tipo: string) =>
@@ -104,7 +116,7 @@ export function leerFacetas(filas: unknown): Facetas {
   const num = (tipo: string) => Number(rows.find((r) => r.tipo === tipo)?.n ?? 0);
   return {
     cat: de("cat"), marca: de("marca"), cal: de("cal"), marco: de("marco"), tag: de("tag"), sis: de("sis"),
-    vmarca: de("vmarca"), vmodelo: de("vmodelo"), vmm: de("vmm"), anio: de("anio"), version: de("version"),
+    vmarca: de("vmarca"), vmodelo: de("vmodelo"), vmm: pares(rows), anio: de("anio"), version: de("version"),
     total: num("total"),
     stock: num("stock"),
   };
