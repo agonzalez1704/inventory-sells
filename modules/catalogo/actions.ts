@@ -74,21 +74,24 @@ export type OpcionesCatalogo = {
   pendientes: { sin_carros: number; sin_refaccion: number; sin_sistema: number };
   /** Make → its models, for the vehicle rows' suggestions. */
   vehiculos: Record<string, string[]>;
+  /** "Marca|Modelo" → its known versions ("2ª generación"). */
+  versiones: Record<string, string[]>;
 };
 
 export async function opcionesCatalogo(): Promise<OpcionesCatalogo> {
   await puedeVer();
-  const [sis, fam, pend, marcasRows, veh] = await Promise.all([
+  const [sis, fam, pend, marcasRows, veh, vers] = await Promise.all([
     DB.from("sistemas").select("id, nombre").order("orden"),
     DB.from("familias").select("id, nombre, sistema").order("nombre"),
     DB.rpc("catalogo_pendientes", {}),
     DB.rpc("catalogo_marcas", {}),
     // One jsonb value: as rows (1,646) the API's 1,000-row cap dropped Nissan on.
     ES_AUTOPARTES ? DB.rpc("catalogo_vehiculos_mapa", {}) : Promise.resolve({ data: {} }),
+    ES_AUTOPARTES ? DB.rpc("catalogo_versiones_mapa", {}) : Promise.resolve({ data: {} }),
   ]);
   const p = ((pend.data ?? []) as Record<string, number | string>[])[0] ?? {};
-  const crudo = Array.isArray(veh.data) ? (veh.data[0] as Record<string, unknown> | undefined)?.catalogo_vehiculos_mapa : veh.data;
-  const vehiculos = (crudo && typeof crudo === "object" ? crudo : {}) as Record<string, string[]>;
+  const mapa = (data: unknown) => (data && typeof data === "object" && !Array.isArray(data) ? data : {}) as Record<string, string[]>;
+  const vehiculos = mapa(veh.data);
   return {
     sistemas: (sis.data ?? []) as OpcionesCatalogo["sistemas"],
     familias: (fam.data ?? []) as OpcionesCatalogo["familias"],
@@ -99,6 +102,7 @@ export async function opcionesCatalogo(): Promise<OpcionesCatalogo> {
       sin_sistema: Number(p.sin_sistema ?? 0),
     },
     vehiculos,
+    versiones: mapa(vers.data),
   };
 }
 

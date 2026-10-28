@@ -194,6 +194,7 @@ export function PiezaPanel({
                       key={c.key}
                       c={c}
                       vehiculos={opciones.vehiculos}
+                      versiones={opciones.versiones}
                       editable={puedeEditar}
                       onChange={(x) => cambiar(c.key, x)}
                       onQuitar={() => setCarros((cs) => cs.filter((x) => x.key !== c.key))}
@@ -271,12 +272,15 @@ const igual = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLo
 export function FilaCarro({
   c,
   vehiculos,
+  versiones,
   editable,
   onChange,
   onQuitar,
 }: {
   c: CarroUI;
   vehiculos: Record<string, string[]>;
+  /** "Marca|Modelo" → known versions, so the same one is picked, not retyped. */
+  versiones: Record<string, string[]>;
   editable: boolean;
   onChange: (p: Partial<CarroUI>) => void;
   onQuitar: () => void;
@@ -299,13 +303,15 @@ export function FilaCarro({
   // Years only turn red once the car has a name: an empty new row is not an error.
   const sinAnios = !c.desde && Boolean(c.marca || c.modelo);
   const lista = `modelos-${c.key}`;
+  const susVersiones = versiones[`${c.marca}|${c.modelo}`] ?? [];
   return (
     <div className={cn("rounded-xl border p-2", sugArmadora || sugModelo ? "border-amber-300 bg-amber-50/60 dark:bg-amber-950/20" : "border-border")}>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-[1fr_1fr_0.8fr_0.8fr_1fr_auto_auto]">
         <input aria-label="Modelo" placeholder="Modelo" list={c.marca ? lista : "catalogo-modelos"} value={c.modelo} disabled={!editable} onChange={(e) => cambiarModelo(e.target.value)} className={CAMPO} />
         {c.marca && <datalist id={lista}>{modelos.map((m) => <option key={m} value={m} />)}</datalist>}
         <input aria-label="Armadora" placeholder="Armadora (sola)" list="catalogo-armadoras" value={c.marca} disabled={!editable} onChange={(e) => onChange({ marca: e.target.value, marcaAuto: false })} className={CAMPO} />
-        <input aria-label="Versión" placeholder="Versión" value={c.version ?? ""} disabled={!editable} onChange={(e) => onChange({ version: e.target.value })} className={CAMPO} />
+        {susVersiones.length > 0 && <datalist id={`versiones-${c.key}`}>{susVersiones.map((v) => <option key={v} value={v} />)}</datalist>}
+        <input aria-label="Versión" placeholder={susVersiones.length ? `Versión: ${susVersiones.slice(0, 2).join(", ")}` : "Versión"} list={susVersiones.length ? `versiones-${c.key}` : undefined} value={c.version ?? ""} disabled={!editable} onChange={(e) => onChange({ version: e.target.value })} className={CAMPO} />
         <input aria-label="Cilindrada" placeholder="1.6L" value={c.cilindrada ?? ""} disabled={!editable} onChange={(e) => onChange({ cilindrada: e.target.value })} className={CAMPO} />
         <input aria-label="Condición" placeholder="Condición" value={c.condicion ?? ""} disabled={!editable} onChange={(e) => onChange({ condicion: e.target.value })} className={CAMPO} />
         <span className="flex items-center gap-1">

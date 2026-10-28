@@ -252,7 +252,7 @@ export function CatalogoView({
         onGuardado={refrescar}
       />
       {lote === "carros" && (
-        <AplicarCarros skus={[...sel]} vehiculos={opciones.vehiculos} onClose={() => setLote(null)} onListo={() => { setLote(null); refrescar(); }} />
+        <AplicarCarros skus={[...sel]} vehiculos={opciones.vehiculos} versiones={opciones.versiones} onClose={() => setLote(null)} onListo={() => { setLote(null); refrescar(); }} />
       )}
       {lote && lote !== "carros" && (
         <AsignarLote campo={lote} skus={[...sel]} opciones={opciones} onClose={() => setLote(null)} onListo={() => { setLote(null); refrescar(); }} />

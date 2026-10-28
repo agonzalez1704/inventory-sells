@@ -21,11 +21,13 @@ const MAX = 30;
 export function AplicarCarros({
   skus,
   vehiculos,
+  versiones,
   onClose,
   onListo,
 }: {
   skus: string[];
   vehiculos: Record<string, string[]>;
+  versiones: Record<string, string[]>;
   onClose: () => void;
   onListo: () => void;
 }) {
@@ -160,6 +162,7 @@ export function AplicarCarros({
             <FilaCarro
               c={nuevo}
               vehiculos={vehiculos}
+              versiones={versiones}
               editable
               onChange={(p) => setNuevo((x) => ({ ...x, ...p }))}
               onQuitar={() => setNuevo(carroVacio())}
