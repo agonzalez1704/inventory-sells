@@ -87,6 +87,7 @@ Reglas de productos:
 - NUNCA digas cantidades ni números de stock. Solo "Disponible" o "Agotado" (campo "disponible").
 - Da el precio en pesos de las versiones que SÍ tengan precio. Nunca inventes un precio.
 - Si la versión EXACTA que pidió está agotada (disponible: false), DILO con la frase "la tengo agotada" y ofrece las variantes que SÍ hay con su nombre completo y su precio. NUNCA sustituyas en silencio el precio de otra variante.
+- Si una pieza agotada trae "equivalente", es LA MISMA pieza con otra clave (conversión): dile que esa la tienes agotada pero que tienes la equivalente, con su nombre y precio, y anótala si la quiere.
 - Si una versión tiene precio 0 (no cargado): di que también la tenemos, pero que ESE precio te lo confirma un asesor. NO escales por esto solo.
 - MEZCLA (muy común): entre las coincidencias, unas traen precio y otras 0. Da primero el/los precios que SÍ tienes y menciona que la otra versión también la hay con el precio por confirmar; luego pregunta cuál quiere.
 - Si el cliente elige/pide la versión cuyo precio está en 0 (por confirmar), ENTONCES sí usa pasar_a_asesor. Antes no.
@@ -445,7 +446,32 @@ Este número no está en el registro de clientes.
               ? { precio_cliente_mxn: Math.round(r.precio_mxn * 100 * (100 - pct) / 100) / 100 }
               : {}),
             disponible: r.stock > 0,
-          }));
+          })) as ({ sku: string; nombre: string; precio_mxn: number; disponible: boolean; equivalente?: { nombre: string; precio_mxn: number } } & Record<string, unknown>)[];
+          // Conversiones: an out-of-stock part may be on the shelf under
+          // another clave. The agent offers that one, by its own name.
+          const agotados = items.filter((i) => !i.disponible).map((i) => i.sku);
+          if (agotados.length) {
+            const { data: grupos } = await insforgeAdmin.database
+              .from("products")
+              .select("sku, conversion_grupo")
+              .in("sku", agotados)
+              .not("conversion_grupo", "is", null);
+            const gs = (grupos ?? []) as { sku: string; conversion_grupo: string }[];
+            if (gs.length) {
+              const { data: otros } = await insforgeAdmin.database
+                .from("products")
+                .select("name, price_cents, quantity, conversion_grupo")
+                .in("conversion_grupo", [...new Set(gs.map((g) => g.conversion_grupo))])
+                .gt("quantity", 0)
+                .gt("price_cents", 0);
+              const porGrupo = new Map(((otros ?? []) as { name: string; price_cents: number; conversion_grupo: string }[]).map((o) => [o.conversion_grupo, o]));
+              for (const g of gs) {
+                const o = porGrupo.get(g.conversion_grupo);
+                const it = items.find((i) => i.sku === g.sku);
+                if (o && it) it.equivalente = { nombre: o.name, precio_mxn: o.price_cents / 100 };
+              }
+            }
+          }
           // Reminder next to the data: an out-of-stock ask must come back with
           // the in-stock alternatives, never a bare "no disponible".
           const hayAgotados = items.some((i) => !i.disponible);

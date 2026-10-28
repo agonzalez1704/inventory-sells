@@ -14,6 +14,7 @@ import {
   BarChart3,
   Settings,
   Lightbulb,
+  Library,
   Headset,
   Calculator,
   Wallet,
@@ -76,6 +77,7 @@ const GRUPOS: {
     label: "Catálogo",
     links: [
       { href: "/inventario", label: "Inventario", icon: Boxes, permiso: "inventario_ver" },
+      { href: "/catalogo", label: "Catálogo", icon: Library, permiso: "inventario_ver" },
       { href: "/traspasos", label: "Traspasos", icon: ArrowLeftRight, permiso: "inventario_gestionar" },
       { href: "/proveedores", label: "Proveedores", icon: Truck, permiso: "abastecer" },
       { href: "/compras", label: "Compras", icon: ShoppingBag, permiso: "abastecer" },

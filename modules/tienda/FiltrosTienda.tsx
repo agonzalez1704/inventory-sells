@@ -77,7 +77,7 @@ export function PanelFiltros({
         <Seccion titulo="Tu vehículo">
           <div className="grid gap-2">
             <Selector
-              label="Marca"
+              label="Armadora"
               valor={filtros.vmarca}
               opciones={facetas.vmarca}
               onElegir={(v) => set({ vmarca: v, vmodelo: null, anio: null, version: null })}
@@ -120,7 +120,7 @@ export function PanelFiltros({
       )}
 
       {util(facetas.cat, filtros.cat) && (
-        <Seccion titulo="Tipo de pieza">
+        <Seccion titulo={facetas.vmarca.length > 0 ? "Refacción" : "Tipo de pieza"}>
           <ListaCheck
             opciones={facetas.cat}
             activos={filtros.cat}
@@ -130,8 +130,8 @@ export function PanelFiltros({
       )}
 
       {util(facetas.marca, filtros.marca) && (
-        // With a vehicle filter above, "Marca" alone would read as the car's.
-        <Seccion titulo={facetas.vmarca.length > 0 ? "Marca de refacción" : "Marca"}>
+        // The car's make is "Armadora", so the part's is plain "Marca".
+        <Seccion titulo="Marca">
           <ListaCheck
             opciones={facetas.marca}
             activos={filtros.marca}
@@ -202,7 +202,7 @@ export function BarraVehiculo({
       <span className="text-sm font-semibold text-foreground">Tu vehículo</span>
       <div className="w-56">
         <Selector
-          label="Marca"
+          label="Armadora"
           valor={filtros.vmarca}
           opciones={facetas.vmarca}
           onElegir={(v) => set({ vmarca: v, vmodelo: null, anio: null, version: null })}

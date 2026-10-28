@@ -18,6 +18,8 @@ import {
   type ProductoCompatible,
 } from "@/modules/tags/actions";
 import { garantiasEnStock, type GarantiaEnStock } from "@/modules/garantias/cliente-actions";
+import { conversionesDe } from "@/modules/catalogo/actions";
+import { MARCA } from "@/lib/marca";
 
 // Everything the register knows about a product, for the seller who is holding
 // it and needs to answer a question at the counter. Reached by pressing and
@@ -44,6 +46,7 @@ export function ProductoSheet({
   const [verTodasTags, setVerTodasTags] = useState(false);
   const [compatibles, setCompatibles] = useState<ProductoCompatible[]>([]);
   const [garantias, setGarantias] = useState<GarantiaEnStock[]>([]);
+  const [conversiones, setConversiones] = useState<Awaited<ReturnType<typeof conversionesDe>>>([]);
   // The product changes while the sheet is open (tapping another card): a
   // stale fullscreen — or the previous part's gallery — must not survive it.
   useEffect(() => {
@@ -54,6 +57,7 @@ export function ProductoSheet({
     setVerTodasTags(false);
     setCompatibles([]);
     setGarantias([]);
+    setConversiones([]);
     if (!p?.id) return;
     let on = true;
     galeriaProducto(p.id)
@@ -67,6 +71,9 @@ export function ProductoSheet({
       .catch(() => {});
     garantiasEnStock(p.id)
       .then((g) => on && setGarantias(g))
+      .catch(() => {});
+    conversionesDe(p.id)
+      .then((c) => on && setConversiones(c))
       .catch(() => {});
     return () => {
       on = false;
@@ -86,7 +93,8 @@ export function ProductoSheet({
   const filas: [string, string | null][] = [
     ["SKU", p.sku],
     ["Marca", p.brand],
-    ["Categoría", p.category],
+    // Auto parts: the category holds the owner's refacción (the Línea is retired).
+    [MARCA.id === "ruli" ? "Refacción" : "Categoría", p.category],
     ["Tamaño", p.size],
     ["Precio", p.price_cents ? formatMXN(p.price_cents) : "Sin precio"],
     // Cost and margin answer to the same permiso the rest of the app uses.
@@ -200,6 +208,22 @@ export function ProductoSheet({
               garantía de <span className="font-medium">{g.cliente}</span> (
               {new Date(g.fecha).toLocaleDateString("es-MX", { day: "numeric", month: "short" })})
               {g.motivo ? ` · ${g.motivo}` : ""} — pruébala antes de revenderla.
+            </p>
+          ))}
+        </div>
+      )}
+
+      {conversiones.length > 0 && (
+        <div className="mt-4 rounded-xl border border-indigo-200 bg-indigo-50 p-3 dark:border-indigo-900 dark:bg-indigo-950/30">
+          <p className="text-xs font-semibold uppercase tracking-wide text-indigo-800 dark:text-indigo-300">Conversiones</p>
+          {conversiones.map((c) => (
+            <p key={c.sku} className="mt-1.5 flex items-center gap-2 text-sm">
+              <span className="font-mono text-xs font-bold">{c.sku}</span>
+              <span className="min-w-0 flex-1 truncate">{c.name}</span>
+              <span className="font-mono text-xs">{c.price_cents ? formatMXN(c.price_cents) : "—"}</span>
+              <span className={c.quantity > 0 ? "text-xs font-semibold text-emerald-700" : "text-xs font-semibold text-red-700"}>
+                {c.quantity > 0 ? `${c.quantity} pzs` : "Agotada"}
+              </span>
             </p>
           ))}
         </div>

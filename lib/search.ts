@@ -452,3 +452,32 @@ export function aniosEnNombre(nombre: string, hoy = new Date().getFullYear()): [
   }
   return out;
 }
+
+/**
+ * The known name a typed one is probably a typo of: "Toledoo" → "Toledo".
+ * null when it is known as typed, or nothing is close (a genuinely new model).
+ */
+export function quisoDecir(escrito: string, conocidos: string[]): string | null {
+  const e = normalize(escrito);
+  if (!e || conocidos.some((c) => normalize(c) === e)) return null;
+  let mejor: string | null = null;
+  let dist = e.length > 4 ? 2 : 1;
+  for (const c of conocidos) {
+    const n = normalize(c);
+    if (Math.abs(n.length - e.length) > dist) continue;
+    // Levenshtein, one row at a time.
+    let prev = Array.from({ length: n.length + 1 }, (_, j) => j);
+    for (let i = 1; i <= e.length; i++) {
+      const fila = [i];
+      for (let j = 1; j <= n.length; j++)
+        fila[j] = Math.min(prev[j] + 1, fila[j - 1] + 1, prev[j - 1] + (e[i - 1] === n[j - 1] ? 0 : 1));
+      prev = fila;
+    }
+    if (prev[n.length] <= dist) {
+      dist = prev[n.length] - 1;
+      mejor = c;
+      if (dist < 0) break;
+    }
+  }
+  return mejor;
+}

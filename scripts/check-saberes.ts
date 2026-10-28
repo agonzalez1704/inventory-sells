@@ -48,3 +48,11 @@ assert.deepEqual(aniosEnNombre("ROTULA INF DER HID POINTER 98-09"), [[1998, 2009
 assert.deepEqual(aniosEnNombre("CREM ELECTRO VERSA,MARCH 1.6 11-20"), [[2011, 2020]]);
 assert.deepEqual(aniosEnNombre("CAJA DE DIRECCION HID"), []);
 console.log("✓ años en el nombre");
+
+// A typed model that is a typo of a known one.
+import { quisoDecir } from "../lib/search.ts";
+assert.equal(quisoDecir("Toledoo", ["Toledo", "Ibiza", "Leon"]), "Toledo");
+assert.equal(quisoDecir("Toledo", ["Toledo", "Ibiza"]), null, "known as typed");
+assert.equal(quisoDecir("Kicks", ["Versa", "March"]), null, "nothing close: new model");
+assert.equal(quisoDecir("Volkwagen", ["Volkswagen", "Nissan"]), "Volkswagen");
+console.log("✓ quiso decir");
