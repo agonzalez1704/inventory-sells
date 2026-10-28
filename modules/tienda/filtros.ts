@@ -21,7 +21,8 @@ export type Filtros = Record<Lista, string[]> & {
   orden: Orden | null;
 };
 
-export type Facetas = Record<Lista | "vmarca" | "vmodelo" | "anio" | "version", Facet[]> & {
+// vmm: "Armadora|Modelo" pairs, only while no armadora is chosen.
+export type Facetas = Record<Lista | "vmarca" | "vmodelo" | "vmm" | "anio" | "version", Facet[]> & {
   total: number;
   stock: number;
 };
@@ -103,7 +104,7 @@ export function leerFacetas(filas: unknown): Facetas {
   const num = (tipo: string) => Number(rows.find((r) => r.tipo === tipo)?.n ?? 0);
   return {
     cat: de("cat"), marca: de("marca"), cal: de("cal"), marco: de("marco"), tag: de("tag"), sis: de("sis"),
-    vmarca: de("vmarca"), vmodelo: de("vmodelo"), anio: de("anio"), version: de("version"),
+    vmarca: de("vmarca"), vmodelo: de("vmodelo"), vmm: de("vmm"), anio: de("anio"), version: de("version"),
     total: num("total"),
     stock: num("stock"),
   };

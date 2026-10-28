@@ -82,13 +82,7 @@ export function PanelFiltros({
               opciones={facetas.vmarca}
               onElegir={(v) => set({ vmarca: v, vmodelo: null, anio: null, version: null })}
             />
-            <Selector
-              label="Modelo"
-              valor={filtros.vmodelo}
-              opciones={facetas.vmodelo}
-              deshabilitado={!filtros.vmarca}
-              onElegir={(v) => set({ vmodelo: v, anio: null, version: null })}
-            />
+            <SelectorModelo facetas={facetas} filtros={filtros} set={set} />
             <Selector
               label="Año"
               valor={filtros.anio ? String(filtros.anio) : null}
@@ -209,13 +203,7 @@ export function BarraVehiculo({
         />
       </div>
       <div className="w-56">
-        <Selector
-          label="Modelo"
-          valor={filtros.vmodelo}
-          opciones={facetas.vmodelo}
-          deshabilitado={!filtros.vmarca}
-          onElegir={(v) => set({ vmodelo: v, anio: null, version: null })}
-        />
+        <SelectorModelo facetas={facetas} filtros={filtros} set={set} />
       </div>
       <div className="w-52">
         <Selector
@@ -386,6 +374,51 @@ const sinAcentos = (t: string) =>
  * opens on tap for whoever prefers to browse, matches ignore accents and case,
  * and each option keeps its count of pieces.
  */
+/**
+ * Modelo, with or without the armadora. With none chosen it lists every model
+ * ("Versa"; "Jetta · Volkswagen" where two makes share the name) and picking
+ * one sets both — the customer goes straight to the car.
+ */
+function SelectorModelo({
+  facetas,
+  filtros,
+  set,
+}: {
+  facetas: Facetas;
+  filtros: Filtros;
+  set: (parcial: Partial<Filtros>) => void;
+}) {
+  if (filtros.vmarca)
+    return (
+      <Selector
+        label="Modelo"
+        valor={filtros.vmodelo}
+        opciones={facetas.vmodelo}
+        onElegir={(v) => set({ vmodelo: v, anio: null, version: null })}
+      />
+    );
+  const pares = facetas.vmm.map((o) => {
+    const [marca, modelo] = o.value.split("|");
+    return { marca, modelo, n: o.n };
+  });
+  const veces = new Map<string, number>();
+  for (const p of pares) veces.set(p.modelo, (veces.get(p.modelo) ?? 0) + 1);
+  const porEtiqueta = new Map(
+    pares.map((p) => [(veces.get(p.modelo) ?? 0) > 1 ? `${p.modelo} · ${p.marca}` : p.modelo, p]),
+  );
+  return (
+    <Selector
+      label="Modelo"
+      valor={null}
+      opciones={[...porEtiqueta].map(([value, p]) => ({ value, n: p.n }))}
+      onElegir={(v) => {
+        const p = v ? porEtiqueta.get(v) : null;
+        if (p) set({ vmarca: p.marca, vmodelo: p.modelo, anio: null, version: null });
+      }}
+    />
+  );
+}
+
 function Selector({
   label,
   valor,
