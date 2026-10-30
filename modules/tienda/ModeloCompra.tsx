@@ -63,7 +63,7 @@ export function ModeloCompra({
   // null, and either way the model's photo is the same part.
   const imagenes = [...new Set([v.imagen || m.imagen, ...(vistas[v.id] ?? [])].filter(Boolean) as string[])];
   const wa = `https://wa.me/${whatsapp ?? ""}?text=${encodeURIComponent(
-    `Hola ${MARCA.tienda.nombre}, me interesa: ${v.nombre}`,
+    `Hola ${MARCA.tienda.nombre}, me interesa: ${v.nombre}${v.sku ? ` (No. de parte ${v.sku})` : ""}`,
   )}`;
 
   function elegir(id: string) {
@@ -152,6 +152,12 @@ export function ModeloCompra({
           </h1>
           {!varias && v.nombre.toUpperCase() !== m.modelo.toUpperCase() && (
             <p className="mt-1 text-sm text-muted-foreground">{v.nombre}</p>
+          )}
+          {/* Follows the chosen variant: what the mechanic matches against the box. */}
+          {v.sku && (
+            <p className="mt-1 text-sm text-muted-foreground">
+              No. de parte <span className="font-mono font-semibold text-foreground">{v.sku}</span>
+            </p>
           )}
 
           {varias ? (

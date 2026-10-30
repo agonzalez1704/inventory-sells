@@ -96,7 +96,7 @@ export function ProductoSheet({
       : null;
 
   const filas: [string, string | null][] = [
-    ["SKU", p.sku],
+    [MARCA.id === "ruli" ? "No. de parte" : "SKU", p.sku],
     ["Marca", p.brand],
     // Auto parts: the category holds the owner's refacción (the Línea is retired).
     [MARCA.id === "ruli" ? "Refacción" : "Categoría", p.category],

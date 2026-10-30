@@ -24,6 +24,8 @@ export function glosaDe(calidad: string | null | undefined): string | null {
 export type VarianteModelo = {
   id: string;
   nombre: string;
+  /** Part number (the SKU / clave), shown on the product page. */
+  sku?: string | null;
   calidad: string | null;
   precio_cents: number;
   disponible: boolean;
@@ -58,6 +60,7 @@ export function agruparPorModelo<
     id: string;
     modelo?: string | null;
     name: string;
+    sku?: string | null;
     brand: string | null;
     category: string | null;
     calidad?: string | null;
@@ -85,6 +88,7 @@ export function agruparPorModelo<
     g.variantes.push({
       id: f.id,
       nombre: f.name,
+      sku: f.sku ?? null,
       calidad: f.calidad ?? null,
       precio_cents: f.price_cents,
       disponible: f.quantity > 0,
