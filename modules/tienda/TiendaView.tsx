@@ -590,6 +590,11 @@ export function ModeloCard({ m, compat = null }: { m: ModeloTienda; compat?: str
             .filter(Boolean)
             .join(" · ")}
         </span>
+        {destino.sku && (
+          <span className="truncate text-[13px] text-muted-foreground">
+            No. de parte <span className="font-mono font-semibold text-foreground">{destino.sku}</span>
+          </span>
+        )}
         {compat && (
           <span className="line-clamp-2 text-[13px] text-tienda-700 dark:text-tienda-300">Le queda a {compat}</span>
         )}
