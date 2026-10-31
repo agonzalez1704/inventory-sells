@@ -44,7 +44,7 @@ export function GaleriaFotos({ imagenes, alt }: { imagenes: string[]; alt: strin
                 "h-16 w-16 shrink-0 overflow-hidden rounded-xl border bg-background",
                 i === sel
                   ? "border-tienda-500 ring-1 ring-tienda-500/40"
-                  : "border-tienda-100 dark:border-tienda-900",
+                  : "border-border",
               )}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}

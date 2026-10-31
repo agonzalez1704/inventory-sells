@@ -47,10 +47,10 @@
   --radius-xl: 0.875rem;
   --radius-2xl: 1.125rem;
 
-  --shadow-xs: 0 1px 2px 0 rgb(15 23 42 / 0.04);
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.04);
   --shadow-card:
-    0 1px 3px 0 rgb(15 23 42 / 0.06), 0 1px 2px -1px rgb(15 23 42 / 0.05);
-  --shadow-pop: 0 10px 30px -10px rgb(15 23 42 / 0.2);
+    0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.05);
+  --shadow-pop: 0 10px 30px -10px rgb(0 0 0 / 0.2);
 
   --animate-fade-in: fade-in 0.2s ease-out;
 
@@ -88,15 +88,17 @@
 
 @layer base {
   :root {
-    --page: 220 20% 98%;
+    /* Neutral whites and grays, no blue cast (2026-10-30 reference UIs):
+       #fafafa page, white cards, #f5f5f5 chips, #e8e8e8 hairlines. */
+    --page: 0 0% 98%;
     --background: 0 0% 100%;
-    --foreground: 222 47% 11%;
-    --muted: 220 14% 96%;
-    --muted-foreground: 220 9% 46%;
-    --border: 220 13% 91%;
-    --ring: 222 47% 11%;
-    --primary: 222 47% 11%;
-    --primary-foreground: 210 40% 98%;
+    --foreground: 240 4% 11%;
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 45%;
+    --border: 0 0% 91%;
+    --ring: 240 4% 11%;
+    --primary: 240 4% 11%;
+    --primary-foreground: 0 0% 98%;
     --accent: 158 64% 35%; /* emerald-600 — money / availability */
     --accent-foreground: 0 0% 100%;
     --accent-soft: 152 76% 96%; /* emerald-50 */
@@ -109,18 +111,18 @@
   }
 
   /* Dark theme — toggled by the `dark` class on <html> (see ThemeToggle + the
-     no-FOUC script in layout.tsx). Surfaces are lifted slates; primary flips to
+     no-FOUC script in layout.tsx). Surfaces are lifted neutral grays; primary flips to
      a light chip (dark text) so `bg-primary` buttons stay visible on dark. */
   .dark {
-    --page: 222 34% 8%;
-    --background: 222 30% 12%;
-    --foreground: 210 38% 96%;
-    --muted: 222 24% 17%;
-    --muted-foreground: 217 15% 65%;
-    --border: 220 18% 22%;
-    --ring: 210 40% 80%;
-    --primary: 210 38% 96%;
-    --primary-foreground: 222 47% 11%;
+    --page: 0 0% 6%;
+    --background: 0 0% 9%;
+    --foreground: 0 0% 96%;
+    --muted: 0 0% 14%;
+    --muted-foreground: 0 0% 64%;
+    --border: 0 0% 18%;
+    --ring: 0 0% 80%;
+    --primary: 0 0% 96%;
+    --primary-foreground: 240 4% 11%;
     --accent: 158 60% 45%; /* emerald, lifted for dark contrast */
     --accent-foreground: 158 90% 8%;
     --accent-soft: 158 45% 15%;

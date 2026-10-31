@@ -109,7 +109,7 @@ export function CotizacionPublica() {
 
       <Estado cot={cot} />
 
-      <div className="overflow-hidden rounded-2xl border border-tienda-100 dark:border-tienda-900 bg-background shadow-sm">
+      <div className="overflow-hidden rounded-2xl border border-border bg-background shadow-sm">
         {cot.cliente && (
           <div className="border-b border-tienda-50 px-5 py-3 text-sm">
             <span className="text-muted-foreground">Cliente: </span>
@@ -152,7 +152,7 @@ export function CotizacionPublica() {
       </div>
 
       {cot.notas && (
-        <div className="rounded-2xl border border-tienda-100 dark:border-tienda-900 bg-background p-4 text-sm">
+        <div className="rounded-2xl border border-border bg-background p-4 text-sm">
           <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">Notas</p>
           <p>{cot.notas}</p>
         </div>

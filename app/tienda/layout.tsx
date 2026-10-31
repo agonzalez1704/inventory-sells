@@ -131,7 +131,7 @@ export default async function TiendaLayout({
       </div>
 
       {/* Header */}
-      <header className="sticky top-0 z-30 border-b border-tienda-100 dark:border-tienda-900 bg-white/85 backdrop-blur-sm">
+      <header className="sticky top-0 z-30 border-b border-border bg-white/85 backdrop-blur-sm">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6 xl:max-w-7xl">
           <Wordmark />
           {/* Desktop search. Suspense: it reads the URL's query, and without a
@@ -163,7 +163,7 @@ export default async function TiendaLayout({
       <main className="flex-1">{children}</main>
 
       {/* Footer */}
-      <footer className="mt-8 border-t border-tienda-100 dark:border-tienda-900 bg-background">
+      <footer className="mt-8 border-t border-border bg-background">
         <div className="mx-auto grid max-w-6xl gap-6 px-4 py-10 sm:grid-cols-2 sm:px-6 lg:grid-cols-4">
           <div className="sm:col-span-2 lg:col-span-1">
             <Wordmark />
@@ -210,7 +210,7 @@ export default async function TiendaLayout({
             </ul>
           </div>
         </div>
-        <div className="border-t border-tienda-100 dark:border-tienda-900">
+        <div className="border-t border-border">
           <p className="mx-auto max-w-6xl px-4 py-4 text-center text-xs text-muted-foreground sm:px-6">
             © {MARCA.tienda.nombre}. Precios sujetos a disponibilidad.
           </p>

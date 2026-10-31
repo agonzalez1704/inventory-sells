@@ -28,7 +28,7 @@ export function CartButton() {
     >
       <DrawerTrigger
         aria-label={`Carrito${count ? ` (${count})` : ""}`}
-        className="relative flex h-11 w-11 cursor-pointer items-center justify-center rounded-xl border border-tienda-100 bg-background text-foreground transition-colors hover:border-tienda-300 hover:text-tienda-700 dark:border-tienda-900 dark:text-tienda-300"
+        className="relative flex h-11 w-11 cursor-pointer items-center justify-center rounded-xl border border-border bg-background text-foreground transition-colors hover:border-tienda-300 hover:text-tienda-700 dark:border-tienda-900 dark:text-tienda-300"
       >
         <ShoppingCart className="h-5 w-5" />
         {ready && count > 0 && (
