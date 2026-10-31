@@ -46,7 +46,8 @@ export function ProductoSheet({
   const [verTodasTags, setVerTodasTags] = useState(false);
   const [compatibles, setCompatibles] = useState<ProductoCompatible[]>([]);
   const [garantias, setGarantias] = useState<GarantiaEnStock[]>([]);
-  const [conversiones, setConversiones] = useState<Awaited<ReturnType<typeof conversionesDe>>>([]);
+  const [conversiones, setConversiones] = useState<Awaited<ReturnType<typeof conversionesDe>>["conversiones"]>([]);
+  const [numeros, setNumeros] = useState<string[]>([]);
   const [descripcion, setDescripcion] = useState<string | null>(null);
   // The product changes while the sheet is open (tapping another card): a
   // stale fullscreen — or the previous part's gallery — must not survive it.
@@ -59,6 +60,7 @@ export function ProductoSheet({
     setCompatibles([]);
     setGarantias([]);
     setConversiones([]);
+    setNumeros([]);
     setDescripcion(null);
     if (!p?.id) return;
     let on = true;
@@ -75,7 +77,11 @@ export function ProductoSheet({
       .then((g) => on && setGarantias(g))
       .catch(() => {});
     conversionesDe(p.id)
-      .then((c) => on && setConversiones(c))
+      .then((c) => {
+        if (!on) return;
+        setConversiones(c.conversiones);
+        setNumeros(c.numeros);
+      })
       .catch(() => {});
     descripcionDe(p.id)
       .then((d) => on && setDescripcion(d))
@@ -220,7 +226,7 @@ export function ProductoSheet({
 
       {descripcion && <p className="mt-4 whitespace-pre-line text-sm leading-relaxed text-muted-foreground">{descripcion}</p>}
 
-      {conversiones.length > 0 && (
+      {(conversiones.length > 0 || numeros.length > 0) && (
         <div className="mt-4 rounded-xl border border-indigo-200 bg-indigo-50 p-3 dark:border-indigo-900 dark:bg-indigo-950/30">
           <p className="text-xs font-semibold uppercase tracking-wide text-indigo-800 dark:text-indigo-300">Conversiones</p>
           {conversiones.map((c) => (
@@ -233,6 +239,11 @@ export function ProductoSheet({
               </span>
             </p>
           ))}
+          {numeros.length > 0 && (
+            <p className="mt-2 text-xs text-indigo-900/80 dark:text-indigo-200/80">
+              Otras marcas (no se manejan): <span className="font-mono font-semibold">{numeros.join(" · ")}</span>
+            </p>
+          )}
         </div>
       )}
 

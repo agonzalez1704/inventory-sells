@@ -405,18 +405,30 @@ export async function descripcionDe(productId: string): Promise<string | null> {
   return (data as { descripcion: string | null } | null)?.descripcion ?? null;
 }
 
-export async function conversionesDe(productId: string): Promise<PiezaDetalle["conversiones"]> {
+/** The POS sheet's conversiones: the shop's equivalent parts, plus the other
+ *  brands' numbers it doesn't carry. */
+export async function conversionesDe(
+  productId: string,
+): Promise<{ conversiones: PiezaDetalle["conversiones"]; numeros: string[] }> {
   await puedeVer();
-  const { data } = await DB.from("products").select("sku, conversion_grupo").eq("id", productId).maybeSingle();
-  const p = data as { sku: string; conversion_grupo: string | null } | null;
-  if (!p?.conversion_grupo) return [];
-  const { data: otros } = await DB.from("products")
-    .select("sku, name, price_cents, quantity")
-    .eq("conversion_grupo", p.conversion_grupo)
-    .neq("sku", p.sku)
-    .order("quantity", { ascending: false });
-  const ya = new Set<string>();
-  return ((otros ?? []) as PiezaDetalle["conversiones"]).filter((o) => !ya.has(o.sku) && ya.add(o.sku));
+  const { data } = await DB.from("products")
+    .select("sku, conversion_grupo, numeros_originales")
+    .eq("id", productId)
+    .maybeSingle();
+  const p = data as { sku: string; conversion_grupo: string | null; numeros_originales: string[] | null } | null;
+  if (!p) return { conversiones: [], numeros: [] };
+  let conversiones: PiezaDetalle["conversiones"] = [];
+  if (p.conversion_grupo) {
+    const { data: otros } = await DB.from("products")
+      .select("sku, name, price_cents, quantity")
+      .eq("conversion_grupo", p.conversion_grupo)
+      .neq("sku", p.sku)
+      .order("quantity", { ascending: false });
+    const ya = new Set<string>();
+    conversiones = ((otros ?? []) as PiezaDetalle["conversiones"]).filter((o) => !ya.has(o.sku) && ya.add(o.sku));
+  }
+  const propios = new Set([p.sku, ...conversiones.map((c) => c.sku)]);
+  return { conversiones, numeros: (p.numeros_originales ?? []).filter((n) => !propios.has(n)) };
 }
 
 // ---------------------------------------------------------------------------

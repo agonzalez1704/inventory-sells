@@ -43,6 +43,9 @@ type Row = {
   quantity: number;
   is_active: boolean;
   image_url: string | null;
+  sku: string | null;
+  conversion_grupo: string | null;
+  numeros_originales: string[] | null;
 };
 
 type Mini = {
@@ -82,7 +85,7 @@ export default async function ProductoPage({
 
   const { data, error } = await insforgeAdmin.database
     .from("products")
-    .select("id, name, descripcion, modelo, brand, category, price_cents, quantity, is_active, image_url")
+    .select("id, name, descripcion, modelo, brand, category, price_cents, quantity, is_active, image_url, sku, conversion_grupo, numeros_originales")
     .eq("id", id)
     .maybeSingle();
   if (error) throw new Error(`producto: ${error.message}`);
@@ -106,7 +109,19 @@ export default async function ProductoPage({
     .neq("modelo", row.modelo)
     .limit(12);
 
-  const [herm, compat, relData] = await Promise.all([
+  // Equivalent parts the shop carries (the owner links them in /catalogo).
+  const conv = row.conversion_grupo
+    ? insforgeAdmin.database
+        .from("products")
+        .select("id, name, brand, price_cents, quantity, image_url, sku")
+        .eq("is_active", true)
+        .eq("conversion_grupo", row.conversion_grupo)
+        .neq("id", row.id)
+        .order("quantity", { ascending: false })
+        .limit(40)
+    : Promise.resolve({ data: [] });
+
+  const [herm, compat, relData, convData] = await Promise.all([
     hermanos,
     insforgeAdmin.database.rpc("productos_compatibles", { p_product_id: row.id, p_limit: 12 }),
     row.category
@@ -114,6 +129,7 @@ export default async function ProductoPage({
       : row.brand
         ? rel.eq("brand", row.brand)
         : Promise.resolve({ data: [] }),
+    conv,
   ]);
 
   const ids = [...new Set([row.id, ...((herm.data ?? []) as { id: string }[]).map((h) => h.id)])];
@@ -143,6 +159,14 @@ export default async function ProductoPage({
     .filter((c) => !propios.has(c.id))
     .slice(0, 8)
     .map(aRelacionado);
+  // One row per part number: the same part lives once per inventario.
+  const vistos = new Set([row.sku]);
+  const conversiones = ((convData.data ?? []) as (Mini & { sku: string | null })[])
+    .filter((c) => c.sku && !propios.has(c.id) && !vistos.has(c.sku) && vistos.add(c.sku))
+    .map((c) => ({ ...aRelacionado(c), sku: c.sku as string }));
+  // Other brands' numbers it doesn't carry: shown so a customer holding one
+  // finds the part.
+  const otrasMarcas = (row.numeros_originales ?? []).filter((n) => !vistos.has(n));
   const relacionados = ((relData.data ?? []) as Mini[])
     .map(aRelacionado)
     .sort((a, b) => Number(b.disponible) - Number(a.disponible))
@@ -155,6 +179,8 @@ export default async function ProductoPage({
       vistas={vistas}
       relacionados={relacionados}
       compatibles={compatibles}
+      conversiones={conversiones}
+      otrasMarcas={otrasMarcas}
       descripcion={row.descripcion}
       whatsapp={process.env.STORE_WHATSAPP ?? null}
     />

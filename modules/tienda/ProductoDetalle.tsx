@@ -22,6 +22,8 @@ export function ProductoDetalle({
   vistas,
   relacionados,
   compatibles = [],
+  conversiones = [],
+  otrasMarcas = [],
   descripcion,
   whatsapp,
 }: {
@@ -33,6 +35,10 @@ export function ProductoDetalle({
   relacionados: RelacionadoProducto[];
   /** Products sharing a compatibility tag — the strongest recommendation. */
   compatibles?: RelacionadoProducto[];
+  /** Equivalent parts the shop carries. */
+  conversiones?: (RelacionadoProducto & { sku: string })[];
+  /** Other brands' numbers for this part, not carried. */
+  otrasMarcas?: string[];
   descripcion?: string | null;
   whatsapp: string | null;
 }) {
@@ -48,6 +54,9 @@ export function ProductoDetalle({
               <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-muted-foreground">{descripcion}</p>
             </section>
           )}
+          {(conversiones.length > 0 || otrasMarcas.length > 0) && (
+            <Conversiones items={conversiones} otrasMarcas={otrasMarcas} />
+          )}
         </div>
         <aside className="hidden xl:sticky xl:top-20 xl:block xl:self-start">
           <RielPedido />
@@ -59,6 +68,68 @@ export function ProductoDetalle({
       {compatibles.length > 0 && <RejaMini titulo="Compatibles con esta pieza" items={compatibles} />}
       {relacionados.length > 0 && <RejaMini titulo="También buscan" items={relacionados} />}
     </div>
+  );
+}
+
+function Conversiones({
+  items,
+  otrasMarcas,
+}: {
+  items: (RelacionadoProducto & { sku: string })[];
+  otrasMarcas: string[];
+}) {
+  return (
+    <section className="mt-8 max-w-prose">
+      <h2 className="text-base font-semibold tracking-tight text-foreground">Conversiones</h2>
+      <p className="mt-0.5 text-sm text-muted-foreground">Piezas equivalentes que te sirven igual.</p>
+      {items.length > 0 && (
+        <ul className="mt-3 divide-y divide-border overflow-hidden rounded-2xl border border-border bg-background">
+          {items.map((c) => (
+            <li key={c.id}>
+              <Link
+                href={`/tienda/${c.id}`}
+                className="flex items-center gap-3 px-3 py-2.5 transition-colors hover:bg-muted/60"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="font-mono text-sm font-semibold text-foreground">{c.sku}</p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {[c.nombre, c.marca].filter(Boolean).join(" · ")}
+                  </p>
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="text-sm font-semibold tabular-nums text-foreground">
+                    {c.precio_cents > 0 ? formatPrecio(c.precio_cents) : "A cotizar"}
+                  </p>
+                  <p
+                    className={cn(
+                      "text-xs font-medium",
+                      c.disponible ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground",
+                    )}
+                  >
+                    {c.disponible ? "Disponible" : "Agotada"}
+                  </p>
+                </div>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+      {otrasMarcas.length > 0 && (
+        <div className="mt-3">
+          <p className="text-xs font-medium text-muted-foreground">También equivale a</p>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {otrasMarcas.map((n) => (
+              <span
+                key={n}
+                className="rounded-lg border border-border bg-muted px-2 py-0.5 font-mono text-xs font-semibold text-foreground"
+              >
+                {n}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+    </section>
   );
 }
 
