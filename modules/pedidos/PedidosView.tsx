@@ -5,6 +5,7 @@ import { Camera, Landmark, MapPin, Package, Search, Store, Truck } from "lucide-
 import { formatMXN } from "@/lib/money";
 import { foto as urlFoto } from "@/lib/foto";
 import { cn } from "@/lib/utils";
+import { BANDEJA, BANDEJA_CUERPO } from "@/components/ui/bandeja";
 import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PanelPedido } from "./PanelPedido";
@@ -230,24 +231,24 @@ export function PedidosView({
       ) : vista === "tablero" ? (
         <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-2 scrollbar-thin lg:mx-0 lg:grid lg:grid-cols-4 lg:px-0">
           {COLUMNAS.map((c) => (
-            <div key={c.key} className="flex w-76 shrink-0 flex-col gap-2.5 rounded-2xl bg-muted/50 p-2.5 lg:w-auto">
-              <div className="px-1.5 pt-1">
+            <div key={c.key} className={cn("flex w-76 shrink-0 flex-col gap-1 lg:w-auto", BANDEJA)}>
+              <div className="px-2.5 pb-1.5 pt-2">
                 <p className="flex items-center gap-2 text-sm font-semibold">
                   <span className={cn("h-2 w-2 rounded-full", c.color)} />
                   {c.titulo}
-                  <span className="rounded-full bg-background px-1.5 text-xs tabular-nums text-muted-foreground">{grupos[c.key].length}</span>
+                  <span className="rounded-full bg-background px-1.5 text-xs tabular-nums text-muted-foreground ring-1 ring-border">{grupos[c.key].length}</span>
                 </p>
                 <p className="mt-0.5 text-xs text-muted-foreground">{c.sub}</p>
               </div>
               {grupos[c.key].map((p) => (
                 <Tarjeta key={p.id} p={p} activa={p.id === panelId} onClick={() => setPanelId(p.id)} />
               ))}
-              {grupos[c.key].length === 0 && <p className="px-1.5 pb-2 text-xs text-muted-foreground/70">Nada aquí.</p>}
+              {grupos[c.key].length === 0 && <p className="px-2.5 pb-2.5 text-xs text-muted-foreground/70">Nada aquí.</p>}
             </div>
           ))}
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className={cn("space-y-1", BANDEJA)}>
           {orden.map((p) => (
             <Tarjeta key={p.id} p={p} activa={p.id === panelId} onClick={() => setPanelId(p.id)} lista />
           ))}
@@ -255,8 +256,8 @@ export function PedidosView({
       )}
 
       {cerrados && vista === "tablero" && grupos.cerrado.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-sm font-semibold text-muted-foreground">Cancelados y vencidos</p>
+        <div className={cn("space-y-1", BANDEJA)}>
+          <p className="px-2.5 pb-1.5 pt-2 text-sm font-semibold text-muted-foreground">Cancelados y vencidos</p>
           {grupos.cerrado.map((p) => (
             <Tarjeta key={p.id} p={p} activa={p.id === panelId} onClick={() => setPanelId(p.id)} lista />
           ))}
@@ -291,7 +292,8 @@ function Tarjeta({ p, activa, onClick, lista }: { p: PedidoWeb; activa: boolean;
       type="button"
       onClick={onClick}
       className={cn(
-        "w-full cursor-pointer space-y-2.5 rounded-xl border bg-background p-3 text-left hover:border-ring/40",
+        "w-full cursor-pointer space-y-2.5 p-3 text-left hover:border-ring/40",
+        BANDEJA_CUERPO,
         activa ? "border-foreground ring-1 ring-foreground" : "border-border",
         lista && "sm:flex sm:items-center sm:gap-4 sm:space-y-0",
       )}

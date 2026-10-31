@@ -30,6 +30,7 @@ import { formatMXN } from "@/lib/money";
 import { type ColumnaExport } from "@/lib/exportar-tabla";
 import { ExportarMenu } from "@/components/exportar-menu";
 import { cn } from "@/lib/utils";
+import { Bandeja, BANDEJA, BANDEJA_CUERPO } from "@/components/ui/bandeja";
 import type { PaymentMethod, PaymentMethodStored } from "@/lib/types";
 import { imprimirCorteNavegador, type CorteData } from "@/lib/corte";
 import { imprimirCorteUSB, webUsbDisponible } from "@/lib/escpos-usb";
@@ -191,7 +192,14 @@ function Kpi({
   href?: string;
 }) {
   const cuerpo = (
-    <>
+    <span
+      className={cn(
+        "block h-full p-4",
+        BANDEJA_CUERPO,
+        tone === "caja" && "border-brand/40 bg-brand-soft",
+        (onClick || href) && "transition-colors group-hover:border-ring/40",
+      )}
+    >
       <span className={cn("flex items-center gap-2 text-sm", tone === "caja" ? "font-semibold text-brand-foreground" : "text-muted-foreground")}>
         <Icon className="h-4 w-4" />
         {label}
@@ -209,13 +217,9 @@ function Kpi({
       </span>
       {sub && <span className={cn("mt-0.5 block truncate text-xs", tone === "caja" ? "text-brand-foreground/80" : "text-muted-foreground")}>{sub}</span>}
       {href && <span className="mt-1 block text-xs font-semibold text-brand-foreground">Ver cuadre del día →</span>}
-    </>
+    </span>
   );
-  const clase = cn(
-    "block rounded-2xl border p-4 text-left",
-    tone === "caja" ? "border-brand/40 bg-brand-soft" : "border-border bg-background",
-    (onClick || href) && "cursor-pointer transition-colors hover:border-ring/40",
-  );
+  const clase = cn("group block text-left", BANDEJA, (onClick || href) && "cursor-pointer");
   if (href)
     return (
       <Link href={href} className={clase}>
@@ -455,7 +459,7 @@ export function CajaView({ data }: { data: CajaData }) {
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
         <div className="min-w-0 space-y-4">
-          <Seccion titulo="Por método de pago" sub="Neto = ingresos − gastos − devoluciones">
+          <Bandeja titulo="Por método de pago" sub="Neto = ingresos − gastos − devoluciones">
             <div className="overflow-x-auto">
               <table className="w-full min-w-136 text-sm">
                 <thead>
@@ -508,10 +512,10 @@ export function CajaView({ data }: { data: CajaData }) {
                 )}
               </table>
             </div>
-          </Seccion>
+          </Bandeja>
 
           {data.porInventario.length > 0 && (
-            <Seccion titulo="Corte por inventario" sub={`Venta${data.isAdmin ? " y ganancia" : ""} de las ventas del periodo. Sin ingresos extra ni gastos.`}>
+            <Bandeja titulo="Corte por inventario" sub={`Venta${data.isAdmin ? " y ganancia" : ""} de las ventas del periodo. Sin ingresos extra ni gastos.`}>
               <ul>
                 {data.porInventario.map((inv) => (
                   <li key={inv.inventoryId}>
@@ -549,10 +553,10 @@ export function CajaView({ data }: { data: CajaData }) {
                   )}
                 </span>
               </div>
-            </Seccion>
+            </Bandeja>
           )}
 
-          <Seccion
+          <Bandeja
             titulo="Movimientos del periodo"
             extra={
               <Button variant="ghost" size="sm" onClick={() => setMov("gasto")}>
@@ -560,7 +564,7 @@ export function CajaView({ data }: { data: CajaData }) {
               </Button>
             }
           >
-            <div className="flex gap-2 overflow-x-auto px-4 pb-3 scrollbar-none">
+            <div className="flex gap-2 overflow-x-auto px-4 py-3 scrollbar-none">
               {(
                 [
                   ["todo", "Todo"],
@@ -595,12 +599,12 @@ export function CajaView({ data }: { data: CajaData }) {
                 ))}
               </ul>
             )}
-          </Seccion>
+          </Bandeja>
         </div>
 
         <div className="space-y-4">
           {data.ganancia !== null && (
-            <div className="rounded-2xl border border-border bg-background p-4">
+            <Bandeja cuerpoClassName="p-4">
               <p className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Coins className="h-4 w-4" /> Ganancia neta de venta
               </p>
@@ -611,11 +615,11 @@ export function CajaView({ data }: { data: CajaData }) {
               <p className="mt-1 text-xs text-muted-foreground">
                 Precio − costo real de cada pieza, más adelantos entregados, menos lo devuelto. Solo administradores.
               </p>
-            </div>
+            </Bandeja>
           )}
 
           {data.sucursalSel === null && data.porSucursal.some((su) => su.ingresos > 0) && (
-            <Seccion titulo="Por sucursal" sub="Según el check-in de quien cobró">
+            <Bandeja titulo="Por sucursal" sub="Según el check-in de quien cobró">
               <ul>
                 {data.porSucursal.map((su) => (
                   <li key={su.id}>
@@ -632,11 +636,11 @@ export function CajaView({ data }: { data: CajaData }) {
                   </li>
                 ))}
               </ul>
-            </Seccion>
+            </Bandeja>
           )}
 
           {data.porTerminal.length > 0 && (
-            <Seccion titulo="Tarjeta por terminal" sub="Lo que cobró cada terminal, su comisión y lo que debe llegar">
+            <Bandeja titulo="Tarjeta por terminal" sub="Lo que cobró cada terminal, su comisión y lo que debe llegar">
               <ul>
                 {data.porTerminal.map((t) => (
                   <li
@@ -673,11 +677,11 @@ export function CajaView({ data }: { data: CajaData }) {
                   </span>
                 </li>
               </ul>
-            </Seccion>
+            </Bandeja>
           )}
 
           {data.porDestino.length > 0 && (
-            <Seccion titulo="Debe llegar a cada cuenta" sub="Tarjeta neta de comisión, transferencias y depósitos de caja, para cotejar con el banco">
+            <Bandeja titulo="Debe llegar a cada cuenta" sub="Tarjeta neta de comisión, transferencias y depósitos de caja, para cotejar con el banco">
               <ul>
                 {data.porDestino.map((d) => (
                   <li key={d.cuenta.id} className="flex items-center gap-2.5 border-t border-border/70 px-4 py-2.5 text-sm">
@@ -690,11 +694,11 @@ export function CajaView({ data }: { data: CajaData }) {
                   </li>
                 ))}
               </ul>
-            </Seccion>
+            </Bandeja>
           )}
 
           {data.porCuenta.length > 0 && (
-            <Seccion titulo="Transferencias por cuenta" sub="A dónde llegó el dinero, según los comprobantes">
+            <Bandeja titulo="Transferencias por cuenta" sub="A dónde llegó el dinero, según los comprobantes">
               <ul>
                 {data.porCuenta.map((c) => (
                   <li key={c.cuenta?.id ?? "sin"} className="flex items-center gap-2.5 border-t border-border/70 px-4 py-2.5 text-sm">
@@ -709,11 +713,11 @@ export function CajaView({ data }: { data: CajaData }) {
                   </li>
                 ))}
               </ul>
-            </Seccion>
+            </Bandeja>
           )}
 
           {data.etiquetado.length > 0 && (
-            <Seccion titulo="Efectivo etiquetado" sub="Ya incluido en los ingresos">
+            <Bandeja titulo="Efectivo etiquetado" sub="Ya incluido en los ingresos">
               <ul>
                 {data.etiquetado.map((e) => (
                   <li key={e.tag} className="border-t border-border/70 px-4 py-3">
@@ -735,7 +739,7 @@ export function CajaView({ data }: { data: CajaData }) {
                   </li>
                 ))}
               </ul>
-            </Seccion>
+            </Bandeja>
           )}
         </div>
       </div>
@@ -749,21 +753,6 @@ export function CajaView({ data }: { data: CajaData }) {
         onClose={() => setInvSel(null)}
       />
     </section>
-  );
-}
-
-function Seccion({ titulo, sub, extra, children }: { titulo: string; sub?: string; extra?: React.ReactNode; children: React.ReactNode }) {
-  return (
-    <div className="overflow-hidden rounded-2xl border border-border bg-background">
-      <div className="flex items-center gap-3 px-4 pb-3 pt-3.5">
-        <div className="min-w-0 flex-1">
-          <h2 className="text-[15px] font-semibold">{titulo}</h2>
-          {sub && <p className="text-xs text-muted-foreground">{sub}</p>}
-        </div>
-        {extra}
-      </div>
-      {children}
-    </div>
   );
 }
 

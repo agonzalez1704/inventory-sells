@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { formatMXN } from "@/lib/money";
 import { cn } from "@/lib/utils";
+import { Bandeja, BANDEJA_CUERPO } from "@/components/ui/bandeja";
 import { Button } from "@/components/ui/button";
 import type { ConteoCaja, Cuadre, EventoCaja } from "./cuadre";
 import { ContarEfectivo } from "./ContarEfectivo";
@@ -227,7 +228,8 @@ export function CuadreView({
       </div>
 
       {/* The numbers of the day */}
-      <div className="grid grid-cols-2 overflow-hidden rounded-2xl border border-border bg-background sm:grid-cols-3 lg:grid-cols-6">
+      <Bandeja>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
         <Cifra label="Fondo al abrir" valor={c.fondoCents == null ? "—" : formatMXN(c.fondoCents)} sub={c.fondoCents == null ? "Sin cierre anterior" : "Lo que se dejó ayer"} />
         <Cifra label="Entró en efectivo" valor={`+${formatMXN(c.entradasCents)}`} tono="ok" />
         <Cifra label="Salió en efectivo" valor={`−${formatMXN(c.salidasCents)}`} tono="mal" />
@@ -254,6 +256,7 @@ export function CuadreView({
           </div>
         )}
       </div>
+      </Bandeja>
 
       {/* El efectivo de quien no registró entrada no cae en ningún cajón: es
           justo lo que hace que el corte global y este cuadre no empaten, así
@@ -284,25 +287,25 @@ export function CuadreView({
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_400px]">
         {/* Timeline */}
-        <div className="order-2 overflow-hidden rounded-2xl border border-border bg-background lg:order-1">
-          <div className="flex items-center gap-3 px-4 pb-3 pt-4 sm:px-5">
-            <div className="min-w-0 flex-1">
-              <p className="text-[15px] font-semibold">Efectivo del día</p>
-              <p className="text-xs text-muted-foreground">Cada entrada y salida del cajón, con lo que debería haber después</p>
-            </div>
-            <div className="inline-flex rounded-lg bg-muted p-0.5 text-sm">
-              {(["efectivo", "todo"] as const).map((v) => (
-                <button
-                  key={v}
-                  type="button"
-                  onClick={() => setVista(v)}
-                  className={cn("h-8 cursor-pointer rounded-md px-3 font-medium", vista === v ? "bg-background shadow-sm" : "text-muted-foreground")}
-                >
-                  {v === "efectivo" ? "Efectivo" : "Todo"}
-                </button>
-              ))}
-            </div>
-          </div>
+        <Bandeja
+          className="order-2 lg:order-1"
+          titulo="Efectivo del día"
+          sub="Cada entrada y salida del cajón, con lo que debería haber después"
+          extra={
+              <div className="inline-flex rounded-lg bg-background p-0.5 ring-1 ring-border text-sm">
+                {(["efectivo", "todo"] as const).map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => setVista(v)}
+                    className={cn("h-8 cursor-pointer rounded-md px-3 font-medium", vista === v ? "bg-muted" : "text-muted-foreground")}
+                  >
+                    {v === "efectivo" ? "Efectivo" : "Todo"}
+                  </button>
+                ))}
+              </div>
+          }
+        >
           <ul>
             <li className="flex h-11 items-center gap-3 border-t border-border/70 bg-muted/40 px-4 text-sm sm:px-5">
               <span className="hidden w-20 text-xs text-muted-foreground sm:block">Abre</span>
@@ -330,20 +333,21 @@ export function CuadreView({
               {noEfectivo.length} {noEfectivo.length === 1 ? "movimiento" : "movimientos"} sin efectivo ({formatMXN(noEfectivo.reduce((s, e) => s + Math.abs(e.montoCents), 0))}) no pasan por el cajón · ver
             </button>
           )}
-        </div>
+        </Bandeja>
 
         {/* What to check first + per person */}
         <div className="order-1 space-y-3 lg:order-2">
-          <div className="px-0.5">
-            <p className="text-[15px] font-semibold">Revisa primero</p>
-            <p className="text-xs text-muted-foreground">
-              {c.diferenciaCents
+          <Bandeja
+            suelta
+            titulo="Revisa primero"
+            sub={
+              c.diferenciaCents
                 ? `Lo que más probablemente explica ${c.diferenciaCents < 0 ? "el faltante" : "el sobrante"} de ${formatMXN(Math.abs(c.diferenciaCents))}`
-                : "Movimientos que suelen descuadrar la caja"}
-            </p>
-          </div>
+                : "Movimientos que suelen descuadrar la caja"
+            }
+          >
           {c.sospechosos.length === 0 ? (
-            <div className="rounded-2xl border border-border bg-background px-4 py-6 text-center text-sm text-muted-foreground">
+            <div className={cn(BANDEJA_CUERPO, "px-4 py-6 text-center text-sm text-muted-foreground")}>
               Nada fuera de lo normal este día.
             </div>
           ) : (
@@ -351,8 +355,9 @@ export function CuadreView({
               <div
                 key={s.clave}
                 className={cn(
-                  "space-y-1.5 rounded-2xl border p-3.5",
-                  s.coincide ? "border-amber-300 bg-amber-50/60 dark:border-amber-800 dark:bg-amber-950/30" : "border-border bg-background",
+                  "space-y-1.5 p-3.5",
+                  BANDEJA_CUERPO,
+                  s.coincide && "border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30",
                 )}
               >
                 <div className="flex items-center gap-2">
@@ -384,13 +389,10 @@ export function CuadreView({
               </div>
             ))
           )}
+          </Bandeja>
 
           {c.porPersona.length > 0 && (
-            <div className="overflow-hidden rounded-2xl border border-border bg-background">
-              <div className="px-4 pb-2 pt-3.5">
-                <p className="text-[15px] font-semibold">Efectivo por persona</p>
-                <p className="text-xs text-muted-foreground">Quién cobró, no quién vendió</p>
-              </div>
+            <Bandeja titulo="Efectivo por persona" sub="Quién cobró, no quién vendió">
               {c.porPersona.map((p) => (
                 <div key={p.quien} className="flex items-center gap-3 border-t border-border/70 px-4 py-2.5">
                   <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-soft text-xs font-semibold text-brand-foreground">
@@ -408,7 +410,7 @@ export function CuadreView({
                   <span className="text-sm font-semibold tabular-nums">{formatMXN(p.entradasCents - p.salidasCents)}</span>
                 </div>
               ))}
-            </div>
+            </Bandeja>
           )}
         </div>
       </div>
