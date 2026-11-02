@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Search, Loader2, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Select } from "@/components/ui/input";
+import { ComboSelect, type Opcion } from "@/components/ui/combo-select";
 import { cn } from "@/lib/utils";
 import { unwrap } from "@/lib/errors";
 import { formatMXN } from "@/lib/money";
@@ -99,12 +99,18 @@ export function CatalogoView({
       </div>
 
       <div className="flex flex-wrap items-end gap-2.5">
-        <Filtro label="Sistema" valor={f.sistema ?? ""} onChange={(v) => set({ sistema: v || null, familia: null })}>
-          {opciones.sistemas.map((s) => <option key={s.id} value={s.id}>{s.nombre}</option>)}
-        </Filtro>
-        <Filtro label="Refacción" valor={f.familia ?? ""} onChange={(v) => set({ familia: v || null })}>
-          {familiasVisibles.map((x) => <option key={x.id} value={x.id}>{x.nombre}</option>)}
-        </Filtro>
+        <Filtro
+          label="Sistema"
+          valor={f.sistema ?? ""}
+          onChange={(v) => set({ sistema: v || null, familia: null })}
+          opciones={opciones.sistemas.map((s) => ({ value: s.id, label: s.nombre }))}
+        />
+        <Filtro
+          label="Refacción"
+          valor={f.familia ?? ""}
+          onChange={(v) => set({ familia: v || null })}
+          opciones={familiasVisibles.map((x) => ({ value: x.id, label: x.nombre }))}
+        />
         {puedeEditar && f.familia && (
           <RenombrarFamilia
             key={f.familia}
@@ -113,9 +119,12 @@ export function CatalogoView({
             onListo={refrescar}
           />
         )}
-        <Filtro label="Marca" valor={f.marca ?? ""} onChange={(v) => set({ marca: v || null })}>
-          {opciones.marcas.map((m) => <option key={m} value={m}>{m}</option>)}
-        </Filtro>
+        <Filtro
+          label="Marca"
+          valor={f.marca ?? ""}
+          onChange={(v) => set({ marca: v || null })}
+          opciones={opciones.marcas.map((m) => ({ value: m, label: m }))}
+        />
         <label className="flex min-w-0 flex-1 basis-64 flex-col gap-1">
           <span className="text-xs font-semibold text-muted-foreground">Buscar</span>
           <span className="flex h-10 items-center gap-2 rounded-lg border border-border bg-background px-3 focus-within:border-ring">
@@ -329,15 +338,12 @@ function RenombrarFamilia({ id, nombre, onListo }: { id: string; nombre: string;
   );
 }
 
-function Filtro({ label, valor, onChange, children }: { label: string; valor: string; onChange: (v: string) => void; children: React.ReactNode }) {
+function Filtro({ label, valor, onChange, opciones }: { label: string; valor: string; onChange: (v: string) => void; opciones: Opcion[] }) {
   return (
-    <label className="flex w-[calc(50%-0.4rem)] flex-col gap-1 sm:w-48">
+    <div className="flex w-[calc(50%-0.4rem)] flex-col gap-1 sm:w-52">
       <span className="text-xs font-semibold text-muted-foreground">{label}</span>
-      <Select value={valor} onChange={(e) => onChange(e.target.value)} className={cn(valor && "border-brand")}>
-        <option value="">Todas</option>
-        {children}
-      </Select>
-    </label>
+      <ComboSelect aria-label={label} valor={valor} onChange={onChange} vacio="Todas" opciones={opciones} />
+    </div>
   );
 }
 

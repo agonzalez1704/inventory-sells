@@ -9,6 +9,8 @@ import { insforgeAdmin } from "@/lib/insforge/admin";
 import { toCents } from "@/lib/money";
 import { esEtiquetaValida } from "@/lib/etiquetas";
 import { attempt, type ActionResult } from "@/lib/errors";
+import { familiaDeNombre } from "@/lib/familias";
+import { MARCA } from "@/lib/marca";
 
 export type EditableProduct = {
   id: string;
@@ -188,12 +190,14 @@ export async function updateProduct(
   // stored value — the UI hides these fields, this is the server backstop.
   const { data: cur } = await insforgeAdmin.database
     .from("products")
-    .select("price_cents, cost_cents")
+    .select("price_cents, cost_cents, sku, category")
     .eq("id", id)
     .maybeSingle();
-  const stored = (cur as { price_cents: number; cost_cents: number } | null) ?? {
+  const stored = (cur as { price_cents: number; cost_cents: number; sku: string | null; category: string | null } | null) ?? {
     price_cents: 0,
     cost_cents: 0,
+    sku: null,
+    category: null,
   };
 
   const insforge = await createInsForgeServerClient();
@@ -214,6 +218,18 @@ export async function updateProduct(
     })
     .eq("id", id);
   if (error) throw new Error(error.message ?? "Error al guardar");
+
+  // In the auto parts shop the category IS the refacción the catálogo, the
+  // POS and the store filter by: a new one here moves the part (every row of
+  // its SKU) to that refacción, creating it if the shop doesn't have it yet.
+  const categoria = patch.category?.trim();
+  if (MARCA.id === "ruli" && categoria && categoria !== stored.category?.trim()) {
+    const f = await familiaDeNombre(categoria);
+    const fila = { familia: f.id, familia_fija: true, category: f.nombre };
+    const q = insforgeAdmin.database.from("products").update(fila);
+    const { error: e2 } = await (stored.sku ? q.eq("sku", stored.sku) : q.eq("id", id));
+    if (e2) throw new Error(e2.message ?? "No se pudo cambiar la refacción");
+  }
   updateTag("tienda");
   return null;
   });

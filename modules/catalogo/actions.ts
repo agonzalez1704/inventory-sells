@@ -6,6 +6,7 @@ import { assertPermiso, permisosDe } from "@/lib/auth/profile";
 import { attempt, type ActionResult } from "@/lib/errors";
 import { normalize } from "@/lib/search";
 import { MARCA } from "@/lib/marca";
+import { familiaDeNombre, type Familia } from "@/lib/familias";
 
 // "Catálogo": the owner works carros, refacción, sistema, marca and
 // conversiones here instead of in his Excel (approved mockup:
@@ -328,6 +329,14 @@ export async function asignarEnLote(
     await ponerCampos(skus.slice(0, 500), { [campo]: valor });
     updateTag("tienda");
     return null;
+  });
+}
+
+/** A refacción typed in the catálogo that the shop doesn't have yet. */
+export async function crearFamilia(nombre: string, sistema: string | null): Promise<ActionResult<Familia>> {
+  return attempt("crearFamilia", async () => {
+    await assertPermiso("inventario_gestionar");
+    return familiaDeNombre(nombre, sistema);
   });
 }
 

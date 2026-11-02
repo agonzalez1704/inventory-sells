@@ -4,9 +4,9 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
-import { Select } from "@/components/ui/input";
+import { ComboSelect } from "@/components/ui/combo-select";
 import { unwrap } from "@/lib/errors";
-import { asignarEnLote, type OpcionesCatalogo } from "./actions";
+import { asignarEnLote, crearFamilia, type OpcionesCatalogo } from "./actions";
 
 const TITULO = { familia: "Poner refacción", sistema: "Poner sistema", brand: "Poner marca" } as const;
 
@@ -44,25 +44,35 @@ export function AsignarLote({
     <Modal open onClose={onClose} title={`${TITULO[campo]} a ${skus.length} piezas`} className="max-w-md">
       <div className="space-y-4">
         {campo === "brand" ? (
-          <>
-            <input
-              list="lote-marcas"
-              autoFocus
-              value={valor}
-              onChange={(e) => setValor(e.target.value.toUpperCase())}
-              placeholder="YOKOMITSU"
-              aria-label="Marca"
-              className="h-11 w-full rounded-lg border border-border bg-background px-3 text-base outline-hidden focus:border-ring"
-            />
-            <datalist id="lote-marcas">{opciones.marcas.map((m) => <option key={m} value={m} />)}</datalist>
-          </>
+          <ComboSelect
+            aria-label="Marca"
+            valor={valor}
+            onChange={setValor}
+            placeholder="YOKOMITSU"
+            opciones={opciones.marcas.map((m) => ({ value: m, label: m }))}
+            onCrear={async (t) => ({ value: t.toUpperCase(), label: t.toUpperCase() })}
+          />
         ) : (
-          <Select value={valor} onChange={(e) => setValor(e.target.value)} aria-label={TITULO[campo]}>
-            <option value="">{campo === "familia" ? "Sin refacción" : "Sin sistema"}</option>
-            {(campo === "familia" ? opciones.familias : opciones.sistemas).map((x) => (
-              <option key={x.id} value={x.id}>{x.nombre}</option>
-            ))}
-          </Select>
+          <ComboSelect
+            aria-label={TITULO[campo]}
+            valor={valor}
+            onChange={setValor}
+            vacio={campo === "familia" ? "Sin refacción" : "Sin sistema"}
+            opciones={(campo === "familia" ? opciones.familias : opciones.sistemas).map((x) => ({ value: x.id, label: x.nombre }))}
+            onCrear={
+              campo === "familia"
+                ? async (t) => {
+                    try {
+                      const f = unwrap(await crearFamilia(t, null));
+                      return { value: f.id, label: f.nombre };
+                    } catch (e) {
+                      toast.error(e instanceof Error ? e.message : "No se pudo crear");
+                      return null;
+                    }
+                  }
+                : undefined
+            }
+          />
         )}
         <Button variant="brand" className="h-11 w-full" loading={guardando} onClick={aplicar}>
           Aplicar a {skus.length} piezas

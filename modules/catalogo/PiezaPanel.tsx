@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { AlertTriangle, Loader2, Search, X } from "lucide-react";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
-import { Select } from "@/components/ui/input";
+import { ComboSelect } from "@/components/ui/combo-select";
 import { useIsMobile } from "@/components/use-is-mobile";
 import { cn } from "@/lib/utils";
 import { unwrap } from "@/lib/errors";
@@ -13,6 +13,7 @@ import { formatMXN } from "@/lib/money";
 import { quisoDecir } from "@/lib/search";
 import {
   buscarCatalogo,
+  crearFamilia,
   desligarConversion,
   detallePieza,
   guardarPieza,
@@ -141,26 +142,45 @@ export function PiezaPanel({
               </p>
               <div className="mt-3 grid gap-2 sm:grid-cols-3">
                 <Campo label="Refacción">
-                  <Select value={familia} disabled={!puedeEditar} onChange={(e) => setFamilia(e.target.value)}>
-                    <option value="">Sin refacción</option>
-                    {opciones.familias.map((f) => <option key={f.id} value={f.id}>{f.nombre}</option>)}
-                  </Select>
+                  <ComboSelect
+                    aria-label="Refacción"
+                    valor={familia}
+                    disabled={!puedeEditar}
+                    onChange={setFamilia}
+                    vacio="Sin refacción"
+                    opciones={opciones.familias.map((f) => ({ value: f.id, label: f.nombre }))}
+                    onCrear={async (t) => {
+                      try {
+                        const f = unwrap(await crearFamilia(t, sistema || null));
+                        toast.success(`Refacción «${f.nombre}» creada`);
+                        return { value: f.id, label: f.nombre };
+                      } catch (e) {
+                        toast.error(e instanceof Error ? e.message : "No se pudo crear");
+                        return null;
+                      }
+                    }}
+                  />
                 </Campo>
                 <Campo label="Sistema">
-                  <Select value={sistema} disabled={!puedeEditar} onChange={(e) => setSistema(e.target.value)}>
-                    <option value="">{familia ? "El de la refacción" : "Sin sistema"}</option>
-                    {opciones.sistemas.map((s) => <option key={s.id} value={s.id}>{s.nombre}</option>)}
-                  </Select>
+                  <ComboSelect
+                    aria-label="Sistema"
+                    valor={sistema}
+                    disabled={!puedeEditar}
+                    onChange={setSistema}
+                    vacio={familia ? "El de la refacción" : "Sin sistema"}
+                    opciones={opciones.sistemas.map((s) => ({ value: s.id, label: s.nombre }))}
+                  />
                 </Campo>
                 <Campo label="Marca de la pieza">
-                  <input
-                    list="catalogo-marcas"
-                    value={brand}
+                  <ComboSelect
+                    aria-label="Marca de la pieza"
+                    valor={brand}
                     disabled={!puedeEditar}
-                    onChange={(e) => setBrand(e.target.value.toUpperCase())}
-                    className="h-10 w-full rounded-lg border border-border bg-background px-3 text-base outline-hidden focus:border-ring lg:text-sm"
+                    onChange={setBrand}
+                    vacio="Sin marca"
+                    opciones={opciones.marcas.map((m) => ({ value: m, label: m }))}
+                    onCrear={async (t) => ({ value: t.toUpperCase(), label: t.toUpperCase() })}
                   />
-                  <datalist id="catalogo-marcas">{opciones.marcas.map((m) => <option key={m} value={m} />)}</datalist>
                 </Campo>
               </div>
               <div className="mt-2">
