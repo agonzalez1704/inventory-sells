@@ -2,14 +2,15 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Search, Loader2 } from "lucide-react";
+import { Search, Loader2, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { unwrap } from "@/lib/errors";
 import { formatMXN } from "@/lib/money";
-import { buscarCatalogo, type FilaCatalogo, type FiltrosCatalogo, type OpcionesCatalogo } from "./actions";
+import { buscarCatalogo, renombrarFamilia, type FilaCatalogo, type FiltrosCatalogo, type OpcionesCatalogo } from "./actions";
 import { PiezaPanel } from "./PiezaPanel";
 import { AplicarCarros } from "./AplicarCarros";
 import { AsignarLote } from "./AsignarLote";
@@ -104,6 +105,14 @@ export function CatalogoView({
         <Filtro label="Refacción" valor={f.familia ?? ""} onChange={(v) => set({ familia: v || null })}>
           {familiasVisibles.map((x) => <option key={x.id} value={x.id}>{x.nombre}</option>)}
         </Filtro>
+        {puedeEditar && f.familia && (
+          <RenombrarFamilia
+            key={f.familia}
+            id={f.familia}
+            nombre={opciones.familias.find((x) => x.id === f.familia)?.nombre ?? ""}
+            onListo={refrescar}
+          />
+        )}
         <Filtro label="Marca" valor={f.marca ?? ""} onChange={(v) => set({ marca: v || null })}>
           {opciones.marcas.map((m) => <option key={m} value={m}>{m}</option>)}
         </Filtro>
@@ -258,6 +267,65 @@ export function CatalogoView({
         <AsignarLote campo={lote} skus={[...sel]} opciones={opciones} onClose={() => setLote(null)} onListo={() => { setLote(null); refrescar(); }} />
       )}
     </div>
+  );
+}
+
+/** Rename the selected refacción in place: the POS, the store and the parts
+ *  all read the new name. */
+function RenombrarFamilia({ id, nombre, onListo }: { id: string; nombre: string; onListo: () => void }) {
+  const router = useRouter();
+  const [editando, setEditando] = useState(false);
+  const [valor, setValor] = useState(nombre);
+  const [guardando, setGuardando] = useState(false);
+
+  const guardar = async () => {
+    if (valor.trim() === nombre) return setEditando(false);
+    setGuardando(true);
+    try {
+      unwrap(await renombrarFamilia(id, valor));
+      toast.success("Refacción renombrada");
+      setEditando(false);
+      router.refresh();
+      onListo();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo renombrar");
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  if (!editando)
+    return (
+      <Button type="button" variant="secondary" onClick={() => { setValor(nombre); setEditando(true); }}>
+        <Pencil className="h-3.5 w-3.5" /> Renombrar
+      </Button>
+    );
+  return (
+    <form
+      className="flex w-full items-end gap-2 sm:w-auto"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void guardar();
+      }}
+    >
+      <label className="flex min-w-0 flex-1 flex-col gap-1 sm:w-72 sm:flex-none">
+        <span className="text-xs font-semibold text-muted-foreground">Nuevo nombre de la refacción</span>
+        <input
+          autoFocus
+          value={valor}
+          maxLength={80}
+          onChange={(e) => setValor(e.target.value)}
+          onKeyDown={(e) => e.key === "Escape" && setEditando(false)}
+          className="h-10 rounded-lg border border-border bg-background px-3 text-base outline-hidden focus:border-ring lg:text-sm"
+        />
+      </label>
+      <Button type="submit" loading={guardando} disabled={!valor.trim()}>
+        Guardar
+      </Button>
+      <Button type="button" variant="ghost" onClick={() => setEditando(false)} disabled={guardando}>
+        Cancelar
+      </Button>
+    </form>
   );
 }
 

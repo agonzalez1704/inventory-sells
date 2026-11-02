@@ -331,6 +331,29 @@ export async function asignarEnLote(
   });
 }
 
+/** Rename a refacción ("Bujes de horquilla" → "Bujes de horquillas y puente"). */
+export async function renombrarFamilia(id: string, nombre: string): Promise<ActionResult<null>> {
+  return attempt("renombrarFamilia", async () => {
+    await assertPermiso("inventario_gestionar");
+    const limpio = nombre.replace(/\s+/g, " ").trim().slice(0, 80);
+    if (!limpio) throw new Error("Escribe el nombre");
+    const { data } = await DB.from("familias").select("id, nombre");
+    const todas = (data ?? []) as { id: string; nombre: string }[];
+    if (!todas.some((x) => x.id === id)) throw new Error("No encontré esa refacción");
+    if (todas.some((x) => x.id !== id && normalize(x.nombre) === normalize(limpio)))
+      throw new Error("Ya hay una refacción con ese nombre");
+    const { error } = await DB.from("familias").update({ nombre: limpio }).eq("id", id);
+    if (error) throw new Error(error.message ?? "No se pudo renombrar");
+    // The category is a copy of the refacción's name in the auto parts shop.
+    if (ES_AUTOPARTES) {
+      const { error: e2 } = await DB.from("products").update({ category: limpio }).eq("familia", id);
+      if (e2) throw new Error(e2.message ?? "No se pudo renombrar en las piezas");
+    }
+    updateTag("tienda");
+    return null;
+  });
+}
+
 /**
  * "Aplicar carros": a grid of cars × selected parts. Each row says which of
  * the selected parts carry that car; a part not ticked loses it.
