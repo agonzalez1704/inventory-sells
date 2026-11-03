@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { MARCA } from "@/lib/marca";
+import { inventariosSoloConsulta } from "@/modules/inventory/solo-consulta";
 import type { ModeloTienda } from "@/lib/calidades";
 import { ProductoDetalle, type RelacionadoProducto } from "@/modules/tienda/ProductoDetalle";
 
@@ -56,6 +57,7 @@ type Mini = {
   price_cents: number;
   quantity: number;
   image_url: string | null;
+  inventory_id?: string;
 };
 
 const aRelacionado = (p: Mini): RelacionadoProducto => ({
@@ -105,7 +107,7 @@ export default async function ProductoPage({
 
   const rel = insforgeAdmin.database
     .from("products")
-    .select("id, name, brand, price_cents, quantity, image_url")
+    .select("id, name, brand, price_cents, quantity, image_url, inventory_id")
     .eq("is_active", true)
     .neq("modelo", row.modelo)
     .limit(12);
@@ -114,7 +116,7 @@ export default async function ProductoPage({
   const conv = row.conversion_grupo
     ? insforgeAdmin.database
         .from("products")
-        .select("id, name, brand, price_cents, quantity, image_url, sku")
+        .select("id, name, brand, price_cents, quantity, image_url, sku, inventory_id")
         .eq("is_active", true)
         .eq("conversion_grupo", row.conversion_grupo)
         .neq("id", row.id)
@@ -159,15 +161,27 @@ export default async function ProductoPage({
     (vistas[g.product_id] ??= []).push(g.url);
   }
 
+  // A supplier's solo-consulta row (Grob) has no page of its own: never link one.
+  const consulta = await inventariosSoloConsulta();
+  const compatIds = ((compat.data ?? []) as Mini[]).map((c) => c.id);
+  const deConsulta = new Set<string>();
+  if (consulta.size && compatIds.length) {
+    const { data } = await insforgeAdmin.database.from("products").select("id, inventory_id").in("id", compatIds);
+    for (const p of (data ?? []) as { id: string; inventory_id: string }[])
+      if (consulta.has(p.inventory_id)) deConsulta.add(p.id);
+  }
+  const visible = (p: { id: string; inventory_id?: string }) =>
+    !deConsulta.has(p.id) && !consulta.has(p.inventory_id ?? "");
+
   const propios = new Set(ids);
   const compatibles = ((compat.data ?? []) as Mini[])
-    .filter((c) => !propios.has(c.id))
+    .filter((c) => !propios.has(c.id) && visible(c))
     .slice(0, 8)
     .map(aRelacionado);
   // One row per part number: the same part lives once per inventario.
   const vistos = new Set([row.sku]);
   const conversiones = ((convData.data ?? []) as (Mini & { sku: string | null })[])
-    .filter((c) => c.sku && !propios.has(c.id) && !vistos.has(c.sku) && vistos.add(c.sku))
+    .filter((c) => c.sku && visible(c) && !propios.has(c.id) && !vistos.has(c.sku) && vistos.add(c.sku))
     .map((c) => ({ ...aRelacionado(c), sku: c.sku as string }));
   // Other brands' numbers it doesn't carry: shown so a customer holding one
   // finds the part.
@@ -192,6 +206,7 @@ export default async function ProductoPage({
       }),
   )];
   const relacionados = ((relData.data ?? []) as Mini[])
+    .filter(visible)
     .map(aRelacionado)
     .sort((a, b) => Number(b.disponible) - Number(a.disponible))
     .slice(0, 4);

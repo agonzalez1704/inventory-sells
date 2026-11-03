@@ -630,7 +630,7 @@ export function SalesScreen({
   function add(p: SalesProduct) {
     const ajena = inventariosAjenos[p.inventory_id ?? ""];
     if (ajena) {
-      toast.error(`${p.name} está en la sucursal ${ajena}. Ofrécelo y mándalo traer — se cobra desde allá.`);
+      toast.error(`${p.name} está en ${ajena}. Ofrécelo y mándalo traer.`);
       return false;
     }
     if (!p.price_cents) {

@@ -43,7 +43,7 @@ type Row = {
   quantity: number;
   image_url: string | null;
   is_active: boolean;
-  inventories: { entrega_dias_habiles: number | null; es_dropship: boolean | null } | null;
+  inventories: { entrega_dias_habiles: number | null; es_dropship: boolean | null; solo_consulta: boolean | null } | null;
 };
 
 // Re-price the cart from the catalog. Never trust client prices.
@@ -56,7 +56,7 @@ export async function validarCarrito(
 
     const { data } = await insforgeAdmin.database
       .from("products")
-      .select("id, name, price_cents, quantity, image_url, is_active, inventories(entrega_dias_habiles, es_dropship)")
+      .select("id, name, price_cents, quantity, image_url, is_active, inventories(entrega_dias_habiles, es_dropship, solo_consulta)")
       .in("id", ids);
     const rows = (data ?? []) as unknown as Row[];
     const byId = new Map(rows.map((r) => [r.id, r]));
@@ -69,7 +69,7 @@ export async function validarCarrito(
       const dropship = p?.inventories?.es_dropship ?? false;
       // Must be active and priced; stock only gates lines WE hold — a dropship
       // line's stock is the supplier's problem, not a reason to drop it.
-      if (!p || !p.is_active || p.price_cents <= 0 || (!dropship && p.quantity <= 0)) {
+      if (!p || !p.is_active || p.inventories?.solo_consulta || p.price_cents <= 0 || (!dropship && p.quantity <= 0)) {
         if (p) removidos.push(p.name);
         continue;
       }

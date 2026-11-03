@@ -810,7 +810,13 @@ function PanelFiltros({
         </button>
         {inventories.map((i) => {
           const activa = inv === i.id;
-          const donde = i.es_dropship ? "dropship" : i.sucursal_id ? sucursales[i.sucursal_id] : null;
+          const donde = i.solo_consulta
+            ? "solo consulta"
+            : i.es_dropship
+              ? "dropship"
+              : i.sucursal_id
+                ? sucursales[i.sucursal_id]
+                : null;
           return (
             <div key={i.id} className="group relative">
               <button type="button" onClick={() => onInv(i.id)} className={opcion(activa)}>

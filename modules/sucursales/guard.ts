@@ -2,6 +2,7 @@ import "server-only";
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { getPermisos } from "@/lib/auth/profile";
 import { mxHoy, rangoUTC } from "@/lib/caja-range";
+import { inventariosSoloConsulta } from "@/modules/inventory/solo-consulta";
 
 // Physical-stock rule: an inventory linked to a sucursal is only sellable by
 // someone checked in AT that sucursal today. Mirrors the geo gate's
@@ -9,11 +10,19 @@ import { mxHoy, rangoUTC } from "@/lib/caja-range";
 // anything — so the two features can't disagree about who is gated.
 
 /**
- * Inventory ids this user may NOT sell from right now, each mapped to the
- * branch it physically lives at (for the "está en Panorama" copy). Empty for
- * exempt users and for shops that never linked an inventory to a branch.
+ * Inventory ids this user may NOT sell from right now, each mapped to where
+ * the stock is (for the "está en Panorama" copy): another branch, or a
+ * supplier's solo-consulta inventory, which nobody sells from — admins neither.
  */
 export async function inventariosAjenos(userId: string): Promise<Map<string, string>> {
+  const consulta = new Map(
+    [...(await inventariosSoloConsulta())].map(([id, nombre]) => [id, `${nombre} · bajo pedido`] as const),
+  );
+  return new Map([...(await deSucursalAjena(userId)), ...consulta]);
+}
+
+/** Branch-linked inventories this user isn't checked in at, mapped to the branch. */
+async function deSucursalAjena(userId: string): Promise<Map<string, string>> {
   const vacio = new Map<string, string>();
 
   const { data: invData } = await insforgeAdmin.database
@@ -58,35 +67,22 @@ export async function inventariosAjenos(userId: string): Promise<Map<string, str
   );
 }
 
-/** Set view of inventariosAjenos, for callers that only need membership. */
-export async function inventariosBloqueados(userId: string): Promise<Set<string>> {
-  return new Set((await inventariosAjenos(userId)).keys());
-}
-
-/** Throw (naming product and branch) if any item lives at another sucursal. */
+/** Throw (naming product and place) if any item can't be sold from here. */
 export async function assertVentaPermitida(
   userId: string,
   productIds: string[],
 ): Promise<void> {
   if (productIds.length === 0) return;
-  const bloqueados = await inventariosBloqueados(userId);
+  const bloqueados = await inventariosAjenos(userId);
   if (bloqueados.size === 0) return;
 
   const { data } = await insforgeAdmin.database
     .from("products")
-    .select("name, inventory_id, inventories(name, sucursales(nombre))")
+    .select("name, inventory_id")
     .in("id", productIds);
-  const rows = (data ?? []) as unknown as {
-    name: string;
-    inventory_id: string;
-    inventories: { name: string; sucursales: { nombre: string } | { nombre: string }[] | null } | null;
-  }[];
+  const rows = (data ?? []) as unknown as { name: string; inventory_id: string }[];
   const fuera = rows.find((r) => bloqueados.has(r.inventory_id));
   if (fuera) {
-    const suc = fuera.inventories?.sucursales;
-    const nombreSuc = (Array.isArray(suc) ? suc[0]?.nombre : suc?.nombre) ?? "otra sucursal";
-    throw new Error(
-      `"${fuera.name}" está físicamente en la sucursal ${nombreSuc} — solo se vende desde ahí.`,
-    );
+    throw new Error(`"${fuera.name}" está en ${bloqueados.get(fuera.inventory_id)}: no se vende desde aquí.`);
   }
 }

@@ -92,7 +92,7 @@ export async function faltantesPorProveedor(): Promise<FaltantesProveedor[]> {
   const [{ data: prodData }, { data: pedidoData }] = await Promise.all([
     insforgeAdmin.database
       .from("products")
-      .select("id, sku, quantity, proveedor_id, proveedores(nombre, telefono, lead_time_dias)")
+      .select("id, sku, quantity, proveedor_id, proveedores(nombre, telefono, lead_time_dias), inventories(solo_consulta)")
       .in("sku", skus)
       .eq("is_active", true),
     insforgeAdmin.database.from("surtido_pedidos").select("sku, qty").eq("estado", "pedido").in("sku", skus),
@@ -103,6 +103,7 @@ export async function faltantesPorProveedor(): Promise<FaltantesProveedor[]> {
     quantity: number;
     proveedor_id: string | null;
     proveedores: { nombre: string; telefono: string | null; lead_time_dias: number } | null;
+    inventories: { solo_consulta: boolean | null } | null;
   };
   const productos = (prodData ?? []) as unknown as Prod[];
   const porSku = new Map<string, Prod[]>();
@@ -115,7 +116,9 @@ export async function faltantesPorProveedor(): Promise<FaltantesProveedor[]> {
   for (const [sku, d] of demanda) {
     const ps = porSku.get(sku);
     if (!ps?.length) continue; // not in the catalog: nothing to order from anyone
-    const stock = ps.reduce((s, p) => s + Number(p.quantity ?? 0), 0);
+    // A supplier's solo-consulta stock (Grob) is theirs, not on our shelf:
+    // counting it would mean never ordering what we sold bajo pedido.
+    const stock = ps.filter((p) => !p.inventories?.solo_consulta).reduce((s, p) => s + Number(p.quantity ?? 0), 0);
     const yaPedidas = enCamino.get(sku) ?? 0;
     const porPedir = d.qty - stock - yaPedidas;
     if (porPedir <= 0) continue;

@@ -28,7 +28,7 @@ export default async function InventarioPage() {
     })),
     insforge.database
       .from("inventories")
-      .select("id, name, ciudad, entrega_dias_habiles, es_dropship, sucursal_id")
+      .select("id, name, ciudad, entrega_dias_habiles, es_dropship, sucursal_id, solo_consulta")
       .order("name", { ascending: true }),
     insforge.database.from("sucursales").select("id, nombre"),
     estadisticasInventario(),

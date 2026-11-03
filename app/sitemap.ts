@@ -29,13 +29,15 @@ const listar = unstable_cache(
     // URL that 404s is how a sitemap loses a crawler's trust.
     const { data, error } = await insforgeAdmin.database
       .from("products")
-      .select("id, updated_at")
+      .select("id, updated_at, inventories(solo_consulta)")
       .eq("is_active", true)
       .limit(TOPE - 1);
     // Loud on purpose. Swallowing this publishes a sitemap saying the shop has
     // one page, which is worse than not publishing one — and it looks fine.
     if (error) throw new Error(`sitemap: ${error.message ?? "no pude leer el catálogo"}`);
-    return (data ?? []) as { id: string; updated_at: string | null }[];
+    // A supplier's solo-consulta row (Grob) has no page.
+    return ((data ?? []) as unknown as { id: string; updated_at: string | null; inventories: { solo_consulta: boolean | null } | null }[])
+      .filter((p) => !p.inventories?.solo_consulta);
   },
   ["sitemap-productos"],
   { revalidate: UN_DIA },

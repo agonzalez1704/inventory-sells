@@ -29,6 +29,7 @@ export function EditarInventarioModal({
     inventario.entrega_dias_habiles != null ? String(inventario.entrega_dias_habiles) : "",
   );
   const [dropship, setDropship] = useState(inventario.es_dropship ?? false);
+  const [consulta, setConsulta] = useState(inventario.solo_consulta ?? false);
   const [sucursalId, setSucursalId] = useState<string>(inventario.sucursal_id ?? "");
   const [sucursales, setSucursales] = useState<Sucursal[]>([]);
   useEffect(() => {
@@ -45,6 +46,7 @@ export function EditarInventarioModal({
           entregaDias: dias.trim() === "" ? null : Number(dias),
           esDropship: dropship,
           sucursalId: sucursalId || null,
+          soloConsulta: consulta,
         });
         toast.success("Inventario guardado");
         onClose();
@@ -113,6 +115,21 @@ export function EditarInventarioModal({
             </span>
           </label>
         )}
+        <label className="flex cursor-pointer items-start gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={consulta}
+            onChange={(e) => setConsulta(e.target.checked)}
+            className="mt-0.5 h-4 w-4 cursor-pointer accent-[hsl(var(--accent))]"
+          />
+          <span>
+            De proveedor · solo consulta
+            <span className="block text-xs text-muted-foreground">
+              Se ve qué tiene el proveedor, pero no se vende de aquí: no sale en
+              la tienda, el POS no lo cobra y no cuenta como existencia propia.
+            </span>
+          </span>
+        </label>
         <label className="flex cursor-pointer items-start gap-2 text-sm">
           <input
             type="checkbox"

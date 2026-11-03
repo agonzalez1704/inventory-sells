@@ -27,6 +27,8 @@ export interface Inventory {
   es_dropship?: boolean;
   /** Physical branch: only sellers checked in there can sell this stock. */
   sucursal_id?: string | null;
+  /** A supplier's stock, loaded only to see it (Grob): never sold from. */
+  solo_consulta?: boolean;
 }
 
 export interface Product {
