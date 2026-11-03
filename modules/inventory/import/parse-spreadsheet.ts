@@ -42,6 +42,8 @@ const ALIASES: Record<Field, string[]> = {
   quantity: [
     "pz", "pza", "pzas", "pieza", "piezas", "cantidad",
     "existencia", "existencias", "stock", "qty", "cant",
+    // Grob's stock file: Producto | Descripcion | EnStock.
+    "enstock", "en stock",
   ],
   // Not stock — kept so "cantidad de ventas anuales" can never be mistaken for
   // it, and because it tells you which products deserve a price first.
@@ -105,13 +107,28 @@ function rowsFromGrid(grid: unknown[][], sheetName: string): ExtractedRow[] {
   }
   if (headerIdx < 0 || best === 0) return [];
 
+  // `Producto | Descripcion` with no code column: "Producto" is the code (the
+  // supplier's ERP calls its part number that), the description is the name.
+  // Read as two names, the sheet looked pivoted and every product came out
+  // twice — once named by its code, once with its description slugged as SKU.
+  const hdr = grid[headerIdx] ?? [];
+  if (!Object.values(headerMap).includes("sku")) {
+    const n = (c: number) => norm(hdr[c]);
+    const nombres = Object.keys(headerMap).map(Number).filter((c) => headerMap[c] === "name");
+    const codigo = nombres.find((c) => ["producto", "articulo"].includes(n(c)));
+    if (codigo !== undefined && nombres.some((c) => c !== codigo && n(c).startsWith("descripcion")))
+      headerMap[codigo] = "sku";
+  }
+
   const cols = Object.keys(headerMap).map(Number);
   // The tab name is a category only for sheets that don't carry one. When the
   // sheet HAS a category column, a blank cell means "uncategorised" — not "use
   // the tab name", which on an ERP export would file 1,790 parts under
   // "productos 05-08-26".
   const tieneColCategoria = cols.some((c) => headerMap[c] === "category");
-  const categoriaHoja = tieneColCategoria ? undefined : norm(sheetName) || undefined;
+  // An untitled tab ("Hoja1", "Sheet1") names nothing.
+  const hojaGenerica = /^(hoja|sheet)\s*\d*$/.test(norm(sheetName));
+  const categoriaHoja = tieneColCategoria || hojaGenerica ? undefined : norm(sheetName) || undefined;
   const nameCols = cols.filter((c) => headerMap[c] === "name").sort((a, b) => a - b);
   const skuCols = cols.filter((c) => headerMap[c] === "sku").sort((a, b) => a - b);
   const anchors = nameCols.length ? nameCols : skuCols;
@@ -148,6 +165,9 @@ function rowsFromGrid(grid: unknown[][], sheetName: string): ExtractedRow[] {
       const row = grid[r] ?? [];
       const nameVal = str(row[nameCol]);
       if (!nameVal) continue;
+      // Grob lists retired codes as "Producto Obsoleto" (one even turned into
+      // a date by Excel): not a part anyone can sell.
+      if (g.name !== undefined && norm(row[g.name]) === "producto obsoleto") continue;
 
       const color = g.color !== undefined ? str(row[g.color]) : undefined;
       const size = g.size !== undefined ? str(row[g.size]) : undefined;

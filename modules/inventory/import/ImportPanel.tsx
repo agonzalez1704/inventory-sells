@@ -206,8 +206,17 @@ export function ImportPanel({
     startTransition(async () => {
       try {
         if (newMode) {
-          const r = await createInventoryWithImport(name, rows, source, filename);
-          toast.success(`"${r.name}" creado · ${r.inserted} productos`);
+          // Created with the first chunk, the rest imported into it the same
+          // way as below: one call with a supplier's 16k-row list timed out and
+          // rolled back the whole inventory.
+          const r = await createInventoryWithImport(name, rows.slice(0, LOTE), source, filename);
+          let inserted = r.inserted;
+          for (let i = LOTE; i < rows.length; i += LOTE) {
+            const res = await commitImport(rows.slice(i, i + LOTE), source, filename, r.inventory_id, "alta");
+            inserted += res.inserted;
+            setAvance(Math.min(i + LOTE, rows.length));
+          }
+          toast.success(`"${r.name}" creado · ${inserted} productos`);
         } else {
           // Sent in chunks, not in one call. commit_import walks every row in a
           // single plpgsql loop — a SELECT FOR UPDATE, an upsert and a movement
