@@ -222,12 +222,15 @@ function Grupo({
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold">{l.nombre}</p>
               <p className="truncate text-xs text-muted-foreground">
-                <span className="font-mono">{l.sku}</span> · {l.pedidas} cotizadas · {l.enExistencia} en existencia
+                <span className="font-mono">{l.sku}</span> · {l.pedidas} pedidas · {l.enExistencia} en existencia
                 {l.yaPedidas > 0 && ` · ${l.yaPedidas} en camino`} · para{" "}
                 {l.folios.map((f, k) => (
                   <span key={f}>
                     {k > 0 && ", "}
-                    <Link href={`/cotizaciones?folio=${f}`} className="font-medium text-amber-700 hover:underline dark:text-amber-400">
+                    <Link
+                      href={f.startsWith("Pedido") ? "/adelantos" : `/cotizaciones?folio=${f}`}
+                      className="font-medium text-amber-700 hover:underline dark:text-amber-400"
+                    >
                       {f}
                     </Link>
                   </span>

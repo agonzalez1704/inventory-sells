@@ -58,24 +58,44 @@ export async function faltantesPorProveedor(): Promise<FaltantesProveedor[]> {
     .select("id, folio, estado")
     .in("estado", ["pendiente", "autorizada"]);
   const vivas = (cots ?? []) as { id: string; folio: string; estado: string }[];
-  if (vivas.length === 0) return [];
 
-  const { data: itemData } = await insforgeAdmin.database
-    .from("cotizacion_items")
-    .select("cotizacion_id, sku, nombre, qty")
-    .in(
-      "cotizacion_id",
-      vivas.map((c) => c.id),
-    );
+  const [{ data: itemData }, { data: pedData }] = await Promise.all([
+    vivas.length
+      ? insforgeAdmin.database
+          .from("cotizacion_items")
+          .select("cotizacion_id, sku, nombre, qty")
+          .in(
+            "cotizacion_id",
+            vivas.map((c) => c.id),
+          )
+      : Promise.resolve({ data: [] }),
+    // Sold bajo pedido at the POS (a part only Grob had): an adelanto 'pedido'
+    // waiting for the piece is demand like a quote.
+    insforgeAdmin.database
+      .from("adelantos")
+      .select("id, qty, cliente, products(sku, name)")
+      .eq("tipo", "pedido")
+      .eq("estado", "activo")
+      .not("product_id", "is", null),
+  ]);
   const items = (itemData ?? []) as {
     cotizacion_id: string;
     sku: string | null;
     nombre: string;
     qty: number;
   }[];
-  if (items.length === 0) return [];
-
   const folioDe = new Map(vivas.map((c) => [c.id, c.folio]));
+  for (const a of (pedData ?? []) as unknown as {
+    id: string;
+    qty: number;
+    cliente: string | null;
+    products: { sku: string; name: string } | null;
+  }[]) {
+    if (!a.products) continue;
+    items.push({ cotizacion_id: a.id, sku: a.products.sku, nombre: a.products.name, qty: a.qty });
+    folioDe.set(a.id, `Pedido ${a.cliente ?? ""}`.trim());
+  }
+  if (items.length === 0) return [];
 
   // Demand per SKU across every live quote.
   const demanda = new Map<string, { nombre: string; qty: number; folios: Set<string> }>();

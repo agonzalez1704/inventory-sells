@@ -31,11 +31,16 @@ export type LineaApartado = { productId: string; nombre: string; qty: number; un
  * payment. An adelanto is one product, so the cart becomes one per line and
  * the payment fills them in order — the total collected is what was handed
  * over, whichever line it lands on.
+ *
+ * `pedido` (a part only the supplier has, Grob): the same adelanto with
+ * tipo 'pedido', which reserves nothing and is delivered once the piece
+ * arrives with the supplier's invoice.
  */
 export function ApartarPanel({
   open,
   lineas,
   clienteInicial,
+  pedido = null,
   verComision = false,
   onClose,
   onListo,
@@ -43,6 +48,8 @@ export function ApartarPanel({
   open: boolean;
   lineas: LineaApartado[];
   clienteInicial: string;
+  /** Bajo pedido: who has it and how many, for the copy. */
+  pedido?: { proveedor: string; enProveedor: number } | null;
   /** Show the terminal's commission and what lands in the account. */
   verComision?: boolean;
   onClose: () => void;
@@ -88,7 +95,7 @@ export function ApartarPanel({
           const parte = Math.min(resta, precio);
           resta -= parte;
           const { id } = await crearAdelanto({
-            tipo: "apartado",
+            tipo: pedido ? "pedido" : "apartado",
             productId: l.productId,
             descripcion: null,
             qty: l.qty,
@@ -117,7 +124,7 @@ export function ApartarPanel({
         return;
       }
       if (pideTerminal) recordarTerminal(terminalId);
-      toast.success(`Apartado para ${cliente.trim()}${abonoCents ? ` · abonó ${formatMXN(abonoCents)}` : ""}`, {
+      toast.success(`${pedido ? "Pedido" : "Apartado"} para ${cliente.trim()}${abonoCents ? ` · abonó ${formatMXN(abonoCents)}` : ""}`, {
         action: { label: "Ver apartados", onClick: () => router.push("/adelantos") },
       });
       onListo();
@@ -130,8 +137,12 @@ export function ApartarPanel({
       <DrawerContent className="data-[swipe-direction=down]:top-16 data-[swipe-direction=down]:max-h-none data-[swipe-direction=right]:w-[min(440px,100vw)]">
         <div className="flex items-start justify-between px-4 pt-1 pb-3 sm:px-6 sm:pt-5">
           <div>
-            <DrawerTitle className="text-lg font-semibold sm:text-xl">Apartar</DrawerTitle>
-            <p className="text-sm text-muted-foreground">Las piezas se guardan hasta que liquide.</p>
+            <DrawerTitle className="text-lg font-semibold sm:text-xl">{pedido ? "Bajo pedido" : "Apartar"}</DrawerTitle>
+            <p className="text-sm text-muted-foreground">
+              {pedido
+                ? `${pedido.proveedor} tiene ${pedido.enProveedor}. Se pide y se entrega cuando llegue con su factura.`
+                : "Las piezas se guardan hasta que liquide."}
+            </p>
           </div>
           <Button variant="ghost" size="icon" onClick={onClose} aria-label="Cerrar">
             <X className="h-5 w-5" />
@@ -174,7 +185,7 @@ export function ApartarPanel({
               />
             </div>
             {abonoCents > 0 && abonoCents <= total && (
-              <span className="text-xs text-muted-foreground">Resta {formatMXN(total - abonoCents)} al recoger.</span>
+              <span className="text-xs text-muted-foreground">Resta {formatMXN(total - abonoCents)} al {pedido ? "entregar" : "recoger"}.</span>
             )}
           </label>
 
@@ -223,7 +234,13 @@ export function ApartarPanel({
             Cancelar
           </Button>
           <Button className="h-12 flex-2 text-base sm:text-sm" onClick={guardar} loading={pending} disabled={!listo}>
-            {abonoCents ? `Apartar con ${formatMXN(abonoCents)}` : "Apartar sin abono"}
+            {pedido
+              ? abonoCents
+                ? `Pedir con ${formatMXN(abonoCents)}`
+                : "Pedir sin abono"
+              : abonoCents
+                ? `Apartar con ${formatMXN(abonoCents)}`
+                : "Apartar sin abono"}
           </Button>
         </div>
       </DrawerContent>

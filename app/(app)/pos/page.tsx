@@ -5,6 +5,7 @@ import { SalesScreen, type SalesProduct } from "@/modules/sales/SalesScreen";
 import { listarCategorias } from "@/modules/inventory/buscar";
 import { fiadoExigeCliente, posClickAbreDetalle, comprobanteObligatorio, piezaFueraActiva } from "@/modules/config/negocio";
 import { inventariosAjenos } from "@/modules/sucursales/guard";
+import { inventariosSoloConsulta } from "@/modules/inventory/solo-consulta";
 import { getTiendaInfo } from "@/modules/config/lib";
 import { encabezadoTicket, terminosGarantia } from "@/lib/tienda-info";
 import { hayVehiculos } from "@/modules/vehiculos/actions";
@@ -67,7 +68,10 @@ export default async function PosPage() {
   // Branch-linked stock elsewhere stays VISIBLE — "no tengo aquí, pero en
   // Panorama sí, se lo mando traer" is a sale — it just can't be added to the
   // cart; the server rejects it anyway if something slips through.
-  const ajenos = Object.fromEntries(await inventariosAjenos(userId));
+  const [ajenos, consulta] = await Promise.all([
+    inventariosAjenos(userId).then((m) => Object.fromEntries(m)),
+    inventariosSoloConsulta().then((m) => Object.fromEntries(m)),
+  ]);
   const products = (
     (productData ?? []) as (SalesProduct & { inventory_id: string })[]
   ).map((p) => ({
@@ -101,6 +105,7 @@ export default async function PosPage() {
       comprobanteObligatorio={comprobanteOblig}
       piezaFuera={piezaFuera}
       inventariosAjenos={ajenos}
+      inventariosConsulta={consulta}
       esAdmin={esAdmin}
       puedeCotizar={puedeCotizar}
       garantia={terminosGarantia(tienda)}

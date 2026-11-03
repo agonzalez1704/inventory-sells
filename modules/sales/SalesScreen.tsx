@@ -50,6 +50,7 @@ import { guardarComprobante } from "./comprobantes";
 import { asignarTerminalVenta } from "@/modules/config/terminales";
 import { PaymentSheet, type Comprobante } from "./PaymentSheet";
 import { ApartarPanel } from "./ApartarPanel";
+import { piezaParaPedido, type PiezaPedido } from "./bajo-pedido";
 import { PiezaFueraPanel } from "./PiezaFueraPanel";
 import type { PiezaFueraResult } from "./pieza-fuera";
 import { ReciboImpreso } from "./ReciboImpreso";
@@ -294,6 +295,7 @@ export function SalesScreen({
   clickAbreDetalle,
   comprobanteObligatorio = false,
   inventariosAjenos: inventariosAjenosProp = {},
+  inventariosConsulta = {},
   esAdmin = false,
   puedeCotizar = false,
   garantia = null,
@@ -313,6 +315,8 @@ export function SalesScreen({
   comprobanteObligatorio?: boolean;
   /** inventory_id -> sucursal where that stock sits: visible, not sellable here. */
   inventariosAjenos?: Record<string, string>;
+  /** inventory_id -> name of a supplier's solo-consulta inventory: sold bajo pedido. */
+  inventariosConsulta?: Record<string, string>;
   /** Manual discount is the admin's call; the RPC enforces it too. */
   esAdmin?: boolean;
   puedeCotizar?: boolean;
@@ -343,6 +347,7 @@ export function SalesScreen({
   const [catsAbiertas, setCatsAbiertas] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [apartarOpen, setApartarOpen] = useState(false);
+  const [pedido, setPedido] = useState<PiezaPedido | null>(null);
   const [piezaFueraOpen, setPiezaFueraOpen] = useState(false);
   const [carritoOpen, setCarritoOpen] = useState(false);
   const [escaneando, setEscaneando] = useState(false);
@@ -628,6 +633,10 @@ export function SalesScreen({
   const etiquetaDesc = origen === "manual" ? `Descuento especial · ${pct}%` : `Descuento del cliente · ${pct}%`;
 
   function add(p: SalesProduct) {
+    if (inventariosConsulta[p.inventory_id ?? ""]) {
+      void pedirBajoPedido(p);
+      return false;
+    }
     const ajena = inventariosAjenos[p.inventory_id ?? ""];
     if (ajena) {
       toast.error(`${p.name} está en ${ajena}. Ofrécelo y mándalo traer.`);
@@ -645,6 +654,14 @@ export function SalesScreen({
     setCart((c) => ({ ...c, [p.id]: Math.min((c[p.id] ?? 0) + 1, p.quantity) }));
     return true;
   }
+  async function pedirBajoPedido(p: SalesProduct) {
+    const t = toast.loading(`Preparando el pedido de ${p.name}…`);
+    const r = await piezaParaPedido(p.id);
+    toast.dismiss(t);
+    if (!r.ok) return void toast.error(r.error);
+    setPedido(r.data);
+  }
+
   function setQty(id: string, qty: number) {
     setCart((c) => {
       const next = Math.max(0, Math.min(qty, conocidos[id]?.quantity ?? 0));
@@ -822,7 +839,7 @@ export function SalesScreen({
 
   // ---- Keyboard: F2 charges, F4 switches to credit, Esc clears. Any other
   // key typed with focus nowhere lands in the search (a USB scanner too).
-  const hayOverlay = paymentOpen || apartarOpen || carritoOpen || escaneando || !!detalle || !!recibo || catsAbiertas;
+  const hayOverlay = paymentOpen || apartarOpen || !!pedido || carritoOpen || escaneando || !!detalle || !!recibo || catsAbiertas;
   const teclado = useRef({ onCta, pedirLimpiar, hayOverlay, query });
   teclado.current = { onCta, pedirLimpiar, hayOverlay, query };
   useEffect(() => {
@@ -1495,6 +1512,16 @@ export function SalesScreen({
           setCarritoOpen(false);
           limpiar();
         }}
+      />
+
+      <ApartarPanel
+        open={!!pedido}
+        verComision={esAdmin}
+        pedido={pedido}
+        lineas={pedido ? [{ productId: pedido.productId, nombre: pedido.nombre, qty: 1, unit: conDescuento(pedido.precio_cents, pct) }] : []}
+        clienteInicial={customer.is_system ? "" : `${customer.nombre}${customer.telefono ? ` · ${customer.telefono}` : ""}`}
+        onClose={() => setPedido(null)}
+        onListo={() => setPedido(null)}
       />
 
       <PiezaFueraPanel
