@@ -24,6 +24,7 @@ export function ProductoDetalle({
   compatibles = [],
   conversiones = [],
   otrasMarcas = [],
+  carros = [],
   descripcion,
   whatsapp,
 }: {
@@ -39,6 +40,8 @@ export function ProductoDetalle({
   conversiones?: (RelacionadoProducto & { sku: string })[];
   /** Other brands' numbers for this part, not carried. */
   otrasMarcas?: string[];
+  /** The cars it fits: "Nissan Versa V-Drive 2012–2025 1.6L". */
+  carros?: string[];
   descripcion?: string | null;
   whatsapp: string | null;
 }) {
@@ -48,6 +51,7 @@ export function ProductoDetalle({
       <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_280px] xl:gap-8">
         <div className="min-w-0">
           <ModeloCompra modelo={modelo} inicial={inicial} vistas={vistas} whatsapp={whatsapp} />
+          {carros.length > 0 && <LeQueda carros={carros} />}
           {descripcion && (
             <section className="mt-8 max-w-prose">
               <h2 className="text-base font-semibold tracking-tight text-foreground">Descripción</h2>
@@ -68,6 +72,19 @@ export function ProductoDetalle({
       {compatibles.length > 0 && <RejaMini titulo="Compatibles con esta pieza" items={compatibles} />}
       {relacionados.length > 0 && <RejaMini titulo="También buscan" items={relacionados} />}
     </div>
+  );
+}
+
+function LeQueda({ carros }: { carros: string[] }) {
+  return (
+    <section className="mt-8 max-w-prose">
+      <h2 className="text-base font-semibold tracking-tight text-foreground">Le queda a</h2>
+      <ul className="mt-3 divide-y divide-border overflow-hidden rounded-2xl border border-border bg-background">
+        {carros.map((c) => (
+          <li key={c} className="px-3 py-2.5 text-sm text-foreground">{c}</li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

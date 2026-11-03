@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { insforgeAdmin } from "@/lib/insforge/admin";
+import { MARCA } from "@/lib/marca";
 import type { ModeloTienda } from "@/lib/calidades";
 import { ProductoDetalle, type RelacionadoProducto } from "@/modules/tienda/ProductoDetalle";
 
@@ -92,15 +93,15 @@ export default async function ProductoPage({
   const row = data as Row | null;
   if (!row || !row.is_active) notFound();
 
-  // Same key the catalog groups by: brand, type and model.
-  let hermanos = insforgeAdmin.database
-    .from("products")
-    .select("id")
-    .eq("is_active", true)
-    .eq("modelo", row.modelo)
-    .limit(20);
-  hermanos = row.brand ? hermanos.eq("brand", row.brand) : hermanos.is("brand", null);
-  hermanos = row.category ? hermanos.eq("category", row.category) : hermanos.is("category", null);
+  // Same key the catalog groups by: the part number in the auto parts shop
+  // (tienda_una_pieza_por_sku), brand, type and model in the phone shop.
+  let hermanos = insforgeAdmin.database.from("products").select("id").eq("is_active", true).limit(20);
+  if (MARCA.id === "ruli" && row.sku) hermanos = hermanos.eq("sku", row.sku);
+  else {
+    hermanos = hermanos.eq("modelo", row.modelo);
+    hermanos = row.brand ? hermanos.eq("brand", row.brand) : hermanos.is("brand", null);
+    hermanos = row.category ? hermanos.eq("category", row.category) : hermanos.is("category", null);
+  }
 
   const rel = insforgeAdmin.database
     .from("products")
@@ -121,7 +122,7 @@ export default async function ProductoPage({
         .limit(40)
     : Promise.resolve({ data: [] });
 
-  const [herm, compat, relData, convData] = await Promise.all([
+  const [herm, compat, relData, convData, carrosData] = await Promise.all([
     hermanos,
     insforgeAdmin.database.rpc("productos_compatibles", { p_product_id: row.id, p_limit: 12 }),
     row.category
@@ -130,6 +131,10 @@ export default async function ProductoPage({
         ? rel.eq("brand", row.brand)
         : Promise.resolve({ data: [] }),
     conv,
+    insforgeAdmin.database
+      .from("product_tags")
+      .select("cilindrada, tags(veh_marca, veh_modelo, veh_version, veh_anio_desde, veh_anio_hasta)")
+      .eq("product_id", row.id),
   ]);
 
   const ids = [...new Set([row.id, ...((herm.data ?? []) as { id: string }[]).map((h) => h.id)])];
@@ -167,6 +172,25 @@ export default async function ProductoPage({
   // Other brands' numbers it doesn't carry: shown so a customer holding one
   // finds the part.
   const otrasMarcas = (row.numeros_originales ?? []).filter((n) => !vistos.has(n));
+  // Which cars it fits, spelled out: the description says only the part
+  // ("Amortiguador del. der."), so a customer who arrived by part number
+  // learns the cars here.
+  type Carro = { cilindrada: string | null; tags: {
+    veh_marca: string | null; veh_modelo: string | null; veh_version: string | null;
+    veh_anio_desde: number | null; veh_anio_hasta: number | null } | null };
+  const carros = [...new Set(
+    ((carrosData.data ?? []) as unknown as Carro[])
+      .filter((c) => c.tags?.veh_marca)
+      .sort((a, b) =>
+        `${a.tags!.veh_marca} ${a.tags!.veh_modelo}`.localeCompare(`${b.tags!.veh_marca} ${b.tags!.veh_modelo}`)
+        || (a.tags!.veh_anio_desde ?? 0) - (b.tags!.veh_anio_desde ?? 0))
+      .map(({ cilindrada, tags: t }) => {
+        const anios = t!.veh_anio_desde == null ? ""
+          : t!.veh_anio_desde === t!.veh_anio_hasta ? `${t!.veh_anio_desde}`
+          : `${t!.veh_anio_desde}–${t!.veh_anio_hasta}`;
+        return [t!.veh_marca, t!.veh_modelo, t!.veh_version, anios, cilindrada].filter(Boolean).join(" ");
+      }),
+  )];
   const relacionados = ((relData.data ?? []) as Mini[])
     .map(aRelacionado)
     .sort((a, b) => Number(b.disponible) - Number(a.disponible))
@@ -180,6 +204,7 @@ export default async function ProductoPage({
       relacionados={relacionados}
       compatibles={compatibles}
       conversiones={conversiones}
+      carros={carros}
       otrasMarcas={otrasMarcas}
       descripcion={row.descripcion}
       whatsapp={process.env.STORE_WHATSAPP ?? null}
