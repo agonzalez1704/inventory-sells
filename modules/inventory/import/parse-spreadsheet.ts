@@ -208,7 +208,7 @@ function rowsFromGrid(grid: unknown[][], sheetName: string): ExtractedRow[] {
 }
 
 /**
- * Grob's price list per warehouse: LINEA | CODIGO | MARCA | MODELO |
+ * Yoko's stock in Guadalajara, priced as of today: LINEA | CODIGO | MARCA | MODELO |
  * DESCRIPCION | AÑO | AÑOFIN | A | B | C | <almacén>. MARCA/MODELO/AÑO are the
  * CAR, not the part, so they go into the name (that's how the counter
  * searches); A/B/C are cost tiers and A is what Ruli pays (it matches the cost
@@ -216,7 +216,7 @@ function rowsFromGrid(grid: unknown[][], sheetName: string): ExtractedRow[] {
  * is the warehouse's stock, 100 meaning "100 or more". LINEA (MEC/COL/ACC)
  * would only spawn junk categories.
  */
-function rowsListaGrob(grid: unknown[][]): ExtractedRow[] | null {
+function rowsExistenciaYoko(grid: unknown[][]): ExtractedRow[] | null {
   const h = (grid[0] ?? []).map(norm);
   const col = (n: string) => h.indexOf(n);
   const [cod, marca, modelo, desc, de, a, c] = ["codigo", "marca", "modelo", "descripcion", "ano", "a", "c"].map(col);
@@ -242,6 +242,8 @@ function rowsListaGrob(grid: unknown[][]): ExtractedRow[] | null {
       // Ruli's own rule, read off its catalog: cost × 1.5 plus IVA (median
       // price/cost 1.74 over the shared parts). Only a fallback: a part Ruli
       // already stocks sells at its own price.
+      // ponytail: the owner wants Yoko-only parts a bit higher (parcel to
+      // GDL); a factor per supplier like Grob's once he names it.
       r.price = Math.round(costo * 1.5 * 1.16 * 100) / 100;
     }
     out.push(r);
@@ -277,7 +279,7 @@ export async function parseSpreadsheet(file: File): Promise<ExtractedRow[]> {
       header: 1,
       defval: "",
     });
-    all.push(...(rowsListaGrob(grid) ?? rowsFromGrid(grid, sheetName)));
+    all.push(...(rowsExistenciaYoko(grid) ?? rowsFromGrid(grid, sheetName)));
   }
   return mergeBySku(all).filter((r) => r.sku !== "");
 }

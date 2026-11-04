@@ -4,6 +4,7 @@ import { auth } from "@clerk/nextjs/server";
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { getPermisos } from "@/lib/auth/profile";
 import { attempt, type ActionResult } from "@/lib/errors";
+import { inventarioQueRecibe } from "@/modules/inventory/solo-consulta";
 
 export type PiezaPedido = {
   /** Our own row for the SKU: the adelanto is on it, the supplier's invoice fills it. */
@@ -67,17 +68,7 @@ export async function piezaParaPedido(productId: string): Promise<ActionResult<P
     let id = propia?.id;
     if (propia && !propia.is_active) await DB.from("products").update({ is_active: true }).eq("id", propia.id);
     if (!id) {
-      // ponytail: the receiving inventory is the oldest own one (Mostrador in
-      // Ruli); a "Lo recibe" setting on the supplier's inventory if a shop
-      // ever has two.
-      const { data: invs } = await DB.from("inventories")
-        .select("id")
-        .eq("solo_consulta", false)
-        .eq("es_dropship", false)
-        .order("created_at", { ascending: true })
-        .limit(1);
-      const destino = (invs as { id: string }[] | null)?.[0]?.id;
-      if (!destino) throw new Error("No hay un inventario propio que reciba la pieza");
+      const destino = await inventarioQueRecibe();
       const { data: nueva, error } = await DB.from("products")
         .insert([
           {

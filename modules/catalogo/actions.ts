@@ -7,6 +7,7 @@ import { attempt, type ActionResult } from "@/lib/errors";
 import { normalize } from "@/lib/search";
 import { MARCA } from "@/lib/marca";
 import { familiaDeNombre, type Familia } from "@/lib/familias";
+import { inventarioQueRecibe, inventariosSoloConsulta } from "@/modules/inventory/solo-consulta";
 
 // "Catálogo": the owner works carros, refacción, sistema, marca and
 // conversiones here instead of in his Excel (approved mockup:
@@ -475,21 +476,35 @@ export async function compararSae(filas: FilaSae[]): Promise<
 > {
   return attempt("compararSae", async () => {
     await assertPermiso("precios_gestionar");
+    type Fila = { sku: string; name: string; price_cents: number; cost_cents: number; stock_minimo: number | null; inventory_id: string };
     const skus = filas.map((f) => f.sku);
-    const { data } = await DB.from("products").select("sku, name, price_cents, cost_cents, stock_minimo").in("sku", skus);
-    const app = new Map<string, { name: string; price_cents: number; cost_cents: number; stock_minimo: number | null }>();
-    for (const r of (data ?? []) as { sku: string; name: string; price_cents: number; cost_cents: number; stock_minimo: number | null }[])
+    // In slices: InsForge stops at 1,000 rows without saying so, and a part
+    // sits in up to three inventories — 3,000 claves came back as "nuevas".
+    const rows: Fila[] = [];
+    for (let i = 0; i < skus.length; i += 300) {
+      const { data, error } = await DB.from("products")
+        .select("sku, name, price_cents, cost_cents, stock_minimo, inventory_id")
+        .in("sku", skus.slice(i, i + 300));
+      if (error) throw new Error(error.message ?? "No se pudo comparar");
+      rows.push(...((data ?? []) as Fila[]));
+    }
+    const consulta = await inventariosSoloConsulta();
+    const app = new Map<string, Fila>();
+    const propias = new Set<string>();
+    for (const r of rows) {
       if (!app.has(r.sku)) app.set(r.sku, r);
+      if (!consulta.has(r.inventory_id)) propias.add(r.sku);
+    }
     const precios: CambioSae[] = [];
     const costos: CambioSae[] = [];
     const minimos: { sku: string; antes: number | null; despues: number }[] = [];
     const nuevas: string[] = [];
     for (const f of filas) {
       const p = app.get(f.sku);
-      if (!p) {
-        nuevas.push(f.sku);
-        continue;
-      }
+      // Seen only in the supplier's warehouse still counts as missing: the
+      // owner wants every number of the list in HIS catalog.
+      if (!propias.has(f.sku)) nuevas.push(f.sku);
+      if (!p) continue;
       if (f.precio > 0 && f.precio !== p.price_cents) precios.push({ sku: f.sku, name: p.name, antes: p.price_cents, despues: f.precio });
       if (f.costo > 0 && f.costo !== p.cost_cents) costos.push({ sku: f.sku, name: p.name, antes: p.cost_cents, despues: f.costo });
       if (f.ventas !== null) {
@@ -524,6 +539,53 @@ export async function aplicarSae(cambios: {
     await porValor("price_cents", cambios.precios);
     await porValor("cost_cents", cambios.costos);
     await porValor("stock_minimo", cambios.minimos);
+    updateTag("tienda");
+    return n;
+  });
+}
+
+// Supplier price lists (Grob's Lista Plana): sale price = P.L. × a factor the
+// owner sets once per supplier, kept in config_negocio.factores_lista.
+export async function factorLista(proveedor: string): Promise<number | null> {
+  const { data } = await DB.from("config_negocio").select("factores_lista").eq("id", 1).maybeSingle();
+  const f = (data as { factores_lista: Record<string, number> | null } | null)?.factores_lista?.[proveedor];
+  return typeof f === "number" && f > 0 ? f : null;
+}
+
+export async function guardarFactor(proveedor: string, factor: number): Promise<ActionResult<null>> {
+  return attempt("guardarFactor", async () => {
+    await assertPermiso("precios_gestionar");
+    if (!(factor > 0 && factor < 10)) throw new Error("Factor fuera de rango");
+    const { data } = await DB.from("config_negocio").select("factores_lista").eq("id", 1).maybeSingle();
+    const actual = (data as { factores_lista: Record<string, number> | null } | null)?.factores_lista ?? {};
+    const { error } = await DB.from("config_negocio").update({ factores_lista: { ...actual, [proveedor]: factor } }).eq("id", 1);
+    if (error) throw new Error(error.message ?? "No se pudo guardar el factor");
+    return null;
+  });
+}
+
+/**
+ * The list's numbers the catalog lacks, created at 0 pieces in the receiving
+ * inventory with the list's description and price: from then on they are
+ * searchable, quotable and orderable bajo pedido.
+ */
+export async function altaDesdeLista(filas: { sku: string; name: string; precio: number }[]): Promise<ActionResult<number>> {
+  return attempt("altaDesdeLista", async () => {
+    await assertPermiso("precios_gestionar");
+    const destino = await inventarioQueRecibe();
+    let n = 0;
+    for (let i = 0; i < filas.length; i += 500) {
+      const lote = filas.slice(i, i + 500);
+      const { data } = await DB.from("products").select("sku").eq("inventory_id", destino).in("sku", lote.map((f) => f.sku));
+      const ya = new Set(((data ?? []) as { sku: string }[]).map((r) => r.sku));
+      const nuevas = lote
+        .filter((f) => !ya.has(f.sku) && f.name.trim())
+        .map((f) => ({ sku: f.sku, name: f.name.trim(), price_cents: f.precio, cost_cents: 0, quantity: 0, inventory_id: destino, is_active: true }));
+      if (!nuevas.length) continue;
+      const { error } = await DB.from("products").insert(nuevas);
+      if (error) throw new Error(error.message ?? "No se pudieron dar de alta");
+      n += nuevas.length;
+    }
     updateTag("tienda");
     return n;
   });
