@@ -24,6 +24,7 @@ import { Bandeja, BANDEJA_CUERPO } from "@/components/ui/bandeja";
 import { Button } from "@/components/ui/button";
 import type { ConteoCaja, Cuadre, EventoCaja } from "./cuadre";
 import { ContarEfectivo } from "./ContarEfectivo";
+import { MovModal } from "./CajaView";
 import { reabrirDia } from "./cuadre-actions";
 
 const TZ = "America/Mexico_City";
@@ -66,8 +67,12 @@ export function CuadreView({
   const router = useRouter();
   const [vista, setVista] = useState<"efectivo" | "todo">("efectivo");
   const [contar, setContar] = useState<"conteo" | "cierre" | null>(null);
+  const [depositar, setDepositar] = useState(false);
   const [pending, start] = useTransition();
   const c = cuadre;
+  // "Mandar el corte al banco": everything the drawer should hold beyond its
+  // float. Tomorrow then opens with the float alone.
+  const paraDepositar = Math.max(0, c.esperadoCents - (c.fondoCents ?? 0));
   // Phones scroll the week sideways: start at the selected day (the right end).
   const semanaRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -152,6 +157,10 @@ export function CuadreView({
             </>
           ) : (
             <>
+              <Button variant="secondary" onClick={() => setDepositar(true)} title="Depositar el efectivo del cajón a una cuenta">
+                <Landmark className="h-4 w-4" />
+                <span className="hidden sm:inline">Depositar</span>
+              </Button>
               <Button variant="secondary" onClick={() => setContar("conteo")}>
                 <Banknote className="h-4 w-4" />
                 <span className="hidden sm:inline">Contar ahora</span>
@@ -415,6 +424,7 @@ export function CuadreView({
         </div>
       </div>
 
+      <MovModal open={depositar} onClose={() => setDepositar(false)} tipo="deposito" montoInicial={paraDepositar} />
       <ContarEfectivo
         open={contar !== null}
         onClose={() => setContar(null)}

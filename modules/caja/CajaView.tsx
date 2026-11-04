@@ -246,7 +246,7 @@ export function CajaView({ data }: { data: CajaData }) {
   const [navegando, startNav] = useTransition();
   const [from, setFrom] = useState(data.from);
   const [to, setTo] = useState(data.to);
-  const [mov, setMov] = useState<"gasto" | "ingreso" | null>(null);
+  const [mov, setMov] = useState<"gasto" | "ingreso" | "deposito" | null>(null);
   const [ventasOpen, setVentasOpen] = useState(false);
   const [invSel, setInvSel] = useState<InvAgg | null>(null);
   const [usbOk, setUsbOk] = useState(false);
@@ -356,6 +356,10 @@ export function CajaView({ data }: { data: CajaData }) {
               </button>
             )}
           </div>
+          <Button variant="secondary" onClick={() => setMov("deposito")} className="h-10" title="Depositar el efectivo del cajón a una cuenta">
+            <Landmark className="h-4 w-4" />
+            <span className="hidden sm:inline">Depositar</span>
+          </Button>
           <Button variant="secondary" onClick={() => setMov("ingreso")} className="h-10">
             <TrendingUp className="h-4 w-4 text-emerald-600" />
             <span className="hidden sm:inline">Ingreso extra</span>
@@ -744,7 +748,13 @@ export function CajaView({ data }: { data: CajaData }) {
         </div>
       </div>
 
-      <MovModal open={mov !== null} onClose={() => setMov(null)} tipo={mov ?? "gasto"} categorias={data.categorias} />
+      <MovModal
+        open={mov !== null}
+        onClose={() => setMov(null)}
+        tipo={mov ?? "gasto"}
+        categorias={data.categorias}
+        montoInicial={mov === "deposito" ? Math.max(0, efectivoCaja) : null}
+      />
       <IngresosModal open={ventasOpen} onClose={() => setVentasOpen(false)} lineas={data.ingresosDetalle} total={data.ingresosTotal} />
       <InventarioModal
         inv={invSel}
@@ -1103,11 +1113,14 @@ export function MovModal({
   onClose,
   tipo: tipoInicial,
   categorias,
+  montoInicial = null,
 }: {
   open: boolean;
   onClose: () => void;
   tipo: "gasto" | "ingreso" | "deposito";
   categorias?: { gasto: string[]; ingreso: string[] };
+  /** Cents to start the amount at — "deposit what is in the drawer". */
+  montoInicial?: number | null;
 }) {
   const router = useRouter();
   const isMobile = useIsMobile();
@@ -1130,14 +1143,14 @@ export function MovModal({
     if (!open) return;
     setTipo(tipoInicial);
     setConcepto("");
-    setMonto("");
+    setMonto(montoInicial && montoInicial > 0 ? String(montoInicial / 100) : "");
     setMetodo("efectivo");
     setCategoria("");
     setOtra(false);
     setCuentaId("");
     setReferencia("");
     setFoto(null);
-  }, [open, tipoInicial]);
+  }, [open, tipoInicial, montoInicial]);
 
   useEffect(() => {
     if (!open || !esDeposito || cuentas) return;
