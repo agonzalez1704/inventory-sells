@@ -207,6 +207,48 @@ function rowsFromGrid(grid: unknown[][], sheetName: string): ExtractedRow[] {
   return out;
 }
 
+/**
+ * Grob's price list per warehouse: LINEA | CODIGO | MARCA | MODELO |
+ * DESCRIPCION | AÑO | AÑOFIN | A | B | C | <almacén>. MARCA/MODELO/AÑO are the
+ * CAR, not the part, so they go into the name (that's how the counter
+ * searches); A/B/C are cost tiers and A is what Ruli pays (it matches the cost
+ * of 785 of 2,469 shared parts exactly, median ratio 1.00); the column after C
+ * is the warehouse's stock, 100 meaning "100 or more". LINEA (MEC/COL/ACC)
+ * would only spawn junk categories.
+ */
+function rowsListaGrob(grid: unknown[][]): ExtractedRow[] | null {
+  const h = (grid[0] ?? []).map(norm);
+  const col = (n: string) => h.indexOf(n);
+  const [cod, marca, modelo, desc, de, a, c] = ["codigo", "marca", "modelo", "descripcion", "ano", "a", "c"].map(col);
+  const hasta = col("anofin");
+  if ([cod, desc, de, hasta, a, c].some((i) => i < 0) || col("b") < 0) return null;
+  const almacen = c + 1;
+  const yy = (v: unknown) => String(v ?? "").trim().slice(-2);
+
+  const out: ExtractedRow[] = [];
+  for (const row of grid.slice(1)) {
+    const sku = str(row[cod]);
+    const nombre = str(row[desc]);
+    if (!sku || !nombre) continue;
+    const anos = str(row[de]) ? `${yy(row[de])}-${yy(row[hasta])}` : "";
+    const costo = num(row[a]);
+    const r: ExtractedRow = {
+      sku,
+      name: [nombre, str(row[marca]), str(row[modelo]), anos].filter(Boolean).join(" ").replace(/\s+/g, " "),
+      quantity: Math.max(0, Math.round(num(row[almacen]) ?? 0)),
+    };
+    if (costo) {
+      r.cost = costo;
+      // Ruli's own rule, read off its catalog: cost × 1.5 plus IVA (median
+      // price/cost 1.74 over the shared parts). Only a fallback: a part Ruli
+      // already stocks sells at its own price.
+      r.price = Math.round(costo * 1.5 * 1.16 * 100) / 100;
+    }
+    out.push(r);
+  }
+  return out;
+}
+
 // Merge rows that resolve to the same SKU (same brand+model+color): sum
 // quantities so a duplicate doesn't overwrite an earlier one.
 function mergeBySku(rows: ExtractedRow[]): ExtractedRow[] {
@@ -235,7 +277,7 @@ export async function parseSpreadsheet(file: File): Promise<ExtractedRow[]> {
       header: 1,
       defval: "",
     });
-    all.push(...rowsFromGrid(grid, sheetName));
+    all.push(...(rowsListaGrob(grid) ?? rowsFromGrid(grid, sheetName)));
   }
   return mergeBySku(all).filter((r) => r.sku !== "");
 }

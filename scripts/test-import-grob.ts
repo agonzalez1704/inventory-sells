@@ -23,3 +23,22 @@ assert.ok(filas.every((r) => r.quantity != null), "EnStock es la existencia");
 assert.ok(filas.every((r) => !r.category), "Hoja1 no es categoría");
 assert.ok(!filas.some((r) => /obsoleto/i.test(r.name)), "sin Producto Obsoleto");
 console.log("✓ Grob: código, descripción y existencia");
+
+// Grob's price list (stock 3 nov GDL): car in the name, A = cost, last column = stock.
+const gdl = "/Users/antoniogonzalez/Downloads/stock 3 nov GDL (1).xlsx";
+if (!process.argv[2] && (await import("node:fs")).existsSync(gdl)) {
+  const b = readFileSync(gdl);
+  const lista = await parseSpreadsheet({ arrayBuffer: async () => b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) } as File);
+  const p = new Map(lista.map((r) => [r.sku, r]));
+  console.log(`lista GDL: ${lista.length}`);
+  assert.equal(lista.length, 9036);
+  assert.deepEqual(p.get("AANA0100"), {
+    sku: "AANA0100",
+    name: "FILTRO DE AIRE (ACCENT 1.6L 18-22) (SEDAN/H-BACK) KIA RIO 1.6L 18-24",
+    quantity: 100,
+    cost: 29,
+    price: 50.46,
+  });
+  assert.ok(lista.every((r) => !r.category && !r.brand), "LINEA y MARCA del carro no son categoría ni marca");
+  console.log("✓ Grob GDL: carro en el nombre, costo A, precio ×1.74");
+}
