@@ -62,7 +62,9 @@ function attrsToObject(
 //   alta      goods arrived — add to what we have (a delivery, a photo, a PO)
 //   espejo    the file IS the stock — set ours to match (their ERP owns it)
 //   catalogo  ignore quantity, update only names/prices/costs (we own stock)
-export type ModoImport = "alta" | "espejo" | "catalogo";
+//   precios   existing SKUs: cost and price only; new SKUs: created with the
+//             file's stock (a supplier's monthly list with new parts in it)
+export type ModoImport = "alta" | "espejo" | "catalogo" | "precios";
 
 export type CommitResult = {
   inserted: number;
@@ -187,7 +189,7 @@ export async function previewImport(
     else out.existentes++;
     if (!r.price_cents) out.sinPrecio++;
 
-    if (modo === "catalogo") continue;
+    if (modo === "catalogo" || (modo === "precios" && prev)) continue;
     const desde = prev?.quantity ?? 0;
     const hasta = modo === "espejo" ? r.quantity : desde + r.quantity;
     if (hasta > desde) out.suben++;

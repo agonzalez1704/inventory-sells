@@ -189,7 +189,10 @@ function rowsFromGrid(grid: unknown[][], sheetName: string): ExtractedRow[] {
         sku: skuRaw ?? slug([brand, nameVal, color].filter(Boolean).join("-")),
         name: nombre,
       };
-      if (brand) row2.brand = brand;
+      // The sheet's own MARCA column wins; the label above a pivoted group is
+      // the fallback. The column was mapped but never read.
+      const marca = (g.brand !== undefined ? str(row[g.brand]) : undefined) ?? brand;
+      if (marca) row2.brand = marca;
       if (categoria) row2.category = categoria;
       if (color) row2.color = color;
       if (size) row2.size = size;

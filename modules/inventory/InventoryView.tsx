@@ -70,7 +70,7 @@ const ORDEN_LABEL: Record<OrdenLista, string> = {
 /** Today's threshold for "bajo" when a product has no reorder point of its own. */
 const MINIMO_DEFAULT = 5;
 
-function ExportMenu({ verCostos, etiquetasHref }: { verCostos: boolean; etiquetasHref: string }) {
+function ExportMenu({ verCostos, etiquetasHref, inv }: { verCostos: boolean; etiquetasHref: string; inv: string | null }) {
   const [open, setOpen] = useState(false);
   const item = "block rounded-md px-3 py-2 transition-colors hover:bg-muted cursor-pointer";
   return (
@@ -87,6 +87,10 @@ function ExportMenu({ verCostos, etiquetasHref }: { verCostos: boolean; etiqueta
             <a href="/api/inventario/export?variant=public" onClick={() => setOpen(false)} className={item}>
               <p className="text-sm font-medium">Lista para cliente</p>
               <p className="text-xs text-muted-foreground">Solo precios de venta</p>
+            </a>
+            <a href={`/api/inventario/excel${inv ? `?inventario=${inv}` : ""}`} onClick={() => setOpen(false)} className={item}>
+              <p className="text-sm font-medium">Excel (.xlsx)</p>
+              <p className="text-xs text-muted-foreground">{inv ? "Este inventario" : "Todos los inventarios"}; se puede editar y volver a importar</p>
             </a>
             <Link href={etiquetasHref} onClick={() => setOpen(false)} className={item}>
               <p className="text-sm font-medium">Etiquetas QR</p>
@@ -315,7 +319,7 @@ export function InventoryView({
         </div>
         <div className="flex items-center gap-2">
           <div className="hidden items-center gap-2 sm:flex">
-            {stats.productos > 0 && <ExportMenu verCostos={verCostos} etiquetasHref={etiquetasHref} />}
+            {stats.productos > 0 && <ExportMenu verCostos={verCostos} etiquetasHref={etiquetasHref} inv={inv} />}
             {puedeGestionar && (
               <Button variant="secondary" onClick={() => setImportOpen(true)}>
                 <Upload className="h-4 w-4" />

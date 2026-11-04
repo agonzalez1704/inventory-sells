@@ -13,7 +13,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Input, Select } from "@/components/ui/input";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { Inventory } from "@/lib/types";
 import type { ExtractedRow, ImportSource } from "./schema";
 import { parseSpreadsheet } from "./parse-spreadsheet";
@@ -61,6 +62,17 @@ const FORMATS: {
   { key: "image", label: "Imagen", icon: ImageIcon, accept: "image/png,image/jpeg", hint: "Foto JPEG o PNG de una lista, etiqueta o factura" },
   { key: "spreadsheet", label: "Excel / CSV", icon: Sheet, accept: ".xlsx,.xls,.csv", hint: "Hoja con columnas (sku, nombre, precio, cantidad…)" },
   { key: "pdf", label: "PDF", icon: FileText, accept: "application/pdf", hint: "Documento PDF de inventario" },
+];
+
+const MODOS: { value: ModoImport; label: string; ayuda: string }[] = [
+  { value: "alta", label: "Llegó mercancía", ayuda: "Suma las existencias del archivo a lo que hay." },
+  { value: "espejo", label: "El archivo es el inventario", ayuda: "Reemplaza las existencias con las del archivo." },
+  {
+    value: "precios",
+    label: "Actualizar costos y precios",
+    ayuda: "Lo que ya existe: solo costo y precio. Lo que no existe: se da de alta con su existencia.",
+  },
+  { value: "catalogo", label: "Solo catálogo", ayuda: "Nombres, precios y costos; no toca existencias. Lo nuevo entra en 0." },
 ];
 
 export function ImportPanel({
@@ -312,13 +324,22 @@ export function ImportPanel({
             </span>
             <Select
               value={inventoryId}
-              onChange={(e) => setInventoryId(e.target.value)}
+              onValueChange={(v) => {
+                setInventoryId(String(v ?? ""));
+                setPreview(null);
+              }}
+              items={Object.fromEntries(inventories.map((inv) => [inv.id, inv.name]))}
             >
-              {inventories.map((inv) => (
-                <option key={inv.id} value={inv.id}>
-                  {inv.name}
-                </option>
-              ))}
+              <SelectTrigger aria-label="Inventario destino">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {inventories.map((inv) => (
+                  <SelectItem key={inv.id} value={inv.id}>
+                    {inv.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
             </Select>
           </label>
         )
@@ -334,18 +355,22 @@ export function ImportPanel({
           </span>
           <Select
             value={modo}
-            onChange={(e) => {
-              setModo(e.target.value as ModoImport);
+            onValueChange={(v) => {
+              setModo(v as ModoImport);
               setPreview(null);
             }}
+            items={Object.fromEntries(MODOS.map((m) => [m.value, m.label]))}
           >
-            <option value="alta">Llegó mercancía — sumar a lo que hay</option>
-            <option value="espejo">
-              El archivo es el inventario — reemplazar existencias
-            </option>
-            <option value="catalogo">
-              Solo catálogo — no tocar existencias (precios, nombres, costos)
-            </option>
+            <SelectTrigger aria-label="Qué significan las existencias del archivo">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {MODOS.map((m) => (
+                <SelectItem key={m.value} value={m.value} description={m.ayuda}>
+                  {m.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
           </Select>
           {modo === "espejo" && (
             <span className="mt-1 block text-xs text-amber-700 dark:text-amber-300">
