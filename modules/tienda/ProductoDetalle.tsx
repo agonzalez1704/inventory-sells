@@ -51,16 +51,21 @@ export function ProductoDetalle({
       <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_280px] xl:gap-8">
         <div className="min-w-0">
           <ModeloCompra modelo={modelo} inicial={inicial} vistas={vistas} whatsapp={whatsapp} />
-          {carros.length > 0 && <LeQueda carros={carros} />}
-          {descripcion && (
-            <section className="mt-8 max-w-prose">
-              <h2 className="text-base font-semibold tracking-tight text-foreground">Descripción</h2>
-              <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-muted-foreground">{descripcion}</p>
-            </section>
-          )}
-          {(conversiones.length > 0 || otrasMarcas.length > 0) && (
-            <Conversiones items={conversiones} otrasMarcas={otrasMarcas} />
-          )}
+          {/* Desktop: two columns on the same grid as photo | options above, so
+              "Le queda a" and the conversions sit side by side instead of a
+              half-width stack with an empty column next to it. */}
+          <div className="lg:grid lg:grid-cols-2 lg:items-start lg:gap-x-10">
+            {descripcion && (
+              <section className="mt-8 max-w-prose lg:col-span-2">
+                <h2 className="text-base font-semibold tracking-tight text-foreground">Descripción</h2>
+                <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-muted-foreground">{descripcion}</p>
+              </section>
+            )}
+            {carros.length > 0 && <LeQueda carros={carros} />}
+            {(conversiones.length > 0 || otrasMarcas.length > 0) && (
+              <Conversiones items={conversiones} otrasMarcas={otrasMarcas} />
+            )}
+          </div>
         </div>
         <aside className="hidden xl:sticky xl:top-20 xl:block xl:self-start">
           <RielPedido />
@@ -77,7 +82,7 @@ export function ProductoDetalle({
 
 function LeQueda({ carros }: { carros: string[] }) {
   return (
-    <section className="mt-8 max-w-prose">
+    <section className="mt-8 max-w-prose lg:max-w-none">
       <h2 className="text-base font-semibold tracking-tight text-foreground">Le queda a</h2>
       <ul className="mt-3 divide-y divide-border overflow-hidden rounded-2xl border border-border bg-background">
         {carros.map((c) => (
@@ -96,7 +101,7 @@ function Conversiones({
   otrasMarcas: string[];
 }) {
   return (
-    <section className="mt-8 max-w-prose">
+    <section className="mt-8 max-w-prose lg:max-w-none">
       <h2 className="text-base font-semibold tracking-tight text-foreground">Conversiones</h2>
       <p className="mt-0.5 text-sm text-muted-foreground">Piezas equivalentes que te sirven igual.</p>
       {items.length > 0 && (
@@ -105,7 +110,7 @@ function Conversiones({
             <li key={c.id}>
               <Link
                 href={`/tienda/${c.id}`}
-                className="flex items-center gap-3 px-3 py-2.5 transition-colors hover:bg-muted/60"
+                className="flex items-center gap-3 px-3 py-2.5 transition-colors duration-150 ease-out hover:bg-muted/60 active:bg-muted"
               >
                 <div className="min-w-0 flex-1">
                   <p className="font-mono text-sm font-semibold text-foreground">{c.sku}</p>
