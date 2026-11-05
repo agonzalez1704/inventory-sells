@@ -2,6 +2,7 @@
 
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@clerk/nextjs";
 import { toast } from "sonner";
 import {
   Image as ImageIcon,
@@ -87,6 +88,12 @@ export function ImportPanel({
   onClose?: () => void;
 }) {
   const router = useRouter();
+  // A 16k-row list is ~16 chunks and ~10 minutes. Clerk's session cookie lives
+  // 60 s and is refreshed by a timer the browser throttles in a background tab,
+  // so a later chunk arrived signed out ("No autenticado") and the import died
+  // at row 5,000. Refreshing it before every chunk keeps each request signed in.
+  const { getToken } = useAuth();
+  const sesionFresca = () => getToken({ skipCache: true });
   const fileRef = useRef<HTMLInputElement>(null);
   const [inventoryId, setInventoryId] = useState(
     defaultInventoryId || inventories[0]?.id || "",
@@ -215,18 +222,25 @@ export function ImportPanel({
       });
       return;
     }
+    // Rows already committed. Each chunk commits on its own, so when one fails
+    // the earlier ones stay — say how far it got and how to finish.
+    let hechos = 0;
     startTransition(async () => {
       try {
         if (newMode) {
           // Created with the first chunk, the rest imported into it the same
           // way as below: one call with a supplier's 16k-row list timed out and
           // rolled back the whole inventory.
+          await sesionFresca();
           const r = await createInventoryWithImport(name, rows.slice(0, LOTE), source, filename);
           let inserted = r.inserted;
+          hechos = Math.min(LOTE, rows.length);
           for (let i = LOTE; i < rows.length; i += LOTE) {
+            await sesionFresca();
             const res = await commitImport(rows.slice(i, i + LOTE), source, filename, r.inventory_id, "alta");
             inserted += res.inserted;
-            setAvance(Math.min(i + LOTE, rows.length));
+            hechos = Math.min(i + LOTE, rows.length);
+            setAvance(hechos);
           }
           toast.success(`"${r.name}" creado · ${inserted} productos`);
         } else {
@@ -240,11 +254,13 @@ export function ImportPanel({
           let inserted = 0, updated = 0, bajas = 0, sinPrecio = 0;
           for (let i = 0; i < total; i += LOTE) {
             const trozo = rows.slice(i, i + LOTE);
+            await sesionFresca();
             const res = await commitImport(trozo, source, filename, inventoryId, modo);
             inserted += res.inserted;
             updated += res.updated;
             bajas += res.bajas;
             sinPrecio += res.sin_precio;
+            hechos = Math.min(i + LOTE, total);
             if (total > LOTE) setAvance(Math.min(i + LOTE, total));
           }
           toast.success(
@@ -256,7 +272,15 @@ export function ImportPanel({
         setStatus("done");
         router.refresh();
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Error al importar");
+        if (hechos > 0) {
+          toast.error(
+            `Se cortó en la fila ${hechos.toLocaleString("es-MX")} de ${rows.length.toLocaleString("es-MX")}. ` +
+              `Lo anterior ya quedó guardado: vuelve a subir el archivo al mismo inventario con ` +
+              `"Actualizar costos y precios" para dar de alta lo que falta sin duplicar existencias.`,
+            { duration: Infinity },
+          );
+          router.refresh();
+        } else toast.error(err instanceof Error ? err.message : "Error al importar");
       } finally {
         setAvance(0);
       }
