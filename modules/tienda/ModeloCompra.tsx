@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, ChevronRight, MapPin, MessageCircle, ShieldCheck, Truck } from "lucide-react";
+import { ArrowLeft, ChevronRight, MapPin, MessageCircle, ShieldCheck, Truck, Warehouse } from "lucide-react";
 import { foto } from "@/lib/foto";
 import { StepperPieza } from "./StepperPieza";
 import { formatPrecio } from "@/lib/money";
@@ -56,6 +56,11 @@ export function ModeloCompra({
 
   const v = m.variantes.find((x) => x.id === selId) ?? m.variantes[0];
   const varias = m.variantes.length > 1;
+  // The same part number in several inventories (Mostrador, CEDIS): the
+  // inventory IS the choice, so it leads each option instead of the part name
+  // repeated three times.
+  const porAlmacen = varias && m.variantes.every((x) => x.almacen);
+  const etiqueta = (x: VarianteModelo) => (porAlmacen ? x.almacen! : (x.calidad ?? x.nombre));
   const tope = (items.find((i) => i.id === v.id)?.qty ?? 0) >= MAX_POR_PRODUCTO;
   const sucursales = puntosRecoger(tienda).map((p) => p.nombre ?? "tienda");
   const local = v.disponible && !(v.entrega_dias ?? 0);
@@ -124,7 +129,7 @@ export function ModeloCompra({
                   key={x.id}
                   type="button"
                   onClick={() => elegir(x.id)}
-                  aria-label={`Ver ${x.calidad ?? x.nombre}`}
+                  aria-label={`Ver ${etiqueta(x)}`}
                   className={cn(
                     "flex w-20 cursor-pointer flex-col items-center gap-1 rounded-xl p-1 text-xs transition-colors",
                     x.id === v.id ? "ring-2 ring-tienda-600" : "ring-1 ring-border hover:ring-tienda-300",
@@ -136,7 +141,7 @@ export function ModeloCompra({
                       <img src={foto((x.imagen || m.imagen) as string, 128)} alt="" className="h-full w-full object-cover" />
                     ) : null}
                   </span>
-                  <span className="w-full truncate text-center text-muted-foreground">{x.calidad ?? x.nombre}</span>
+                  <span className="w-full truncate text-center text-muted-foreground">{etiqueta(x)}</span>
                 </button>
               ))}
             </div>
@@ -164,13 +169,13 @@ export function ModeloCompra({
             <>
               {/* Only a shop whose variants ARE quality tiers says "calidad". */}
               <h2 className="mt-4 text-[15px] font-semibold text-foreground">
-                {m.variantes.some((x) => x.calidad) ? "Elige la calidad" : "Elige la opción"}
+                {porAlmacen ? "Elige de qué almacén" : m.variantes.some((x) => x.calidad) ? "Elige la calidad" : "Elige la opción"}
               </h2>
               <div role="radiogroup" aria-label="Calidad" className="mt-2 flex flex-col gap-2">
                 {m.variantes.map((x) => {
                   const on = x.id === v.id;
                   const e = estado(x);
-                  const detalle = [x.almacen, glosaDe(x.calidad), marcoDe(x.nombre)].filter(Boolean).join(" · ");
+                  const detalle = [porAlmacen && (x.calidad ?? x.nombre), glosaDe(x.calidad), marcoDe(x.nombre)].filter(Boolean).join(" · ");
                   return (
                     <button
                       key={x.id}
@@ -179,7 +184,7 @@ export function ModeloCompra({
                       aria-checked={on}
                       onClick={() => elegir(x.id)}
                       className={cn(
-                        "flex min-h-16 w-full cursor-pointer items-center gap-3 rounded-xl px-3.5 py-2.5 text-left transition-colors",
+                        "flex min-h-16 w-full cursor-pointer items-center gap-3 rounded-xl px-3.5 py-2.5 text-left transition-[color,background-color,box-shadow,transform] duration-150 ease-out active:scale-[0.98]",
                         on
                           ? "bg-tienda-50/70 ring-2 ring-tienda-600"
                           : "bg-background ring-1 ring-border hover:ring-tienda-300",
@@ -194,7 +199,13 @@ export function ModeloCompra({
                       />
                       <span className="min-w-0 flex-1">
                         <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[15px] font-semibold text-foreground">
-                          {x.calidad ?? x.nombre}
+                          {porAlmacen && (
+                            <Warehouse
+                              aria-hidden
+                              className={cn("h-4 w-4 shrink-0", on ? "text-tienda-600" : "text-muted-foreground")}
+                            />
+                          )}
+                          {etiqueta(x)}
                           {m.mas_vendida === x.id && (
                             <span className="rounded-md bg-tienda-100 px-1.5 py-0.5 text-xs font-medium text-tienda-800">
                               La más pedida
@@ -202,7 +213,7 @@ export function ModeloCompra({
                           )}
                         </span>
                         {(detalle || e) && (
-                          <span className="block text-[13px] text-muted-foreground">
+                          <span className={cn("block text-[13px] text-muted-foreground", porAlmacen && "line-clamp-1")}>
                             {detalle}
                             {detalle && e ? " · " : ""}
                             {e && <span className={e.tono}>{e.texto}</span>}
