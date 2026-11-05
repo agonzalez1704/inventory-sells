@@ -156,6 +156,22 @@ export default async function ProductoPage({
   );
   if (!modelo) notFound();
 
+  // Ruli groups by part number, so the same part in Mostrador and in CEDIS is
+  // two options that look identical. Name the inventory when they differ.
+  if (modelo.variantes.length > 1) {
+    const { data: invs } = await insforgeAdmin.database
+      .from("products")
+      .select("id, inventories(name)")
+      .in("id", modelo.variantes.map((v) => v.id));
+    const de = new Map(
+      ((invs ?? []) as unknown as { id: string; inventories: { name: string } | null }[]).map((p) => [
+        p.id,
+        p.inventories?.name ?? null,
+      ]),
+    );
+    if (new Set(de.values()).size > 1) for (const v of modelo.variantes) v.almacen = de.get(v.id) ?? null;
+  }
+
   const vistas: Record<string, string[]> = {};
   for (const g of (gal.data ?? []) as { product_id: string; url: string }[]) {
     (vistas[g.product_id] ??= []).push(g.url);

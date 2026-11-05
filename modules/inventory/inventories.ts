@@ -4,7 +4,9 @@ import { updateTag } from "next/cache";
 
 import { assertPermiso } from "@/lib/auth/profile";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
+import { insforgeAdmin } from "@/lib/insforge/admin";
 import type { Inventory } from "@/lib/types";
+import { attempt, type ActionResult } from "@/lib/errors";
 
 export async function createInventory(name: string): Promise<Inventory> {
   // The permission, not the legacy role text. The shop renamed a seller's role
@@ -68,4 +70,57 @@ export async function editarInventario(
     .eq("id", id);
   if (error) throw new Error(error.message ?? "No se pudo guardar el inventario");
   updateTag("tienda");
+}
+
+/**
+ * Delete an inventory and every product in it — for a load that went wrong
+ * (a CEDIS imported twice). Parts with history (sales, purchases, quotes,
+ * transfers…) are kept by their foreign keys: the products DELETE is one
+ * statement, so one such part fails it whole and nothing is deleted.
+ * Their movements, photos, tags and cost layers go with them (cascade).
+ */
+export async function eliminarInventario(
+  id: string,
+): Promise<ActionResult<{ productos: number }>> {
+  return attempt("eliminarInventario", async () => {
+    await assertPermiso("admin_total");
+    const DB = insforgeAdmin.database;
+
+    const { count } = await DB.from("products")
+      .select("id", { count: "exact", head: true })
+      .eq("inventory_id", id);
+    const del = await DB.from("products").delete().eq("inventory_id", id);
+    if (del.error) {
+      throw new Error(
+        /foreign key|violates/i.test(del.error.message ?? "")
+          ? "Tiene piezas con ventas, compras, cotizaciones o traspasos: no se puede eliminar. No se borró nada."
+          : (del.error.message ?? "No se pudo eliminar"),
+      );
+    }
+    await DB.from("import_batches").delete().eq("inventory_id", id);
+    const { error } = await DB.from("inventories").delete().eq("id", id);
+    if (error)
+      throw new Error(error.message ?? "No se pudo eliminar el inventario");
+    updateTag("tienda");
+    return { productos: count ?? 0 };
+  });
+}
+
+/** One brand for every product of an inventory (all of CEDIS is Grob). */
+export async function marcaParaInventario(
+  id: string,
+  marca: string,
+): Promise<ActionResult> {
+  return attempt("marcaParaInventario", async () => {
+    await assertPermiso("inventario_gestionar");
+    const limpia = marca.trim();
+    if (!limpia) throw new Error("Escribe la marca");
+    const { error } = await insforgeAdmin.database
+      .from("products")
+      .update({ brand: limpia })
+      .eq("inventory_id", id);
+    if (error) throw new Error(error.message ?? "No se pudo poner la marca");
+    updateTag("tienda");
+    return null;
+  });
 }

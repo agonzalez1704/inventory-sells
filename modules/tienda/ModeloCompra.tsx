@@ -170,7 +170,7 @@ export function ModeloCompra({
                 {m.variantes.map((x) => {
                   const on = x.id === v.id;
                   const e = estado(x);
-                  const detalle = [glosaDe(x.calidad), marcoDe(x.nombre)].filter(Boolean).join(" · ");
+                  const detalle = [x.almacen, glosaDe(x.calidad), marcoDe(x.nombre)].filter(Boolean).join(" · ");
                   return (
                     <button
                       key={x.id}

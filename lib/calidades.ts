@@ -34,6 +34,8 @@ export type VarianteModelo = {
   ultima: boolean;
   /** Extra business days when the stock sits in another city. Null = local. */
   entrega_dias?: number | null;
+  /** Which inventory it comes from, set only when the options span several. */
+  almacen?: string | null;
   imagen: string | null;
 };
 
