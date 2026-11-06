@@ -206,7 +206,7 @@ function ProductCard({
       {/* One gradient over the whole card, clear at the top and grey at the
           price: it tints the photo's own foot too, so photo and text are one
           surface instead of a photo over a white banner. */}
-      <div aria-hidden className="pointer-events-none absolute inset-0 bg-linear-to-b from-transparent via-transparent via-40% to-slate-200" />
+      <div aria-hidden className="pointer-events-none absolute inset-0 bg-linear-to-b from-slate-300/0 via-slate-300/40 via-55% to-slate-300" />
       <div className="relative flex flex-1 flex-col gap-px px-2 pt-1.5 pb-2">
         {/* The part number tells apart the 721 and the 712 of one family —
             the names differ by a word buried mid-string. */}
