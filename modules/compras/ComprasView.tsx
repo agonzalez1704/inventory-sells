@@ -24,7 +24,7 @@ const ETIQUETA: Record<CompraEstado, string> = {
 };
 
 const fecha = (iso: string) =>
-  new Date(iso).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
+  new Date(/^\d{4}-\d{2}-\d{2}$/.test(iso) ? `${iso}T00:00:00` : iso).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
 
 // Sum of the captured lines — what we compare against the invoice's own total.
 export function capturado(c: Compra): number {

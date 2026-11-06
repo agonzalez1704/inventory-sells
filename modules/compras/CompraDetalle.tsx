@@ -17,7 +17,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { CargarFactura } from "./CargarFactura";
 
 const fecha = (iso: string) =>
-  new Date(iso).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
+  new Date(/^\d{4}-\d{2}-\d{2}$/.test(iso) ? `${iso}T00:00:00` : iso).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
 
 export function CompraDetalle({
   compra,
