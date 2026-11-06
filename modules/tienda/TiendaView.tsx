@@ -745,7 +745,7 @@ export function ProductCard({
       </span>
 
       <Link prefetch={true} href={`/tienda/${p.id}`} className="flex flex-1 flex-col">
-        <div className="relative mb-3 flex aspect-square items-center justify-center overflow-hidden rounded-xl bg-linear-to-b from-white to-slate-100">
+        <div className="relative mb-3 flex aspect-square items-center justify-center overflow-hidden rounded-xl bg-linear-to-b from-white via-white to-slate-200">
           {p.imagen ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img

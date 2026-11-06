@@ -170,7 +170,7 @@ function ProductCard({
       className={cn(
         // Always a light card, even on the dark theme: product photos come on
         // white, and a white photo only melts into a light card.
-        "group relative flex cursor-pointer flex-col overflow-hidden rounded-xl border bg-linear-to-b from-white to-slate-100 text-left text-slate-900 shadow-xs transition-[border-color,box-shadow] outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+        "group relative flex cursor-pointer flex-col overflow-hidden rounded-xl border bg-white text-left text-slate-900 shadow-xs transition-[border-color,box-shadow] outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
         inCart ? "border-slate-900" : "border-slate-200 hover:border-slate-400 hover:shadow-card dark:border-white/10",
         soldOut && "opacity-60",
       )}
@@ -203,7 +203,9 @@ function ProductCard({
           )
         )}
       </div>
-      <div className="flex flex-1 flex-col gap-px px-2 pt-1.5 pb-2">
+      {/* The foot is the gradient: white where the photo ends, settling into
+          grey at the price, so photo and card read as one piece. */}
+      <div className="flex flex-1 flex-col gap-px bg-linear-to-b from-white to-slate-200 px-2 pt-1.5 pb-2">
         {/* The part number tells apart the 721 and the 712 of one family —
             the names differ by a word buried mid-string. */}
         <p className="flex items-center justify-between gap-1 font-mono text-[10px] leading-tight font-semibold tracking-wide text-slate-500 uppercase">
