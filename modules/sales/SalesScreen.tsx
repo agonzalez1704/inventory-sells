@@ -178,11 +178,11 @@ function ProductCard({
           {inCart}
         </span>
       )}
-      {/* Product photos come on white: the stage is white too, fading into the
-          card at the foot so the photo's edge never shows as a box. */}
-      <div className="relative aspect-square bg-linear-to-b from-white to-slate-50 dark:from-muted/40 dark:to-background">
-        <Thumb src={p.image_url} alt={p.name} className="p-1.5 transition-transform duration-300 group-hover:scale-105" />
-        <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-2/5 bg-linear-to-t from-background to-transparent" />
+      {/* Product photos come on white. The stage is a light tile in both
+          themes and the photo multiplies onto it, so its white edge vanishes
+          instead of reading as a pasted box — also on a dark card. */}
+      <div className="relative m-1.5 aspect-square overflow-hidden rounded-lg bg-linear-to-b from-white to-slate-100">
+        <Thumb src={p.image_url} alt={p.name} className="p-1 mix-blend-multiply transition-transform duration-300 group-hover:scale-105" />
         {soldOut ? (
           <span className="absolute inset-x-0 bottom-0 bg-red-600/90 text-center text-[10px] font-semibold text-white">Agotado</span>
         ) : (

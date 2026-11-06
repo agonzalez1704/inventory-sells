@@ -745,18 +745,15 @@ export function ProductCard({
       </span>
 
       <Link prefetch={true} href={`/tienda/${p.id}`} className="flex flex-1 flex-col">
-        <div className="relative mb-3 flex aspect-square items-center justify-center overflow-hidden rounded-xl bg-linear-to-b from-white to-slate-50 dark:from-muted/40 dark:to-background">
+        <div className="relative mb-3 flex aspect-square items-center justify-center overflow-hidden rounded-xl bg-linear-to-b from-white to-slate-100">
           {p.imagen ? (
-            <>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={foto(p.imagen, 384)}
-                alt={p.nombre}
-                loading="lazy"
-                className="h-full w-full object-contain p-2 transition-transform duration-300 group-hover:scale-105"
-              />
-              <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-2/5 bg-linear-to-t from-background to-transparent" />
-            </>
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={foto(p.imagen, 384)}
+              alt={p.nombre}
+              loading="lazy"
+              className="h-full w-full object-contain p-2 mix-blend-multiply transition-transform duration-300 group-hover:scale-105"
+            />
           ) : (
             <div className="flex h-full w-full items-center justify-center bg-linear-to-br from-tienda-50 to-slate-50 text-tienda-400">
               <Smartphone className="h-9 w-9" />
