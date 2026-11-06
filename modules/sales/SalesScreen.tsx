@@ -122,7 +122,7 @@ export function Thumb({ src, alt, className }: { src?: string | null; alt: strin
     );
   }
   return (
-    <span className="flex h-full w-full items-center justify-center bg-muted text-muted-foreground/50">
+    <span className="flex h-full w-full items-center justify-center bg-slate-100 text-slate-400">
       <Package className="h-7 w-7" />
     </span>
   );
@@ -168,21 +168,23 @@ function ProductCard({
       {...handlers}
       style={{ WebkitTouchCallout: "none", WebkitUserSelect: "none", userSelect: "none" }}
       className={cn(
-        "group relative flex cursor-pointer flex-col overflow-hidden rounded-xl border bg-background text-left shadow-xs transition-[border-color,box-shadow] outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
-        inCart ? "border-foreground" : "border-border hover:border-foreground/30 hover:shadow-card",
+        // Always a light card, even on the dark theme: product photos come on
+        // white, and a white photo only melts into a light card.
+        "group relative flex cursor-pointer flex-col overflow-hidden rounded-xl border bg-linear-to-b from-white to-slate-100 text-left text-slate-900 shadow-xs transition-[border-color,box-shadow] outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+        inCart ? "border-slate-900" : "border-slate-200 hover:border-slate-400 hover:shadow-card dark:border-white/10",
         soldOut && "opacity-60",
       )}
     >
       {inCart > 0 && (
-        <span className="absolute top-1.5 left-1.5 z-10 flex h-5 min-w-5 items-center justify-center rounded-full bg-foreground px-1 text-[11px] font-semibold text-background tabular-nums">
+        <span className="absolute top-1.5 left-1.5 z-10 flex h-5 min-w-5 items-center justify-center rounded-full bg-slate-900 px-1 text-[11px] font-semibold text-white tabular-nums">
           {inCart}
         </span>
       )}
-      {/* Product photos come on white. The stage is a light tile in both
-          themes and the photo multiplies onto it, so its white edge vanishes
-          instead of reading as a pasted box — also on a dark card. */}
-      <div className="relative m-1.5 aspect-square overflow-hidden rounded-lg bg-linear-to-b from-white to-slate-100">
-        <Thumb src={p.image_url} alt={p.name} className="p-1 mix-blend-multiply transition-transform duration-300 group-hover:scale-105" />
+      {/* Full-bleed photo: it fills the whole stage and multiplies onto the
+          card, so its white background IS the card and nothing reads as a
+          pasted box. */}
+      <div className="relative aspect-square overflow-hidden">
+        <Thumb src={p.image_url} alt={p.name} className="object-cover mix-blend-multiply transition-transform duration-300 group-hover:scale-105" />
         {soldOut ? (
           <span className="absolute inset-x-0 bottom-0 bg-red-600/90 text-center text-[10px] font-semibold text-white">Agotado</span>
         ) : (
@@ -204,39 +206,37 @@ function ProductCard({
       <div className="flex flex-1 flex-col gap-px px-2 pt-1.5 pb-2">
         {/* The part number tells apart the 721 and the 712 of one family —
             the names differ by a word buried mid-string. */}
-        <p className="flex items-center justify-between gap-1 font-mono text-[10px] leading-tight font-semibold tracking-wide text-muted-foreground uppercase">
+        <p className="flex items-center justify-between gap-1 font-mono text-[10px] leading-tight font-semibold tracking-wide text-slate-500 uppercase">
           <span className="truncate">{p.sku}</span>
           {p.sucursal_ajena && (
-            <span className="shrink-0 rounded-sm bg-amber-100 px-1 font-sans text-[10px] font-semibold normal-case text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">
+            <span className="shrink-0 rounded-sm bg-amber-100 px-1 font-sans text-[10px] font-semibold normal-case text-amber-800">
               En {p.sucursal_ajena}
             </span>
           )}
         </p>
-        <p className="line-clamp-2 text-[13px] leading-tight font-bold text-foreground">{p.name}</p>
-        <p className="truncate text-[10px] leading-tight text-muted-foreground capitalize">
+        <p className="line-clamp-2 text-[13px] leading-tight font-bold text-slate-900">{p.name}</p>
+        <p className="truncate text-[10px] leading-tight text-slate-500 capitalize">
           {p.sucursal_name && !p.sucursal_ajena ? `${p.sucursal_name} · ` : ""}
           {p.category || p.inventory_name}
         </p>
         {compat && (
-          <p className="truncate text-[10px] leading-tight font-medium text-emerald-700 dark:text-emerald-400">{compat}</p>
+          <p className="truncate text-[10px] leading-tight font-medium text-emerald-700">{compat}</p>
         )}
         <div className="mt-auto flex items-center justify-between gap-1 pt-1.5">
           {importe ? (
-            <span className={cn("text-sm font-semibold tabular-nums", alCosto && "text-amber-700 dark:text-amber-400")}>
+            <span className={cn("text-sm font-semibold tabular-nums text-slate-900", alCosto && "text-amber-700")}>
               {alCosto && <span className="mr-1 text-[10px] font-medium uppercase">costo</span>}
               {formatMXN(importe).replace(".00", "")}
             </span>
           ) : (
-            <span className="rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+            <span className="rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
               Sin precio
             </span>
           )}
           <span
             className={cn(
               "shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium tabular-nums",
-              p.quantity <= 3 && !soldOut
-                ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
-                : "bg-muted text-muted-foreground",
+              p.quantity <= 3 && !soldOut ? "bg-amber-100 text-amber-800" : "bg-slate-200/80 text-slate-600",
             )}
           >
             {soldOut ? "—" : `${p.quantity} disp.`}
@@ -1306,7 +1306,7 @@ export function SalesScreen({
                   </div>
                 ) : (
                   <div className={cn(
-                      "grid grid-cols-3 gap-2 transition-opacity sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8",
+                      "grid grid-cols-2 gap-2.5 transition-opacity sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6",
                       cargandoVeh && "opacity-60",
                     )}>
                     {piezasVisibles.map((p) => (
@@ -1416,7 +1416,7 @@ export function SalesScreen({
               </div>
             )}
             <div className={cn(
-                "mt-3 grid grid-cols-3 gap-2 transition-opacity sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8",
+                "mt-3 grid grid-cols-2 gap-2.5 transition-opacity sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6",
                 buscando && "opacity-60",
               )}>
               {results.map((p) => (

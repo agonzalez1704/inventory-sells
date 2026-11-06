@@ -752,7 +752,7 @@ export function ProductCard({
               src={foto(p.imagen, 384)}
               alt={p.nombre}
               loading="lazy"
-              className="h-full w-full object-contain p-2 mix-blend-multiply transition-transform duration-300 group-hover:scale-105"
+              className="h-full w-full object-cover mix-blend-multiply transition-transform duration-300 group-hover:scale-105"
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center bg-linear-to-br from-tienda-50 to-slate-50 text-tienda-400">
