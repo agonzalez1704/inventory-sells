@@ -54,6 +54,32 @@ export async function enviarTexto(
   });
 }
 
+// Send an approved template — the only way to reach someone who has not
+// written to us in the last 24 hours (an owner getting an alert, say).
+export async function enviarPlantilla(
+  phoneNumberId: string,
+  to: string,
+  nombre: string,
+  parametros: string[],
+  idioma = "es_MX",
+): Promise<void> {
+  await kapso(`/meta/whatsapp/${META_VERSION}/${phoneNumberId}/messages`, {
+    method: "POST",
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      to,
+      type: "template",
+      template: {
+        name: nombre,
+        language: { code: idioma },
+        components: parametros.length
+          ? [{ type: "body", parameters: parametros.map((text) => ({ type: "text", text })) }]
+          : [],
+      },
+    }),
+  });
+}
+
 // Download an inbound media file (audio note, image) from a Kapso media_url.
 // Kapso media URLs require the API key; returns the raw bytes + content type.
 export async function descargarMedia(
