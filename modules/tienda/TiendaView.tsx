@@ -17,12 +17,15 @@ import {
   MapPin,
   X,
   CarFront,
+  Store,
+  Warehouse,
 } from "lucide-react";
 import { foto } from "@/lib/foto";
 import { formatPrecio } from "@/lib/money";
 import { type ModeloTienda } from "@/lib/calidades";
 import { cn } from "@/lib/utils";
 import { useTiendaInfo } from "./TiendaInfoProvider";
+import { puntosRecoger } from "@/lib/tienda-info";
 import { AddToCart } from "./AddToCart";
 import { CompatibleBox } from "./CompatibleBox";
 import { BarraPedido } from "./CartDrawer";
@@ -563,6 +566,18 @@ export function ModeloCard({
   // Narrow grid card (desktop, phone shop): the action goes full width under
   // the price instead of squeezing it.
   const ancho = tarjeta && "lg:w-full lg:justify-center";
+  // Where it is and when the customer has it: the warehouse(s) it can come
+  // from, and for stock on hand, pickup today (or the shop's shipping time).
+  const tienda = useTiendaInfo();
+  const almacenes = [...new Set(disponibles.map((v) => v.almacen).filter(Boolean))] as string[];
+  const entrega =
+    agotado || !locales.length
+      ? null
+      : puntosRecoger(tienda).length
+        ? "listo para recoger hoy"
+        : tienda.entregaDias
+          ? `envío en ${tienda.entregaDias}`
+          : null;
 
   return (
     <div
@@ -627,6 +642,23 @@ export function ModeloCard({
           </p>
         )}
 
+        {(almacenes.length > 0 || entrega) && (
+          <p className="mt-1.5 flex items-start gap-1.5 text-[13px] leading-snug text-muted-foreground">
+            {almacenes.length ? (
+              <Warehouse aria-hidden className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            ) : (
+              <Store aria-hidden className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            )}
+            <span className="line-clamp-2">
+              {almacenes.length > 0 && (
+                <span className="font-medium text-foreground">{almacenes.join(" y ")}</span>
+              )}
+              {almacenes.length > 0 && entrega && " · "}
+              {entrega && (almacenes.length ? entrega : entrega[0].toUpperCase() + entrega.slice(1))}
+            </span>
+          </p>
+        )}
+
         <div className={cn("mt-auto flex items-end justify-between gap-3 pt-3", tarjeta && "lg:flex-col lg:items-stretch lg:gap-2.5")}>
           <div className="min-w-0 leading-tight">
             {m.desde_cents ? (
@@ -639,17 +671,17 @@ export function ModeloCard({
             )}
             <p
               className={cn(
-                "mt-0.5 flex items-center gap-1.5 text-xs font-medium",
+                "mt-0.5 flex items-center gap-1.5 whitespace-nowrap text-xs font-medium",
                 locales.length ? "text-green-700" : disponibles.length ? "text-amber-700" : "text-muted-foreground",
               )}
             >
               <span
                 className={cn(
-                  "h-1.5 w-1.5 rounded-full",
+                  "h-1.5 w-1.5 shrink-0 rounded-full",
                   locales.length ? "bg-green-600" : disponibles.length ? "bg-amber-500" : "bg-muted-foreground/50",
                 )}
               />
-              {locales.length ? "En existencia" : disponibles.length ? `Llega en +${dias} días` : "Agotado"}
+              {locales.length ? "En existencia" : disponibles.length ? `Llega en +${dias} días hábiles` : "Agotado"}
             </p>
           </div>
 

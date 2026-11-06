@@ -1,4 +1,4 @@
-import { facetasTienda, modelosTienda } from "@/modules/tienda/lecturas";
+import { facetasTienda, modelosTienda, nombrarAlmacenes } from "@/modules/tienda/lecturas";
 import { buscarModelos } from "@/modules/tienda/busqueda";
 import { compatibilidadDe } from "@/modules/tienda/compat-vehiculo";
 import { TiendaView } from "@/modules/tienda/TiendaView";
@@ -65,7 +65,10 @@ export default async function TiendaPage({
   const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
 
   // A vehicle chosen: tell the customer what each listed part fits.
-  const compat = filtros.vmarca ? await compatibilidadDe(modelos, filtros) : null;
+  const [compat] = await Promise.all([
+    filtros.vmarca ? compatibilidadDe(modelos, filtros) : null,
+    nombrarAlmacenes(modelos),
+  ]);
 
   return (
     <TiendaView
