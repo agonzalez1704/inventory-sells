@@ -186,7 +186,7 @@ function ProductCard({
       <div className="relative aspect-square overflow-hidden">
         <Thumb src={p.image_url} alt={p.name} className="object-cover mix-blend-multiply transition-transform duration-300 group-hover:scale-105" />
         {soldOut ? (
-          <span className="absolute inset-x-0 bottom-0 bg-red-600/90 text-center text-[10px] font-semibold text-white">Agotado</span>
+          <span className="absolute inset-x-0 bottom-0 z-10 bg-red-600/90 text-center text-[10px] font-semibold text-white">Agotado</span>
         ) : (
           !maxed && (
             <button
@@ -196,16 +196,18 @@ function ProductCard({
                 e.stopPropagation();
                 onAdd();
               }}
-              className="absolute right-1.5 bottom-1.5 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-primary text-primary-foreground shadow-pop transition-transform active:scale-95 group-hover:scale-105"
+              className="absolute right-1.5 bottom-1.5 z-10 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-primary text-primary-foreground shadow-pop transition-transform active:scale-95 group-hover:scale-105"
             >
               <Plus className="h-4 w-4" />
             </button>
           )
         )}
       </div>
-      {/* The foot is the gradient: white where the photo ends, settling into
-          grey at the price, so photo and card read as one piece. */}
-      <div className="flex flex-1 flex-col gap-px bg-linear-to-b from-white to-slate-200 px-2 pt-1.5 pb-2">
+      {/* One gradient over the whole card, clear at the top and grey at the
+          price: it tints the photo's own foot too, so photo and text are one
+          surface instead of a photo over a white banner. */}
+      <div aria-hidden className="pointer-events-none absolute inset-0 bg-linear-to-b from-transparent via-transparent via-40% to-slate-200" />
+      <div className="relative flex flex-1 flex-col gap-px px-2 pt-1.5 pb-2">
         {/* The part number tells apart the 721 and the 712 of one family —
             the names differ by a word buried mid-string. */}
         <p className="flex items-center justify-between gap-1 font-mono text-[10px] leading-tight font-semibold tracking-wide text-slate-500 uppercase">
