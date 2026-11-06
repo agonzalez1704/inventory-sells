@@ -16,6 +16,7 @@ import {
   Loader2,
   MapPin,
   X,
+  CarFront,
 } from "lucide-react";
 import { foto } from "@/lib/foto";
 import { formatPrecio } from "@/lib/money";
@@ -331,6 +332,7 @@ export function TiendaView({
                   <li key={`${m.brand}|${m.category}|${m.modelo}`}>
                     <ModeloCard
                       m={m}
+                      whatsapp={whatsapp}
                       compat={m.variantes.map((v) => compat?.[v.id]).find(Boolean) ?? null}
                     />
                   </li>
@@ -530,12 +532,23 @@ function PageBtn({
 }
 
 /**
- * One model, one row: photo, brand, model, how many qualities, the entry price
- * and whether it can be had. The qualities themselves are chosen on the model
- * page — three price rows inside every card made the phone list unreadable
- * (the user's call, 2026-09-15). On desktop the same element is a grid card.
+ * One model, one row: photo, then the part with a clear order of reading —
+ * what it is (name), whether it fits (car), what it costs and the action.
+ * Brand, type and part number are reference, so they sit quieter. The row is
+ * one big link (stretched over the title) with the action floating above it,
+ * so a part with a single price goes to the order without opening its page;
+ * one with several options opens the page to choose. On desktop the non-Ruli
+ * shop turns the same element into a grid card.
  */
-export function ModeloCard({ m, compat = null }: { m: ModeloTienda; compat?: string | null }) {
+export function ModeloCard({
+  m,
+  compat = null,
+  whatsapp = null,
+}: {
+  m: ModeloTienda;
+  compat?: string | null;
+  whatsapp?: string | null;
+}) {
   // Lead Displays turns the row into a grid card on desktop; Ruli stays a row.
   const tarjeta = !ES_RULI;
   const disponibles = m.variantes.filter((v) => v.disponible);
@@ -546,90 +559,133 @@ export function ModeloCard({ m, compat = null }: { m: ModeloTienda; compat?: str
   const tipo = m.category ? m.category[0].toUpperCase() + m.category.slice(1) : null;
   const titulo = [m.brand, m.modelo].filter(Boolean).join(" ");
   const dias = disponibles.length ? Math.min(...disponibles.map((v) => v.entrega_dias ?? 0)) : 0;
+  const agotado = disponibles.length === 0;
+  // Narrow grid card (desktop, phone shop): the action goes full width under
+  // the price instead of squeezing it.
+  const ancho = tarjeta && "lg:w-full lg:justify-center";
 
   return (
-    <Link
-      prefetch={true}
-      href={`/tienda/${destino.id}`}
-      aria-label={`Ver ${titulo}`}
+    <div
       className={cn(
-        "flex items-center gap-3 p-3 transition-colors active:bg-muted/60",
+        "group relative flex gap-3.5 p-3.5 transition-colors duration-150 ease-out has-[a:active]:bg-muted/60",
         tarjeta
-          ? "lg:h-full lg:flex-col lg:items-stretch lg:gap-0 lg:overflow-hidden lg:rounded-2xl lg:border lg:border-border lg:bg-background lg:p-0 lg:hover:border-tienda-300"
+          ? "lg:h-full lg:flex-col lg:gap-0 lg:overflow-hidden lg:rounded-2xl lg:border lg:border-border lg:bg-background lg:p-0 lg:hover:border-tienda-300"
           : "hover:bg-muted/40",
-        disponibles.length === 0 && "opacity-70",
       )}
     >
       <span
         className={cn(
-          "flex h-[68px] w-[68px] shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-muted/50",
-          tarjeta && "lg:aspect-4/3 lg:h-auto lg:w-full lg:rounded-none",
+          "flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white ring-1 ring-border",
+          agotado && "opacity-60",
+          tarjeta && "lg:aspect-4/3 lg:h-auto lg:w-full lg:rounded-none lg:ring-0",
         )}
       >
         {m.imagen ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={foto(m.imagen, 384)} alt={titulo} loading="lazy" className="h-full w-full object-cover" />
+          <img src={foto(m.imagen, 384)} alt="" loading="lazy" className="h-full w-full object-contain p-1" />
         ) : (
           <Smartphone className="h-7 w-7 text-muted-foreground/40" />
         )}
       </span>
 
-      <span className={cn("flex min-w-0 flex-1 flex-col gap-0.5", tarjeta && "lg:px-3 lg:pt-3")}>
-        {m.brand && (
-          <span className="truncate text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-            {m.brand}
-          </span>
+      <div className={cn("flex min-w-0 flex-1 flex-col", tarjeta && "lg:p-3")}>
+        {(m.brand || tipo) && (
+          <p className="truncate text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+            {[m.brand, tipo].filter(Boolean).join(" · ")}
+          </p>
         )}
-        <span className="line-clamp-2 text-base font-semibold leading-snug tracking-tight text-foreground">
-          {m.modelo}
-        </span>
-        <span className="truncate text-[13px] text-muted-foreground">
-          {/* "Calidades" is phone-shop language: Ruli's grouped rows are
-              variants of one part, not quality tiers. */}
-          {[tipo, n > 1 ? `${n} ${ES_RULI ? "opciones" : "calidades"}` : null]
-            .filter(Boolean)
-            .join(" · ")}
-        </span>
-        {destino.sku && (
-          <span className="truncate text-[13px] text-muted-foreground">
-            No. de parte <span className="font-mono font-semibold text-foreground">{destino.sku}</span>
-          </span>
-        )}
-        {compat && (
-          <span className="line-clamp-2 text-[13px] text-tienda-700 dark:text-tienda-300">Le queda a {compat}</span>
-        )}
-      </span>
-
-      <span
-        className={cn(
-          "flex shrink-0 flex-col items-end gap-1",
-          tarjeta && "lg:flex-row lg:items-center lg:justify-between lg:px-3 lg:pb-3 lg:pt-2",
-        )}
-      >
-        <span className="text-right leading-tight">
-          {n > 1 && m.desde_cents ? (
-            <span className="block text-[11px] text-muted-foreground lg:mr-1 lg:inline">desde</span>
-          ) : null}
-          <span className="text-[17px] font-semibold tabular-nums text-foreground">
-            {m.desde_cents ? formatPrecio(m.desde_cents) : "A cotizar"}
-          </span>
-        </span>
-        <span
-          className={cn(
-            "flex items-center gap-1.5 text-[11px]",
-            locales.length ? "text-green-700" : disponibles.length ? "text-amber-700" : "text-muted-foreground",
-          )}
+        <Link
+          prefetch={true}
+          href={`/tienda/${destino.id}`}
+          aria-label={`Ver ${titulo}`}
+          // Stretched: the whole row opens the part; only the action button
+          // (z-10) sits above it.
+          className="mt-0.5 line-clamp-2 text-[15px] font-semibold leading-snug tracking-tight text-foreground outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:rounded-2xl focus-visible:after:ring-2 focus-visible:after:ring-tienda-500"
         >
-          <span
-            className={cn(
-              "h-1.5 w-1.5 rounded-full",
-              locales.length ? "bg-green-600" : disponibles.length ? "bg-amber-500" : "bg-muted-foreground/50",
+          {m.modelo}
+        </Link>
+
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+          {/* The part number is what a mechanic matches; the phone shop's sku is
+              an internal slug, so it stays off the card. */}
+          {ES_RULI && destino.sku && (
+            <span className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-xs font-semibold text-foreground">
+              {destino.sku}
+            </span>
+          )}
+          {n > 1 && (
+            <span className="text-xs text-muted-foreground">
+              {n} {ES_RULI ? "opciones" : "calidades"}
+            </span>
+          )}
+        </div>
+
+        {compat && (
+          <p className="mt-1.5 flex items-start gap-1.5 text-[13px] font-medium leading-snug text-tienda-800 dark:text-tienda-300">
+            <CarFront aria-hidden className="mt-px h-4 w-4 shrink-0 text-tienda-600" />
+            <span className="line-clamp-2">Le queda a {compat}</span>
+          </p>
+        )}
+
+        <div className={cn("mt-auto flex items-end justify-between gap-3 pt-3", tarjeta && "lg:flex-col lg:items-stretch lg:gap-2.5")}>
+          <div className="min-w-0 leading-tight">
+            {m.desde_cents ? (
+              <p className="text-lg font-bold tabular-nums tracking-tight text-foreground">
+                {n > 1 && <span className="mr-1 text-xs font-medium text-muted-foreground">desde</span>}
+                {formatPrecio(m.desde_cents)}
+              </p>
+            ) : (
+              <p className="text-[15px] font-semibold text-muted-foreground">A cotizar</p>
             )}
-          />
-          {locales.length ? "En existencia" : disponibles.length ? `Llega en +${dias} días` : "Agotado"}
-        </span>
-      </span>
-    </Link>
+            <p
+              className={cn(
+                "mt-0.5 flex items-center gap-1.5 text-xs font-medium",
+                locales.length ? "text-green-700" : disponibles.length ? "text-amber-700" : "text-muted-foreground",
+              )}
+            >
+              <span
+                className={cn(
+                  "h-1.5 w-1.5 rounded-full",
+                  locales.length ? "bg-green-600" : disponibles.length ? "bg-amber-500" : "bg-muted-foreground/50",
+                )}
+              />
+              {locales.length ? "En existencia" : disponibles.length ? `Llega en +${dias} días` : "Agotado"}
+            </p>
+          </div>
+
+          {!agotado &&
+            (n > 1 ? (
+              // Part of the row link (no z-10): choosing happens on its page.
+              <span className={cn("flex h-10 shrink-0 items-center gap-1 rounded-xl px-3.5 text-sm font-semibold text-tienda-700 ring-1 ring-tienda-200 transition-colors group-hover:bg-tienda-50", ancho)}>
+                Elegir
+                <ChevronRight className="h-4 w-4" />
+              </span>
+            ) : destino.precio_cents > 0 ? (
+              <AddToCart
+                size="md"
+                className={cn("relative z-10 shrink-0", ancho)}
+                p={{
+                  id: destino.id,
+                  nombre: destino.nombre,
+                  precio_cents: destino.precio_cents,
+                  imagen: destino.imagen ?? m.imagen,
+                  disponible: true,
+                }}
+              />
+            ) : (
+              <a
+                href={waHref(`${destino.nombre}${destino.sku ? ` (No. de parte ${destino.sku})` : ""}`, whatsapp)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={cn("relative z-10 flex h-10 shrink-0 items-center gap-1.5 rounded-xl bg-green-50 px-3.5 text-sm font-semibold text-green-700 ring-1 ring-green-200 transition-[background-color,transform] duration-150 ease-out hover:bg-green-100 active:scale-[0.97]", ancho)}
+              >
+                <MessageCircle className="h-4 w-4" />
+                Cotizar
+              </a>
+            ))}
+        </div>
+      </div>
+    </div>
   );
 }
 

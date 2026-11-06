@@ -1,6 +1,6 @@
 "use client";
 
-import { ShoppingCart, Check } from "lucide-react";
+import { ShoppingCart, Check, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCart } from "./CartProvider";
 
@@ -27,7 +27,7 @@ export function AddToCart({
   p: AddableProduct;
   /** xs exists for stacked variant rows: a 36px button in a 44px row leaves
    *  8px of air, and three of them read as one solid column. */
-  size?: "xs" | "sm" | "lg";
+  size?: "xs" | "sm" | "md" | "lg";
   className?: string;
 }) {
   const { add, items } = useCart();
@@ -41,11 +41,11 @@ export function AddToCart({
         aria-label="Agotado"
         className={cn(
           "flex items-center justify-center rounded-xl bg-muted font-semibold text-muted-foreground",
-          size === "lg" ? "h-12 w-full text-sm" : size === "xs" ? "h-7 w-7 rounded-lg" : "h-9 w-9",
+          size === "lg" ? "h-12 w-full text-sm" : size === "md" ? "h-10 px-3.5 text-sm" : size === "xs" ? "h-7 w-7 rounded-lg" : "h-9 w-9",
           className,
         )}
       >
-        {size === "lg" ? "Agotado" : <ShoppingCart className={size === "xs" ? "h-3.5 w-3.5" : "h-4 w-4"} />}
+        {size === "lg" || size === "md" ? "Agotado" : <ShoppingCart className={size === "xs" ? "h-3.5 w-3.5" : "h-4 w-4"} />}
       </button>
     );
   }
@@ -71,8 +71,11 @@ export function AddToCart({
       aria-label={`Agregar ${p.nombre} al carrito`}
       title={maxed ? "Máximo por pieza en línea" : "Agregar al carrito"}
       className={cn(
-        "flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-tienda-600 font-semibold text-white shadow-sm shadow-tienda-600/30 transition-colors hover:bg-tienda-700 disabled:cursor-not-allowed disabled:bg-muted disabled:shadow-none",
-        size === "lg" ? "h-12 w-full text-sm" : size === "xs" ? "h-7 w-7 rounded-lg" : "h-9 w-9",
+        "flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-tienda-600 font-semibold text-white shadow-sm shadow-tienda-600/30 transition-[background-color,transform] duration-150 ease-out hover:bg-tienda-700 active:scale-[0.97] disabled:cursor-not-allowed disabled:bg-muted disabled:shadow-none",
+        size === "lg" ? "h-12 w-full text-sm" : size === "md" ? "h-10 px-3.5 text-sm" : size === "xs" ? "h-7 w-7 rounded-lg" : "h-9 w-9",
+        // Already in the order: quieter, so the row says "done" at a glance;
+        // tapping still adds one more.
+        size === "md" && inCart > 0 && !maxed && "bg-tienda-50 text-tienda-800 shadow-none ring-1 ring-tienda-200 hover:bg-tienda-100",
         className,
       )}
     >
@@ -80,7 +83,20 @@ export function AddToCart({
         <>
           <Check className={size === "xs" ? "h-3.5 w-3.5" : "h-4 w-4"} />
           {size === "lg" && "Máximo por pieza"}
+          {size === "md" && "Máximo"}
         </>
+      ) : size === "md" ? (
+        inCart > 0 ? (
+          <>
+            <Check className="h-4 w-4" />
+            {inCart} en pedido
+          </>
+        ) : (
+          <>
+            <Plus className="h-4 w-4" />
+            Agregar
+          </>
+        )
       ) : (
         <>
           <ShoppingCart className={size === "xs" ? "h-3.5 w-3.5" : "h-4 w-4"} />
