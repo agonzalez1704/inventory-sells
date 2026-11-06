@@ -185,6 +185,9 @@ function ProductCard({
           pasted box. */}
       <div className="relative aspect-square overflow-hidden">
         <Thumb src={p.image_url} alt={p.name} className="object-cover mix-blend-multiply transition-transform duration-300 group-hover:scale-105" />
+        {/* Overlay on the photo only: clear at the top, the foot's grey at the
+            bottom, so the photo dissolves into the foot with no seam. */}
+        <div aria-hidden className="pointer-events-none absolute inset-0 bg-linear-to-b from-transparent via-transparent via-30% to-slate-200" />
         {soldOut ? (
           <span className="absolute inset-x-0 bottom-0 z-10 bg-red-600/90 text-center text-[10px] font-semibold text-white">Agotado</span>
         ) : (
@@ -203,11 +206,7 @@ function ProductCard({
           )
         )}
       </div>
-      {/* One gradient over the whole card, clear at the top and grey at the
-          price: it tints the photo's own foot too, so photo and text are one
-          surface instead of a photo over a white banner. */}
-      <div aria-hidden className="pointer-events-none absolute inset-0 bg-linear-to-b from-slate-200/0 from-35% via-slate-200 via-64% to-slate-300" />
-      <div className="relative flex flex-1 flex-col gap-px px-2 pt-1.5 pb-2">
+      <div className="relative flex flex-1 flex-col gap-px bg-slate-200 px-2 pt-1.5 pb-2">
         {/* The part number tells apart the 721 and the 712 of one family —
             the names differ by a word buried mid-string. */}
         <p className="flex items-center justify-between gap-1 font-mono text-[10px] leading-tight font-semibold tracking-wide text-slate-500 uppercase">
@@ -240,7 +239,7 @@ function ProductCard({
           <span
             className={cn(
               "shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium tabular-nums",
-              p.quantity <= 3 && !soldOut ? "bg-amber-100 text-amber-800" : "bg-slate-200/80 text-slate-600",
+              p.quantity <= 3 && !soldOut ? "bg-amber-100 text-amber-800" : "bg-white/70 text-slate-600",
             )}
           >
             {soldOut ? "—" : `${p.quantity} disp.`}
