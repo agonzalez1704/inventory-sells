@@ -307,8 +307,8 @@ export function CompraDetalle({
       <Card className="p-4">
         <div className="grid gap-3 sm:grid-cols-3">
           <div>
-            <p className="text-xs text-muted-foreground">Dice la factura</p>
-            <p className="text-lg font-semibold tabular-nums">{formatMXN(papel)}</p>
+            <p className="text-xs text-muted-foreground">{papel === 0 ? "Sin total en factura · se toma lo capturado" : "Dice la factura"}</p>
+            <p className="text-lg font-semibold tabular-nums">{formatMXN(papel || capturado)}</p>
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Capturado ({piezas} piezas)</p>
