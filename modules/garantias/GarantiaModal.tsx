@@ -10,6 +10,8 @@ import { Modal } from "@/components/ui/modal";
 import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import type { SaleWithItems } from "@/modules/sales/RecentSales";
+import { asignarClienteFiado } from "@/modules/sales/actions";
+import { CustomerPicker, type PickerCustomer } from "@/modules/customers/CustomerPicker";
 import { BuscarVenta } from "./BuscarVenta";
 import {
   registrarGarantia,
@@ -31,18 +33,31 @@ import {
  */
 export function GarantiaModal({
   sale,
+  customers = [],
   onClose,
 }: {
   /** Omitted when the operator has to find the sale first. */
   sale?: SaleWithItems;
+  /** To put a person on a Mostrador sale before the claim — the DB refuses otherwise. */
+  customers?: PickerCustomer[];
   onClose: () => void;
 }) {
   const [elegida, setElegida] = useState<VentaGarantia | null>(null);
+  // A sale on the walk-in placeholder cannot carry a warranty. The sales list
+  // has no customer_id, so a sale in hand is judged by its name: blank or a
+  // name that resolves to the system customer means Mostrador.
+  const esMostrador = sale
+    ? (customers.find((c) => c.nombre === sale.customer_name)?.is_system ??
+      !sale.customer_name?.trim())
+    : (elegida?.es_mostrador ?? false);
+  const [cliente, setCliente] = useState<PickerCustomer | null>(null);
   const [lineasBuscadas, setLineasBuscadas] = useState<LineaVenta[]>([]);
   const [cargandoLineas, setCargandoLineas] = useState(false);
 
   const saleId = sale?.id ?? elegida?.id ?? null;
-  const nombreCliente = sale?.customer_name ?? elegida?.customer_name ?? null;
+  const nombreCliente = esMostrador
+    ? (cliente?.nombre ?? null)
+    : (sale?.customer_name ?? elegida?.customer_name ?? null);
 
   // Only when the sale came from the search — one already in hand carries its
   // own lines.
@@ -107,8 +122,12 @@ export function GarantiaModal({
     if (!saleId || !linea) return toast.error("Elige la pieza");
     if (reingresa === null) return toast.error("Falta decir si la pieza sirve");
     if (!propuesta) return toast.error("Falta qué pide el cliente");
+    if (esMostrador && !cliente) return toast.error("Elige el cliente de la venta");
     start(async () => {
       try {
+        // Reassign first: the claim hangs off the person, and the RPC rejects
+        // the placeholder customer.
+        if (esMostrador && cliente) await asignarClienteFiado(saleId!, cliente.id);
         unwrap(
           await registrarGarantia(
             saleId!,
@@ -140,6 +159,26 @@ export function GarantiaModal({
           Queda ligada a esta venta{nombreCliente ? ` de ${nombreCliente}` : ""}.
           Se valúa a lo que el cliente pagó ese día, no al precio de hoy.
         </p>
+
+        {esMostrador && (
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-muted-foreground">
+              Cliente
+            </span>
+            <CustomerPicker
+              customers={customers}
+              value={cliente}
+              onChange={setCliente}
+              placeholder="¿De quién es la venta?"
+              excludeSystem
+              openUp={false}
+            />
+            <span className="mt-1.5 block text-xs text-muted-foreground">
+              La venta está en Mostrador. Una garantía se resuelve con una
+              persona: queda asignada a quien elijas.
+            </span>
+          </label>
+        )}
 
         <label className="block">
           <span className="mb-1 block text-xs font-medium text-muted-foreground">Pieza</span>

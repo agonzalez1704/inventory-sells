@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { GarantiaModal } from "./GarantiaModal";
 import { GarantiasClienteList } from "./GarantiasClienteList";
 import type { GarantiaCliente } from "./cliente-actions";
+import type { PickerCustomer } from "@/modules/customers/CustomerPicker";
 import { useConfirm } from "@/components/ui/use-confirm";
 import { unwrap, type ActionResult } from "@/lib/errors";
 import { Input, Select } from "@/components/ui/input";
@@ -49,6 +50,7 @@ export function GarantiasView({
   saldos,
   proveedores,
   deClientes = [],
+  customers = [],
   puedeAprobar = false,
   abrirGarantia = null,
 }: {
@@ -56,6 +58,7 @@ export function GarantiasView({
   saldos: GarantiaSaldo[];
   proveedores: Proveedor[];
   deClientes?: GarantiaCliente[];
+  customers?: PickerCustomer[];
   puedeAprobar?: boolean;
   abrirGarantia?: string | null;
 }) {
@@ -212,7 +215,7 @@ export function GarantiasView({
       )}
 
       {garantiaCliente && (
-        <GarantiaModal onClose={() => setGarantiaCliente(false)} />
+        <GarantiaModal customers={customers} onClose={() => setGarantiaCliente(false)} />
       )}
       {nueva && <NuevaGarantia proveedores={proveedores} onClose={() => setNueva(false)} />}
     </section>

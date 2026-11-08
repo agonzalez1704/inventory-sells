@@ -3,6 +3,8 @@ import { listarGarantias, saldosGarantias } from "@/modules/garantias/actions";
 import { listarProveedores } from "@/modules/proveedores/actions";
 import { GarantiasView } from "@/modules/garantias/GarantiasView";
 import { listarGarantiasCliente } from "@/modules/garantias/cliente-actions";
+import { createInsForgeServerClient } from "@/lib/insforge/server";
+import type { PickerCustomer } from "@/modules/customers/CustomerPicker";
 
 
 export default async function GarantiasPage({
@@ -15,18 +17,27 @@ export default async function GarantiasPage({
   const puedeAprobar = perms.has("admin_total") || perms.has("garantias_aprobar");
   // The notification deep-links to the claim that needs deciding.
   const abrirGarantia = (await searchParams).garantia ?? null;
-  const [garantias, saldos, proveedores, deClientes] = await Promise.all([
+  const insforge = await createInsForgeServerClient();
+  const [garantias, saldos, proveedores, deClientes, { data: customerData }] = await Promise.all([
     listarGarantias(),
     saldosGarantias(),
     listarProveedores(),
     listarGarantiasCliente(),
+    // For the claim on a Mostrador sale: it gets a person before it is filed.
+    insforge.database
+      .from("customers")
+      .select("id, nombre, telefono, is_system")
+      .eq("is_active", true)
+      .order("nombre", { ascending: true }),
   ]);
+  const customers = (customerData ?? []) as PickerCustomer[];
   return (
     <GarantiasView
       garantias={garantias}
       saldos={saldos}
       proveedores={proveedores}
       deClientes={deClientes}
+      customers={customers}
       puedeAprobar={puedeAprobar}
       abrirGarantia={abrirGarantia}
     />

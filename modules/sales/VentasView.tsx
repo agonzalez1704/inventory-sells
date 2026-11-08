@@ -348,8 +348,8 @@ export function VentasView({
       />
 
       {corregir && <EditModal sale={corregir as SaleWithItems} customers={customers} onClose={() => setCorregir(null)} />}
-      {garantia && <GarantiaModal sale={garantia as SaleWithItems} onClose={() => setGarantia(null)} />}
-      {garantiaBuscar && <GarantiaModal onClose={() => setGarantiaBuscar(false)} />}
+      {garantia && <GarantiaModal sale={garantia as SaleWithItems} customers={customers} onClose={() => setGarantia(null)} />}
+      {garantiaBuscar && <GarantiaModal customers={customers} onClose={() => setGarantiaBuscar(false)} />}
     </section>
   );
 }

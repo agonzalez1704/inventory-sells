@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { Search, Loader2 } from "lucide-react";
 import { formatMXN } from "@/lib/money";
-import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { buscarVentasGarantia, type VentaGarantia } from "./cliente-actions";
@@ -75,14 +74,8 @@ export function BuscarVenta({ onElegir }: { onElegir: (v: VentaGarantia) => void
             <li key={v.id}>
               <button
                 type="button"
-                disabled={v.es_mostrador}
                 onClick={() => onElegir(v)}
-                className={cn(
-                  "flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors",
-                  v.es_mostrador
-                    ? "cursor-not-allowed opacity-60"
-                    : "cursor-pointer hover:bg-muted/60",
-                )}
+                className="flex w-full cursor-pointer items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-muted/60"
               >
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">
@@ -94,16 +87,11 @@ export function BuscarVenta({ onElegir }: { onElegir: (v: VentaGarantia) => void
                     <span className="font-mono uppercase">{v.id.slice(0, 8)}</span>
                   </p>
                 </div>
-                {/* Shown, not hidden: the operator has to see the sale exists
-                    and why it cannot carry a warranty, rather than search for
-                    something that silently is not there. */}
-                {v.es_mostrador ? (
-                  <Badge tone="warning">Sin cliente</Badge>
-                ) : (
-                  <span className="shrink-0 font-mono text-sm tabular-nums">
-                    {formatMXN(v.total_cents)}
-                  </span>
-                )}
+                {/* Flagged, not blocked: the next step asks whose sale it is. */}
+                {v.es_mostrador && <Badge tone="warning">Sin cliente</Badge>}
+                <span className="shrink-0 font-mono text-sm tabular-nums">
+                  {formatMXN(v.total_cents)}
+                </span>
               </button>
             </li>
           ))}
@@ -112,8 +100,8 @@ export function BuscarVenta({ onElegir }: { onElegir: (v: VentaGarantia) => void
 
       {ventas.some((v) => v.es_mostrador) && (
         <p className="text-xs text-muted-foreground">
-          Las ventas a Mostrador no pueden llevar garantía: una garantía se
-          resuelve con una persona. Asigna el cliente a la venta primero.
+          Las ventas a Mostrador se asignan a un cliente al registrar la
+          garantía: una garantía se resuelve con una persona.
         </p>
       )}
     </div>
