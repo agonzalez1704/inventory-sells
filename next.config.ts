@@ -28,6 +28,7 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       { protocol: "https", hostname: "*.us-east.insforge.app", pathname: "/api/storage/**" },
       { protocol: "https", hostname: "cdn.insforge.dev", pathname: "/storage/**" },
+      { protocol: "https", hostname: "fhjlzqqsftlxipeitckt.supabase.co", pathname: "/storage/v1/object/public/**" },
     ],
     // The URL changes whenever the photo does, so a cached variant can never be
     // stale. Vercel's default is 60 s, which would re-fetch the origin all day.
