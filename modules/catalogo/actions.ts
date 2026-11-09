@@ -8,6 +8,7 @@ import { normalize } from "@/lib/search";
 import { MARCA } from "@/lib/marca";
 import { familiaDeNombre, type Familia } from "@/lib/familias";
 import { inventarioQueRecibe, inventariosSoloConsulta } from "@/modules/inventory/solo-consulta";
+import type { FilaActual } from "./excel-diff";
 
 // "Catálogo": the owner works carros, refacción, sistema, marca and
 // conversiones here instead of in his Excel (approved mockup:
@@ -271,7 +272,9 @@ async function nombreFamilia(id: string | null): Promise<string | null> {
   return (data as { nombre: string } | null)?.nombre ?? null;
 }
 
-async function ponerCampos(skus: string[], campos: { familia?: string | null; sistema?: string | null; brand?: string | null }): Promise<void> {
+type Campos = { familia?: string | null; sistema?: string | null; brand?: string | null };
+
+async function filaDeCampos(campos: Campos): Promise<Record<string, unknown>> {
   const fila: Record<string, unknown> = {};
   if (campos.familia !== undefined) {
     fila.familia = campos.familia;
@@ -282,6 +285,11 @@ async function ponerCampos(skus: string[], campos: { familia?: string | null; si
   }
   if (campos.sistema !== undefined) fila.sistema = campos.sistema;
   if (campos.brand !== undefined) fila.brand = campos.brand ? campos.brand.trim().toUpperCase() : null;
+  return fila;
+}
+
+async function ponerCampos(skus: string[], campos: Campos): Promise<void> {
+  const fila = await filaDeCampos(campos);
   if (!Object.keys(fila).length) return;
   const { error } = await DB.from("products").update(fila).in("sku", skus);
   if (error) throw new Error(error.message ?? "No se pudo guardar");
@@ -332,6 +340,78 @@ export async function asignarEnLote(
     await ponerCampos(skus.slice(0, 500), { [campo]: valor });
     updateTag("tienda");
     return null;
+  });
+}
+
+/** One page of the catalog, oldest row of each SKU first: what an Excel is compared against. */
+export async function paginaCatalogo(pagina: number): Promise<ActionResult<FilaActual[]>> {
+  return attempt("paginaCatalogo", async () => {
+    await puedeVer();
+    const { data, error } = await DB.from("products")
+      .select("sku, name, brand, familia, sistema")
+      .eq("is_active", true)
+      .order("sku")
+      .order("created_at")
+      .order("id")
+      .range(pagina * 1000, pagina * 1000 + 999);
+    if (error) throw new Error(error.message ?? "No se pudo leer el catálogo");
+    return (data ?? []) as FilaActual[];
+  });
+}
+
+/** Names from a corrected Excel, on every inventory's row of each SKU. */
+export async function renombrarPiezas(filas: { sku: string; name: string }[]): Promise<ActionResult<null>> {
+  return attempt("renombrarPiezas", async () => {
+    await assertPermiso("inventario_gestionar");
+    for (let i = 0; i < Math.min(filas.length, 100); i += 10) {
+      const res = await Promise.all(
+        filas.slice(i, i + 10).map((f) => DB.from("products").update({ name: f.name.trim().slice(0, 200) }).eq("sku", f.sku)),
+      );
+      const fallo = res.find((r) => r.error);
+      if (fallo?.error) throw new Error(fallo.error.message ?? "No se pudo renombrar");
+    }
+    updateTag("tienda");
+    return null;
+  });
+}
+
+/**
+ * "Todo lo que empieza con SAN es amortiguador, en suspensión." Counts first and
+ * writes only with `aplicar`. With soloVacias it leaves alone a refacción chosen
+ * by hand (familia_fija) and a sistema already set. Counts are rows: a part in
+ * two inventories is two.
+ */
+export async function reglaPorSku(input: {
+  prefijo: string;
+  familia: string | null;
+  sistema: string | null;
+  soloVacias: boolean;
+  aplicar: boolean;
+}): Promise<ActionResult<{ refaccion: number; sistema: number }>> {
+  return attempt("reglaPorSku", async () => {
+    await assertPermiso("inventario_gestionar");
+    const prefijo = input.prefijo.trim().replace(/[%_\\]/g, "");
+    if (prefijo.length < 2) throw new Error("Escribe al menos 2 letras del SKU");
+    const patron = `${prefijo}%`;
+    const contar = () => DB.from("products").select("id", { count: "exact", head: true }).ilike("sku", patron);
+    const [fam, sis] = await Promise.all([
+      input.familia ? (input.soloVacias ? contar().eq("familia_fija", false) : contar()) : null,
+      input.sistema ? (input.soloVacias ? contar().is("sistema", null) : contar()) : null,
+    ]);
+    if (input.aplicar) {
+      if (input.familia) {
+        const q = DB.from("products").update(await filaDeCampos({ familia: input.familia })).ilike("sku", patron);
+        const { error } = await (input.soloVacias ? q.eq("familia_fija", false) : q);
+        if (error) throw new Error(error.message ?? "No se pudo aplicar");
+      }
+      if (input.sistema) {
+        const q = DB.from("products").update({ sistema: input.sistema }).ilike("sku", patron);
+        const { error } = await (input.soloVacias ? q.is("sistema", null) : q);
+        if (error) throw new Error(error.message ?? "No se pudo aplicar");
+      }
+      updateTag("tienda");
+    }
+    return { refaccion: fam?.count ?? 0, sistema: sis?.count ?? 0 };
   });
 }
 

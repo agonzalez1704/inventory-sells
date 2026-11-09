@@ -14,6 +14,7 @@ import { buscarCatalogo, renombrarFamilia, type FilaCatalogo, type FiltrosCatalo
 import { PiezaPanel } from "./PiezaPanel";
 import { AplicarCarros } from "./AplicarCarros";
 import { AsignarLote } from "./AsignarLote";
+import { HerramientasCatalogo } from "./HerramientasCatalogo";
 
 /**
  * "Catálogo": the owner's sheet, in the app. Filter Sistema → Refacción →
@@ -91,6 +92,7 @@ export function CatalogoView({
             {autopartes ? "Carros, refacción" : "Refacción"} y conversiones de cada pieza. Lo que cambies aquí lo usan el POS, la tienda y el agente.
           </p>
         </div>
+        {puedeEditar && <HerramientasCatalogo opciones={opciones} onListo={refrescar} />}
         {puedePrecios && (
           <Link href="/catalogo/precios" className="inline-flex h-10 items-center rounded-lg border border-border bg-background px-4 text-sm font-medium hover:bg-muted">
             Importar precios del SAE
