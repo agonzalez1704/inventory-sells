@@ -9,7 +9,7 @@ import { backendSupabase, enSupabase } from "./supabase";
 // user. Returns an unauthenticated (anon) client if there is no session.
 export async function createInsForgeServerClient() {
   const { getToken } = await auth();
-  const token = await getToken({ template: enSupabase ? "supabase" : "insforge" });
+  const token = await getToken(enSupabase ? undefined : { template: "insforge" });
 
   if (enSupabase) {
     return backendSupabase(process.env.SUPABASE_ANON_KEY!, token) as unknown as ReturnType<typeof createClient>;
