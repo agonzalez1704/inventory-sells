@@ -73,7 +73,7 @@ const MODOS: { value: ModoImport; label: string; ayuda: string }[] = [
     label: "Actualizar costos y precios",
     ayuda: "Lo que ya existe: solo costo y precio. Lo que no existe: se da de alta con su existencia.",
   },
-  { value: "catalogo", label: "Solo catálogo", ayuda: "Nombres, precios y costos; no toca existencias. Lo nuevo entra en 0." },
+  { value: "catalogo", label: "Solo catálogo", ayuda: "Precios, costos y marca; nombres solo a lo que no tiene. No toca existencias. Lo nuevo entra en 0." },
 ];
 
 export function ImportPanel({

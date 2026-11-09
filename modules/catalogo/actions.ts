@@ -143,7 +143,9 @@ export async function detallePieza(sku: string): Promise<ActionResult<PiezaDetal
     const { data } = await DB.from("products")
       .select("id, sku, name, descripcion, familia, sistema, brand, price_cents, quantity, conversion_grupo, numeros_originales, product_tags(condicion, cilindrada, tags(veh_marca, veh_modelo, veh_version, veh_anio_desde, veh_anio_hasta))")
       .eq("sku", sku)
-      .order("quantity", { ascending: false });
+      // The oldest row carries the owner's work; a later import into another
+      // inventory (Guadalajara, 100 of everything) must not take its place.
+      .order("created_at", { ascending: true });
     type Fila = {
       id: string; sku: string; name: string; descripcion: string | null; familia: string | null; sistema: string | null; brand: string | null;
       price_cents: number; quantity: number; conversion_grupo: string | null; numeros_originales: string[] | null;

@@ -332,7 +332,7 @@ export function TiendaView({
                 )}
               >
                 {modelos.map((m) => (
-                  <li key={`${m.brand}|${m.category}|${m.modelo}`}>
+                  <li key={m.variantes[0].id}>
                     <ModeloCard
                       m={m}
                       whatsapp={whatsapp}
