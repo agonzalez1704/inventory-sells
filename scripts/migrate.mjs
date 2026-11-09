@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // Apply migrations to one business's database, or check that both are level.
 //
-// One repo serves two businesses from two SEPARATE InsForge projects, and the
-// CLI only ever talks to whichever project `.insforge/project.json` names. So
+// One repo serves two businesses from two SEPARATE databases. Ruli is on Supabase
+// and is reached with psql through SUPABASE_DB_URL in .env.local. Fiable is on
+// InsForge, whose CLI only ever talks to whichever project `.insforge/project.json` names. So
 // this swaps that file for the duration of a command and always puts it back —
 // including when the command fails.
 //
@@ -31,6 +32,10 @@ const RAIZ = resolve(import.meta.dirname, "..");
 const ACTIVO = resolve(RAIZ, ".insforge/project.json");
 const RESPALDO = resolve(RAIZ, ".insforge/project.json.bak");
 const NEGOCIOS = resolve(RAIZ, ".insforge/negocios.json");
+
+// Ruli moved to Supabase on 2026-11-09. Its entry in negocios.json still points
+// at the old InsForge project, which is why this has to be decided first.
+const EN_SUPABASE = new Set(["ruli"]);
 
 const arg = (n) => process.argv.find((a) => a.startsWith(`--${n}`));
 const valor = (n) => arg(n)?.split("=")[1];
@@ -73,8 +78,56 @@ const cli = (args) =>
     stdio: ["ignore", "pipe", "pipe"],
   });
 
+function urlSupabase() {
+  const linea = readFileSync(resolve(RAIZ, ".env.local"), "utf8")
+    .split("\n")
+    .find((l) => l.startsWith("SUPABASE_DB_URL="));
+  if (!linea) {
+    console.error("Falta SUPABASE_DB_URL en .env.local");
+    process.exit(1);
+  }
+  return linea.slice(linea.indexOf("=") + 1).trim().replace(/^["']|["']$/g, "");
+}
+
+function psql(args) {
+  try {
+    return execFileSync("psql", [urlSupabase(), "-X", "-q", "-At", "-v", "ON_ERROR_STOP=1", ...args], {
+      cwd: RAIZ,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+  } catch (e) {
+    // Only stderr: the thrown message carries the command line, password included.
+    console.error(String(e.stderr));
+    process.exit(1);
+  }
+}
+
+const aplicadasSupabase = () =>
+  new Set(psql(["-c", "select version || '_' || name from system.custom_migrations"]).split("\n").filter(Boolean));
+
+function migrarSupabase(seco) {
+  const remoto = aplicadasSupabase();
+  const pendientes = locales().filter((m) => !remoto.has(m));
+  if (!pendientes.length) return console.log("Sin migraciones pendientes.");
+  for (const m of pendientes) {
+    if (seco) {
+      console.log(`pendiente: ${m}`);
+      continue;
+    }
+    const [, version, nombre] = m.match(/^(\d{14})_([a-z0-9-]+)$/);
+    psql([
+      "--single-transaction",
+      "-f", `migrations/${m}.sql`,
+      "-c", `insert into system.custom_migrations (version, name) values ('${version}', '${nombre}')`,
+    ]);
+    console.log(`✓ ${m}`);
+  }
+}
+
 /** Migrations the remote database reports as applied. */
-function aplicadas(cfg) {
+function aplicadas(nombre, cfg) {
+  if (EN_SUPABASE.has(nombre)) return aplicadasSupabase();
   const salida = apuntandoA(cfg, () => cli(["db", "migrations", "list"]));
   return new Set(salida.match(/\d{14}[_a-z0-9-]*/g) ?? []);
 }
@@ -89,7 +142,7 @@ function check(cfgs) {
   const produccion = Object.entries(cfgs).filter(([, cfg]) => cfg.check !== false);
   const fuera = Object.entries(cfgs).filter(([, cfg]) => cfg.check === false);
   const estado = produccion.map(([nombre, cfg]) => {
-    const remoto = aplicadas(cfg);
+    const remoto = aplicadas(nombre, cfg);
     const faltan = local.filter((m) => ![...remoto].some((r) => m.startsWith(r.slice(0, 14))));
     return { nombre, aplicadas: remoto.size, faltan };
   });
@@ -135,9 +188,14 @@ if (arg("check")) {
     process.exit(1);
   }
   const seco = !!arg("dry");
-  console.log(`${seco ? "Revisando" : "Aplicando a"} ${negocio} (${cfg.project_name})…\n`);
-  const salida = apuntandoA(cfg, () =>
-    cli(["db", "migrations", seco ? "list" : "up", ...(seco ? [] : ["--all"])]),
-  );
-  console.log(salida.trim());
+  if (EN_SUPABASE.has(negocio)) {
+    console.log(`${seco ? "Revisando" : "Aplicando a"} ${negocio} (Supabase)…\n`);
+    migrarSupabase(seco);
+  } else {
+    console.log(`${seco ? "Revisando" : "Aplicando a"} ${negocio} (${cfg.project_name})…\n`);
+    const salida = apuntandoA(cfg, () =>
+      cli(["db", "migrations", seco ? "list" : "up", ...(seco ? [] : ["--all"])]),
+    );
+    console.log(salida.trim());
+  }
 }
