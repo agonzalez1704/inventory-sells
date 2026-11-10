@@ -46,14 +46,16 @@ for ruta in PDFS:
                 # "COD." on a line ABOVE the photo, in the same column; the
                 # "ORIG." line between them is the OEM number, not ours.
                 if not any(SKU.search(w["text"]) for w in zona):
-                    cods = [c for c in words if c["text"].upper().startswith("COD")]
+                    # cat09 labels the pair "DER. CODE  IZQ. CODE" instead, and
+                    # both sides share the one photo.
+                    cods = [c for c in words if c["text"].upper().startswith(("COD", "DER", "IZQ"))]
                     arriba = [w for w in words
                               if w["bottom"] <= im["top"] + 2 and im["top"] - w["bottom"] < 70
                               and (w["x0"] < 306 if col_izq else w["x0"] >= 306)
                               and SKU.search(w["text"])
                               and any(abs(c["top"] - w["top"]) < 4 and c["x0"] < w["x0"] for c in cods)]
                     arriba.sort(key=lambda w: im["top"] - w["bottom"])
-                    zona = arriba[:1]
+                    zona = [w for w in arriba if abs(w["top"] - arriba[0]["top"]) < 4] if arriba else []
                 skus = []
                 for w in zona:
                     for m in SKU.findall(w["text"]):
