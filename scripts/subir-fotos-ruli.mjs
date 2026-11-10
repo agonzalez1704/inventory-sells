@@ -10,18 +10,20 @@
 // touched, so re-running after a crash — or after future catalog imports add
 // SKUs that now match a MEGA photo — uploads only what is missing.
 //
-// Usage (Ruli only — reads creds from .insforge/negocios.json):
+// Usage (Ruli only — Ruli is on Supabase since 2026-11-09; reads
+// SUPABASE_SERVICE_ROLE_KEY and SUPABASE_DB_URL from .env.local):
 //   node scripts/subir-fotos-ruli.mjs           # dry run: report matches, upload nothing
 //   node scripts/subir-fotos-ruli.mjs --subir   # main photos: compress + upload + update DB
 //   node scripts/subir-fotos-ruli.mjs --vistas  # gallery: extra views into product_images
 
 import { readFileSync, readdirSync, statSync, mkdirSync, existsSync } from "node:fs";
 import { createHash } from "node:crypto";
-import { execFile } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
 import { promisify } from "node:util";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { createAdminClient } from "@insforge/sdk";
+import { createClient } from "@supabase/supabase-js";
+import { cubetaCompat } from "../lib/insforge/compat.ts";
 
 const run = promisify(execFile);
 const BUCKET = "product-images";
@@ -40,20 +42,27 @@ const ES_IMAGEN = /\.(jpe?g|png|webp)$/i;
 const SUBIR = process.argv.includes("--subir");
 const VISTAS = process.argv.includes("--vistas");
 
-const { ruli } = JSON.parse(
-  readFileSync(new URL("../.insforge/negocios.json", import.meta.url), "utf8"),
-);
-const admin = createAdminClient({ baseUrl: ruli.oss_host, apiKey: ruli.api_key });
+process.loadEnvFile(new URL("../.env.local", import.meta.url));
+const sb = createClient("https://fhjlzqqsftlxipeitckt.supabase.co", process.env.SUPABASE_SERVICE_ROLE_KEY, {
+  auth: { persistSession: false, autoRefreshToken: false },
+});
+// Same { database, storage } shape the app uses, so the code below is unchanged.
+const admin = { database: sb, storage: { from: (b) => cubetaCompat(sb.storage.from(b)) } };
 
 const rawsql = async (query) => {
-  const r = await fetch(`${ruli.oss_host}/api/database/advance/rawsql/unrestricted`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${ruli.api_key}` },
-    body: JSON.stringify({ query }),
-  });
-  const d = await r.json();
-  if (!r.ok) throw new Error(d.message ?? `rawsql HTTP ${r.status}`);
-  return d.rows ?? [];
+  const select = /^\s*select/i.test(query);
+  try {
+    const out = execFileSync(
+      "psql",
+      [process.env.SUPABASE_DB_URL, "-X", "-q", "-At", "-v", "ON_ERROR_STOP=1", "-c",
+        select ? `select coalesce(json_agg(t), '[]') from (${query}) t` : query],
+      { encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "pipe"] },
+    );
+    return select ? JSON.parse(out) : [];
+  } catch (e) {
+    // Only stderr: the thrown message carries the command line, password included.
+    throw new Error(String(e.stderr).trim());
+  }
 };
 
 // ---------------------------------------------------------------------------
