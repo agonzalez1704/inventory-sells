@@ -18,6 +18,20 @@ SKU = re.compile(r"[A-Z]{2,6}-?\d{3,}[A-Z]?")
 RES = 300
 ESCALA = RES / 72.0
 
+def unir_partidos(words):
+    """cat09 sometimes splits a code across two words ("CBTK11" "01")."""
+    out = []
+    for w in words:
+        prev = out[-1] if out else None
+        if (prev and re.fullmatch(r"\d{1,3}", w["text"])
+                and re.fullmatch(r"(?:[A-Z]{3}\.)?[A-Z]{4}\d{1,3}", prev["text"])
+                and abs(prev["top"] - w["top"]) < 3 and 0 <= w["x0"] - prev["x1"] < 8):
+            out[-1] = {**prev, "text": prev["text"] + w["text"], "x1": w["x1"]}
+        else:
+            out.append(w)
+    return out
+
+
 vistos = set()
 total = 0
 for ruta in PDFS:
@@ -25,7 +39,7 @@ for ruta in PDFS:
     n = len(pdf.pages)
     for page in pdf.pages:
         try:
-            words = page.extract_words()
+            words = unir_partidos(page.extract_words())
             if QUIERO is not None and not any(m in QUIERO for w in words for m in SKU.findall(w["text"])):
                 continue
             imgs = [im for im in page.images
@@ -45,15 +59,20 @@ for ruta in PDFS:
                 # Card layout (steering racks, cat01 p.196+): the code follows
                 # "COD." on a line ABOVE the photo, in the same column; the
                 # "ORIG." line between them is the OEM number, not ours.
-                if not any(SKU.search(w["text"]) for w in zona):
+                # A whole-word code only: the OEM line beside a photo
+                # ("52713-BZ520") holds a code-shaped tail that is not ours.
+                zona = [w for w in zona if SKU.fullmatch(w["text"].strip(".,;:"))]
+                if not zona:
                     # cat09 labels the pair "DER. CODE  IZQ. CODE" instead, and
-                    # both sides share the one photo.
+                    # both sides share the one photo. Often the label and the
+                    # code come out as one word ("COD.CFTC0201"), so the label
+                    # may be the code's own word, not one to its left.
                     cods = [c for c in words if c["text"].upper().startswith(("COD", "DER", "IZQ"))]
                     arriba = [w for w in words
                               if w["bottom"] <= im["top"] + 2 and im["top"] - w["bottom"] < 70
                               and (w["x0"] < 306 if col_izq else w["x0"] >= 306)
                               and SKU.search(w["text"])
-                              and any(abs(c["top"] - w["top"]) < 4 and c["x0"] < w["x0"] for c in cods)]
+                              and any(abs(c["top"] - w["top"]) < 4 and c["x0"] <= w["x0"] for c in cods)]
                     arriba.sort(key=lambda w: im["top"] - w["bottom"])
                     zona = [w for w in arriba if abs(w["top"] - arriba[0]["top"]) < 4] if arriba else []
                 skus = []
