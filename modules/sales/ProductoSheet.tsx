@@ -54,6 +54,9 @@ export function ProductoSheet({
   const [conversiones, setConversiones] = useState<Awaited<ReturnType<typeof conversionesDe>>["conversiones"]>([]);
   const [numeros, setNumeros] = useState<string[]>([]);
   const [descripcion, setDescripcion] = useState<string | null>(null);
+  // Compatibility arrives a beat after the sheet opens: hold its place with a
+  // skeleton so the sections don't pop in and shove the sheet around.
+  const [cargando, setCargando] = useState(false);
   // The product changes while the sheet is open (tapping another card): a
   // stale fullscreen — or the previous part's gallery — must not survive it.
   useEffect(() => {
@@ -69,20 +72,21 @@ export function ProductoSheet({
     setDescripcion(null);
     if (!p?.id) return;
     let on = true;
+    setCargando(true);
     galeriaProducto(p.id)
       .then((v) => on && setVistas(v))
       .catch(() => {});
-    tagsDeProducto(p.id)
+    const tagsP = tagsDeProducto(p.id)
       .then((t) => on && setTags(t))
       .catch(() => {});
     // The same part in another almacén is not a compatible: "Por almacén" has it.
-    compatiblesDe(p.id, 7)
+    const compatP = compatiblesDe(p.id, 7)
       .then((c) => on && setCompatibles(c.filter((x) => x.sku.trim().toUpperCase() !== p.sku.trim().toUpperCase()).slice(0, 6)))
       .catch(() => {});
     garantiasEnStock(p.id)
       .then((g) => on && setGarantias(g))
       .catch(() => {});
-    conversionesDe(p.id)
+    const convP = conversionesDe(p.id)
       .then((c) => {
         if (!on) return;
         setConversiones(c.conversiones);
@@ -92,6 +96,7 @@ export function ProductoSheet({
     descripcionDe(p.id)
       .then((d) => on && setDescripcion(d))
       .catch(() => {});
+    Promise.allSettled([tagsP, compatP, convP]).then(() => on && setCargando(false));
     return () => {
       on = false;
     };
@@ -287,7 +292,7 @@ export function ProductoSheet({
 
       {descripcion && <p className="mt-4 whitespace-pre-line text-sm leading-relaxed text-muted-foreground">{descripcion}</p>}
 
-      {(conversiones.length > 0 || numeros.length > 0) && (
+      {!cargando && (conversiones.length > 0 || numeros.length > 0) && (
         <div className="mt-4 rounded-xl border border-indigo-200 bg-indigo-50 p-3 dark:border-indigo-900 dark:bg-indigo-950/30">
           <p className="text-xs font-semibold uppercase tracking-wide text-indigo-800 dark:text-indigo-300">Conversiones</p>
           {conversiones.map((c) => (
@@ -308,7 +313,35 @@ export function ProductoSheet({
         </div>
       )}
 
-      {tags.length > 0 && (
+      {cargando && (
+        <div aria-busy="true" aria-label="Cargando compatibilidad" className="mt-4 space-y-4 border-t border-border pt-3">
+          <div>
+            <div className="h-3 w-28 animate-pulse rounded bg-muted" />
+            <div className="mt-2.5 flex flex-wrap gap-1.5">
+              {[96, 120, 84, 132, 104, 90].map((w, i) => (
+                <div key={i} className="h-6 animate-pulse rounded-full bg-muted" style={{ width: w }} />
+              ))}
+            </div>
+          </div>
+          <div>
+            <div className="h-3 w-32 animate-pulse rounded bg-muted" />
+            <div className="mt-2 divide-y divide-border rounded-xl border border-border">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="flex items-center gap-3 px-3 py-2">
+                  <div className="h-9 w-9 shrink-0 animate-pulse rounded-lg bg-muted" />
+                  <div className="min-w-0 flex-1 space-y-1.5">
+                    <div className="h-3 w-3/4 animate-pulse rounded bg-muted" />
+                    <div className="h-2.5 w-1/4 animate-pulse rounded bg-muted" />
+                  </div>
+                  <div className="h-3 w-14 animate-pulse rounded bg-muted" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!cargando && tags.length > 0 && (
         <div className="mt-4 border-t border-border pt-3">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Compatible con
@@ -338,7 +371,7 @@ export function ProductoSheet({
         </div>
       )}
 
-      {compatibles.length > 0 && (
+      {!cargando && compatibles.length > 0 && (
         <div className="mt-4 border-t border-border pt-3">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Compatibles ({compatibles.length})

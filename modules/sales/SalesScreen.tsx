@@ -22,6 +22,7 @@ import {
   Store,
   Trash2,
   Wallet,
+  MapPin,
 } from "lucide-react";
 import { conDescuento, formatMXN } from "@/lib/money";
 import { foto } from "@/lib/foto";
@@ -210,45 +211,55 @@ function ProductCard({
           )
         )}
       </div>
-      <div className="relative flex flex-1 flex-col gap-px bg-slate-200 px-2 pt-1.5 pb-2">
-        {/* The part number tells apart the 721 and the 712 of one family —
-            the names differ by a word buried mid-string. */}
-        <p className="flex items-center justify-between gap-1 font-mono text-[10px] leading-tight font-semibold tracking-wide text-slate-500 uppercase">
-          <span className="truncate">{p.sku}</span>
-          {p.sucursal_ajena && (
-            <span className="shrink-0 rounded-sm bg-amber-100 px-1 font-sans text-[10px] font-semibold normal-case text-amber-800">
-              En {p.sucursal_ajena}
-            </span>
-          )}
-        </p>
-        <p className="line-clamp-2 text-[13px] leading-tight font-bold text-slate-900">{p.name}</p>
-        <p className="truncate text-[10px] leading-tight text-slate-500 capitalize">
-          {almacen && <span className="font-semibold text-slate-700 normal-case">{almacen}</span>}
-          {almacen && p.category ? " · " : ""}
-          {p.category}
-        </p>
-        {compat && (
-          <p className="truncate text-[10px] leading-tight font-medium text-emerald-700">{compat}</p>
-        )}
-        <div className="mt-auto flex items-center justify-between gap-1 pt-1.5">
-          {importe ? (
-            <span className={cn("text-sm font-semibold tabular-nums text-slate-900", alCosto && "text-amber-700")}>
-              {alCosto && <span className="mr-1 text-[10px] font-medium uppercase">costo</span>}
-              {formatMXN(importe).replace(".00", "")}
-            </span>
-          ) : (
-            <span className="rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
-              Sin precio
-            </span>
-          )}
-          <span
-            className={cn(
-              "shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium tabular-nums",
-              p.quantity <= 3 && !soldOut ? "bg-amber-100 text-amber-800" : "bg-white/70 text-slate-600",
+      {/* Two groups, not five stacked lines: what the part is at the top, what
+          it costs and where it sits pinned to the foot — so a row of cards
+          lines its prices up no matter how long the names run. */}
+      <div className="relative flex flex-1 flex-col bg-slate-200 px-2.5 pt-2 pb-2.5">
+        <div className="space-y-0.5">
+          <p className="flex items-center justify-between gap-1 font-mono text-[10px] leading-none font-semibold tracking-wide text-slate-500 uppercase">
+            <span className="truncate">{p.sku}</span>
+            {p.sucursal_ajena && (
+              <span className="shrink-0 rounded-sm bg-amber-100 px-1 py-0.5 font-sans text-[10px] font-semibold normal-case text-amber-800">
+                En {p.sucursal_ajena}
+              </span>
             )}
-          >
-            {soldOut ? "—" : `${p.quantity} disp.`}
-          </span>
+          </p>
+          <p className="line-clamp-2 pt-0.5 text-[13px] leading-snug font-bold text-slate-900">{p.name}</p>
+          {(p.category || compat) && (
+            <p className="truncate text-[11px] leading-tight text-slate-500">
+              {p.category && <span className="capitalize">{p.category}</span>}
+              {p.category && compat ? " · " : ""}
+              {compat && <span className="font-medium text-emerald-700">{compat}</span>}
+            </p>
+          )}
+        </div>
+        <div className="mt-auto space-y-1.5 pt-2.5">
+          <div className="flex items-baseline justify-between gap-1">
+            {importe ? (
+              <span className={cn("text-[15px] font-bold tabular-nums tracking-tight text-slate-900", alCosto && "text-amber-700")}>
+                {alCosto && <span className="mr-1 text-[10px] font-medium uppercase">costo</span>}
+                {formatMXN(importe).replace(".00", "")}
+              </span>
+            ) : (
+              <span className="rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                Sin precio
+              </span>
+            )}
+            <span
+              className={cn(
+                "shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums",
+                p.quantity <= 3 && !soldOut ? "bg-amber-100 text-amber-800" : "bg-white/80 text-slate-600",
+              )}
+            >
+              {soldOut ? "—" : `${p.quantity} disp.`}
+            </span>
+          </div>
+          {almacen && (
+            <p className="flex items-center gap-1 border-t border-slate-300/70 pt-1.5 text-[10px] leading-tight text-slate-600">
+              <MapPin className="h-3 w-3 shrink-0 text-slate-400" />
+              <span className="truncate">{almacen}</span>
+            </p>
+          )}
         </div>
       </div>
     </div>
@@ -587,9 +598,14 @@ export function SalesScreen({
   // counter's 17 moves on to Guadalajara's instead of stopping.
   const siguiente = (filas: SalesProduct[]) => siguienteFila(filas, cart, vendible);
   // The almacenes holding stock, or the card's own when none does.
+  // One almacén: its name. Several: each with its own count, "Mostrador 6 · Guadalajara 100".
   const almacenDe = (filas: SalesProduct[]) => {
-    const con = filas.filter((f) => f.quantity > 0).map((f) => f.inventory_name).filter(Boolean);
-    return (con.length ? [...new Set(con)] : [filas[0].inventory_name]).filter(Boolean).join(" · ") || null;
+    const nombre = (f: SalesProduct) =>
+      (f.inventory_name ?? "").toLowerCase().replace(/(^|\s)\p{L}/gu, (c) => c.toUpperCase());
+    const con = filas.filter((f) => f.quantity > 0 && f.inventory_name);
+    if (con.length > 1) return con.map((f) => `${nombre(f)} ${f.quantity}`).join(" · ");
+    const f = con[0] ?? filas[0];
+    return f.inventory_name ? nombre(f) : null;
   };
   const comoTarjeta = (filas: SalesProduct[]): SalesProduct =>
     filas.length === 1 ? filas[0] : { ...filas[0], quantity: filas.reduce((n, f) => n + f.quantity, 0) };
