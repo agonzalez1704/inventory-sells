@@ -92,6 +92,7 @@ function buildPayload(rows: ExtractedRow[]) {
         size: r.size?.trim() || null,
         color: r.color?.trim() || null,
         category: r.category?.trim() || null,
+        ...(r.sistema ? { sistema: r.sistema } : {}),
         cost_cents: r.cost != null && r.cost >= 0 ? toCents(r.cost) : null,
         price_cents: r.price != null && r.price >= 0 ? toCents(r.price) : null,
         quantity: r.quantity != null && r.quantity > 0 ? Math.round(r.quantity) : 0,

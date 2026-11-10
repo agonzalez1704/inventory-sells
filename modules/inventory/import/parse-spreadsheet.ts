@@ -17,6 +17,7 @@ type Field =
   | "color"
   | "size"
   | "category"
+  | "sistema"
   | "cost"
   | "price"
   | "quantity"
@@ -37,6 +38,8 @@ const ALIASES: Record<Field, string[]> = {
   color: ["color"],
   size: ["talla", "size", "medida"],
   category: ["linea", "categoria", "familia"],
+  // Matched to the catalog's systems on the server; unknown values are ignored.
+  sistema: ["sistema"],
   cost: ["costo", "cost", "ultimo costo", "costo ultimo"],
   price: ["precio", "price", "pvp", "venta", "precio 4"],
   quantity: [
@@ -194,6 +197,8 @@ function rowsFromGrid(grid: unknown[][], sheetName: string): ExtractedRow[] {
       const marca = (g.brand !== undefined ? str(row[g.brand]) : undefined) ?? brand;
       if (marca) row2.brand = marca;
       if (categoria) row2.category = categoria;
+      const sistema = g.sistema !== undefined ? str(row[g.sistema]) : undefined;
+      if (sistema) row2.sistema = norm(sistema);
       if (color) row2.color = color;
       if (size) row2.size = size;
       if (qty != null) row2.quantity = Math.round(qty);

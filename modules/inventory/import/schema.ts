@@ -23,6 +23,8 @@ const RowSchema = z.object({
 
 export const AIExtractionSchema = z.object({ rows: z.array(RowSchema) });
 
-export type ExtractedRow = z.infer<typeof RowSchema>;
+// sistema comes only from a spreadsheet column, never from the AI: guessing a
+// system per row is the catalog's job, not the importer's.
+export type ExtractedRow = z.infer<typeof RowSchema> & { sistema?: string };
 
 export type ImportSource = "image" | "excel" | "csv" | "pdf";
