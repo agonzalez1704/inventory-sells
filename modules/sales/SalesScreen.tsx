@@ -140,7 +140,7 @@ function ProductCard({
   precioBase,
   clickAbreDetalle,
   compat = null,
-  almacen = null,
+  almacen = [],
 }: {
   p: SalesProduct;
   inCart: number;
@@ -150,8 +150,8 @@ function ProductCard({
   clickAbreDetalle: boolean;
   /** "Versa 2012–2017": which car this piece matched. */
   compat?: string | null;
-  /** Where the pieces sit: "CEDIS LEON", or "Mostrador · GUADALAJARA". */
-  almacen?: string | null;
+  /** Where the pieces sit: ["Cedis Leon"], or ["Mostrador 6", "Guadalajara 100"]. */
+  almacen?: string[];
 }) {
   const soldOut = p.quantity === 0;
   const maxed = inCart >= p.quantity;
@@ -233,8 +233,18 @@ function ProductCard({
             </p>
           )}
         </div>
-        <div className="mt-auto space-y-1.5 pt-2.5">
-          <div className="flex items-baseline justify-between gap-1">
+        <div className="mt-auto space-y-2 pt-2.5">
+          {almacen.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1">
+              <MapPin className="h-3 w-3 shrink-0 text-slate-400" />
+              {almacen.map((a) => (
+                <span key={a} className="rounded-sm bg-white/70 px-1 py-px text-[10px] leading-tight font-medium text-slate-700">
+                  {a}
+                </span>
+              ))}
+            </div>
+          )}
+          <div className="flex items-baseline justify-between gap-1 border-t border-slate-300/70 pt-2">
             {importe ? (
               <span className={cn("text-[15px] font-bold tabular-nums tracking-tight text-slate-900", alCosto && "text-amber-700")}>
                 {alCosto && <span className="mr-1 text-[10px] font-medium uppercase">costo</span>}
@@ -254,12 +264,6 @@ function ProductCard({
               {soldOut ? "—" : `${p.quantity} disp.`}
             </span>
           </div>
-          {almacen && (
-            <p className="flex items-center gap-1 border-t border-slate-300/70 pt-1.5 text-[10px] leading-tight text-slate-600">
-              <MapPin className="h-3 w-3 shrink-0 text-slate-400" />
-              <span className="truncate">{almacen}</span>
-            </p>
-          )}
         </div>
       </div>
     </div>
@@ -603,9 +607,9 @@ export function SalesScreen({
     const nombre = (f: SalesProduct) =>
       (f.inventory_name ?? "").toLowerCase().replace(/(^|\s)\p{L}/gu, (c) => c.toUpperCase());
     const con = filas.filter((f) => f.quantity > 0 && f.inventory_name);
-    if (con.length > 1) return con.map((f) => `${nombre(f)} ${f.quantity}`).join(" · ");
+    if (con.length > 1) return con.map((f) => `${nombre(f)} ${f.quantity}`);
     const f = con[0] ?? filas[0];
-    return f.inventory_name ? nombre(f) : null;
+    return f.inventory_name ? [nombre(f)] : [];
   };
   const comoTarjeta = (filas: SalesProduct[]): SalesProduct =>
     filas.length === 1 ? filas[0] : { ...filas[0], quantity: filas.reduce((n, f) => n + f.quantity, 0) };
