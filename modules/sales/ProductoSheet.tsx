@@ -27,12 +27,17 @@ import { MARCA } from "@/lib/marca";
 // shortcut to reading, not a step in making a sale.
 export function ProductoSheet({
   p,
+  filas = [],
+  enCarrito = {},
   verCostos,
   onClose,
   onAgregar,
   onAnotarDemanda,
 }: {
   p: SalesProduct | null;
+  /** Every stock row of this part number, best first; 2+ means several almacenes. */
+  filas?: SalesProduct[];
+  enCarrito?: Record<string, number>;
   verCostos: boolean;
   onClose: () => void;
   onAgregar: (p: SalesProduct) => void;
@@ -101,23 +106,31 @@ export function ProductoSheet({
       ? Math.round(((p.price_cents - (p.cost_cents ?? 0)) / (p.cost_cents ?? 1)) * 100)
       : null;
 
-  const filas: [string, string | null][] = [
+  // Same part in two almacenes: price, stock and the add button go per almacén.
+  const almacenes = filas.length > 1 ? filas : null;
+  const datos: [string, string | null][] = [
     [MARCA.id === "ruli" ? "No. de parte" : "SKU", p.sku],
     ["Marca", p.brand],
     // Auto parts: the category holds the owner's refacción (the Línea is retired).
     [MARCA.id === "ruli" ? "Refacción" : "Categoría", p.category],
     ["Tamaño", p.size],
-    ["Precio", p.price_cents ? formatMXN(p.price_cents) : "Sin precio"],
+    ...(almacenes
+      ? []
+      : ([["Precio", p.price_cents ? formatMXN(p.price_cents) : "Sin precio"]] as [string, string | null][])),
     // Cost and margin answer to the same permiso the rest of the app uses.
-    ...(verCostos
+    ...(verCostos && !almacenes
       ? ([
           ["Costo", p.cost_cents ? formatMXN(p.cost_cents) : "—"],
           ["Margen", margen === null ? "—" : `${margen}%`],
         ] as [string, string | null][])
       : []),
-    ["Sucursal", p.sucursal_name ?? null],
-    ["Inventario", p.inventory_name ?? null],
-    ["Existencia", `${p.quantity}`],
+    ...(almacenes
+      ? []
+      : ([
+          ["Sucursal", p.sucursal_name ?? null],
+          ["Inventario", p.inventory_name ?? null],
+          ["Existencia", `${p.quantity}`],
+        ] as [string, string | null][])),
   ];
 
   return (
@@ -172,7 +185,7 @@ export function ProductoSheet({
             </Badge>
           )}
           <dl className="divide-y divide-border rounded-xl border border-border">
-            {filas
+            {datos
               .filter(([, v]) => v)
               .map(([k, v]) => (
                 <div key={k} className="flex items-baseline justify-between gap-3 px-3 py-2">
@@ -184,7 +197,54 @@ export function ProductoSheet({
 
           {/* The click that opens this replaced the tap that added, so the
               sheet must offer adding back — anchored to the column's foot. */}
-          {p.quantity === 0 && onAnotarDemanda ? (
+          {almacenes ? (
+            <div className="mt-4 sm:mt-auto">
+              <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Por almacén</p>
+              <ul className="divide-y divide-border rounded-xl border border-border">
+                {almacenes.map((f) => {
+                  const lleno = (enCarrito[f.id] ?? 0) >= f.quantity;
+                  return (
+                    <li key={f.id} className="flex items-center gap-2 px-3 py-2">
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium">
+                          {f.inventory_name ?? "Sin almacén"}
+                          {f.sucursal_name ? <span className="text-muted-foreground"> · {f.sucursal_name}</span> : null}
+                        </span>
+                        <span className="block font-mono text-xs tabular-nums text-muted-foreground">
+                          {f.price_cents ? formatMXN(f.price_cents) : "Sin precio"}
+                          {verCostos && f.cost_cents ? ` · costo ${formatMXN(f.cost_cents)}` : ""}
+                        </span>
+                      </span>
+                      <span
+                        className={cn(
+                          "shrink-0 text-xs font-semibold tabular-nums",
+                          f.quantity > 0 ? "text-emerald-700" : "text-red-700",
+                        )}
+                      >
+                        {f.quantity > 0 ? `${f.quantity} pzs` : "Agotado"}
+                      </span>
+                      <Button
+                        size="sm"
+                        className="shrink-0"
+                        disabled={f.quantity === 0 || lleno}
+                        onClick={() => {
+                          onAgregar(f);
+                          onClose();
+                        }}
+                      >
+                        Agregar
+                      </Button>
+                    </li>
+                  );
+                })}
+              </ul>
+              {onAnotarDemanda && almacenes.every((f) => f.quantity === 0) && (
+                <Button variant="brand" className="mt-2 w-full" onClick={() => onAnotarDemanda(p)}>
+                  Anotar que la piden
+                </Button>
+              )}
+            </div>
+          ) : p.quantity === 0 && onAnotarDemanda ? (
             <div className="mt-4 space-y-2 sm:mt-auto">
               <p className="rounded-xl bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
                 Sin piezas. Anótalo para que el resurtido lo tome en cuenta.

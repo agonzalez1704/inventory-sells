@@ -55,6 +55,7 @@ import { PiezaFueraPanel } from "./PiezaFueraPanel";
 import type { PiezaFueraResult } from "./pieza-fuera";
 import { ReciboImpreso } from "./ReciboImpreso";
 import { ProductoSheet } from "./ProductoSheet";
+import { agruparPorSku, siguienteFila } from "./agrupar";
 import { CategoriaSheet } from "./CategoriaSheet";
 import { useLongPress } from "./useLongPress";
 import type { PrecioBase } from "./pos-prefs";
@@ -308,6 +309,7 @@ export function SalesScreen({
   encabezado = null,
   porVehiculo = false,
   piezaFuera = false,
+  inventarios = {},
 }: {
   /** First page of the catalog, rendered before any search runs. */
   products: SalesProduct[];
@@ -332,6 +334,8 @@ export function SalesScreen({
   encabezado?: string[] | null;
   /** This shop sells parts by car (Ruli): offer the vehicle search. */
   porVehiculo?: boolean;
+  /** inventory_id -> name, sucursal and age order (oldest first: the counter's own stock). */
+  inventarios?: Record<string, { name: string; sucursal: string | null; orden: number }>;
   /** Shop setting: offer buying a part next door with drawer cash. */
   piezaFuera?: boolean;
 }) {
@@ -348,7 +352,7 @@ export function SalesScreen({
   const [importe, setImporte] = useState("");
   const [descManual, setDescManual] = useState<number | null>(null);
   const [editDesc, setEditDesc] = useState(false);
-  const [detalle, setDetalle] = useState<SalesProduct | null>(null);
+  const [detalle, setDetalle] = useState<{ p: SalesProduct; filas: SalesProduct[] } | null>(null);
   const [saldo, setSaldo] = useState(0);
   const [catsAbiertas, setCatsAbiertas] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
@@ -556,26 +560,55 @@ export function SalesScreen({
       cost_cents: p.cost_cents,
       quantity: p.quantity,
       image_url: p.image_url,
+      inventory_name: inventarios[p.inventory_id]?.name ?? null,
+      sucursal_name: inventarios[p.inventory_id]?.sucursal ?? null,
       sucursal_ajena: inventariosAjenos[p.inventory_id] ?? null,
     }),
-    [inventariosAjenos],
+    [inventariosAjenos, inventarios],
   );
+
+  // One part, one card: the same number in Mostrador and in Guadalajara is one
+  // piece stocked in two places, not two pieces. The card leads with the row
+  // the counter can sell first; the sheet breaks the stock down per almacén.
+  const vendible = useCallback(
+    (p: SalesProduct) => !inventariosAjenos[p.inventory_id ?? ""] && !inventariosConsulta[p.inventory_id ?? ""],
+    [inventariosAjenos, inventariosConsulta],
+  );
+  const agrupar = useCallback(
+    (ps: SalesProduct[]) => agruparPorSku(ps, vendible, (id) => inventarios[id]?.orden ?? 999),
+    [vendible, inventarios],
+  );
+  const piezasEnCarrito = (filas: SalesProduct[]) => filas.reduce((n, f) => n + (cart[f.id] ?? 0), 0);
+  // The card's +: the first sellable row with room left, so selling past the
+  // counter's 17 moves on to Guadalajara's instead of stopping.
+  const siguiente = (filas: SalesProduct[]) => siguienteFila(filas, cart, vendible);
+  const comoTarjeta = (filas: SalesProduct[]): SalesProduct =>
+    filas.length === 1 ? filas[0] : { ...filas[0], quantity: filas.reduce((n, f) => n + f.quantity, 0) };
+
+  // Filter counts are parts, not stock rows: "Cremallera 2" means two parts.
+  const piezasUnicas = useMemo(() => {
+    const vistos = new Set<string>();
+    return piezas.filter((p) => {
+      const k = p.sku.trim().toUpperCase();
+      return !vistos.has(k) && (vistos.add(k), true);
+    });
+  }, [piezas]);
 
   // Two levels, the way the counter asks: the system first ("dame suspensión"),
   // its families inside it ("horquillas, amortiguadores").
   const sistemas = useMemo(() => {
     const cuenta = new Map<string, { id: string; nombre: string; n: number }>();
-    for (const p of piezas) {
+    for (const p of piezasUnicas) {
       const id = p.sistema ?? SIN_SISTEMA;
       const prev = cuenta.get(id);
       cuenta.set(id, { id, nombre: p.sistema_nombre ?? "Sin sistema", n: (prev?.n ?? 0) + 1 });
     }
     return [...cuenta.values()].sort((a, b) => b.n - a.n || a.nombre.localeCompare(b.nombre, "es"));
-  }, [piezas]);
+  }, [piezasUnicas]);
 
   const familias = useMemo(() => {
     const cuenta = new Map<string, { id: string; nombre: string; n: number }>();
-    for (const p of piezas) {
+    for (const p of piezasUnicas) {
       if (!p.familia) continue;
       if (sistema && (p.sistema ?? SIN_SISTEMA) !== sistema) continue;
       const prev = cuenta.get(p.familia);
@@ -586,20 +619,20 @@ export function SalesScreen({
       });
     }
     return [...cuenta.values()].sort((a, b) => b.n - a.n || a.nombre.localeCompare(b.nombre, "es"));
-  }, [piezas, sistema]);
+  }, [piezasUnicas, sistema]);
 
   // The part's brand (GROB, YOKOMITSU), counted inside the system and family
   // already chosen; offered only when there is a choice to make.
   const marcasPieza = useMemo(() => {
     const cuenta = new Map<string, number>();
-    for (const p of piezas) {
+    for (const p of piezasUnicas) {
       if (!p.brand) continue;
       if (sistema && (p.sistema ?? SIN_SISTEMA) !== sistema) continue;
       if (familia && p.familia !== familia) continue;
       cuenta.set(p.brand, (cuenta.get(p.brand) ?? 0) + 1);
     }
     return [...cuenta].map(([nombre, n]) => ({ nombre, n })).sort((a, b) => b.n - a.n);
-  }, [piezas, sistema, familia]);
+  }, [piezasUnicas, sistema, familia]);
 
   const piezasVisibles = useMemo(
     () =>
@@ -1312,16 +1345,16 @@ export function SalesScreen({
                       "grid grid-cols-2 gap-2.5 transition-opacity sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6",
                       cargandoVeh && "opacity-60",
                     )}>
-                    {piezasVisibles.map((p) => (
+                    {agrupar(piezasVisibles.map(comoProducto)).map((filas) => (
                       <ProductCard
-                        key={p.id}
-                        p={comoProducto(p)}
-                        inCart={cart[p.id] ?? 0}
-                        onAdd={() => add(comoProducto(p))}
-                        onVerDetalle={() => setDetalle(comoProducto(p))}
+                        key={filas[0].id}
+                        p={comoTarjeta(filas)}
+                        inCart={piezasEnCarrito(filas)}
+                        onAdd={() => add(siguiente(filas))}
+                        onVerDetalle={() => setDetalle({ p: filas[0], filas })}
                         clickAbreDetalle={clickAbreDetalle}
                         precioBase={precioBase}
-                        compat={p.compat}
+                        compat={piezasVisibles.find((x) => x.id === filas[0].id)?.compat ?? null}
                       />
                     ))}
                   </div>
@@ -1422,13 +1455,13 @@ export function SalesScreen({
                 "mt-3 grid grid-cols-2 gap-2.5 transition-opacity sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6",
                 buscando && "opacity-60",
               )}>
-              {results.map((p) => (
+              {agrupar(results).map((filas) => (
                 <ProductCard
-                  key={p.id}
-                  p={p}
-                  inCart={cart[p.id] ?? 0}
-                  onAdd={() => add(p)}
-                  onVerDetalle={() => setDetalle(p)}
+                  key={filas[0].id}
+                  p={comoTarjeta(filas)}
+                  inCart={piezasEnCarrito(filas)}
+                  onAdd={() => add(siguiente(filas))}
+                  onVerDetalle={() => setDetalle({ p: filas[0], filas })}
                   clickAbreDetalle={clickAbreDetalle}
                   precioBase={precioBase}
                 />
@@ -1569,7 +1602,9 @@ export function SalesScreen({
       )}
 
       <ProductoSheet
-        p={detalle}
+        p={detalle?.p ?? null}
+        filas={detalle?.filas ?? []}
+        enCarrito={cart}
         verCostos={verCostos}
         onClose={() => setDetalle(null)}
         onAgregar={(p) => {

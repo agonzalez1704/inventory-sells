@@ -35,7 +35,7 @@ export default async function PosPage() {
         .order("quantity", { ascending: false })
         .order("name", { ascending: true })
         .limit(30),
-      insforge.database.from("inventories").select("id, name, sucursales(nombre)"),
+      insforge.database.from("inventories").select("id, name, sucursales(nombre)").order("created_at", { ascending: true }),
       insforge.database
         .from("customers")
         .select("id, nombre, telefono, is_system, descuento_pct")
@@ -111,6 +111,9 @@ export default async function PosPage() {
       garantia={terminosGarantia(tienda)}
       encabezado={encabezadoTicket(tienda)}
       porVehiculo={conVehiculos}
+      inventarios={Object.fromEntries(
+        [...invName].map(([id, name], orden) => [id, { name, sucursal: invSucursal.get(id) ?? null, orden }]),
+      )}
     />
   );
 }
