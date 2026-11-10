@@ -75,8 +75,9 @@ export function ProductoSheet({
     tagsDeProducto(p.id)
       .then((t) => on && setTags(t))
       .catch(() => {});
-    compatiblesDe(p.id, 6)
-      .then((c) => on && setCompatibles(c))
+    // The same part in another almacén is not a compatible: "Por almacén" has it.
+    compatiblesDe(p.id, 7)
+      .then((c) => on && setCompatibles(c.filter((x) => x.sku.trim().toUpperCase() !== p.sku.trim().toUpperCase()).slice(0, 6)))
       .catch(() => {});
     garantiasEnStock(p.id)
       .then((g) => on && setGarantias(g))

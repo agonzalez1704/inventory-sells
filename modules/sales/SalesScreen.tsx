@@ -139,6 +139,7 @@ function ProductCard({
   precioBase,
   clickAbreDetalle,
   compat = null,
+  almacen = null,
 }: {
   p: SalesProduct;
   inCart: number;
@@ -148,6 +149,8 @@ function ProductCard({
   clickAbreDetalle: boolean;
   /** "Versa 2012–2017": which car this piece matched. */
   compat?: string | null;
+  /** Where the pieces sit: "CEDIS LEON", or "Mostrador · GUADALAJARA". */
+  almacen?: string | null;
 }) {
   const soldOut = p.quantity === 0;
   const maxed = inCart >= p.quantity;
@@ -220,8 +223,9 @@ function ProductCard({
         </p>
         <p className="line-clamp-2 text-[13px] leading-tight font-bold text-slate-900">{p.name}</p>
         <p className="truncate text-[10px] leading-tight text-slate-500 capitalize">
-          {p.sucursal_name && !p.sucursal_ajena ? `${p.sucursal_name} · ` : ""}
-          {p.category || p.inventory_name}
+          {almacen && <span className="font-semibold text-slate-700 normal-case">{almacen}</span>}
+          {almacen && p.category ? " · " : ""}
+          {p.category}
         </p>
         {compat && (
           <p className="truncate text-[10px] leading-tight font-medium text-emerald-700">{compat}</p>
@@ -582,6 +586,11 @@ export function SalesScreen({
   // The card's +: the first sellable row with room left, so selling past the
   // counter's 17 moves on to Guadalajara's instead of stopping.
   const siguiente = (filas: SalesProduct[]) => siguienteFila(filas, cart, vendible);
+  // The almacenes holding stock, or the card's own when none does.
+  const almacenDe = (filas: SalesProduct[]) => {
+    const con = filas.filter((f) => f.quantity > 0).map((f) => f.inventory_name).filter(Boolean);
+    return (con.length ? [...new Set(con)] : [filas[0].inventory_name]).filter(Boolean).join(" · ") || null;
+  };
   const comoTarjeta = (filas: SalesProduct[]): SalesProduct =>
     filas.length === 1 ? filas[0] : { ...filas[0], quantity: filas.reduce((n, f) => n + f.quantity, 0) };
 
@@ -1349,6 +1358,7 @@ export function SalesScreen({
                       <ProductCard
                         key={filas[0].id}
                         p={comoTarjeta(filas)}
+                        almacen={almacenDe(filas)}
                         inCart={piezasEnCarrito(filas)}
                         onAdd={() => add(siguiente(filas))}
                         onVerDetalle={() => setDetalle({ p: filas[0], filas })}
@@ -1459,6 +1469,7 @@ export function SalesScreen({
                 <ProductCard
                   key={filas[0].id}
                   p={comoTarjeta(filas)}
+                  almacen={almacenDe(filas)}
                   inCart={piezasEnCarrito(filas)}
                   onAdd={() => add(siguiente(filas))}
                   onVerDetalle={() => setDetalle({ p: filas[0], filas })}
