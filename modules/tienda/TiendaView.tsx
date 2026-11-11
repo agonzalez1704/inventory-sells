@@ -19,14 +19,17 @@ import {
   CarFront,
   Store,
   Warehouse,
+  Plus,
 } from "lucide-react";
 import { foto } from "@/lib/foto";
 import { formatPrecio } from "@/lib/money";
-import { type ModeloTienda } from "@/lib/calidades";
+import { type ModeloTienda, type VarianteModelo } from "@/lib/calidades";
 import { cn } from "@/lib/utils";
 import { useTiendaInfo } from "./TiendaInfoProvider";
 import { puntosRecoger } from "@/lib/tienda-info";
-import { AddToCart } from "./AddToCart";
+import { AddToCart, MAX_POR_PRODUCTO } from "./AddToCart";
+import { useCart } from "./CartProvider";
+import { StepperPieza } from "./StepperPieza";
 import { CompatibleBox } from "./CompatibleBox";
 import { BarraPedido } from "./CartDrawer";
 import { logoDeMarca } from "./marca-logo";
@@ -570,6 +573,12 @@ export function ModeloCard({
   // from, and for stock on hand, pickup today (or the shop's shipping time).
   const tienda = useTiendaInfo();
   const almacenes = [...new Set(disponibles.map((v) => v.almacen).filter(Boolean))] as string[];
+  // Ruli: the same part in several warehouses, one priced option each. The
+  // card orders straight from the list, one button per warehouse, nearest
+  // first — mechanics know the part, opening its page for each was the friction.
+  const porAlmacen =
+    ES_RULI && n > 1 && almacenes.length === disponibles.length && disponibles.every((v) => v.precio_cents > 0);
+  const opciones = porAlmacen ? [...disponibles].sort((a, b) => (a.entrega_dias ?? 0) - (b.entrega_dias ?? 0)) : [];
   const entrega =
     agotado || !locales.length
       ? null
@@ -659,6 +668,13 @@ export function ModeloCard({
           </p>
         )}
 
+        {porAlmacen ? (
+          <div className="relative z-10 mt-3 space-y-1.5">
+            {opciones.map((v, i) => (
+              <OpcionAlmacen key={v.id} v={v} imagen={v.imagen ?? m.imagen} principal={i === 0} />
+            ))}
+          </div>
+        ) : (
         <div className={cn("mt-auto flex items-end justify-between gap-3 pt-3", tarjeta && "lg:flex-col lg:items-stretch lg:gap-2.5")}>
           <div className="min-w-0 leading-tight">
             {m.desde_cents ? (
@@ -695,6 +711,7 @@ export function ModeloCard({
             ) : destino.precio_cents > 0 ? (
               <AddToCart
                 size="md"
+                abrir={false}
                 className={cn("relative z-10 shrink-0", ancho)}
                 p={{
                   id: destino.id,
@@ -716,7 +733,60 @@ export function ModeloCard({
               </a>
             ))}
         </div>
+        )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * One warehouse's option on a listing card: where, when, price, and add — or,
+ * once in the order, the stepper. Adding never opens the cart: the next part
+ * is the next tap.
+ */
+function OpcionAlmacen({ v, imagen, principal }: { v: VarianteModelo; imagen: string | null; principal: boolean }) {
+  const { add, items, setQty } = useCart();
+  const qty = items.find((i) => i.id === v.id)?.qty ?? 0;
+  const dias = v.entrega_dias ?? 0;
+  return (
+    <div
+      className={cn(
+        "flex min-h-11 items-center justify-between gap-2 rounded-xl pl-3 ring-1",
+        qty > 0 ? "bg-tienda-50 ring-tienda-200" : "ring-border",
+      )}
+    >
+      <div className="min-w-0 py-1 leading-tight">
+        <p className="truncate text-[13px] font-semibold text-foreground">{v.almacen}</p>
+        <p className="truncate text-xs text-muted-foreground">
+          <span className="font-semibold tabular-nums text-foreground">{formatPrecio(v.precio_cents)}</span>
+          {" · "}
+          {dias ? `+${dias} días hábiles` : "en existencia"}
+        </p>
+      </div>
+      {qty > 0 ? (
+        <StepperPieza qty={qty} max={MAX_POR_PRODUCTO} nombre={v.nombre} onChange={(q) => setQty(v.id, q)} />
+      ) : (
+        <button
+          type="button"
+          onClick={() =>
+            add(
+              { id: v.id, nombre: v.nombre, precio_cents: v.precio_cents, imagen, max: MAX_POR_PRODUCTO, almacen: v.almacen },
+              1,
+              false,
+            )
+          }
+          aria-label={`Agregar ${v.nombre} de ${v.almacen}`}
+          className={cn(
+            "flex h-11 shrink-0 cursor-pointer items-center gap-1 rounded-xl px-3.5 text-sm font-semibold transition-[background-color,transform] duration-150 ease-out active:scale-[0.97]",
+            principal
+              ? "bg-tienda-600 text-white shadow-sm shadow-tienda-600/30 hover:bg-tienda-700"
+              : "text-tienda-700 ring-1 ring-tienda-200 hover:bg-tienda-50",
+          )}
+        >
+          <Plus className="h-4 w-4" />
+          Agregar
+        </button>
+      )}
     </div>
   );
 }

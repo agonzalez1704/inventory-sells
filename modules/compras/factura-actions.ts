@@ -1,5 +1,6 @@
 "use server";
 
+import { claveSku } from "@/lib/sku";
 import * as XLSX from "xlsx";
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
@@ -58,7 +59,7 @@ const esHoja = (nombre: string, tipo: string) =>
 
 /** Resolve our own SKUs in bulk. */
 async function porSku(skus: string[]) {
-  const limpios = [...new Set(skus.filter(Boolean))];
+  const limpios = [...new Set(skus.filter(Boolean).map(claveSku))];
   if (!limpios.length) return new Map<string, { id: string; sku: string; name: string }>();
   const { data } = await insforgeAdmin.database
     .from("products")
@@ -147,7 +148,7 @@ async function proponer(
       pedido: c.pedido,
     };
 
-    const propio = mapSku.get(c.skuPropio);
+    const propio = mapSku.get(claveSku(c.skuPropio));
     if (propio) {
       out.push({ ...base, productId: propio.id, productoNombre: propio.name, productoSku: propio.sku, origen: "sku" });
       continue;

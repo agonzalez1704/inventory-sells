@@ -22,9 +22,12 @@ export type AddableProduct = {
 export function AddToCart({
   p,
   size = "sm",
+  abrir = true,
   className,
 }: {
   p: AddableProduct;
+  /** False in lists: add without opening the cart. */
+  abrir?: boolean;
   /** xs exists for stacked variant rows: a 36px button in a 44px row leaves
    *  8px of air, and three of them read as one solid column. */
   size?: "xs" | "sm" | "md" | "lg";
@@ -65,6 +68,7 @@ export function AddToCart({
             max: MAX_POR_PRODUCTO,
           },
           1,
+          abrir,
         );
       }}
       disabled={maxed}

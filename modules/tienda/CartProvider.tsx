@@ -21,6 +21,8 @@ export type CartItem = {
   imagen: string | null;
   qty: number;
   max: number; // stock snapshot, to keep the stepper sane
+  /** Warehouse it ships from, when the same part sits in several. */
+  almacen?: string | null;
 };
 
 /**
@@ -48,7 +50,9 @@ type CartCtx = {
   items: CartItem[];
   count: number;
   subtotal: number;
-  add: (item: Omit<CartItem, "qty">, qty?: number) => void;
+  /** `abrir` false: added from a list, where the cart opening on every tap
+   *  would bury the next part. */
+  add: (item: Omit<CartItem, "qty">, qty?: number, abrir?: boolean) => void;
   setQty: (id: string, qty: number) => void;
   remove: (id: string) => void;
   clear: () => void;
@@ -105,7 +109,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
   }, [entrega, ready]);
 
-  const add = useCallback((item: Omit<CartItem, "qty">, qty = 1) => {
+  const add = useCallback((item: Omit<CartItem, "qty">, qty = 1, abrir = true) => {
     setItems((cur) => {
       const found = cur.find((i) => i.id === item.id);
       if (found) {
@@ -114,7 +118,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       }
       return [...cur, { ...item, qty: Math.min(qty, item.max) }];
     });
-    setOpen(true);
+    if (abrir) setOpen(true);
   }, []);
 
   const setQty = useCallback((id: string, qty: number) => {

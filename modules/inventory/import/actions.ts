@@ -1,5 +1,6 @@
 "use server";
 
+import { claveSku } from "@/lib/sku";
 import { slugify } from "@/lib/slug";
 import { assertPermiso } from "@/lib/auth/profile";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
@@ -80,7 +81,7 @@ function buildPayload(rows: ExtractedRow[]) {
   return rows
     .map((r) => ({
       ...r,
-      sku: r.sku?.trim() || (r.name ? slugify(r.name) : ""),
+      sku: claveSku(r.sku?.trim() || (r.name ? slugify(r.name) : "")),
     }))
     .filter((r) => r.sku !== "")
     .map((r) => {

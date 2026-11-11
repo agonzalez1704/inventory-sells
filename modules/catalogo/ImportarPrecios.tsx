@@ -1,5 +1,6 @@
 "use client";
 
+import { claveSku } from "@/lib/sku";
 import { useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -40,7 +41,7 @@ function leerListaGrob(XLSX: typeof import("xlsx"), wb: import("xlsx").WorkBook)
       const vistos = new Set<string>();
       const out: FilaLista[] = [];
       for (const r of rows.slice(h + 1)) {
-        const sku = String(r[iCod] ?? "").trim();
+        const sku = claveSku(String(r[iCod] ?? ""));
         const pl = centavos(r[iPl]) / 100;
         if (!sku || !pl || vistos.has(sku)) continue;
         vistos.add(sku);
@@ -105,7 +106,7 @@ export function ImportarPrecios({ factorGrob }: { factorGrob: number | null }) {
         const vistos = new Set<string>();
         const filas: FilaSae[] = [];
         for (const r of rows.slice(1)) {
-          const sku = String(r[iClave] ?? "").trim();
+          const sku = claveSku(String(r[iClave] ?? ""));
           if (!sku || vistos.has(sku)) continue;
           vistos.add(sku);
           filas.push({

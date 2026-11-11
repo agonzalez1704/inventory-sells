@@ -1,5 +1,6 @@
 "use server";
 
+import { claveSku } from "@/lib/sku";
 import { auth } from "@clerk/nextjs/server";
 import { updateTag } from "next/cache";
 import { insforgeAdmin } from "@/lib/insforge/admin";
@@ -247,7 +248,7 @@ export async function duplicarProducto(id: string): Promise<ActionResult<{ id: s
 
     const insforge = await createInsForgeServerClient();
     for (let n = 1; n <= 20; n++) {
-      const sku = `${p.sku}-copia${n > 1 ? `-${n}` : ""}`;
+      const sku = claveSku(`${p.sku}-copia${n > 1 ? `-${n}` : ""}`);
       const { data: nuevo, error } = await insforge.database
         .from("products")
         .insert([{ ...p, sku, name: `${p.name} (copia)`, quantity: 0, is_active: true }])

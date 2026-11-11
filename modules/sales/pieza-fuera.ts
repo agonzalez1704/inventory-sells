@@ -1,5 +1,6 @@
 "use server";
 
+import { claveSku } from "@/lib/sku";
 import { auth } from "@clerk/nextjs/server";
 import { assertPermiso } from "@/lib/auth/profile";
 import { insforgeAdmin } from "@/lib/insforge/admin";
@@ -135,7 +136,7 @@ export async function registrarPiezaDeFuera(input: PiezaFueraInput): Promise<Act
     // 1. The part, in this branch's "Piezas de fuera". Bought again later, the
     //    same part is reused: its stock and cost layers simply grow.
     const inventoryId = await inventarioDeFuera(userId);
-    const sku = slugify(nombre) || `pieza-${Date.now()}`;
+    const sku = claveSku(slugify(nombre) || `pieza-${Date.now()}`);
     const { data: prev } = await insforgeAdmin.database
       .from("products")
       .select("id")

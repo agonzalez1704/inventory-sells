@@ -1,5 +1,6 @@
 "use server";
 
+import { claveSku } from "@/lib/sku";
 import { slugify } from "@/lib/slug";
 
 import { insforgeAdmin } from "@/lib/insforge/admin";
@@ -554,7 +555,7 @@ export async function crearProductoEnCompra(
 
   const name = nombre.trim();
   if (name.length < 3) throw new Error("Escribe el nombre de la pieza");
-  const sku = slugify(name);
+  const sku = claveSku(slugify(name));
   if (!sku) throw new Error("El nombre no genera un SKU válido");
 
   const { data: compra } = await insforgeAdmin.database

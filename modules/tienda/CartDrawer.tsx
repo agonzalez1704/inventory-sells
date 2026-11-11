@@ -99,7 +99,10 @@ function CartBody() {
                   </span>
                   <div className="min-w-0 flex-1">
                     <div className="flex justify-between gap-2">
-                      <p className="line-clamp-2 text-[15px] font-semibold leading-snug text-foreground">{i.nombre}</p>
+                      <div className="min-w-0">
+                        <p className="line-clamp-2 text-[15px] font-semibold leading-snug text-foreground">{i.nombre}</p>
+                        {i.almacen && <p className="mt-0.5 text-[13px] text-muted-foreground">{i.almacen}</p>}
+                      </div>
                       <span className="shrink-0 text-[15px] font-semibold tabular-nums text-foreground">
                         {formatPrecio(i.precio_cents * i.qty)}
                       </span>

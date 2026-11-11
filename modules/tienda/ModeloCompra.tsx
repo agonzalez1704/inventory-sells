@@ -305,6 +305,7 @@ export function ModeloCompra({
                       precio_cents: v.precio_cents,
                       imagen: v.imagen ?? m.imagen,
                       max: MAX_POR_PRODUCTO,
+                      almacen: porAlmacen ? v.almacen : null,
                     },
                     cantidad,
                   )

@@ -34,7 +34,7 @@ export function leerHoja(grid: unknown[][]): FilaArchivo[] | null {
   const celda = (r: unknown[], i: number) => (i < 0 ? undefined : String(r[i] ?? "").replace(/\s+/g, " ").trim() || undefined);
   return grid
     .slice(cab + 1)
-    .map((r) => ({ sku: celda(r, sku) ?? "", nombre: celda(r, nombre), marca: celda(r, marca), refaccion: celda(r, refaccion), sistema: celda(r, sistema) }))
+    .map((r) => ({ sku: (celda(r, sku) ?? "").toUpperCase(), nombre: celda(r, nombre), marca: celda(r, marca), refaccion: celda(r, refaccion), sistema: celda(r, sistema) }))
     .filter((f) => f.sku);
 }
 

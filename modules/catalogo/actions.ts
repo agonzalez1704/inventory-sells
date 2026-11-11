@@ -1,5 +1,6 @@
 "use server";
 
+import { claveSku } from "@/lib/sku";
 import { updateTag } from "next/cache";
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { assertPermiso, permisosDe } from "@/lib/auth/profile";
@@ -485,6 +486,8 @@ export async function aplicarCarros(
 export async function ligarConversion(sku: string, otro: string): Promise<ActionResult<null>> {
   return attempt("ligarConversion", async () => {
     await assertPermiso("inventario_gestionar");
+    sku = claveSku(sku);
+    otro = claveSku(otro);
     if (sku === otro) throw new Error("Es la misma pieza");
     const { data } = await DB.from("products").select("sku, conversion_grupo").in("sku", [sku, otro]);
     const filas = (data ?? []) as { sku: string; conversion_grupo: string | null }[];
