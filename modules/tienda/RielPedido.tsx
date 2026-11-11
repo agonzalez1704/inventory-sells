@@ -52,7 +52,9 @@ export function RielPedido() {
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="line-clamp-2 text-[13px] font-medium leading-snug text-foreground">{i.nombre}</span>
-                    <span className="text-xs text-muted-foreground">{i.qty} pza</span>
+                    <span className="text-xs text-muted-foreground">
+                      {i.qty} pza{i.almacen ? ` · ${i.almacen}` : ""}
+                    </span>
                   </span>
                   <span className="shrink-0 text-sm font-semibold tabular-nums text-foreground">
                     {formatPrecio(i.precio_cents * i.qty)}
