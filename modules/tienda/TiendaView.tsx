@@ -592,6 +592,7 @@ export function ModeloCard({
     <div
       className={cn(
         "group relative flex gap-3.5 p-3.5 transition-colors duration-150 ease-out has-[a:active]:bg-muted/60",
+        porAlmacen && "flex-wrap",
         tarjeta
           ? "lg:h-full lg:flex-col lg:gap-0 lg:overflow-hidden lg:rounded-2xl lg:border lg:border-border lg:bg-background lg:p-0 lg:hover:border-tienda-300"
           : "hover:bg-muted/40",
@@ -668,13 +669,7 @@ export function ModeloCard({
           </p>
         )}
 
-        {porAlmacen ? (
-          <div className="relative z-10 mt-3 space-y-1.5">
-            {opciones.map((v, i) => (
-              <OpcionAlmacen key={v.id} v={v} imagen={v.imagen ?? m.imagen} principal={i === 0} />
-            ))}
-          </div>
-        ) : (
+        {!porAlmacen && (
         <div className={cn("mt-auto flex items-end justify-between gap-3 pt-3", tarjeta && "lg:flex-col lg:items-stretch lg:gap-2.5")}>
           <div className="min-w-0 leading-tight">
             {m.desde_cents ? (
@@ -735,6 +730,16 @@ export function ModeloCard({
         </div>
         )}
       </div>
+
+      {porAlmacen && (
+        // Full card width, under the photo: room for the warehouse name next
+        // to the stepper on a phone.
+        <div className="relative z-10 basis-full space-y-1.5">
+          {opciones.map((v, i) => (
+            <OpcionAlmacen key={v.id} v={v} imagen={v.imagen ?? m.imagen} principal={i === 0} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
