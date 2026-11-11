@@ -20,6 +20,8 @@ import {
   Store,
   Warehouse,
   Plus,
+  Minus,
+  Trash2,
 } from "lucide-react";
 import { foto } from "@/lib/foto";
 import { formatPrecio } from "@/lib/money";
@@ -29,7 +31,6 @@ import { useTiendaInfo } from "./TiendaInfoProvider";
 import { puntosRecoger } from "@/lib/tienda-info";
 import { AddToCart, MAX_POR_PRODUCTO } from "./AddToCart";
 import { useCart } from "./CartProvider";
-import { StepperPieza } from "./StepperPieza";
 import { CompatibleBox } from "./CompatibleBox";
 import { BarraPedido } from "./CartDrawer";
 import { logoDeMarca } from "./marca-logo";
@@ -638,7 +639,7 @@ export function ModeloCard({
               {destino.sku}
             </span>
           )}
-          {n > 1 && (
+          {n > 1 && !porAlmacen && (
             <span className="text-xs text-muted-foreground">
               {n} {ES_RULI ? "opciones" : "calidades"}
             </span>
@@ -652,7 +653,7 @@ export function ModeloCard({
           </p>
         )}
 
-        {(almacenes.length > 0 || entrega) && (
+        {!porAlmacen && (almacenes.length > 0 || entrega) && (
           <p className="mt-1.5 flex items-start gap-1.5 text-[13px] leading-snug text-muted-foreground">
             {almacenes.length ? (
               <Warehouse aria-hidden className="mt-0.5 h-3.5 w-3.5 shrink-0" />
@@ -732,9 +733,10 @@ export function ModeloCard({
       </div>
 
       {porAlmacen && (
-        // Full card width, under the photo: room for the warehouse name next
-        // to the stepper on a phone.
-        <div className="relative z-10 basis-full space-y-1.5">
+        // Full card width, under the photo. The nearest warehouse (Mostrador)
+        // is the big button — it's what mechanics almost always want; the
+        // others sit under it, smaller.
+        <div className="relative z-10 flex basis-full flex-col gap-2">
           {opciones.map((v, i) => (
             <OpcionAlmacen key={v.id} v={v} imagen={v.imagen ?? m.imagen} principal={i === 0} />
           ))}
@@ -745,54 +747,88 @@ export function ModeloCard({
 }
 
 /**
- * One warehouse's option on a listing card: where, when, price, and add — or,
- * once in the order, the stepper. Adding never opens the cart: the next part
- * is the next tap.
+ * One warehouse's option on a listing card. The main one is a full-width
+ * "Agregar · Mostrador  $248"; the rest are a quiet "o pedirlo de …" line.
+ * Once in the order either becomes its own − qty + control. Adding never opens
+ * the cart: the next part is the next tap.
  */
 function OpcionAlmacen({ v, imagen, principal }: { v: VarianteModelo; imagen: string | null; principal: boolean }) {
   const { add, items, setQty } = useCart();
   const qty = items.find((i) => i.id === v.id)?.qty ?? 0;
-  const dias = v.entrega_dias ?? 0;
-  return (
-    <div
+  const dias = v.entrega_dias ? ` · +${v.entrega_dias} días` : "";
+  const precio = formatPrecio(v.precio_cents);
+  const agregar = () =>
+    add({ id: v.id, nombre: v.nombre, precio_cents: v.precio_cents, imagen, max: MAX_POR_PRODUCTO, almacen: v.almacen }, 1, false);
+  const presion = "cursor-pointer transition-[background-color,transform] duration-150 ease-out active:scale-[0.97]";
+
+  if (qty > 0) {
+    const boton = cn(
+      "flex shrink-0 cursor-pointer items-center justify-center disabled:cursor-not-allowed disabled:opacity-30",
+      principal ? "h-11 w-11" : "h-9 w-9",
+    );
+    const icono = principal ? "h-4 w-4" : "h-3.5 w-3.5";
+    return (
+      <div
+        className={cn(
+          "flex items-center justify-between gap-2 rounded-xl bg-tienda-50 pl-3 text-tienda-800 ring-1 ring-tienda-200 dark:bg-tienda-950/40 dark:text-tienda-200 dark:ring-tienda-800",
+          principal ? "h-11 text-sm" : "h-9 text-[13px]",
+        )}
+      >
+        <span className="min-w-0 truncate font-semibold">
+          {v.almacen} · <span className="tabular-nums">{precio}</span>
+          {dias}
+        </span>
+        <span className="flex items-center">
+          <button type="button" onClick={() => setQty(v.id, qty - 1)} aria-label={qty === 1 ? `Quitar ${v.nombre}` : "Quitar uno"} className={boton}>
+            {qty === 1 ? <Trash2 className={icono} /> : <Minus className={icono} />}
+          </button>
+          <span className="min-w-5 text-center font-bold tabular-nums">{qty}</span>
+          <button type="button" onClick={() => setQty(v.id, qty + 1)} disabled={qty >= MAX_POR_PRODUCTO} aria-label="Agregar uno" className={boton}>
+            <Plus className={icono} />
+          </button>
+        </span>
+      </div>
+    );
+  }
+
+  return principal ? (
+    <button
+      type="button"
+      onClick={agregar}
+      aria-label={`Agregar ${v.nombre} de ${v.almacen}`}
       className={cn(
-        "flex min-h-11 items-center justify-between gap-2 rounded-xl pl-3 ring-1",
-        qty > 0 ? "bg-tienda-50 ring-tienda-200" : "ring-border",
+        "flex h-11 w-full items-center justify-between gap-3 rounded-xl bg-tienda-600 px-3.5 text-sm font-semibold text-white shadow-sm shadow-tienda-600/30 hover:bg-tienda-700",
+        presion,
       )}
     >
-      <div className="min-w-0 py-1 leading-tight">
-        <p className="truncate text-[13px] font-semibold text-foreground">{v.almacen}</p>
-        <p className="truncate text-xs text-muted-foreground">
-          <span className="font-semibold tabular-nums text-foreground">{formatPrecio(v.precio_cents)}</span>
-          {" · "}
-          {dias ? `+${dias} días hábiles` : "en existencia"}
-        </p>
-      </div>
-      {qty > 0 ? (
-        <StepperPieza qty={qty} max={MAX_POR_PRODUCTO} nombre={v.nombre} onChange={(q) => setQty(v.id, q)} />
-      ) : (
-        <button
-          type="button"
-          onClick={() =>
-            add(
-              { id: v.id, nombre: v.nombre, precio_cents: v.precio_cents, imagen, max: MAX_POR_PRODUCTO, almacen: v.almacen },
-              1,
-              false,
-            )
-          }
-          aria-label={`Agregar ${v.nombre} de ${v.almacen}`}
-          className={cn(
-            "flex h-11 shrink-0 cursor-pointer items-center gap-1 rounded-xl px-3.5 text-sm font-semibold transition-[background-color,transform] duration-150 ease-out active:scale-[0.97]",
-            principal
-              ? "bg-tienda-600 text-white shadow-sm shadow-tienda-600/30 hover:bg-tienda-700"
-              : "text-tienda-700 ring-1 ring-tienda-200 hover:bg-tienda-50",
-          )}
-        >
-          <Plus className="h-4 w-4" />
-          Agregar
-        </button>
+      <span className="flex min-w-0 items-center gap-1.5">
+        <Plus className="h-4 w-4 shrink-0" />
+        <span className="truncate">
+          Agregar · {v.almacen}
+          {dias}
+        </span>
+      </span>
+      <span className="shrink-0 tabular-nums">{precio}</span>
+    </button>
+  ) : (
+    <button
+      type="button"
+      onClick={agregar}
+      aria-label={`Agregar ${v.nombre} de ${v.almacen}`}
+      className={cn(
+        "flex h-9 w-full items-center justify-between gap-3 rounded-[10px] px-3 text-[13px] text-muted-foreground ring-1 ring-border hover:bg-muted",
+        presion,
       )}
-    </div>
+    >
+      <span className="truncate">
+        o pedirlo de {v.almacen}
+        {dias}
+      </span>
+      <span className="flex shrink-0 items-center gap-1 font-semibold tabular-nums text-foreground">
+        {precio}
+        <Plus className="h-3.5 w-3.5" />
+      </span>
+    </button>
   );
 }
 
