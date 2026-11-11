@@ -13,6 +13,7 @@ import {
   costoUnitario,
   extraerFacturaDeImagen,
   extraerFacturaDePdf,
+  type FacturaExtraida,
   type LineaFactura,
 } from "./extraer-factura";
 
@@ -38,6 +39,8 @@ export type LineaPropuesta = {
   productId: string | null;
   productoNombre: string | null;
   productoSku: string | null;
+  /** What the matched product costs today, pesos — to see the new cost move. */
+  costoActual: number | null;
   origen: Origen;
 };
 
@@ -58,18 +61,21 @@ const esHoja = (nombre: string, tipo: string) =>
   tipo.includes("excel") ||
   tipo === "text/csv";
 
-/** Resolve our own SKUs in bulk. */
-async function porSku(skus: string[]) {
+/**
+ * Resolve our own SKUs in bulk, in the destination inventory when there is one.
+ * Without one the oldest row of each SKU wins (Mostrador, the canonical row).
+ */
+async function porSku(skus: string[], inventarioId: string | null) {
   const limpios = [...new Set(skus.filter(Boolean).map(claveSku))];
-  if (!limpios.length) return new Map<string, { id: string; sku: string; name: string }>();
-  const { data } = await insforgeAdmin.database
-    .from("products")
-    .select("id, sku, name")
-    .in("sku", limpios);
-  return new Map(
-    ((data ?? []) as { id: string; sku: string; name: string }[]).map((p) => [p.sku, p]),
-  );
+  if (!limpios.length) return new Map<string, Producto>();
+  let q = insforgeAdmin.database.from("products").select("id, sku, name, cost_cents").in("sku", limpios);
+  if (inventarioId) q = q.eq("inventory_id", inventarioId);
+  const { data } = await q.order("created_at", { ascending: false });
+  return new Map(((data ?? []) as Producto[]).map((p) => [p.sku, p]));
 }
+
+type Producto = { id: string; sku: string; name: string; cost_cents?: number | null };
+const costoDe = (p: Producto) => (p.cost_cents != null ? p.cost_cents / 100 : null);
 
 /** Supplier codes we have already been taught. */
 async function equivalencias(proveedorId: string, skus: string[]) {
@@ -96,12 +102,12 @@ async function equivalencias(proveedorId: string, skus: string[]) {
  * product and build a cost layer against it — wrong in a way that shows up as a
  * margin, not as an error.
  */
-async function porTexto(texto: string) {
+async function porTexto(texto: string, inventarioId: string | null) {
   const tokens = tokensDeConsulta(texto);
   if (!tokens.length) return null;
   const { data } = await insforgeAdmin.database.rpc("buscar_productos_candidatos", {
     p_tokens: tokens.map(expand),
-    p_inventory_id: null,
+    p_inventory_id: inventarioId,
     p_categoria: null,
     p_limit: 200,
   });
@@ -114,7 +120,7 @@ async function porTexto(texto: string) {
 }
 
 async function proponer(
-  proveedorId: string,
+  proveedorId: string | null,
   crudas: {
     ref: number;
     descripcion: string;
@@ -124,70 +130,148 @@ async function proponer(
     costo: number | null;
     pedido: number | null;
   }[],
+  inventarioId: string | null = null,
 ): Promise<LineaPropuesta[]> {
+  // Our own SKU, or — many suppliers share the maker's numbering — the
+  // supplier's code when it is also one of ours.
+  const clave = (c: (typeof crudas)[number]) => c.skuPropio || c.skuProveedor;
   const [mapSku, mapEq] = await Promise.all([
-    porSku(crudas.map((c) => c.skuPropio)),
-    equivalencias(proveedorId, crudas.map((c) => c.skuProveedor)),
+    porSku(crudas.map(clave), inventarioId),
+    equivalencias(proveedorId ?? "", crudas.map((c) => c.skuProveedor)),
   ]);
 
+  // A taught equivalence points at one row; land it in the destination
+  // inventory's row of the same SKU.
   const idsEq = [...new Set([...mapEq.values()])];
   const { data: prodsEq } = idsEq.length
-    ? await insforgeAdmin.database.from("products").select("id, sku, name").in("id", idsEq)
+    ? await insforgeAdmin.database.from("products").select("id, sku, name, cost_cents").in("id", idsEq)
     : { data: [] };
-  const porId = new Map(
-    ((prodsEq ?? []) as { id: string; sku: string; name: string }[]).map((p) => [p.id, p]),
+  const porId = new Map(((prodsEq ?? []) as Producto[]).map((p) => [p.id, p]));
+  const enDestino = inventarioId
+    ? await porSku(((prodsEq ?? []) as Producto[]).map((p) => p.sku), inventarioId)
+    : new Map<string, Producto>();
+
+  return Promise.all(
+    crudas.map(async (c): Promise<LineaPropuesta> => {
+      const base = {
+        ref: c.ref,
+        descripcion: c.descripcion,
+        skuProveedor: c.skuProveedor,
+        cantidad: c.cantidad,
+        costo: c.costo,
+        pedido: c.pedido,
+      };
+      const con = (p: Producto, origen: Origen): LineaPropuesta => ({
+        ...base,
+        productId: p.id,
+        productoNombre: p.name,
+        productoSku: p.sku,
+        costoActual: costoDe(p),
+        origen,
+      });
+
+      const propio = clave(c) ? mapSku.get(claveSku(clave(c))) : undefined;
+      if (propio) return con(propio, "sku");
+      const eqId = mapEq.get(c.skuProveedor);
+      const eq = eqId ? porId.get(eqId) : undefined;
+      if (eq) return con(enDestino.get(eq.sku) ?? eq, "equivalencia");
+      const adivinado = await porTexto(c.descripcion || c.skuProveedor, inventarioId);
+      return adivinado
+        ? { ...base, productId: adivinado.id, productoNombre: adivinado.name, productoSku: adivinado.sku, costoActual: null, origen: "busqueda" }
+        : { ...base, productId: null, productoNombre: null, productoSku: null, costoActual: null, origen: "sin_match" };
+    }),
   );
-
-  const out: LineaPropuesta[] = [];
-  for (const c of crudas) {
-    const base = {
-      ref: c.ref,
-      descripcion: c.descripcion,
-      skuProveedor: c.skuProveedor,
-      cantidad: c.cantidad,
-      costo: c.costo,
-      pedido: c.pedido,
-    };
-
-    const propio = mapSku.get(claveSku(c.skuPropio));
-    if (propio) {
-      out.push({ ...base, productId: propio.id, productoNombre: propio.name, productoSku: propio.sku, origen: "sku" });
-      continue;
-    }
-    const eqId = mapEq.get(c.skuProveedor);
-    const eq = eqId ? porId.get(eqId) : undefined;
-    if (eq) {
-      out.push({ ...base, productId: eq.id, productoNombre: eq.name, productoSku: eq.sku, origen: "equivalencia" });
-      continue;
-    }
-    const adivinado = await porTexto(c.descripcion || c.skuProveedor);
-    out.push(
-      adivinado
-        ? { ...base, productId: adivinado.id, productoNombre: adivinado.name, productoSku: adivinado.sku, origen: "busqueda" }
-        : { ...base, productId: null, productoNombre: null, productoSku: null, origen: "sin_match" },
-    );
-  }
-  return out;
 }
 
 /**
- * Read an uploaded document into proposed lines. Writes nothing.
+ * Read a document into proposed lines. Writes nothing.
  *
  * The format is detected rather than declared: a recognised template is parsed
- * deterministically, any other sheet falls to the heuristic reader, and a PDF or
- * photo goes to the model. `modo` comes back so the screen can say which path it
- * took — a silent misread is the failure worth designing against.
+ * deterministically, any other sheet is refused, and a PDF or photo goes to the
+ * model. `modo` comes back so the screen can say which path it took — a silent
+ * misread is the failure worth designing against. The supplier is resolved
+ * after reading, since a new purchase learns it from the invoice itself.
  */
+async function leerArchivo(
+  fd: FormData,
+  proveedorDe: (factura: FacturaExtraida | null) => Promise<string | null>,
+  inventarioId: string | null,
+): Promise<{ analisis: AnalisisFactura; factura: FacturaExtraida | null; proveedorId: string | null }> {
+  const file = fd.get("file");
+  if (!(file instanceof File) || file.size === 0) throw new Error("Falta el archivo");
+  if (file.size > MAX_BYTES) throw new Error("El archivo pesa más de 10 MB");
+  const bytes = new Uint8Array(await file.arrayBuffer());
+
+  if (esHoja(file.name, file.type)) {
+    const wb = XLSX.read(bytes, { type: "array" });
+    const hoja = wb.Sheets[wb.SheetNames[0]];
+    const grid = XLSX.utils.sheet_to_json<unknown[]>(hoja, { header: 1, defval: "" });
+
+    // Not our template: say so loudly rather than guessing columns silently.
+    if (!esPlantilla(grid))
+      throw new Error(
+        "No reconocí el formato de la hoja. Descarga la plantilla y vacía ahí tus líneas, " +
+          "o sube la factura como PDF o foto.",
+      );
+    const { filas, ignoradas } = leerPlantilla(grid);
+    const proveedorId = await proveedorDe(null);
+    const lineas = await proponer(
+      proveedorId,
+      filas.map((f) => ({
+        ref: f.fila,
+        descripcion: f.producto,
+        skuProveedor: f.skuProveedor,
+        skuPropio: f.sku,
+        cantidad: f.cantidad,
+        costo: f.costo,
+        // No explicit "Pedido" column means the sheet you uploaded IS the
+        // requisition, so its quantity is what was ordered. Received starts
+        // equal and is then corrected to what actually turned up — which is
+        // what makes the shortfall visible on the counter-receipt. Leaving
+        // this null instead gave a PDF with an empty "Pedido" column.
+        pedido: f.pedido ?? f.cantidad,
+      })),
+      inventarioId,
+    );
+    return { analisis: { modo: "plantilla", folio: null, lineas, ignoradas }, factura: null, proveedorId };
+  }
+
+  if (esPdf(file.type) || esImagen(file.type)) {
+    const factura = esPdf(file.type)
+      ? await extraerFacturaDePdf(bytes)
+      : await extraerFacturaDeImagen(bytes, file.type);
+
+    const crudas = factura.lineas
+      .map((l: LineaFactura, i) => ({
+        ref: i + 1,
+        descripcion: (l.descripcion ?? "").trim(),
+        skuProveedor: (l.sku_proveedor ?? "").trim(),
+        skuPropio: "",
+        cantidad: Math.round(l.cantidad ?? 0),
+        costo: costoUnitario(l),
+        pedido: null as number | null,
+      }))
+      .filter((l) => l.cantidad > 0 && (l.descripcion || l.skuProveedor));
+
+    const proveedorId = await proveedorDe(factura);
+    const lineas = await proponer(proveedorId, crudas, inventarioId);
+    return {
+      analisis: { modo: "documento", folio: factura.folio?.trim() || null, lineas, ignoradas: [] },
+      factura,
+      proveedorId,
+    };
+  }
+
+  throw new Error("Formato no soportado. Usa Excel, CSV, PDF o una foto.");
+}
+
+/** Lines for an existing draft (its supplier is already known). */
 export async function analizarFactura(
   compraId: string,
   fd: FormData,
 ): Promise<ActionResult<AnalisisFactura>> {
   return attempt("analizarFactura", async () => {
     await assertPermiso("abastecer");
-    const file = fd.get("file");
-    if (!(file instanceof File) || file.size === 0) throw new Error("Falta el archivo");
-    if (file.size > MAX_BYTES) throw new Error("El archivo pesa más de 10 MB");
-
     const { data: compra } = await insforgeAdmin.database
       .from("compras")
       .select("proveedor_id, estado")
@@ -197,70 +281,66 @@ export async function analizarFactura(
     if (!c) throw new Error("Compra no encontrada");
     if (c.estado !== "borrador")
       throw new Error(`La compra ya fue ${c.estado}; sólo un borrador acepta líneas`);
+    return (await leerArchivo(fd, async () => c.proveedor_id, null)).analisis;
+  });
+}
 
-    const bytes = new Uint8Array(await file.arrayBuffer());
+export type LecturaFactura = AnalisisFactura & {
+  /** Matched by the issuer's name; null when no supplier on file matches. */
+  proveedorId: string | null;
+  /** The issuer as printed, to show when it matched nobody. */
+  proveedorTexto: string | null;
+  fecha: string | null; // yyyy-mm-dd
+  diasCredito: number | null;
+  total: number | null;
+};
 
-    if (esHoja(file.name, file.type)) {
-      const wb = XLSX.read(bytes, { type: "array" });
-      const hoja = wb.Sheets[wb.SheetNames[0]];
-      const grid = XLSX.utils.sheet_to_json<unknown[]>(hoja, { header: 1, defval: "" });
+const sinAcentos = (t: string) =>
+  t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/[^A-Z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
 
-      if (esPlantilla(grid)) {
-        const { filas, ignoradas } = leerPlantilla(grid);
-        const lineas = await proponer(
-          c.proveedor_id,
-          filas.map((f) => ({
-            ref: f.fila,
-            descripcion: f.producto,
-            skuProveedor: f.skuProveedor,
-            skuPropio: f.sku,
-            cantidad: f.cantidad,
-            costo: f.costo,
-            // No explicit "Pedido" column means the sheet you uploaded IS the
-            // requisition, so its quantity is what was ordered. Received starts
-            // equal and is then corrected to what actually turned up — which is
-            // what makes the shortfall visible on the counter-receipt. Leaving
-            // this null instead gave a PDF with an empty "Pedido" column.
-            pedido: f.pedido ?? f.cantidad,
-          })),
-        );
-        return { modo: "plantilla", folio: null, lineas, ignoradas };
-      }
+/** The supplier on file whose name appears in the issuer's ("OPTIMO" in "OPTIMO AUTOPARTES"). */
+async function proveedorPorNombre(texto: string | undefined): Promise<string | null> {
+  const t = sinAcentos(texto ?? "");
+  if (t.length < 3) return null;
+  const { data } = await insforgeAdmin.database.from("proveedores").select("id, nombre").eq("is_active", true);
+  const hits = ((data ?? []) as { id: string; nombre: string }[])
+    .map((p) => ({ id: p.id, n: sinAcentos(p.nombre) }))
+    .filter((p) => p.n.length >= 3 && (` ${t} `.includes(` ${p.n} `) || ` ${p.n} `.includes(` ${t} `)))
+    .sort((a, b) => b.n.length - a.n.length);
+  return hits[0]?.id ?? null;
+}
 
-      // Not our template: say so loudly rather than guessing columns silently.
-      throw new Error(
-        "No reconocí el formato de la hoja. Descarga la plantilla y vacía ahí tus líneas, " +
-          "o sube la factura como PDF o foto.",
-      );
-    }
+const fechaISO = (t: string | undefined) => (t && /^\d{4}-\d{2}-\d{2}$/.test(t.trim()) ? t.trim() : null);
 
-    if (esPdf(file.type) || esImagen(file.type)) {
-      const factura = esPdf(file.type)
-        ? await extraerFacturaDePdf(bytes)
-        : await extraerFacturaDeImagen(bytes, file.type);
-
-      const crudas = factura.lineas
-        .map((l: LineaFactura, i) => ({
-          ref: i + 1,
-          descripcion: (l.descripcion ?? "").trim(),
-          skuProveedor: (l.sku_proveedor ?? "").trim(),
-          skuPropio: "",
-          cantidad: Math.round(l.cantidad ?? 0),
-          costo: costoUnitario(l),
-          pedido: null as number | null,
-        }))
-        .filter((l) => l.cantidad > 0 && (l.descripcion || l.skuProveedor));
-
-      const lineas = await proponer(c.proveedor_id, crudas);
-      return {
-        modo: "documento",
-        folio: factura.folio?.trim() || null,
-        lineas,
-        ignoradas: [],
-      };
-    }
-
-    throw new Error("Formato no soportado. Usa Excel, CSV, PDF o una foto.");
+/**
+ * Read an invoice for a purchase that doesn't exist yet: the header (supplier,
+ * folio, date, credit, total) and its lines, matched in the inventory the goods
+ * go to. Writes nothing — the purchase is created only once someone reviewed it.
+ */
+export async function leerFacturaNueva(
+  fd: FormData,
+  inventarioId: string,
+): Promise<ActionResult<LecturaFactura>> {
+  return attempt("leerFacturaNueva", async () => {
+    await assertPermiso("abastecer");
+    const { analisis, factura, proveedorId } = await leerArchivo(
+      fd,
+      (f) => proveedorPorNombre(f?.proveedor),
+      inventarioId || null,
+    );
+    const fecha = fechaISO(factura?.fecha_emision);
+    const vence = fechaISO(factura?.fecha_vencimiento);
+    const dias =
+      factura?.dias_credito ??
+      (fecha && vence ? Math.round((Date.parse(vence) - Date.parse(fecha)) / 86_400_000) : null);
+    return {
+      ...analisis,
+      proveedorId,
+      proveedorTexto: factura?.proveedor?.trim() || null,
+      fecha,
+      diasCredito: dias != null && dias > 0 && dias <= 365 ? dias : null,
+      total: factura?.total != null && factura.total > 0 ? factura.total : null,
+    };
   });
 }
 

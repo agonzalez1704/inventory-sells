@@ -29,9 +29,15 @@ Reglas:
 - IGNORA por completo: encabezados, datos fiscales, subtotales, IVA, totales,
   condiciones de pago, leyendas y cualquier fila que no sea un producto.
 
-Además, del documento completo:
+Además, del documento completo (del encabezado y del pie, no de las líneas):
 - "folio": el número o folio de la factura, si aparece.
-- "proveedor": el nombre del proveedor que emite, si aparece.`;
+- "proveedor": el nombre del proveedor que EMITE la factura (no el cliente al
+  que se factura), si aparece.
+- "rfc_emisor": el RFC de quien emite, si aparece.
+- "fecha_emision": la fecha de la factura, en formato AAAA-MM-DD.
+- "fecha_vencimiento": la fecha de vencimiento o límite de pago, AAAA-MM-DD, si aparece.
+- "dias_credito": los días de crédito si las condiciones los dicen ("90 DIAS" → 90).
+- "total": el TOTAL a pagar de la factura, con IVA, como número.`;
 
 const LineaSchema = z.object({
   descripcion: z.string(),
@@ -44,6 +50,11 @@ const LineaSchema = z.object({
 const FacturaSchema = z.object({
   folio: z.string().optional(),
   proveedor: z.string().optional(),
+  rfc_emisor: z.string().optional(),
+  fecha_emision: z.string().optional(),
+  fecha_vencimiento: z.string().optional(),
+  dias_credito: z.number().optional(),
+  total: z.number().optional(),
   lineas: z.array(LineaSchema),
 });
 

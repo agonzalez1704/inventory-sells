@@ -7,6 +7,7 @@ import { insforgeAdmin } from "@/lib/insforge/admin";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
 import { assertPermiso, permisosDe } from "@/lib/auth/profile";
 import { toCents } from "@/lib/money";
+import { attempt, type ActionResult } from "@/lib/errors";
 import { updateTag } from "next/cache";
 
 export type CompraEstado = "borrador" | "recibida" | "cancelada";
@@ -106,19 +107,21 @@ function clean(input: CompraInput) {
   };
 }
 
-export async function crearCompra(input: CompraInput): Promise<{ id: string }> {
-  const userId = await assertPermiso("abastecer");
-  const { data, error } = await insforgeAdmin.database
-    .from("compras")
-    .insert([{ ...clean(input), created_by: userId }])
-    .select("id")
-    .single();
-  if (error || !data) {
-    if (/duplicate|unique/i.test(error?.message ?? ""))
-      throw new Error("Ya registraste esa factura para este proveedor");
-    throw new Error(error?.message ?? "Error al crear la compra");
-  }
-  return { id: (data as { id: string }).id };
+export async function crearCompra(input: CompraInput): Promise<ActionResult<{ id: string }>> {
+  return attempt("crearCompra", async () => {
+    const userId = await assertPermiso("abastecer");
+    const { data, error } = await insforgeAdmin.database
+      .from("compras")
+      .insert([{ ...clean(input), created_by: userId }])
+      .select("id")
+      .single();
+    if (error || !data) {
+      if (/duplicate|unique/i.test(error?.message ?? ""))
+        throw new Error("Ya registraste esa factura para este proveedor");
+      throw new Error(error?.message ?? "Error al crear la compra");
+    }
+    return { id: (data as { id: string }).id };
+  });
 }
 
 async function assertBorrador(compraId: string) {

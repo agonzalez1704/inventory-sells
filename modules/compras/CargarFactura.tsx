@@ -34,13 +34,13 @@ import {
 // wrong product builds a cost layer against it — an error that surfaces later as
 // a margin, never as a failure.
 const ORIGEN: Record<Origen, { texto: string; tono: "success" | "accent" | "warning" | "danger" }> = {
-  sku: { texto: "Por SKU", tono: "success" },
+  sku: { texto: "Misma clave", tono: "success" },
   equivalencia: { texto: "Clave del proveedor", tono: "success" },
   busqueda: { texto: "Coincidencia por texto — revisa", tono: "warning" },
   sin_match: { texto: "Sin producto", tono: "danger" },
 };
 
-type Editable = LineaPropuesta & { incluir: boolean };
+export type Editable = LineaPropuesta & { incluir: boolean };
 
 export function CargarFactura({ compraId }: { compraId: string }) {
   const router = useRouter();
@@ -219,7 +219,7 @@ export function CargarFactura({ compraId }: { compraId: string }) {
   );
 }
 
-function FilaRevision({
+export function FilaRevision({
   l,
   onChange,
 }: {
@@ -301,6 +301,12 @@ function FilaRevision({
                 {l.cantidad < l.pedido ? `faltaron ${l.pedido - l.cantidad}` : `+${l.cantidad - l.pedido}`}
               </strong>
             )}
+          </span>
+        )}
+        {l.costo != null && l.costoActual != null && Math.abs(l.costo - l.costoActual) >= 0.01 && (
+          <span className={cn("pb-1.5 text-[11px]", l.costo > l.costoActual ? "text-amber-700 dark:text-amber-300" : "text-muted-foreground")}>
+            antes {formatMXN(Math.round(l.costoActual * 100))} ({l.costo > l.costoActual ? "+" : ""}
+            {Math.round(((l.costo - l.costoActual) / l.costoActual) * 100)}%)
           </span>
         )}
         {l.costo == null && (
