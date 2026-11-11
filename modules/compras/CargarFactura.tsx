@@ -3,6 +3,7 @@
 import { useCallback, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { unwrap } from "@/lib/errors";
 import {
   UploadCloud,
   FileDown,
@@ -50,12 +51,21 @@ export function CargarFactura({ compraId }: { compraId: string }) {
   const [pending, start] = useTransition();
 
   async function onArchivo(file: File) {
+    // Vercel refuses request bodies over 4.5 MB before our code runs, so a
+    // bigger scan used to fail with no message at all.
+    if (file.size > 4.4 * 1024 * 1024) {
+      toast.error(
+        `El archivo pesa ${(file.size / 1024 / 1024).toFixed(1)} MB y el máximo es 4.4 MB. ` +
+          "Escanéalo a menor resolución o súbelo en partes.",
+      );
+      return;
+    }
     setArchivo(file);
     setLeyendo(true);
     try {
       const fd = new FormData();
       fd.append("file", file);
-      const res = await analizarFactura(compraId, fd);
+      const res = unwrap(await analizarFactura(compraId, fd));
       setAnalisis(res);
       setLineas(res.lineas.map((l) => ({ ...l, incluir: l.productId != null })));
       if (res.lineas.length === 0) toast.error("No encontré líneas de producto en el archivo");
@@ -80,7 +90,7 @@ export function CargarFactura({ compraId }: { compraId: string }) {
     if (!incluidas.length) return;
     start(async () => {
       try {
-        const r = await aplicarLineas(
+        const r = unwrap(await aplicarLineas(
           compraId,
           incluidas.map((l) => ({
             productId: l.productId!,
@@ -90,13 +100,15 @@ export function CargarFactura({ compraId }: { compraId: string }) {
             // Only worth teaching when the document carried the supplier's code.
             skuProveedor: l.skuProveedor || undefined,
           })),
-        );
+        ));
         // Keep the document itself: a shop wants the invoice on file, not just
         // the numbers it produced.
         if (archivo) {
           const fd = new FormData();
           fd.append("file", archivo);
-          await subirFactura(compraId, fd).catch(() => {});
+          // Lines are in; a failed copy of the document only gets a warning.
+          const up = await subirFactura(compraId, fd);
+          if (!up.ok) toast.error(`Líneas capturadas, pero no se guardó el archivo: ${up.error}`);
         }
         toast.success(
           `${r.agregadas} líneas capturadas` +
