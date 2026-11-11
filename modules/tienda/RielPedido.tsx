@@ -6,6 +6,7 @@ import { foto } from "@/lib/foto";
 import { formatPrecio } from "@/lib/money";
 import { puntosRecoger } from "@/lib/tienda-info";
 import { useCart } from "./CartProvider";
+import { StepperPieza } from "./StepperPieza";
 import { useTiendaInfo } from "./TiendaInfoProvider";
 
 const unaDe = (xs: string[]) =>
@@ -17,7 +18,7 @@ const unaDe = (xs: string[]) =>
  * screens only (xl); below that the header cart button does the job.
  */
 export function RielPedido() {
-  const { items, count, subtotal, ready } = useCart();
+  const { items, count, subtotal, ready, setQty } = useCart();
   const tienda = useTiendaInfo();
   const sucursales = puntosRecoger(tienda).map((p) => p.nombre ?? "tienda");
 
@@ -41,7 +42,7 @@ export function RielPedido() {
           <>
             <ul className="mt-2 max-h-80 divide-y divide-border overflow-y-auto">
               {items.map((i) => (
-                <li key={i.id} className="flex items-center gap-2.5 py-2">
+                <li key={i.id} className="flex items-start gap-2.5 py-2.5">
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted/50">
                     {i.imagen ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -52,8 +53,9 @@ export function RielPedido() {
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="line-clamp-2 text-[13px] font-medium leading-snug text-foreground">{i.nombre}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {i.qty} pza{i.almacen ? ` · ${i.almacen}` : ""}
+                    {i.almacen && <span className="block text-xs text-muted-foreground">{i.almacen}</span>}
+                    <span className="mt-1.5 block">
+                      <StepperPieza compacto qty={i.qty} max={i.max} nombre={i.nombre} onChange={(q) => setQty(i.id, q)} />
                     </span>
                   </span>
                   <span className="shrink-0 text-sm font-semibold tabular-nums text-foreground">
