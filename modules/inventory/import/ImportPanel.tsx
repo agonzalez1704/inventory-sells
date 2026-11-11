@@ -526,6 +526,23 @@ export function ImportPanel({
         </div>
       )}
 
+      {status === "review" && !newMode && (source === "pdf" || source === "image") && (
+        // Importing a supplier invoice here enters stock with no proveedor, folio or
+        // credit, and overwrites sale prices with the invoice's costs.
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 text-xs text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
+          <span>
+            ¿Es factura de proveedor? Regístrala en <strong>Compras</strong>: guarda proveedor, folio, crédito y el
+            PDF, y no cambia tus precios de venta.
+          </span>
+          <a
+            href="/compras/nueva"
+            className="shrink-0 rounded-md bg-amber-600 px-2.5 py-1 font-semibold text-white hover:bg-amber-700"
+          >
+            Ir a nueva compra
+          </a>
+        </div>
+      )}
+
       {status === "review" && (
         <ReviewStep
           rows={rows}
