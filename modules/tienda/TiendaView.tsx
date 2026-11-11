@@ -715,6 +715,7 @@ export function ModeloCard({
                   precio_cents: destino.precio_cents,
                   imagen: destino.imagen ?? m.imagen,
                   disponible: true,
+                  tope: destino.tope,
                 }}
               />
             ) : (
@@ -755,10 +756,11 @@ export function ModeloCard({
 function OpcionAlmacen({ v, imagen, principal }: { v: VarianteModelo; imagen: string | null; principal: boolean }) {
   const { add, items, setQty } = useCart();
   const qty = items.find((i) => i.id === v.id)?.qty ?? 0;
+  const tope = v.tope ?? MAX_POR_PRODUCTO;
   const dias = v.entrega_dias ? ` · +${v.entrega_dias} días` : "";
   const precio = formatPrecio(v.precio_cents);
   const agregar = () =>
-    add({ id: v.id, nombre: v.nombre, precio_cents: v.precio_cents, imagen, max: MAX_POR_PRODUCTO, almacen: v.almacen }, 1, false);
+    add({ id: v.id, nombre: v.nombre, precio_cents: v.precio_cents, imagen, max: tope, almacen: v.almacen }, 1, false);
   const presion = "cursor-pointer transition-[background-color,transform] duration-150 ease-out active:scale-[0.97]";
 
   if (qty > 0) {
@@ -776,14 +778,14 @@ function OpcionAlmacen({ v, imagen, principal }: { v: VarianteModelo; imagen: st
       >
         <span className="min-w-0 truncate font-semibold">
           {v.almacen} · <span className="tabular-nums">{precio}</span>
-          {dias}
+          {qty >= tope ? " · ya no hay más" : dias}
         </span>
         <span className="flex items-center">
           <button type="button" onClick={() => setQty(v.id, qty - 1)} aria-label={qty === 1 ? `Quitar ${v.nombre}` : "Quitar uno"} className={boton}>
             {qty === 1 ? <Trash2 className={icono} /> : <Minus className={icono} />}
           </button>
           <span className="min-w-5 text-center font-bold tabular-nums">{qty}</span>
-          <button type="button" onClick={() => setQty(v.id, qty + 1)} disabled={qty >= MAX_POR_PRODUCTO} aria-label="Agregar uno" className={boton}>
+          <button type="button" onClick={() => setQty(v.id, qty + 1)} disabled={qty >= tope} aria-label="Agregar uno" className={boton}>
             <Plus className={icono} />
           </button>
         </span>

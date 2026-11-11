@@ -5,12 +5,9 @@ import { cn } from "@/lib/utils";
 import { useCart } from "./CartProvider";
 import { StepperPieza } from "./StepperPieza";
 
-// The storefront must never expose stock counts (staff-only, same rule as
-// cost/SKU) — it only knows whether a piece is available. So the cart caps at a
-// generic max and the REAL stock is enforced server-side by crear_orden_web,
-// which locks the row and rejects the order if it can't be filled.
-// 10 also happens to be what one 1 kg parcel covers (100 g per piece).
-export const MAX_POR_PRODUCTO = 10;
+import { MAX_POR_PRODUCTO } from "@/lib/calidades";
+
+export { MAX_POR_PRODUCTO };
 
 export type AddableProduct = {
   id: string;
@@ -18,6 +15,8 @@ export type AddableProduct = {
   precio_cents: number;
   imagen: string | null;
   disponible: boolean;
+  /** Shelf cap (topeCarrito); the generic max when absent. */
+  tope?: number;
 };
 
 export function AddToCart({
@@ -36,14 +35,15 @@ export function AddToCart({
 }) {
   const { add, items, setQty } = useCart();
   const inCart = items.find((i) => i.id === p.id)?.qty ?? 0;
-  const maxed = inCart >= MAX_POR_PRODUCTO;
+  const tope = p.tope ?? MAX_POR_PRODUCTO;
+  const maxed = inCart >= tope;
 
   // Listing card, already in the order: − qty + so it can come back out
   // from the same place it went in.
   if (size === "md" && inCart > 0 && p.disponible) {
     return (
       <div className={className} onClick={(e) => e.preventDefault()}>
-        <StepperPieza qty={inCart} max={MAX_POR_PRODUCTO} nombre={p.nombre} onChange={(q) => setQty(p.id, q)} />
+        <StepperPieza qty={inCart} max={tope} nombre={p.nombre} onChange={(q) => setQty(p.id, q)} />
       </div>
     );
   }
@@ -76,7 +76,7 @@ export function AddToCart({
             nombre: p.nombre,
             precio_cents: p.precio_cents,
             imagen: p.imagen,
-            max: MAX_POR_PRODUCTO,
+            max: tope,
           },
           1,
           abrir,

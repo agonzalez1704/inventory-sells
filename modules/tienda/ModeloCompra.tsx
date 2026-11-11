@@ -61,7 +61,8 @@ export function ModeloCompra({
   // repeated three times.
   const porAlmacen = varias && m.variantes.every((x) => x.almacen);
   const etiqueta = (x: VarianteModelo) => (porAlmacen ? x.almacen! : (x.calidad ?? x.nombre));
-  const tope = (items.find((i) => i.id === v.id)?.qty ?? 0) >= MAX_POR_PRODUCTO;
+  const maxV = v.tope ?? MAX_POR_PRODUCTO;
+  const tope = (items.find((i) => i.id === v.id)?.qty ?? 0) >= maxV;
   const sucursales = puntosRecoger(tienda).map((p) => p.nombre ?? "tienda");
   const local = v.disponible && !(v.entrega_dias ?? 0);
   // `||`, not `??`: a variant with no photo of its own carries "" as often as
@@ -275,10 +276,10 @@ export function ModeloCompra({
               <div className="hidden lg:block">
                 <StepperPieza
                   qty={cantidad}
-                  max={MAX_POR_PRODUCTO}
+                  max={maxV}
                   nombre={v.nombre}
                   minimo={1}
-                  onChange={(n) => setCantidad(Math.max(1, Math.min(MAX_POR_PRODUCTO, n)))}
+                  onChange={(n) => setCantidad(Math.max(1, Math.min(maxV, n)))}
                 />
               </div>
             )}
@@ -292,7 +293,7 @@ export function ModeloCompra({
               </button>
             ) : tope ? (
               <button type="button" disabled className={cn(principal, "justify-center bg-muted text-muted-foreground")}>
-                Máximo por pieza en línea
+                {maxV < MAX_POR_PRODUCTO ? "Ya no hay más en existencia" : "Máximo por pieza en línea"}
               </button>
             ) : (
               <button
@@ -304,7 +305,7 @@ export function ModeloCompra({
                       nombre: v.nombre,
                       precio_cents: v.precio_cents,
                       imagen: v.imagen ?? m.imagen,
-                      max: MAX_POR_PRODUCTO,
+                      max: maxV,
                       almacen: porAlmacen ? v.almacen : null,
                     },
                     cantidad,

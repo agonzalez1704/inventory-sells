@@ -1,4 +1,5 @@
 import "server-only";
+import { topeCarrito } from "@/lib/calidades";
 import { cacheLife, cacheTag } from "next/cache";
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import type { ModeloTienda } from "@/lib/calidades";
@@ -64,26 +65,35 @@ async function almacenesDeVenta(): Promise<[string, string][]> {
 }
 
 /**
- * Name each variant's inventory (Mostrador, CEDIS) for the listing — only when
- * the shop sells from more than one, otherwise it's the same word on every
+ * Finish the rows on screen: how many the cart may take of each (its shelf,
+ * capped), and which inventory it comes from (Mostrador, CEDIS) — named only
+ * when the shop sells from more than one, otherwise it's the same word on every
  * card. Takes the rows on screen, not the catalog: one small query.
  */
 export async function nombrarAlmacenes(modelos: ModeloTienda[]): Promise<void> {
-  const almacenes = new Map(await almacenesDeVenta());
-  if (almacenes.size < 2) return;
   const ids = modelos.flatMap((m) => m.variantes.map((v) => v.id));
   if (!ids.length) return;
-  const inv = new Map(await inventarioDe(ids));
-  for (const m of modelos) for (const v of m.variantes) v.almacen = almacenes.get(inv.get(v.id) ?? "") ?? null;
+  const [almacenes, filas] = await Promise.all([almacenesDeVenta().then((a) => new Map(a)), inventarioDe(ids)]);
+  const de = new Map(filas.map((f) => [f[0], f]));
+  for (const m of modelos)
+    for (const v of m.variantes) {
+      const [, inv, existencia] = de.get(v.id) ?? [v.id, "", 0];
+      v.tope = topeCarrito(existencia);
+      if (almacenes.size > 1) v.almacen = almacenes.get(inv) ?? null;
+    }
 }
 
 // Cached like the listing it decorates: same rows, same TTL, and no uncached
 // fetch inside the prerender.
-async function inventarioDe(ids: string[]): Promise<[string, string][]> {
+async function inventarioDe(ids: string[]): Promise<[string, string, number][]> {
   "use cache";
   cacheLife("minutes");
   cacheTag("tienda");
-  const { data, error } = await insforgeAdmin.database.from("products").select("id, inventory_id").in("id", ids);
+  const { data, error } = await insforgeAdmin.database.from("products").select("id, inventory_id, quantity").in("id", ids);
   if (error) throw new Error(`products: ${error.message}`);
-  return ((data ?? []) as { id: string; inventory_id: string }[]).map((p) => [p.id, p.inventory_id]);
+  return ((data ?? []) as { id: string; inventory_id: string; quantity: number }[]).map((p) => [
+    p.id,
+    p.inventory_id,
+    p.quantity,
+  ]);
 }

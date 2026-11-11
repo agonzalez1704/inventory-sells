@@ -21,6 +21,17 @@ export function glosaDe(calidad: string | null | undefined): string | null {
   return calidad ? GLOSA[calidad] ?? null : null;
 }
 
+// The storefront must never expose stock counts (staff-only, same rule as
+// cost/SKU), so the cart caps at a generic max — or at the shelf when it holds
+// fewer — and the REAL stock is enforced server-side by crear_orden_web.
+// 10 also happens to be what one 1 kg parcel covers (100 g per piece).
+export const MAX_POR_PRODUCTO = 10;
+
+/** How many of a row the cart may take: the shelf when it has fewer than the
+ *  cap; the cap when it has none (made to order, dropship). */
+export const topeCarrito = (existencia: number) =>
+  existencia > 0 ? Math.min(existencia, MAX_POR_PRODUCTO) : MAX_POR_PRODUCTO;
+
 export type VarianteModelo = {
   id: string;
   nombre: string;
@@ -36,6 +47,8 @@ export type VarianteModelo = {
   entrega_dias?: number | null;
   /** Which inventory it comes from, set only when the options span several. */
   almacen?: string | null;
+  /** Most the cart may hold of it (topeCarrito). Never shown as a number. */
+  tope?: number;
   imagen: string | null;
 };
 

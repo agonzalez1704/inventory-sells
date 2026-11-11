@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { topeCarrito } from "@/lib/calidades";
 import { notFound } from "next/navigation";
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { MARCA } from "@/lib/marca";
@@ -158,18 +159,18 @@ export default async function ProductoPage({
 
   // Ruli groups by part number, so the same part in Mostrador and in CEDIS is
   // two options that look identical. Name the inventory when they differ.
-  if (modelo.variantes.length > 1) {
+  // Same query caps each option at its shelf for the cart.
+  {
     const { data: invs } = await insforgeAdmin.database
       .from("products")
-      .select("id, inventories(name)")
+      .select("id, quantity, inventories(name)")
       .in("id", modelo.variantes.map((v) => v.id));
-    const de = new Map(
-      ((invs ?? []) as unknown as { id: string; inventories: { name: string } | null }[]).map((p) => [
-        p.id,
-        p.inventories?.name ?? null,
-      ]),
-    );
-    if (new Set(de.values()).size > 1) for (const v of modelo.variantes) v.almacen = de.get(v.id) ?? null;
+    const filas = (invs ?? []) as unknown as { id: string; quantity: number; inventories: { name: string } | null }[];
+    const de = new Map(filas.map((p) => [p.id, p.inventories?.name ?? null]));
+    const existencia = new Map(filas.map((p) => [p.id, p.quantity]));
+    for (const v of modelo.variantes) v.tope = topeCarrito(existencia.get(v.id) ?? 0);
+    if (modelo.variantes.length > 1 && new Set(de.values()).size > 1)
+      for (const v of modelo.variantes) v.almacen = de.get(v.id) ?? null;
   }
 
   const vistas: Record<string, string[]> = {};
