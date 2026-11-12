@@ -1176,7 +1176,8 @@ export function SalesScreen({
       <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start lg:gap-5">
         <div>
           {porVehiculo && (
-            <div className="mb-3 inline-flex rounded-xl bg-muted p-1 text-sm">
+            <div className="mb-3 flex items-center gap-2.5">
+            <div className="inline-flex rounded-xl bg-muted p-1 text-sm">
               {(
                 [
                   ["vehiculo", "Por vehículo"],
@@ -1197,10 +1198,19 @@ export function SalesScreen({
                 </button>
               ))}
             </div>
+            {/* By car there's no text box: the picker asks for the model, and a code is
+                looked up in "Por código o nombre". The label scanner stays. */}
+            {modo === "vehiculo" && (
+              <Button variant="brand" className="ml-auto h-11 w-11 shrink-0 rounded-xl px-0" aria-label="Escanear etiqueta" onClick={() => setEscaneando(true)}>
+                <QrCode className="h-5 w-5" />
+              </Button>
+            )}
+            </div>
           )}
 
+          {modo === "texto" && (
           <div className="flex gap-2.5">
-            <div className={cn("relative flex-1", modo === "vehiculo" && vehiculo && "hidden sm:block")}>
+            <div className="relative flex-1">
               <Search className="pointer-events-none absolute top-1/2 left-3.5 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
               <input
                 ref={buscador}
@@ -1226,6 +1236,7 @@ export function SalesScreen({
               <QrCode className="h-6 w-6" />
             </Button>
           </div>
+          )}
 
           {categorias.length > 1 && modo === "texto" && (
             <div className="mt-3 flex items-center gap-2">
