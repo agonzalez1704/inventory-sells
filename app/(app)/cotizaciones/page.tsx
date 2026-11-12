@@ -15,19 +15,22 @@ export default async function CotizacionesPage() {
   const [{ data: cotsData }, { data: custData }, { data: profData }] = await Promise.all([
     insforgeAdmin.database
       .from("cotizaciones")
-      .select("id, folio, customer_id, vendedor_id, created_by, estado, canal, total_cents, created_at, expires_at")
+      .select("id, folio, customer_id, vendedor_id, created_by, estado, canal, total_cents, created_at, expires_at, inventory_id, entrega, entrega_fecha, pedir_antes, inventories(name)")
       .order("created_at", { ascending: false })
       .limit(200),
     insforgeAdmin.database.from("customers").select("id, nombre"),
     insforgeAdmin.database.from("profiles").select("id, full_name"),
   ]);
+  // Quotes from an almacén other than the counter are sobrepedido.
+  const { data: invData } = await insforgeAdmin.database.from("inventories").select("id").order("created_at").limit(1);
+  const mostradorId = (invData as { id: string }[] | null)?.[0]?.id;
 
   const custName = new Map(((custData ?? []) as { id: string; nombre: string }[]).map((c) => [c.id, c.nombre]));
   const vendName = new Map(
     ((profData ?? []) as { id: string; full_name: string | null }[]).map((p) => [p.id, p.full_name]),
   );
 
-  let cots = ((cotsData ?? []) as {
+  let cots = ((cotsData ?? []) as unknown as {
     id: string;
     folio: string;
     customer_id: string | null;
@@ -38,6 +41,11 @@ export default async function CotizacionesPage() {
     total_cents: number;
     created_at: string;
     expires_at: string | null;
+    inventory_id: string | null;
+    entrega: "ruta" | "expres" | null;
+    entrega_fecha: string | null;
+    pedir_antes: string | null;
+    inventories: { name: string } | null;
   }[]).map(
     (c): CotizacionRow => ({
       id: c.id,
@@ -48,6 +56,10 @@ export default async function CotizacionesPage() {
       canal: c.canal,
       total_cents: c.total_cents,
       created_at: c.created_at,
+      sobrepedido: c.inventory_id && c.inventory_id !== mostradorId ? c.inventories?.name ?? "otro almacén" : null,
+      entrega: c.entrega,
+      entrega_fecha: c.entrega_fecha,
+      pedir_antes: c.pedir_antes,
       expires_at: c.expires_at,
       esPropia: c.created_by === userId || c.vendedor_id === userId,
       sinAsignar: c.vendedor_id === null,

@@ -20,6 +20,15 @@ export type CotPublica = {
   notas: string | null;
   expires_at: string | null;
   vencida: boolean;
+  /** Pieces from another almacén than the counter: arrives on a date, not today. */
+  sobrepedido: boolean;
+  almacen: string | null;
+  entrega: "ruta" | "expres" | null;
+  entrega_fecha: string | null;
+  pedir_antes: string | null;
+  cargo_expres_cents: number;
+  /** The same conversation's other quotes (one per almacén), each paid on its own link. */
+  otras: { folio: string; almacen: string; sobrepedido: boolean; total_cents: number; token: string }[];
 };
 
 export type CotPublicaData = { cot: CotPublica; items: CotPublicaItem[] };
@@ -32,6 +41,14 @@ type Row = {
   total_cents: number;
   notas: string | null;
   expires_at: string | null;
+  canal: string | null;
+  created_at: string;
+  inventory_id: string | null;
+  entrega: "ruta" | "expres" | null;
+  entrega_fecha: string | null;
+  pedir_antes: string | null;
+  cargo_expres_cents: number | null;
+  inventories: { name: string } | null;
 };
 
 // Customer-facing: NO auth. The share_token arrives in the POST body (the link
@@ -44,13 +61,17 @@ export async function cargarCotizacionPublica(token: string): Promise<CotPublica
 
   const { data } = await insforgeAdmin.database
     .from("cotizaciones")
-    .select("id, folio, estado, customer_id, total_cents, notas, expires_at")
+    .select(
+      "id, folio, estado, customer_id, total_cents, notas, expires_at, canal, created_at, inventory_id, entrega, entrega_fecha, pedir_antes, cargo_expres_cents, inventories(name)",
+    )
     .eq("share_token", token)
     .maybeSingle();
-  const c = data as Row | null;
+  const c = data as unknown as Row | null;
   if (!c || c.estado === "borrador") return null;
 
-  const [{ data: itemData }, { data: cust }] = await Promise.all([
+  // A WhatsApp conversation gets one quote per almacén: show the others.
+  const hermanas = c.canal === "whatsapp" && c.notas?.startsWith("WhatsApp:");
+  const [{ data: itemData }, { data: cust }, { data: invs }, { data: otrasData }] = await Promise.all([
     insforgeAdmin.database
       .from("cotizacion_items")
       .select("nombre, sku, qty, unit_price_cents, line_total_cents")
@@ -58,7 +79,21 @@ export async function cargarCotizacionPublica(token: string): Promise<CotPublica
     c.customer_id
       ? insforgeAdmin.database.from("customers").select("nombre").eq("id", c.customer_id).maybeSingle()
       : Promise.resolve({ data: null }),
+    insforgeAdmin.database.from("inventories").select("id, name").order("created_at").limit(1),
+    hermanas
+      ? insforgeAdmin.database
+          .from("cotizaciones")
+          .select("id, folio, share_token, total_cents, inventory_id, inventories(name)")
+          .eq("canal", "whatsapp")
+          .eq("notas", c.notas!)
+          .in("estado", ["pendiente", "autorizada"])
+          .neq("id", c.id)
+          .gt("total_cents", 0)
+          .gte("created_at", new Date(new Date(c.created_at).getTime() - 86_400_000).toISOString())
+      : Promise.resolve({ data: [] }),
   ]);
+  const mostrador = (invs as { id: string; name: string }[] | null)?.[0];
+  const esOtro = (inv: string | null) => !!inv && inv !== mostrador?.id;
 
   return {
     cot: {
@@ -69,6 +104,25 @@ export async function cargarCotizacionPublica(token: string): Promise<CotPublica
       notas: c.notas,
       expires_at: c.expires_at,
       vencida: Boolean(c.expires_at && new Date(c.expires_at) < new Date()),
+      sobrepedido: esOtro(c.inventory_id),
+      almacen: c.inventories?.name ?? null,
+      entrega: c.entrega,
+      entrega_fecha: c.entrega_fecha,
+      pedir_antes: c.pedir_antes,
+      cargo_expres_cents: c.cargo_expres_cents ?? 0,
+      otras: ((otrasData ?? []) as unknown as {
+        folio: string;
+        share_token: string;
+        total_cents: number;
+        inventory_id: string | null;
+        inventories: { name: string } | null;
+      }[]).map((o) => ({
+        folio: o.folio,
+        almacen: o.inventories?.name ?? mostrador?.name ?? "Mostrador",
+        sobrepedido: esOtro(o.inventory_id),
+        total_cents: o.total_cents,
+        token: o.share_token,
+      })),
     },
     items: (itemData ?? []) as CotPublicaItem[],
   };

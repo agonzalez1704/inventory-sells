@@ -17,9 +17,10 @@ import {
   cargarPedido,
   agregarACotizacion,
   quitarDeCotizacion,
+  resumenCotizaciones,
   urlCotizacion,
 } from "./pedido";
-import { almacenesDe, entregaTexto, repartir } from "./almacenes";
+import { ahoraMx, almacenesDe, entregaTexto, opcionesEntrega, repartir, type Opcion } from "./almacenes";
 
 // Quote creation/editing lives in SQL (agregar_a_cotizacion_whatsapp), which
 // holds an advisory lock per phone. The model calls the add tool once per
@@ -52,6 +53,15 @@ function calidadDe(nombre: string): string | null {
 }
 
 // The link rule keys on whether the CUSTOMER has seen it in THIS conversation.
+const avisarNuevas = (sync: { creadas?: string[] } | { error: string } | null) =>
+  sync && "creadas" in sync
+    ? Promise.all((sync.creadas ?? []).map((id) => notifyCotizacionSinAsignar(id, "agente_whatsapp")))
+    : null;
+
+// Several almacenes = several quotes, each with its own link and payment.
+const NOTA_COTIZACIONES =
+  "Si \"cotizaciones\" trae MÁS DE UNA, son cotizaciones SEPARADAS por almacén (cada una con su folio, su enlace y su pago): nómbralas por almacén con su total y su entrega, y pega el \"url\" de cada una la primera vez.";
+
 const NOTA_ENLACE =
   "Revisa TU historial de esta conversación: si NO le has enviado todavía el enlace de la cotización, pega el valor de \"url\" al FINAL de tu respuesta, tal cual, pelón, SIN corchetes ni [texto](url) — el cliente necesita verlo al menos una vez. Si ya se lo mandaste antes en esta misma conversación, no lo repitas. Luego pregunta si sería algo más.";
 
@@ -87,8 +97,9 @@ Reglas de productos:
 - Si no hay resultados, intenta de nuevo con menos palabras antes de decir que no hay.
 - Disponibilidad: campo "disponible". No digas cuántas hay si el cliente no pide una cantidad.
 - CANTIDADES Y ALMACENES: cada resultado disponible trae "almacenes" (dónde hay, cuántas, precio y entrega) en orden de prioridad; el PRIMERO manda (normalmente Mostrador) y su precio es "precio_mxn". Si en el primero no hay, dile de qué almacén saldría, su precio y su "entrega".
-- Si pide MÁS piezas de las que hay en el primer almacén, agregar_al_pedido NO las agrega: te las regresa en "por_confirmar". Dile cuántas tienes en el primero (precio y entrega) y que las demás saldrían del otro almacén, con SU precio (si es distinto, dilo claro: "esas están en $2,450") y SU tiempo de entrega. Pregúntale si así se las anotas. Si dice que sí, vuelve a llamar agregar_al_pedido con la misma cantidad y confirmado: true; si quiere solo las del primero, llámala con esa cantidad.
+- Si pide MÁS piezas de las que hay en mostrador, agregar_al_pedido NO las agrega: te las regresa en "por_confirmar". Dile cuántas tienes en mostrador y que las demás serían sobrepedido (regla SOBREPEDIDO). Si quiere solo las de mostrador, llama agregar_al_pedido con esa cantidad.
 - Si pide más de las que hay EN TOTAL, dile cuántas tienes en total (y dónde). NUNCA anotes más piezas de las que hay.
+- SOBREPEDIDO: lo que no está en mostrador sale de otro almacén (ej. Guadalajara) en OTRA cotización, a SU precio (dilo si es distinto). Esas piezas traen "opciones_entrega" y el CLIENTE ESCOGE: ruta (sin costo, llega el día de ruta si pide antes del corte) o exprés (llega antes, con el cargo que diga). Dile ambas con su fecha en pocas palabras y anota según lo que elija (agregar_al_pedido con entrega). NUNCA escojas tú. Si solo hay una opción, dila.
 - FOTOS: si el cliente pide foto o imagen de un producto, usa mandar_foto con ese producto (la foto se le manda sola). NUNCA digas que no tienes fotos sin haberlo intentado.
 - Da el precio en pesos de las versiones que SÍ tengan precio. Nunca inventes un precio.
 - Si la versión EXACTA que pidió está agotada (disponible: false), DILO con la frase "la tengo agotada" y ofrece las variantes que SÍ hay con su nombre completo y su precio. NUNCA sustituyas en silencio el precio de otra variante.
@@ -444,6 +455,7 @@ Este número no está en el registro de clientes.
           // One result per part: the same SKU in Mostrador and in Guadalajara is
           // one piece in two almacenes, each with its own stock, price and time.
           const porAlmacen = await almacenesDe(rows.map((r) => r.sku));
+          const ahora = ahoraMx();
           const vistos = new Set<string>();
           const items = rows
             .filter((r) => !vistos.has(r.sku) && (vistos.add(r.sku), true))
@@ -467,13 +479,16 @@ Este número no está en el registro de clientes.
                 disponible: conStock.length > 0,
                 ...(conStock.length
                   ? {
-                      almacenes: conStock.map((a) => ({
-                        almacen: a.almacen,
-                        existencia: a.existencia,
-                        precio_mxn: a.precio_mxn,
-                        ...conDescuento(a.precio_mxn),
-                        entrega: entregaTexto(a.entrega_dias),
-                      })),
+                      almacenes: conStock.map((a) => {
+                        const ops = opcionesEntrega(a, ahora);
+                        return {
+                          almacen: a.almacen,
+                          existencia: a.existencia,
+                          precio_mxn: a.precio_mxn,
+                          ...conDescuento(a.precio_mxn),
+                          ...(ops.length ? { opciones_entrega: ops } : { entrega: entregaTexto(a.entrega_dias) }),
+                        };
+                      }),
                     }
                   : {}),
                 tiene_foto: alms.some((a) => a.imagen),
@@ -515,30 +530,28 @@ Este número no está en el registro de clientes.
           // gustaría agregarlo a tu cotización?" is the line that gives the
           // agent away — a person at the counter just writes it down.
           const vendibles = items.filter((i) => i.disponible && i.precio_mxn > 0);
-          if (exactos && vendibles.length === 1) {
+          const primeroDe = (sku: string) => repartir(porAlmacen.get(sku) ?? [], 1).lineas[0];
+          if (exactos && vendibles.length === 1 && primeroDe(vendibles[0].sku)?.es_mostrador) {
             const elegido = vendibles[0];
             const previo = await cargarPedido(telefono);
             // Already in the quote: leave its quantity alone (qty is a TOTAL).
             const sync = previo.items.some((i) => i.sku === elegido.sku)
               ? null
               : await agregarACotizacion(telefono, [
-                  { product_id: repartir(porAlmacen.get(elegido.sku) ?? [], 1).lineas[0]?.product_id, sku: elegido.sku, qty: 1 },
+                  { product_id: primeroDe(elegido.sku)?.product_id, sku: elegido.sku, qty: 1 },
                 ]);
             if (!sync || !("error" in sync)) {
               const pedido = sync ? await cargarPedido(telefono) : previo;
-              if (sync?.creada && pedido.cotizacionId) {
-                await notifyCotizacionSinAsignar(pedido.cotizacionId, "agente_whatsapp");
-              }
+              await avisarNuevas(sync);
               return {
                 items,
                 agregado: elegido.nombre,
-                pedido: pedido.items.map((i) => ({ nombre: i.nombre, qty: i.qty, unit_mxn: i.unit_mxn })),
-                total_mxn: pedido.items.reduce((t, i) => t + i.unit_mxn * i.qty, 0),
-                ...(sync ? { folio: sync.folio, url: sync.url } : {}),
+                cotizaciones: resumenCotizaciones(pedido),
                 nota: [
                   `YA agregué "${elegido.nombre}" (1 pieza) a su cotización. Dale el precio y dile que ya va en su cotización. NO le preguntes si quiere agregarlo.`,
                   hayAgotados ? "Si lo que pidió exactamente está agotado, dilo." : null,
                   sync ? NOTA_ENLACE : "Pregunta si sería algo más.",
+                  pedido.cotizaciones.length > 1 ? NOTA_COTIZACIONES : null,
                   notaAnio,
                 ].filter(Boolean).join(" "),
               };
@@ -597,7 +610,7 @@ Este número no está en el registro de clientes.
           const sync = aAgregar.length ? await agregarACotizacion(telefono, aAgregar) : null;
           const ok = sync && !("error" in sync) ? sync : null;
           const pedido = await cargarPedido(telefono);
-          if (ok?.creada && pedido.cotizacionId) await notifyCotizacionSinAsignar(pedido.cotizacionId, "agente_whatsapp");
+          await avisarNuevas(ok);
           // What could not go in is written down, like any part we did not have.
           const faltan = obligatorias.filter((p) => p.estado !== "ok" || p.soloLado);
           await Promise.all(
@@ -624,9 +637,7 @@ Este número no está en el registro de clientes.
             ),
             faltan: faltan.map((p) => ({ pieza: p.pieza.nombre, motivo: motivo(p) })),
             opcionales,
-            pedido: pedido.items.map((i) => ({ nombre: i.nombre, qty: i.qty, unit_mxn: i.unit_mxn })),
-            total_mxn: pedido.items.reduce((t, i) => t + i.unit_mxn * i.qty, 0),
-            ...(ok ? { folio: ok.folio, url: ok.url } : {}),
+            cotizaciones: resumenCotizaciones(pedido),
             nota: [
               aAgregar.length
                 ? `YA agregué el juego a su cotización. Dile para qué vehículo es y lista cada pieza de "en_cotizacion" con su cantidad y precio (nombres claros, sin abreviaturas). Luego, una línea por cada una de "faltan" con su motivo. NO le preguntes si quiere agregarlo.`
@@ -658,8 +669,13 @@ Este número no está en el registro de clientes.
             .boolean()
             .optional()
             .describe("true SOLO si el cliente ya aceptó que parte salga de otro almacén (precio/entrega distintos) o llevarse menos de las que pidió"),
+          entrega: z
+            .enum(["ruta", "expres"])
+            .optional()
+            .describe("lo que ELIGIÓ el cliente para las piezas de otro almacén: ruta (sin costo, llega el día de ruta) o expres (llega antes, con cargo)"),
         }),
-        execute: async ({ items, confirmado }) => {
+        execute: async ({ items, confirmado, entrega }) => {
+          const ahora = ahoraMx();
           const { data } = await insforgeAdmin.database
             .from("products")
             .select("sku, name, price_cents, quantity, is_active")
@@ -672,7 +688,7 @@ Este número no está en el registro de clientes.
           // Rejections carry their REASON: a product we simply couldn't
           // identify must never be reported to the customer as "agotado".
           const rechazados: { producto: string; motivo: string }[] = [];
-          const aAgregar: { product_id: string; qty: number }[] = [];
+          const aAgregar: { product_id: string; qty: number; entrega?: "ruta" | "expres"; fecha?: string; corte?: string }[] = [];
           const porConfirmar: Record<string, unknown>[] = [];
           for (const it of items) {
             let p = porSku.get(it.producto);
@@ -718,21 +734,40 @@ Este número no está en el registro de clientes.
               rechazados.push({ producto: p.name, motivo: hay ? "sin precio cargado (lo confirma un asesor)" : "agotado" });
               continue;
             }
-            if ((plan.lineas.length > 1 || plan.falta > 0) && !confirmado) {
+            // Pieces from another almacén go on their own quote, and the
+            // customer picks how they arrive (ruta or exprés) before they do.
+            const lineas = plan.lineas.map((l) => ({ l, ops: opcionesEntrega(l, ahora) }));
+            const conOpciones = lineas.filter(({ ops }) => ops.length);
+            const elegida = (ops: Opcion[]) => ops.find((o) => o.modo === entrega);
+            const faltaElegir = conOpciones.some(({ ops }) => !elegida(ops));
+            const otroAlmacen = lineas.some(({ l }) => !l.es_mostrador);
+            if (faltaElegir || ((plan.falta > 0 || otroAlmacen) && !confirmado && !entrega)) {
               porConfirmar.push({
                 producto: p.name,
                 pidio: it.qty,
-                saldrian: plan.lineas.map((l) => ({
-                  almacen: l.almacen,
+                saldrian: lineas.map(({ l, ops }) => ({
+                  almacen: l.es_mostrador ? `${l.almacen} (entrega hoy)` : `Sobrepedido ${l.almacen}`,
                   piezas: l.qty,
                   precio_mxn: l.precio_mxn,
-                  entrega: entregaTexto(l.entrega_dias),
+                  ...(ops.length
+                    ? { opciones_entrega: ops.map(({ fecha: _f, corte: _c, ...o }) => o) }
+                    : l.es_mostrador
+                      ? {}
+                      : { entrega: entregaTexto(l.entrega_dias) }),
                 })),
                 ...(plan.falta > 0 ? { no_alcanza_faltan: plan.falta } : {}),
+                ...(entrega && faltaElegir ? { aviso: `"${entrega}" no está disponible para esta pieza ahora` } : {}),
               });
               continue;
             }
-            for (const l of plan.lineas) aAgregar.push({ product_id: l.product_id, qty: l.qty });
+            for (const { l, ops } of lineas) {
+              const op = elegida(ops);
+              aAgregar.push({
+                product_id: l.product_id,
+                qty: l.qty,
+                ...(op ? { entrega: op.modo, fecha: op.fecha, corte: op.corte } : {}),
+              });
+            }
           }
 
           // One atomic call: SQL finds-or-creates the quote under a per-phone
@@ -753,19 +788,16 @@ Este número no está en el registro de clientes.
             "error" in sync
               ? "NO menciones ningún enlace en esta respuesta. Confirma lo agregado y pregunta si sería algo más."
               : NOTA_ENLACE;
-          if (!("error" in sync) && sync.creada && pedido.cotizacionId) {
-            // A new quote IS a lead: ping sellers once, at creation.
-            await notifyCotizacionSinAsignar(pedido.cotizacionId, "agente_whatsapp");
-          }
+          // A new quote IS a lead: ping sellers once per quote, at creation.
+          await avisarNuevas(sync);
           return {
-            pedido: pedido.items.map((i) => ({ nombre: i.nombre, qty: i.qty, unit_mxn: i.unit_mxn })),
-            total_mxn: pedido.items.reduce((s, i) => s + i.unit_mxn * i.qty, 0),
-            ...("error" in sync ? {} : { folio: sync.folio, url: sync.url }),
+            cotizaciones: resumenCotizaciones(pedido),
+            ...(pedido.cotizaciones.length > 1 ? { nota_cotizaciones: NOTA_COTIZACIONES } : {}),
             ...(porConfirmar.length
               ? {
                   por_confirmar: porConfirmar,
                   nota_por_confirmar:
-                    "Estos NO los agregué. Dile al cliente cuántas tienes en el primer almacén (precio y entrega) y de dónde saldrían las demás con SU precio y SU entrega; si 'no_alcanza_faltan', dile cuántas tienes en total. Pregúntale si así se las anotas. Con su sí, vuelve a llamar agregar_al_pedido con confirmado: true.",
+                    "Estos NO los agregué. Dile al cliente cuántas tienes en mostrador (precio, entrega hoy) y que las demás serían SOBREPEDIDO del otro almacén, en otra cotización, a SU precio. Si traen 'opciones_entrega', dale a ESCOGER con fecha: ruta (sin costo, llega 'llega' si pide antes de 'pide_antes_de') o exprés (llega 'llega', +$cargo_mxn). Si solo hay una opción, dila y pide su sí. Si 'no_alcanza_faltan', dile cuántas tienes en total. Con su respuesta vuelve a llamar agregar_al_pedido con la cantidad, confirmado: true y entrega: 'ruta' o 'expres'.",
                 }
               : {}),
             ...(rechazados.length
@@ -812,13 +844,9 @@ Este número no está en el registro de clientes.
           const pedido = await cargarPedido(telefono);
           const tiene = pedido.items.length > 0 && !!pedido.shareToken;
           return {
-            pedido: pedido.items.map((i) => ({ nombre: i.nombre, qty: i.qty, unit_mxn: i.unit_mxn })),
-            total_mxn: pedido.items.reduce((s, i) => s + i.unit_mxn * i.qty, 0),
-            ...(pedido.folio && pedido.shareToken
-              ? { folio: pedido.folio, url: urlCotizacion(pedido.shareToken) }
-              : {}),
+            cotizaciones: resumenCotizaciones(pedido),
             nota: tiene
-              ? "Si el cliente se está despidiendo, despídete recordándole su folio y pegando el \"url\" tal cual, pelón. No lo dejes ir sin saber dónde está su cotización."
+              ? "Si el cliente se está despidiendo, despídete recordándole el folio de cada cotización y pegando cada \"url\" tal cual, pelón. No lo dejes ir sin saber dónde están sus cotizaciones."
               : "No tiene cotización activa: si se despide, solo despídete normal.",
           };
         },
@@ -855,9 +883,7 @@ Este número no está en el registro de clientes.
           }
           const pedido = await cargarPedido(telefono);
           return {
-            pedido: pedido.items.map((i) => ({ nombre: i.nombre, qty: i.qty, unit_mxn: i.unit_mxn })),
-            total_mxn: pedido.items.reduce((s, i) => s + i.unit_mxn * i.qty, 0),
-            ...("error" in sync ? {} : { folio: sync.folio, url: sync.url }),
+            cotizaciones: resumenCotizaciones(pedido),
           };
         },
       }),
@@ -913,10 +939,8 @@ Este número no está en el registro de clientes.
           // Sellers were pinged when it was created.
           return {
             ok: true,
-            folio: pedido.folio,
-            url: pedido.shareToken ? urlCotizacion(pedido.shareToken) : undefined,
-            total_mxn: pedido.items.reduce((s, i) => s + i.unit_mxn * i.qty, 0),
-            nota: "Dale al cliente su folio y el enlace TAL CUAL, pelón: sin markdown, sin [ ] ni ( ). Dile que en ese enlace completa su compra: paga por transferencia y elige envío o recolección (puede mandar su Uber).",
+            cotizaciones: resumenCotizaciones(pedido),
+            nota: "Dale al cliente el folio y el enlace de CADA cotización TAL CUAL, pelón: sin markdown, sin [ ] ni ( ). Dile que en cada enlace completa esa compra: paga por transferencia y elige envío o recolección (puede mandar su Uber). Si son varias (una por almacén), se pagan por separado.",
           };
         },
       }),

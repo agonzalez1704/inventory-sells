@@ -29,6 +29,13 @@ export interface Inventory {
   sucursal_id?: string | null;
   /** A supplier's stock, loaded only to see it (Grob): never sold from. */
   solo_consulta?: boolean;
+  /** Route truck days (ISO 1 = Monday) and each one's order cutoff: free, at this almacén's price. */
+  ruta?: { llega: number; corte_dia: number; corte: string }[] | null;
+  /** Exprés: arrives expres_dias business days after an order before expres_corte, for a fee per quote. */
+  expres_activo?: boolean;
+  expres_dias?: number;
+  expres_corte?: string;
+  expres_costo_cents?: number;
 }
 
 export interface Product {

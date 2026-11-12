@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import type { Inventory } from "@/lib/types";
 import { editarInventario, eliminarInventario, marcaParaInventario } from "./inventories";
 import { listarSucursales, type Sucursal } from "@/modules/sucursales/actions";
+import type { Expres, RutaDia } from "@/modules/agent/reparto";
+import { RutaExpres } from "./RutaExpres";
 
 /**
  * The inventory itself: name, city, delivery lead. Three fields — creating
@@ -29,6 +31,13 @@ export function EditarInventarioModal({
     inventario.entrega_dias_habiles != null ? String(inventario.entrega_dias_habiles) : "",
   );
   const [dropship, setDropship] = useState(inventario.es_dropship ?? false);
+  const [ruta, setRuta] = useState<RutaDia[]>(inventario.ruta ?? []);
+  const [expres, setExpres] = useState<Expres>({
+    activo: inventario.expres_activo ?? false,
+    dias: inventario.expres_dias ?? 1,
+    corte: inventario.expres_corte ?? "16:00",
+    costo: (inventario.expres_costo_cents ?? 0) / 100,
+  });
   const [consulta, setConsulta] = useState(inventario.solo_consulta ?? false);
   const [sucursalId, setSucursalId] = useState<string>(inventario.sucursal_id ?? "");
   const [sucursales, setSucursales] = useState<Sucursal[]>([]);
@@ -69,6 +78,8 @@ export function EditarInventarioModal({
           esDropship: dropship,
           sucursalId: sucursalId || null,
           soloConsulta: consulta,
+          ruta,
+          expres: { activo: expres.activo, dias: expres.dias, corte: expres.corte, costoCents: Math.round(expres.costo * 100) },
         });
         toast.success("Inventario guardado");
         onClose();
@@ -80,7 +91,7 @@ export function EditarInventarioModal({
   }
 
   return (
-    <Modal open onClose={onClose} title="Editar inventario" className="max-w-sm">
+    <Modal open onClose={onClose} title="Editar inventario" className="max-w-md">
       <form
         className="space-y-3"
         onSubmit={(e) => {
@@ -116,6 +127,7 @@ export function EditarInventarioModal({
           Los días se suman a la entrega estimada de todo pedido que incluya
           piezas de este inventario, y la tienda lo dice en cada pieza.
         </p>
+        <RutaExpres nombre={nombre} ruta={ruta} setRuta={setRuta} expres={expres} setExpres={setExpres} />
         {sucursales.length > 0 && (
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-muted-foreground">

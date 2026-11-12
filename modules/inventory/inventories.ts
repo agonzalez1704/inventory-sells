@@ -47,6 +47,8 @@ export async function editarInventario(
     esDropship?: boolean;
     sucursalId?: string | null;
     soloConsulta?: boolean;
+    ruta?: { llega: number; corte_dia: number; corte: string }[];
+    expres?: { activo: boolean; dias: number; corte: string; costoCents: number };
   },
 ): Promise<void> {
   await assertPermiso("inventario_gestionar");
@@ -55,6 +57,17 @@ export async function editarInventario(
   if (!nombre) throw new Error("El nombre es obligatorio");
   if (campos.entregaDias != null && (!Number.isInteger(campos.entregaDias) || campos.entregaDias < 0))
     throw new Error("Los días de entrega deben ser un entero positivo");
+  const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+  const dia = (d: number) => Number.isInteger(d) && d >= 1 && d <= 6;
+  const ruta = campos.ruta ?? [];
+  if (new Set(ruta.map((r) => r.llega)).size !== ruta.length) throw new Error("Un día de ruta está repetido");
+  for (const r of ruta)
+    if (!dia(r.llega) || !dia(r.corte_dia) || r.corte_dia === r.llega || !HHMM.test(r.corte))
+      throw new Error("Revisa los días y horas de corte de la ruta");
+  const ex = campos.expres ?? { activo: false, dias: 1, corte: "16:00", costoCents: 0 };
+  if (!Number.isInteger(ex.dias) || ex.dias < 0 || ex.dias > 30) throw new Error("Los días del exprés van de 0 a 30");
+  if (!HHMM.test(ex.corte)) throw new Error("La hora de corte del exprés no es válida");
+  if (!Number.isInteger(ex.costoCents) || ex.costoCents < 0) throw new Error("El costo del exprés no puede ser negativo");
 
   const insforge = await createInsForgeServerClient();
   const { error } = await insforge.database
@@ -66,6 +79,11 @@ export async function editarInventario(
       es_dropship: campos.esDropship ?? false,
       sucursal_id: campos.sucursalId ?? null,
       solo_consulta: campos.soloConsulta ?? false,
+      ruta: ruta.length ? [...ruta].sort((a, b) => a.llega - b.llega) : null,
+      expres_activo: ex.activo,
+      expres_dias: ex.dias,
+      expres_corte: ex.corte,
+      expres_costo_cents: ex.costoCents,
     })
     .eq("id", id);
   if (error) throw new Error(error.message ?? "No se pudo guardar el inventario");

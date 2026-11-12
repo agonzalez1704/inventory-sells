@@ -21,7 +21,18 @@ export type CotizacionRow = {
   expires_at: string | null;
   esPropia: boolean;
   sinAsignar: boolean;
+  /** Almacén name when the pieces come from one other than the counter. */
+  sobrepedido?: string | null;
+  entrega?: "ruta" | "expres" | null;
+  entrega_fecha?: string | null;
+  /** When the supplier order must go out to keep that date. */
+  pedir_antes?: string | null;
 };
+
+const dia = (d: string) =>
+  new Date(`${d}T12:00:00`).toLocaleDateString("es-MX", { weekday: "short", day: "numeric" });
+const limite = (iso: string) =>
+  new Date(iso).toLocaleString("es-MX", { weekday: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/Mexico_City" });
 
 type Tone = "neutral" | "success" | "warning" | "danger" | "accent";
 
@@ -133,7 +144,15 @@ export function CotizacionesView({ cotizaciones }: { cotizaciones: CotizacionRow
                       <span className="font-mono text-sm font-semibold">{c.folio}</span>
                       <Badge tone={est.tone}>{est.label}</Badge>
                       {c.sinAsignar && activa(c) && <Badge tone="accent">Sin asignar</Badge>}
+                      {c.sobrepedido && <Badge tone="warning">Sobrepedido · {c.sobrepedido}</Badge>}
                     </div>
+                    {c.sobrepedido && c.entrega && activa(c) && (
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {c.entrega === "expres" ? "Exprés" : "Ruta"}
+                        {c.entrega_fecha ? ` · llega ${dia(c.entrega_fecha)}` : ""}
+                        {c.pedir_antes ? ` · pedir al proveedor antes del ${limite(c.pedir_antes)}` : ""}
+                      </p>
+                    )}
                     <p className="mt-0.5 truncate text-sm text-muted-foreground">
                       {c.cliente}
                       {c.vendedor && (

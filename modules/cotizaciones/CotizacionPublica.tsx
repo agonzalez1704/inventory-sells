@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { CheckCircle2, Clock, Loader2, ShieldCheck, ShoppingCart, XCircle } from "lucide-react";
+import { CheckCircle2, ChevronRight, Clock, Loader2, ShieldCheck, ShoppingCart, Truck, XCircle, Zap } from "lucide-react";
 import { formatMXN } from "@/lib/money";
 import { MARCA } from "@/lib/marca";
 import {
@@ -16,6 +16,14 @@ import { cotizarParaCP, lugarDeCP, type OpcionEnvio } from "@/modules/tienda/che
 function fecha(iso: string) {
   return new Date(iso).toLocaleDateString("es-MX", { day: "2-digit", month: "long", year: "numeric" });
 }
+
+// "2026-11-13" is a calendar day: read it as such, not as UTC midnight.
+const diaEntrega = (d: string) =>
+  new Date(`${d}T12:00:00`).toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long" });
+const limite = (iso: string) =>
+  new Date(iso).toLocaleString("es-MX", {
+    weekday: "long", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/Mexico_City",
+  });
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
@@ -109,6 +117,24 @@ export function CotizacionPublica() {
 
       <Estado cot={cot} />
 
+      {cot.sobrepedido && (
+        <div className="space-y-2 rounded-2xl border border-border bg-background p-4">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
+            <Truck className="h-3.5 w-3.5" />
+            Sobrepedido{cot.almacen ? ` · ${cot.almacen}` : ""}
+          </span>
+          <p className="text-xl font-semibold leading-snug">
+            {cot.entrega_fecha ? `Llega el ${diaEntrega(cot.entrega_fecha)}` : "Fecha de entrega por confirmar"}
+          </p>
+          {cot.pedir_antes && (
+            <p className="text-sm text-muted-foreground">
+              {cot.entrega === "expres" ? "Exprés" : "Ruta"}: pagando antes del {limite(cot.pedir_antes)}. Si pagas
+              después, llega en la siguiente{cot.entrega === "expres" ? " fecha" : " ruta"}.
+            </p>
+          )}
+        </div>
+      )}
+
       <div className="overflow-hidden rounded-2xl border border-border bg-background shadow-sm">
         {cot.cliente && (
           <div className="border-b border-tienda-50 px-5 py-3 text-sm">
@@ -137,6 +163,18 @@ export function CotizacionPublica() {
                 </td>
               </tr>
             ))}
+            {cot.cargo_expres_cents > 0 && (
+              <tr>
+                <td className="px-5 py-3">
+                  <p className="flex items-center gap-1.5 font-medium">
+                    <Zap className="h-4 w-4 text-amber-600" />
+                    Servicio exprés
+                  </p>
+                </td>
+                <td className="px-2 py-3 text-right tabular-nums">1</td>
+                <td className="px-5 py-3 text-right font-medium tabular-nums">{formatMXN(cot.cargo_expres_cents)}</td>
+              </tr>
+            )}
           </tbody>
           <tfoot>
             <tr className="border-t border-tienda-100 dark:border-tienda-900 bg-tienda-50/40 dark:bg-tienda-950/40">
@@ -151,7 +189,26 @@ export function CotizacionPublica() {
         </table>
       </div>
 
-      {cot.notas && (
+      {cot.otras.map((o) => (
+        <a
+          key={o.token}
+          href={`/cotizacion#${o.token}`}
+          // Same page, new fragment: reload so it reads the other quote.
+          onClick={() => setTimeout(() => window.location.reload(), 0)}
+          className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-background px-4 py-3 text-sm transition-colors hover:bg-muted/40"
+        >
+          <span>
+            <span className="block text-xs text-muted-foreground">También tienes · se paga aparte</span>
+            <span className="font-medium">
+              <span className="font-mono">{o.folio}</span> · {o.sobrepedido ? `Sobrepedido ${o.almacen}` : `${o.almacen} · hoy`} ·{" "}
+              {formatMXN(o.total_cents)}
+            </span>
+          </span>
+          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+        </a>
+      ))}
+
+      {cot.notas && !cot.notas.startsWith("WhatsApp:") && (
         <div className="rounded-2xl border border-border bg-background p-4 text-sm">
           <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">Notas</p>
           <p>{cot.notas}</p>
