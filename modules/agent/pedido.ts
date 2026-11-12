@@ -18,7 +18,7 @@ export type Pedido = {
 
 const VACIO: Pedido = { items: [], cotizacionId: null, folio: null, shareToken: null };
 
-const urlBase = () => (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/+$/, "");
+export const urlBase = () => (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/+$/, "");
 export const urlCotizacion = (token: string) => `${urlBase()}/cotizacion#${token}`;
 
 type CotRow = {
@@ -62,7 +62,8 @@ type SyncRow = { id: string; folio: string; share_token: string; total_cents: nu
 // in ONE quote regardless of order.
 export async function agregarACotizacion(
   numero: string,
-  items: { sku: string; qty: number }[],
+  // product_id pins the almacén row; a bare sku lets SQL pick the first one.
+  items: { sku?: string; product_id?: string; qty: number }[],
 ): Promise<{ folio: string; url: string; totalMxn: number; creada: boolean } | { error: string }> {
   try {
     const { data, error } = await insforgeAdmin.database.rpc("agregar_a_cotizacion_whatsapp", {

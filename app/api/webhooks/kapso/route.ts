@@ -7,6 +7,7 @@ import { estadoConversacion, marcarAsesor } from "@/modules/agent/handoff";
 import { resolverRemitente, etiqueta } from "@/modules/agent/identidad";
 import { getAsesores } from "@/modules/config/lib";
 import { enviarTexto, descargarMedia } from "@/lib/kapso";
+import { mandarFotos } from "@/modules/agent/fotos";
 
 export const maxDuration = 60;
 
@@ -130,7 +131,7 @@ export async function POST(req: Request) {
       cargarHistorial(clave, 10),
       detectarCliente(telefono), // best-effort: null if unregistered
     ]);
-    const { texto: respuesta, escalar } = await responderMensaje(
+    const { texto: respuesta, escalar, fotos } = await responderMensaje(
       [...historial, { role: "user", content: texto }],
       clave,
       cliente,
@@ -141,6 +142,7 @@ export async function POST(req: Request) {
     // flowing back to us through the 30-day rule, and falls back to the BSUID
     // for customers whose number we no longer receive.
     await enviarTexto(phoneNumberId, telefono, respuesta, bsuid);
+    await mandarFotos(phoneNumberId, telefono, clave, fotos, bsuid);
 
     // Agent asked for a human: pause the bot + ping the asesores (best-effort,
     // WhatsApp only delivers inside the 24h window).

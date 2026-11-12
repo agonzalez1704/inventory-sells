@@ -54,6 +54,27 @@ export async function enviarTexto(
   });
 }
 
+// Send a photo by public link. Meta fetches it itself, and only takes JPEG/PNG.
+export async function enviarImagen(
+  phoneNumberId: string,
+  to: string,
+  link: string,
+  caption: string,
+  recipientUserId?: string,
+): Promise<void> {
+  if (!to && !recipientUserId) throw new Error("Sin destinatario (ni teléfono ni BSUID)");
+  await kapso(`/meta/whatsapp/${META_VERSION}/${phoneNumberId}/messages`, {
+    method: "POST",
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      ...(to ? { to } : {}),
+      ...(recipientUserId ? { recipient: recipientUserId } : {}),
+      type: "image",
+      image: { link, caption },
+    }),
+  });
+}
+
 // Send an approved template — the only way to reach someone who has not
 // written to us in the last 24 hours (an owner getting an alert, say).
 export async function enviarPlantilla(
