@@ -13,7 +13,11 @@ export async function mandarFotos(
 ) {
   for (const f of fotos) {
     try {
-      await enviarImagen(phoneNumberId, telefono, `${urlBase()}/api/wa-foto/${f.productId}`, f.caption, bsuid);
+      // The apex answers 308 → www, and WhatsApp fetches the link itself:
+      // hand it the final URL, already checked to be a JPEG.
+      const r = await fetch(`${urlBase()}/api/wa-foto/${f.productId}`);
+      if (!r.ok || !r.headers.get("content-type")?.startsWith("image/")) throw new Error(`wa-foto ${r.status}`);
+      await enviarImagen(phoneNumberId, telefono, r.url, f.caption, bsuid);
       await guardarMensaje(clave, "assistant", `[foto] ${f.caption}`);
     } catch (e) {
       console.error("Foto WhatsApp falló:", f.productId, e);

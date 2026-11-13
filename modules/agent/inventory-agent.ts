@@ -100,7 +100,7 @@ Reglas de productos:
 - Si pide MÁS piezas de las que hay en mostrador, agregar_al_pedido NO las agrega: te las regresa en "por_confirmar". Dile cuántas tienes en mostrador y que las demás serían sobrepedido (regla SOBREPEDIDO). Si quiere solo las de mostrador, llama agregar_al_pedido con esa cantidad.
 - Si pide más de las que hay EN TOTAL, dile cuántas tienes en total (y dónde). NUNCA anotes más piezas de las que hay.
 - SOBREPEDIDO: lo que no está en mostrador sale de otro almacén (ej. Guadalajara) en OTRA cotización, a SU precio (dilo si es distinto). Esas piezas traen "opciones_entrega" y el CLIENTE ESCOGE: ruta (sin costo, llega el día de ruta si pide antes del corte) o exprés (llega antes, con el cargo que diga). Dile ambas con su fecha en pocas palabras y anota según lo que elija (agregar_al_pedido con entrega). NUNCA escojas tú. Si solo hay una opción, dila.
-- FOTOS: si el cliente pide foto o imagen de un producto, usa mandar_foto con ese producto (la foto se le manda sola). NUNCA digas que no tienes fotos sin haberlo intentado.
+- FOTOS: si el cliente pide foto o imagen, usa mandar_foto con el SKU de cada producto que le ofreciste (la foto se le manda sola). Si el SKU no lo tienes en este turno, llama antes buscar_producto con lo que pidió (carro y año). NUNCA digas que no tienes foto sin que mandar_foto te lo haya dicho.
 - Da el precio en pesos de las versiones que SÍ tengan precio. Nunca inventes un precio.
 - Si la versión EXACTA que pidió está agotada (disponible: false), DILO con la frase "la tengo agotada" y ofrece las variantes que SÍ hay con su nombre completo y su precio. NUNCA sustituyas en silencio el precio de otra variante.
 - Si una pieza agotada trae "equivalente", es LA MISMA pieza con otra clave (conversión): dile que esa la tienes agotada pero que tienes la equivalente, con su nombre y precio, y anótala si la quiere.
@@ -813,21 +813,22 @@ Este número no está en el registro de clientes.
       }),
       mandar_foto: tool({
         description:
-          "Manda al cliente por WhatsApp la foto que tenemos de un producto. Úsala cuando pida foto o imagen. Identifica el producto por su SKU o su NOMBRE tal como te lo dio buscar_producto.",
+          "Manda al cliente por WhatsApp la foto que tenemos de un producto. Úsala cuando pida foto o imagen. Necesita el SKU exacto que te dio buscar_producto EN ESTE TURNO: si no lo tienes (te pide foto de algo de mensajes anteriores), llama primero buscar_producto con lo que pidió el cliente (con su carro y año) y luego esta con el sku. Una llamada por producto.",
         inputSchema: z.object({
-          producto: z.string().describe("SKU o nombre del producto, como viene en buscar_producto"),
+          sku: z.string().describe("SKU exacto, tal como viene en buscar_producto"),
         }),
-        execute: async ({ producto }) => {
-          let sku = producto.trim();
-          let alms = (await almacenesDe([sku])).get(sku);
-          if (!alms?.length) {
-            const r = (await buscarProducto(producto, 5))[0];
-            if (r) {
-              sku = r.sku;
-              alms = (await almacenesDe([sku])).get(sku);
-            }
-          }
-          const con = alms?.find((a) => a.imagen);
+        execute: async ({ sku: dicho }) => {
+          // SKU only: a name ("cremallera Versa 2016") matched another part or
+          // nothing, and the customer got "no tengo foto" or the wrong photo.
+          const sku = dicho.trim();
+          const mapa = await almacenesDe([sku, sku.toUpperCase()]);
+          const alms = mapa.get(sku) ?? mapa.get(sku.toUpperCase());
+          if (!alms?.length)
+            return {
+              enviada: false,
+              nota: "Ese SKU no existe. Llama buscar_producto con lo que pidió el cliente y vuelve a llamarme con el sku exacto del resultado. No le digas al cliente que no hay foto todavía.",
+            };
+          const con = alms.find((a) => a.imagen);
           if (!con)
             return { enviada: false, nota: "No tengo foto de ese producto. Díselo corto y ofrécele que un asesor se la manda." };
           if (!fotos.some((f) => f.productId === con.product_id)) fotos.push({ productId: con.product_id, caption: con.nombre });
