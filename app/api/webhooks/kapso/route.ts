@@ -131,13 +131,13 @@ export async function POST(req: Request) {
       cargarHistorial(clave, 10),
       detectarCliente(telefono), // best-effort: null if unregistered
     ]);
-    const { texto: respuesta, escalar, fotos } = await responderMensaje(
+    const { texto: respuesta, escalar, fotos, guardar } = await responderMensaje(
       [...historial, { role: "user", content: texto }],
       clave,
       cliente,
     );
     await guardarMensaje(clave, "user", texto);
-    await guardarMensaje(clave, "assistant", respuesta);
+    await guardarMensaje(clave, "assistant", guardar);
     // Send both identifiers: Meta prefers the phone number, which keeps it
     // flowing back to us through the 30-day rule, and falls back to the BSUID
     // for customers whose number we no longer receive.

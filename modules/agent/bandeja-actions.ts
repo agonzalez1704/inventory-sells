@@ -149,9 +149,9 @@ export async function contestarDeNuevo(clave: string): Promise<ActionResult<{ te
     const ultimo = historial.at(-1)?.content;
     if (!ultimo) throw new Error("No hay mensaje reciente del cliente que contestar (más de 6 horas)");
     const cliente = await detectarCliente(telefono);
-    const { texto, escalar, fotos } = await responderMensaje(historial, clave, cliente, { correccion: true });
+    const { texto, escalar, fotos, guardar } = await responderMensaje(historial, clave, cliente, { correccion: true });
     await enviarTexto(numeroWhatsApp(), telefono, texto, bsuid || undefined);
-    await guardarMensaje(clave, "assistant", texto);
+    await guardarMensaje(clave, "assistant", guardar);
     await mandarFotos(numeroWhatsApp(), telefono, clave, fotos, bsuid || undefined);
     if (escalar) await marcarAsesor(clave, escalar.motivo, ultimo);
     return { texto };

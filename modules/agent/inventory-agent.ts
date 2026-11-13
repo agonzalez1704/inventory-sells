@@ -100,7 +100,8 @@ Reglas de productos:
 - Si pide MÁS piezas de las que hay en mostrador, agregar_al_pedido NO las agrega: te las regresa en "por_confirmar". Dile cuántas tienes en mostrador y que las demás serían sobrepedido (regla SOBREPEDIDO). Si quiere solo las de mostrador, llama agregar_al_pedido con esa cantidad.
 - Si pide más de las que hay EN TOTAL, dile cuántas tienes en total (y dónde). NUNCA anotes más piezas de las que hay.
 - SOBREPEDIDO: lo que no está en mostrador sale de otro almacén (ej. Guadalajara) en OTRA cotización, a SU precio (dilo si es distinto). Esas piezas traen "opciones_entrega" y el CLIENTE ESCOGE: ruta (sin costo, llega el día de ruta si pide antes del corte) o exprés (llega antes, con el cargo que diga). Dile ambas con su fecha en pocas palabras y anota según lo que elija (agregar_al_pedido con entrega). NUNCA escojas tú. Si solo hay una opción, dila.
-- FOTOS: si el cliente pide foto o imagen, usa mandar_foto con el SKU de cada producto que le ofreciste (la foto se le manda sola). Si el SKU no lo tienes en este turno, llama antes buscar_producto con lo que pidió (carro y año). NUNCA digas que no tienes foto sin que mandar_foto te lo haya dicho.
+- FOTOS: si el cliente pide foto o imagen, usa mandar_foto con el SKU de cada producto que le ofreciste (la foto se le manda sola). Los SKUs de lo que ofreciste antes están en la nota ⟦productos: …⟧ al final de tus mensajes anteriores; si no está ahí, llama antes buscar_producto con lo que pidió (carro y año). NUNCA digas que no tienes foto sin que mandar_foto te lo haya dicho.
+- Las notas ⟦productos: …⟧ son internas: NUNCA las escribas en tu respuesta.
 - Da el precio en pesos de las versiones que SÍ tengan precio. Nunca inventes un precio.
 - Si la versión EXACTA que pidió está agotada (disponible: false), DILO con la frase "la tengo agotada" y ofrece las variantes que SÍ hay con su nombre completo y su precio. NUNCA sustituyas en silencio el precio de otra variante.
 - Si una pieza agotada trae "equivalente", es LA MISMA pieza con otra clave (conversión): dile que esa la tienes agotada pero que tienes la equivalente, con su nombre y precio, y anótala si la quiere.
@@ -165,7 +166,14 @@ export type RespuestaAgente = {
   texto: string;
   escalar: { motivo: string } | null;
   fotos: { productId: string; caption: string }[];
+  /** What to store: the reply plus a ⟦productos⟧ note with the SKUs it was built on. */
+  guardar: string;
 };
+
+// The history is text only, so "¿tienes foto?" on the next message reached a
+// model that no longer knew which SKU it had offered. The stored reply keeps
+// them in this note; the customer never sees it, the inbox hides it.
+const NOTA_PRODUCTOS = /\n*⟦[^⟧]*⟧/g;
 
 export async function responderMensaje(
   messages: Turno[],
@@ -245,7 +253,8 @@ Este número no está en el registro de clientes.
       ultimoMensaje,
     );
 
-  const { text } = await generateText({
+  const ofrecidos = new Map<string, string>();
+  const { text, steps } = await generateText({
     model: openai(MODEL),
     system,
     messages,
@@ -494,6 +503,7 @@ Este número no está en el registro de clientes.
                 tiene_foto: alms.some((a) => a.imagen),
               };
             }) as ({ sku: string; nombre: string; precio_mxn: number; disponible: boolean; equivalente?: { nombre: string; precio_mxn: number } } & Record<string, unknown>)[];
+          for (const i of items.slice(0, 8)) ofrecidos.set(i.sku, i.nombre);
           // Conversiones: an out-of-stock part may be on the shelf under
           // another clave. The agent offers that one, by its own name.
           const agotados = items.filter((i) => !i.disponible).map((i) => i.sku);
@@ -813,7 +823,7 @@ Este número no está en el registro de clientes.
       }),
       mandar_foto: tool({
         description:
-          "Manda al cliente por WhatsApp la foto que tenemos de un producto. Úsala cuando pida foto o imagen. Necesita el SKU exacto que te dio buscar_producto EN ESTE TURNO: si no lo tienes (te pide foto de algo de mensajes anteriores), llama primero buscar_producto con lo que pidió el cliente (con su carro y año) y luego esta con el sku. Una llamada por producto.",
+          "Manda al cliente por WhatsApp la foto que tenemos de un producto. Úsala cuando pida foto o imagen. Necesita el SKU exacto: el de buscar_producto o el de la nota ⟦productos: …⟧ de tus mensajes anteriores. Si no lo tienes, llama primero buscar_producto con lo que pidió el cliente (con su carro y año) y luego esta con el sku. Una llamada por producto.",
         inputSchema: z.object({
           sku: z.string().describe("SKU exacto, tal como viene en buscar_producto"),
         }),
@@ -1006,7 +1016,20 @@ Este número no está en el registro de clientes.
   // WhatsApp renders no markdown: deterministically unwrap [texto](url) into
   // the bare URL (or drop dead placeholders like [enlace](#)) so a formatting
   // slip by the model never reaches the customer.
+  // Which tools ran and what they said: the only way to tell "no photo" from
+  // "never asked for one" after the fact.
+  console.log(
+    "[agente]",
+    telefono.slice(-4),
+    JSON.stringify(
+      steps.flatMap((s) =>
+        s.toolResults.map((r) => ({ t: r?.toolName, in: r?.input, out: JSON.stringify(r?.output)?.slice(0, 300) })),
+      ),
+    ),
+  );
+
   const sinMarkdown = text
+    .replace(NOTA_PRODUCTOS, "")
     .trim()
     .replace(/\[([^\]]*)\]\(([^)]*)\)/g, (_m, t: string, u: string) =>
       /^https?:\/\//.test(u) ? u : t,
@@ -1029,11 +1052,13 @@ Este número no está en el registro de clientes.
           .trim();
   }
 
+  const texto = final || "Perdón, no pude encontrar esa información. ¿Me das el modelo o SKU exacto?";
   return {
-    texto:
-      final ||
-      "Perdón, no pude encontrar esa información. ¿Me das el modelo o SKU exacto?",
+    texto,
     escalar,
     fotos,
+    guardar: ofrecidos.size
+      ? `${texto}\n⟦productos: ${[...ofrecidos].map(([sku, nombre]) => `${sku} = ${nombre}`).join(" | ")}⟧`
+      : texto,
   };
 }

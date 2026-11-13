@@ -295,7 +295,7 @@ function Burbuja({ m, onEnsenar }: { m: MensajeBandeja; onEnsenar?: () => void }
           v.burbuja,
         )}
       >
-        <p className="whitespace-pre-wrap wrap-break-word leading-relaxed">{m.contenido}</p>
+        <p className="whitespace-pre-wrap wrap-break-word leading-relaxed">{m.contenido.replace(/\n*⟦[^⟧]*⟧/g, "")}</p>
         <p className={cn("mt-1 flex items-center gap-1 text-[10px]", v.meta)}>
           <Icono className="h-3 w-3" />
           {v.etiqueta} · {hora(m.created_at)}
