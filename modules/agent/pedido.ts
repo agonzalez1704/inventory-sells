@@ -55,9 +55,9 @@ type CotRow = {
   cotizacion_items: { sku: string; nombre: string; qty: number; unit_price_cents: number }[] | null;
 };
 
-// Read-only view of the live quotes (same 6h window the SQL uses).
+// Read-only view of the live quotes: every 'pendiente' one of this number,
+// open until a seller converts it (same rule as cotizaciones_wa_vivas).
 export async function cargarPedido(numero: string): Promise<Pedido> {
-  const desde = new Date(Date.now() - 6 * 3_600_000).toISOString();
   const [{ data }, { data: invs }] = await Promise.all([
     insforgeAdmin.database
       .from("cotizaciones")
@@ -67,12 +67,14 @@ export async function cargarPedido(numero: string): Promise<Pedido> {
       .eq("canal", "whatsapp")
       .eq("estado", "pendiente")
       .eq("notas", `WhatsApp: ${numero}`)
-      .gte("created_at", desde)
       .order("created_at", { ascending: true }),
     insforgeAdmin.database.from("inventories").select("id, name").order("created_at").limit(1),
   ]);
   const mostrador = (invs as { id: string; name: string }[] | null)?.[0];
-  const cotizaciones = ((data ?? []) as unknown as CotRow[])
+  // Oldest first, so the newest pending quote per almacén wins: that one is
+  // open, older ones stay pending for the sellers.
+  const abiertas = new Map(((data ?? []) as unknown as CotRow[]).map((r) => [r.inventory_id ?? mostrador?.id ?? "", r]));
+  const cotizaciones = [...abiertas.values()]
     .map((r): CotViva => {
       const esMostrador = !r.inventory_id || r.inventory_id === mostrador?.id;
       const almacen = r.inventories?.name ?? mostrador?.name ?? "Mostrador";
@@ -142,6 +144,12 @@ export async function agregarACotizacion(
     const rows = (Array.isArray(data) ? data : [data]).filter(Boolean) as SyncRow[];
     const row = rows[0];
     if (!row?.id) return { error: "no se pudo agregar" };
+    // An open quote lives as long as it keeps being used: each addition gives
+    // it another week before its link reads "vencida".
+    await insforgeAdmin.database
+      .from("cotizaciones")
+      .update({ expires_at: new Date(Date.now() + 7 * 86_400_000).toISOString() })
+      .in("id", rows.map((r) => r.id));
     return {
       folio: row.folio,
       url: urlCotizacion(row.share_token),

@@ -800,6 +800,9 @@ Este número no está en el registro de clientes.
 
           // One atomic call: SQL finds-or-creates the quote under a per-phone
           // lock and merges these SKUs, so parallel calls can't fork it.
+          // The open quote may hold pieces from days ago: the customer must
+          // hear the whole list, not just what went in now.
+          const antes = aAgregar.length ? await cargarPedido(telefono) : null;
           const sync = aAgregar.length
             ? await agregarACotizacion(telefono, aAgregar)
             : { error: "nada que agregar" as const };
@@ -809,7 +812,7 @@ Este número no está en el registro de clientes.
           // have a url — otherwise the model invents a placeholder.
           // The link rule keys on whether the CUSTOMER has seen it in THIS
           // conversation — not on whether the quote is new. A quote can carry
-          // over from an earlier chat (6h window), and telling the model "you
+          // over from an earlier chat (open until a seller converts it), and telling the model "you
           // already sent it" when it never did is how a customer ends up with
           // a quote and no link.
           const nota =
@@ -821,6 +824,11 @@ Este número no está en el registro de clientes.
           return {
             cotizaciones: resumenCotizaciones(pedido),
             ...(pedido.cotizaciones.length > 1 ? { nota_cotizaciones: NOTA_COTIZACIONES } : {}),
+            ...(antes?.items.length && !("error" in sync)
+              ? {
+                  nota_ya_traia: `Su cotización abierta YA traía de antes: ${antes.items.map((i) => `${i.qty} × ${i.nombre}`).join(", ")}. Dile la lista COMPLETA de lo que lleva ahora (lo de antes y lo nuevo) con el total, y pregúntale si deja lo de antes o se lo quitas.`,
+                }
+              : {}),
             ...(porConfirmar.length
               ? {
                   por_confirmar: porConfirmar,

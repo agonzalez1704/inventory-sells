@@ -92,7 +92,7 @@ export async function cargarCotizacionPublica(token: string): Promise<CotPublica
           .in("estado", ["pendiente", "autorizada"])
           .neq("id", c.id)
           .gt("total_cents", 0)
-          .gte("created_at", new Date(new Date(c.created_at).getTime() - 86_400_000).toISOString())
+          .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
       : Promise.resolve({ data: [] }),
   ]);
   const mostrador = (invs as { id: string; name: string }[] | null)?.[0];
