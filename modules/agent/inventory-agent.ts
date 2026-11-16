@@ -87,10 +87,10 @@ const ANOTAR_SIN_PREGUNTAR = `- Todo producto CONCRETO que tengamos y por el que
 - PROHIBIDO preguntar "¿quieres agregarlo a tu cotización?", "¿lo agrego?" o similar: suena a robot. Un vendedor de mostrador solo lo anota. Si no lo quiere, él te lo dirá y lo quitas con quitar_del_pedido.
 - NO agregues cuando lo que diste fue una LISTA de opciones/calidades y le preguntaste cuál quiere: espera su elección y entonces agrega la elegida.
 - Cuando des VARIAS opciones, cierra con "¿Cuál te anoto?". PROHIBIDO "¿Te gustaría agregar…?" o "¿Quieres que agregue…?".`;
-const ANOTAR_AL_CONFIRMAR = `- NO anotes nada en su cotización sin que el cliente diga que la quiere. Al dar precio y disponibilidad de una pieza concreta, CIERRA preguntando explícito: "¿Te la cotizo?" (si diste varias: "¿Cuál te cotizo?").
+const ANOTAR_AL_CONFIRMAR = `- NO anotes nada en su cotización sin que el cliente diga que la quiere. Al dar precio y disponibilidad de una pieza concreta, CIERRA preguntando explícito: "¿Confirmo tu cotización?" (si diste varias: "¿Cuál quieres? ¿Confirmo tu cotización?").
 - Cuando diga que sí ("sí", "va", "órale", "dámela", "la quiero", "esa"), usa agregar_al_pedido en ese MISMO turno (qty 1 salvo que diga otra cosa). La primera vez esto crea su cotización: incluye el enlace AL FINAL de esa misma respuesta ("Aquí puedes ver tu cotización: <enlace>") y pregunta si sería algo más.
 - Si dice que no o solo estaba preguntando, no anotes nada y pregunta si busca otra pieza.
-- Si la pieza está en Mostrador, junta en la MISMA pregunta cómo la quiere: "¿Te la cotizo? ¿Pasas por ella o te la enviamos?". Cuando diga cómo (pasa él, manda Uber/repartidor → recoger; que se la manden → envio), usa elegir_entrega (después de agregar_al_pedido si en ese mensaje también dijo que sí). No la vuelvas a preguntar si ya la dijo.`;
+- Si la pieza está en Mostrador, junta en la MISMA pregunta cómo la quiere: "¿Confirmo tu cotización? ¿Pasas por ella o te la enviamos?". Cuando diga cómo (pasa él, manda Uber/repartidor → recoger; que se la manden → envio), usa elegir_entrega (después de agregar_al_pedido si en ese mensaje también dijo que sí). No la vuelvas a preguntar si ya la dijo.`;
 const ANOTAR = ES_AUTOPARTES ? ANOTAR_AL_CONFIRMAR : ANOTAR_SIN_PREGUNTAR;
 
 const SYSTEM = `Eres el asistente de WhatsApp de ${MARCA.nombre}.
@@ -666,7 +666,7 @@ Este número no está en el registro de clientes.
             cotizaciones: resumenCotizaciones(pedido),
             nota: [
               preguntar && aAgregar.length
-                ? `NO lo he anotado. Dile para qué vehículo es y lista cada pieza de "en_cotizacion" con su cantidad y precio (nombres claros, sin abreviaturas), y una línea por cada una de "faltan" con su motivo. Cierra preguntando explícito "¿Te cotizo el juego?". Si dice que sí, llama cotizar_juego otra vez con confirmado: true.`
+                ? `NO lo he anotado. Dile para qué vehículo es y lista cada pieza de "en_cotizacion" con su cantidad y precio (nombres claros, sin abreviaturas), y una línea por cada una de "faltan" con su motivo. Cierra preguntando explícito "¿Confirmo tu cotización?". Si dice que sí, llama cotizar_juego otra vez con confirmado: true.`
                 : aAgregar.length
                 ? `YA agregué el juego a su cotización. Dile para qué vehículo es y lista cada pieza de "en_cotizacion" con su cantidad y precio (nombres claros, sin abreviaturas). Luego, una línea por cada una de "faltan" con su motivo. NO le preguntes si quiere agregarlo.`
                 : `No pude agregar ninguna pieza del juego. Dile cuáles de "faltan" y su motivo; si alguna tiene precio por confirmar, usa pasar_a_asesor.`,
