@@ -247,7 +247,7 @@ function PagoBloque({ token, cot, piezas }: { token: string; cot: CotPublica; pi
   const [nombre, setNombre] = useState(cot.cliente ?? "");
   const [email, setEmail] = useState("");
   const [telefono, setTelefono] = useState("");
-  const [entrega, setEntrega] = useState<"recoger" | "envio">("recoger");
+  const [entrega, setEntrega] = useState<"recoger" | "envio">(cot.forma_entrega ?? "recoger");
   const [cp, setCp] = useState("");
   const [estadoDir, setEstadoDir] = useState("");
   const [municipio, setMunicipio] = useState("");

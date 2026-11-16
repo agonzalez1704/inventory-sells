@@ -15,7 +15,7 @@ export default async function CotizacionesPage() {
   const [{ data: cotsData }, { data: custData }, { data: profData }] = await Promise.all([
     insforgeAdmin.database
       .from("cotizaciones")
-      .select("id, folio, customer_id, vendedor_id, created_by, estado, canal, total_cents, created_at, expires_at, inventory_id, entrega, entrega_fecha, pedir_antes, inventories(name)")
+      .select("id, folio, customer_id, vendedor_id, created_by, estado, canal, total_cents, created_at, expires_at, inventory_id, entrega, entrega_fecha, pedir_antes, forma_entrega, inventories(name)")
       .order("created_at", { ascending: false })
       .limit(200),
     insforgeAdmin.database.from("customers").select("id, nombre"),
@@ -45,6 +45,7 @@ export default async function CotizacionesPage() {
     entrega: "ruta" | "expres" | null;
     entrega_fecha: string | null;
     pedir_antes: string | null;
+    forma_entrega: "recoger" | "envio" | null;
     inventories: { name: string } | null;
   }[]).map(
     (c): CotizacionRow => ({
@@ -60,6 +61,7 @@ export default async function CotizacionesPage() {
       entrega: c.entrega,
       entrega_fecha: c.entrega_fecha,
       pedir_antes: c.pedir_antes,
+      forma_entrega: c.forma_entrega,
       expires_at: c.expires_at,
       esPropia: c.created_by === userId || c.vendedor_id === userId,
       sinAsignar: c.vendedor_id === null,

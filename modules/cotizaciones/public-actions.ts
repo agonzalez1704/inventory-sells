@@ -27,6 +27,8 @@ export type CotPublica = {
   entrega_fecha: string | null;
   pedir_antes: string | null;
   cargo_expres_cents: number;
+  /** What the customer told the WhatsApp agent: the pay form starts there. */
+  forma_entrega: "recoger" | "envio" | null;
   /** The same conversation's other quotes (one per almacén), each paid on its own link. */
   otras: { folio: string; almacen: string; sobrepedido: boolean; total_cents: number; token: string }[];
 };
@@ -48,6 +50,7 @@ type Row = {
   entrega_fecha: string | null;
   pedir_antes: string | null;
   cargo_expres_cents: number | null;
+  forma_entrega: "recoger" | "envio" | null;
   inventories: { name: string } | null;
 };
 
@@ -62,7 +65,7 @@ export async function cargarCotizacionPublica(token: string): Promise<CotPublica
   const { data } = await insforgeAdmin.database
     .from("cotizaciones")
     .select(
-      "id, folio, estado, customer_id, total_cents, notas, expires_at, canal, created_at, inventory_id, entrega, entrega_fecha, pedir_antes, cargo_expres_cents, inventories(name)",
+      "id, folio, estado, customer_id, total_cents, notas, expires_at, canal, created_at, inventory_id, entrega, entrega_fecha, pedir_antes, cargo_expres_cents, forma_entrega, inventories(name)",
     )
     .eq("share_token", token)
     .maybeSingle();
@@ -110,6 +113,7 @@ export async function cargarCotizacionPublica(token: string): Promise<CotPublica
       entrega_fecha: c.entrega_fecha,
       pedir_antes: c.pedir_antes,
       cargo_expres_cents: c.cargo_expres_cents ?? 0,
+      forma_entrega: c.forma_entrega,
       otras: ((otrasData ?? []) as unknown as {
         folio: string;
         share_token: string;

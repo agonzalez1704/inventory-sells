@@ -27,6 +27,8 @@ export type CotizacionRow = {
   entrega_fecha?: string | null;
   /** When the supplier order must go out to keep that date. */
   pedir_antes?: string | null;
+  /** What the customer told the agent: pick up or ship. */
+  forma_entrega?: "recoger" | "envio" | null;
 };
 
 const dia = (d: string) =>
@@ -145,6 +147,7 @@ export function CotizacionesView({ cotizaciones }: { cotizaciones: CotizacionRow
                       <Badge tone={est.tone}>{est.label}</Badge>
                       {c.sinAsignar && activa(c) && <Badge tone="accent">Sin asignar</Badge>}
                       {c.sobrepedido && <Badge tone="warning">Sobrepedido · {c.sobrepedido}</Badge>}
+                      {c.forma_entrega && <Badge>{c.forma_entrega === "envio" ? "Envío a domicilio" : "Pasa por ella"}</Badge>}
                     </div>
                     {c.sobrepedido && c.entrega && activa(c) && (
                       <p className="mt-0.5 text-xs text-muted-foreground">

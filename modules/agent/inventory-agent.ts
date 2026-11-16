@@ -89,7 +89,8 @@ const ANOTAR_SIN_PREGUNTAR = `- Todo producto CONCRETO que tengamos y por el que
 - Cuando des VARIAS opciones, cierra con "¿Cuál te anoto?". PROHIBIDO "¿Te gustaría agregar…?" o "¿Quieres que agregue…?".`;
 const ANOTAR_AL_CONFIRMAR = `- NO anotes nada en su cotización sin que el cliente diga que la quiere. Al dar precio y disponibilidad de una pieza concreta, CIERRA preguntando explícito: "¿Te la cotizo?" (si diste varias: "¿Cuál te cotizo?").
 - Cuando diga que sí ("sí", "va", "órale", "dámela", "la quiero", "esa"), usa agregar_al_pedido en ese MISMO turno (qty 1 salvo que diga otra cosa). La primera vez esto crea su cotización: incluye el enlace AL FINAL de esa misma respuesta ("Aquí puedes ver tu cotización: <enlace>") y pregunta si sería algo más.
-- Si dice que no o solo estaba preguntando, no anotes nada y pregunta si busca otra pieza.`;
+- Si dice que no o solo estaba preguntando, no anotes nada y pregunta si busca otra pieza.
+- Si la pieza está en Mostrador, junta en la MISMA pregunta cómo la quiere: "¿Te la cotizo? ¿Pasas por ella o te la enviamos?". Cuando diga cómo (pasa él, manda Uber/repartidor → recoger; que se la manden → envio), usa elegir_entrega (después de agregar_al_pedido si en ese mensaje también dijo que sí). No la vuelvas a preguntar si ya la dijo.`;
 const ANOTAR = ES_AUTOPARTES ? ANOTAR_AL_CONFIRMAR : ANOTAR_SIN_PREGUNTAR;
 
 const SYSTEM = `Eres el asistente de WhatsApp de ${MARCA.nombre}.
@@ -862,6 +863,28 @@ Este número no está en el registro de clientes.
           return {
             enviada: true,
             nota: "La foto se le manda sola justo después de tu mensaje. Dile algo corto como \"Te mando la foto 👇\". NO pegues enlaces de imagen.",
+          };
+        },
+      }),
+      elegir_entrega: tool({
+        description:
+          "Guarda en su cotización si el cliente PASA POR la pieza (recoger: él, su Uber o repartidor) o quiere que se la ENVIEMOS (envio). Úsala cuando lo diga; su página de pago ya sale con eso.",
+        inputSchema: z.object({ forma: z.enum(["recoger", "envio"]) }),
+        execute: async ({ forma }) => {
+          const pedido = await cargarPedido(telefono);
+          if (!pedido.cotizaciones.length)
+            return { ok: false, nota: "Aún no tiene cotización: primero agregar_al_pedido con lo que quiere, y luego esta." };
+          const { error } = await insforgeAdmin.database
+            .from("cotizaciones")
+            .update({ forma_entrega: forma })
+            .in("id", pedido.cotizaciones.map((c) => c.id));
+          if (error) return { ok: false, nota: "No se pudo guardar; él lo escoge en su enlace al pagar." };
+          return {
+            ok: true,
+            nota:
+              forma === "envio"
+                ? "Guardado: envío a domicilio. Dile que en su enlace pone su código postal y dirección para cotizar el envío, y ahí mismo paga."
+                : "Guardado: pasa por ella. Dile que la puede recoger él o mandar su Uber o repartidor, y que paga en su enlace.",
           };
         },
       }),
