@@ -80,6 +80,18 @@ const REGLAS_AUTOPARTES = `- TU PÚBLICO SON MECÁNICOS: hablan coloquial, con m
 - Muchas piezas van por LADO (derecha/izquierda) o POSICIÓN (delantera/trasera). Si el cliente no lo dijo y las coincidencias difieren en eso, pregúntale cuál necesita — en sus palabras ("¿del lado del chofer o del copiloto?").
 - "demasiados" resultados = falta el vehículo o el año: pregúntalos, no listes.`;
 
+// Fiable: a counter clerk just writes it down — asking "¿lo agrego?" sounds
+// like a bot. Ruli asked for the opposite: a quote nobody wanted clutters the
+// sellers' list, so the agent asks first and quotes on a yes.
+const ANOTAR_SIN_PREGUNTAR = `- Todo producto CONCRETO que tengamos y por el que pregunte va a su cotización SIN preguntarle. Cuando buscar_producto encuentra uno solo, ya lo agrega por ti (verás "agregado"); si dio opciones y el cliente eligió, usa agregar_al_pedido en ese MISMO turno (qty 1 salvo que diga otra cosa). La primera vez esto crea su cotización: incluye el enlace AL FINAL de esa misma respuesta ("Aquí puedes ver tu cotización: <enlace>") y pregunta si sería algo más.
+- PROHIBIDO preguntar "¿quieres agregarlo a tu cotización?", "¿lo agrego?" o similar: suena a robot. Un vendedor de mostrador solo lo anota. Si no lo quiere, él te lo dirá y lo quitas con quitar_del_pedido.
+- NO agregues cuando lo que diste fue una LISTA de opciones/calidades y le preguntaste cuál quiere: espera su elección y entonces agrega la elegida.
+- Cuando des VARIAS opciones, cierra con "¿Cuál te anoto?". PROHIBIDO "¿Te gustaría agregar…?" o "¿Quieres que agregue…?".`;
+const ANOTAR_AL_CONFIRMAR = `- NO anotes nada en su cotización sin que el cliente diga que la quiere. Al dar precio y disponibilidad de una pieza concreta, CIERRA preguntando explícito: "¿Te la cotizo?" (si diste varias: "¿Cuál te cotizo?").
+- Cuando diga que sí ("sí", "va", "órale", "dámela", "la quiero", "esa"), usa agregar_al_pedido en ese MISMO turno (qty 1 salvo que diga otra cosa). La primera vez esto crea su cotización: incluye el enlace AL FINAL de esa misma respuesta ("Aquí puedes ver tu cotización: <enlace>") y pregunta si sería algo más.
+- Si dice que no o solo estaba preguntando, no anotes nada y pregunta si busca otra pieza.`;
+const ANOTAR = ES_AUTOPARTES ? ANOTAR_AL_CONFIRMAR : ANOTAR_SIN_PREGUNTAR;
+
 const SYSTEM = `Eres el asistente de WhatsApp de ${MARCA.nombre}.
 Atiendes a clientes que preguntan por PRECIO y DISPONIBILIDAD de productos, y por datos del negocio (envíos, pagos, ubicación, etc.).
 
@@ -141,10 +153,7 @@ Datos del negocio (envíos, pagos, transferencia, Uber, ubicación, horario):
 - Responde SOLO con la "Información del negocio" de abajo. Si la pregunta no está cubierta ahí, di que un asesor lo confirma; no inventes.
 
 Cotización VIVA (el pedido del cliente ES una cotización real desde el primer precio):
-- Todo producto CONCRETO que tengamos y por el que pregunte va a su cotización SIN preguntarle. Cuando buscar_producto encuentra uno solo, ya lo agrega por ti (verás "agregado"); si dio opciones y el cliente eligió, usa agregar_al_pedido en ese MISMO turno (qty 1 salvo que diga otra cosa). La primera vez esto crea su cotización: incluye el enlace AL FINAL de esa misma respuesta ("Aquí puedes ver tu cotización: <enlace>") y pregunta si sería algo más.
-- PROHIBIDO preguntar "¿quieres agregarlo a tu cotización?", "¿lo agrego?" o similar: suena a robot. Un vendedor de mostrador solo lo anota. Si no lo quiere, él te lo dirá y lo quitas con quitar_del_pedido.
-- NO agregues cuando lo que diste fue una LISTA de opciones/calidades y le preguntaste cuál quiere: espera su elección y entonces agrega la elegida.
-- Cuando des VARIAS opciones, cierra con "¿Cuál te anoto?". PROHIBIDO "¿Te gustaría agregar…?" o "¿Quieres que agregue…?".
+${ANOTAR}
 - La cotización se edita en todo momento con el MISMO enlace: más productos → agregar_al_pedido; cambia cantidad → agregar_al_pedido con la cantidad TOTAL nueva; ya no quiere algo → quitar_del_pedido; pregunta qué lleva o pide el enlace → ver_pedido.
 - El enlace se comparte la PRIMERA vez que lo agregas algo en esta conversación, cuando lo pida, y al cierre. Después no lo repitas en cada mensaje. Regla simple: el cliente debe haber visto su enlace al menos una vez en esta conversación.
 - La cotización puede venir de un rato antes con productos ya dentro. Si al agregar algo el pedido trae MÁS productos de los que acabas de agregar, dile la lista completa de lo que lleva (no solo el total), para que no se confunda con el monto.
@@ -541,7 +550,7 @@ Este número no está en el registro de clientes.
           // agent away — a person at the counter just writes it down.
           const vendibles = items.filter((i) => i.disponible && i.precio_mxn > 0);
           const primeroDe = (sku: string) => repartir(porAlmacen.get(sku) ?? [], 1).lineas[0];
-          if (exactos && vendibles.length === 1 && primeroDe(vendibles[0].sku)?.es_mostrador) {
+          if (!ES_AUTOPARTES && exactos && vendibles.length === 1 && primeroDe(vendibles[0].sku)?.es_mostrador) {
             const elegido = vendibles[0];
             const previo = await cargarPedido(telefono);
             // Already in the quote: leave its quantity alone (qty is a TOTAL).
@@ -596,8 +605,12 @@ Este número no está en el registro de clientes.
           vehiculo: z
             .string()
             .describe(ES_AUTOPARTES ? "carro y año como lo dijo el cliente, ej: \"vento 2017\"; vacío si no lo ha dicho" : "modelo del celular, ej: \"iPhone 11 Pro Max\"; vacío si no lo ha dicho"),
+          confirmado: z
+            .boolean()
+            .optional()
+            .describe("true SOLO cuando el cliente ya dijo que sí quiere que le cotices el juego"),
         }),
-        execute: async ({ juego, vehiculo }) => {
+        execute: async ({ juego, vehiculo, confirmado }) => {
           const juegos = saberes.filter((s) => s.tipo === "juego");
           const saber =
             juegos.find((s) => normalize(s.nombre) === normalize(juego)) ??
@@ -617,13 +630,15 @@ Este número no está en el registro de clientes.
           const aAgregar = obligatorias.flatMap((p) =>
             p.productos.filter((x) => x.disponible && x.precio_mxn > 0).map((x) => ({ sku: x.sku, qty: x.qty })),
           );
-          const sync = aAgregar.length ? await agregarACotizacion(telefono, aAgregar) : null;
+          // Ruli: first the list and the question; the quote on a yes.
+          const preguntar = ES_AUTOPARTES && !confirmado;
+          const sync = aAgregar.length && !preguntar ? await agregarACotizacion(telefono, aAgregar) : null;
           const ok = sync && !("error" in sync) ? sync : null;
           const pedido = await cargarPedido(telefono);
           await avisarNuevas(ok);
           // What could not go in is written down, like any part we did not have.
           const faltan = obligatorias.filter((p) => p.estado !== "ok" || p.soloLado);
-          await Promise.all(
+          if (!confirmado) await Promise.all(
             faltan
               .filter((p) => p.estado === "agotada" || p.estado === "no_hay" || p.soloLado)
               .map((p) => anotarDemandaAgente({ texto: `${p.pieza.nombre} ${armado.vehiculo}`, telefono, customerId: cliente?.id ?? null })),
@@ -649,12 +664,14 @@ Este número no está en el registro de clientes.
             opcionales,
             cotizaciones: resumenCotizaciones(pedido),
             nota: [
-              aAgregar.length
+              preguntar && aAgregar.length
+                ? `NO lo he anotado. Dile para qué vehículo es y lista cada pieza de "en_cotizacion" con su cantidad y precio (nombres claros, sin abreviaturas), y una línea por cada una de "faltan" con su motivo. Cierra preguntando explícito "¿Te cotizo el juego?". Si dice que sí, llama cotizar_juego otra vez con confirmado: true.`
+                : aAgregar.length
                 ? `YA agregué el juego a su cotización. Dile para qué vehículo es y lista cada pieza de "en_cotizacion" con su cantidad y precio (nombres claros, sin abreviaturas). Luego, una línea por cada una de "faltan" con su motivo. NO le preguntes si quiere agregarlo.`
                 : `No pude agregar ninguna pieza del juego. Dile cuáles de "faltan" y su motivo; si alguna tiene precio por confirmar, usa pasar_a_asesor.`,
               opcionales.length ? `En UNA línea ofrécele aparte las de "opcionales" ("también tengo…, por si las cambias de una vez"); NO van en la cotización.` : null,
               ok ? NOTA_ENLACE : null,
-              aAgregar.length ? `Cierra con "¿La dejamos así o le quito alguna pieza?".` : null,
+              aAgregar.length && !preguntar ? `Cierra con "¿La dejamos así o le quito alguna pieza?".` : null,
             ]
               .filter(Boolean)
               .join(" "),
@@ -663,7 +680,7 @@ Este número no está en el registro de clientes.
       }),
       agregar_al_pedido: tool({
         description:
-          "Agrega producto(s) a la cotización viva del cliente (la crea si aún no existe y devuelve su enlace). Úsala en cuanto le des precio de producto(s) CONCRETOS disponibles, y también cuando confirme cantidades. Identifica cada producto por su SKU o por su NOMBRE tal como te lo dio buscar_producto (ej: \"EDGE 50 NEO\"); qty = cantidad TOTAL (reemplaza si ya estaba).",
+          `Agrega producto(s) a la cotización viva del cliente (la crea si aún no existe y devuelve su enlace). ${ES_AUTOPARTES ? "Úsala SOLO cuando el cliente dijo que SÍ quiere que se lo cotices" : "Úsala en cuanto le des precio de producto(s) CONCRETOS disponibles"}, y también cuando confirme cantidades. Identifica cada producto por su SKU o por su NOMBRE tal como te lo dio buscar_producto (ej: \"EDGE 50 NEO\"); qty = cantidad TOTAL (reemplaza si ya estaba).`,
         inputSchema: z.object({
           items: z
             .array(
