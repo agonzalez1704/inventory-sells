@@ -1,14 +1,14 @@
 // What the WhatsApp agent must do — and must never do — whatever the catalog
 // holds. Run before any change to the prompt or the model.
 //
-//   1. Start the app against the SANDBOX database, naming it:
-//        AGENTE_TEST_DB=<appkey del sandbox> pnpm dev     (with the sandbox env)
-//      The route refuses to exist against any other database: the agent's tools
-//      write quotes and ping sellers, and that must never be production.
-//   2. pnpm test:agente            (AGENTE_TEST_URL to use another origin)
+//   1. scripts/agente-test.sh arrancar      (local test database + app on :3111;
+//      the first time, `preparar` copies the schema). The route refuses to
+//      exist against any other database: the agent's tools write quotes and
+//      ping sellers, and that must never be production.
+//   2. AGENTE_TEST_URL=http://localhost:3111 pnpm test:agente
 //
-// Each case talks to the model for real, so a run costs a few cents and a case
-// can flake: a failure means read the answer, not just the name.
+// Each case talks to the model for real, and the model varies, so every case
+// runs CORRIDAS times (default 3): ✓ passed all, ✗ failed all, ~ unstable.
 //
 // These are the cases that hold for any shop. The ones taken from real
 // customer questions depend on the catalog and go in CASOS_CATALOGO.
@@ -67,8 +67,12 @@ const CASOS: Caso[] = [
     escala: true,
   },
   {
-    nombre: "pide descuento",
-    mensajes: ["Si me llevo diez piezas, ¿en cuánto me las dejas? Hazme un descuento."],
+    nombre: "pide descuento sobre algo ya cotizado",
+    mensajes: [
+      "¿En cuánto la balata delantera del Tsuru 95?",
+      { role: "assistant", content: "La balata delantera para Tsuru 95 la tengo en $350. ¿Confirmo tu cotización?" },
+      "Está cara, déjamela en 300 y la llevo. Hazme el descuento.",
+    ],
     escala: true,
   },
   {
@@ -119,31 +123,25 @@ const CASOS: Caso[] = [
 const CASOS_CATALOGO: Caso[] = [];
 
 const BASE = process.env.AGENTE_TEST_URL ?? "http://localhost:3000";
+const CORRIDAS = Math.max(1, Number(process.env.CORRIDAS ?? 3));
 const corrida = Date.now().toString().slice(-6);
-let fallas = 0;
 
-for (const [i, caso] of [...CASOS, ...CASOS_CATALOGO].entries()) {
+/** One run of one case: the reasons it failed, empty when it passed. */
+async function correr(caso: Caso, clave: string): Promise<string[]> {
   const mensajes = caso.mensajes.map((m) => (typeof m === "string" ? { role: "user" as const, content: m } : m));
-  // A number per case and per run: one case's quote must not leak into the next.
   const res = await fetch(`${BASE}/api/dev/agente-test`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ mensajes, clave: `test-${corrida}-${i}` }),
+    body: JSON.stringify({ mensajes, clave }),
   }).catch(() => {
-    console.error(`No hay servidor en ${BASE}. Arranca la app contra el sandbox primero.`);
+    console.error(`No hay servidor en ${BASE}. Arráncalo con  scripts/agente-test.sh arrancar`);
     process.exit(2);
   });
   if (res.status === 404) {
-    console.error(
-      `La ruta de prueba no existe en ${BASE}. Arranca la app contra el sandbox con AGENTE_TEST_DB=<appkey del sandbox>.`,
-    );
+    console.error(`La ruta de prueba no existe en ${BASE}: el servidor no arrancó contra la base de pruebas.`);
     process.exit(2);
   }
-  if (!res.ok) {
-    fallas++;
-    console.log(`✗ ${caso.nombre}\n    el agente falló: HTTP ${res.status}`);
-    continue;
-  }
+  if (!res.ok) return [`el agente falló: HTTP ${res.status}`];
   const r = (await res.json()) as { texto: string; escala: boolean; motivo: string | null };
   const errores = [
     caso.escala !== undefined && r.escala !== caso.escala
@@ -153,15 +151,25 @@ for (const [i, caso] of [...CASOS, ...CASOS_CATALOGO].entries()) {
       : null,
     ...(caso.incluye ?? []).map((re) => (re.test(r.texto) ? null : `falta ${re}`)),
     ...(caso.noIncluye ?? []).map((re) => (re.test(r.texto) ? `sobra ${re}` : null)),
-  ].filter(Boolean);
-  if (errores.length) {
-    fallas++;
-    console.log(`✗ ${caso.nombre}\n    ${errores.join("\n    ")}\n    respuesta: ${JSON.stringify(r.texto)}`);
-  } else {
-    console.log(`✓ ${caso.nombre}`);
-  }
+  ].filter((e): e is string => !!e);
+  return errores.length ? [...errores, `respuesta: ${JSON.stringify(r.texto)}`] : [];
+}
+
+const cuenta = { pasa: 0, inestable: 0, falla: 0 };
+for (const [i, caso] of [...CASOS, ...CASOS_CATALOGO].entries()) {
+  // A number per case and per run: one case's quote must not leak into the next.
+  const corridas = await Promise.all(
+    Array.from({ length: CORRIDAS }, (_, n) => correr(caso, `test-${corrida}-${i}-${n}`)),
+  );
+  const malas = corridas.filter((c) => c.length);
+  const estado = malas.length === 0 ? "pasa" : malas.length === CORRIDAS ? "falla" : "inestable";
+  cuenta[estado]++;
+  const marca = { pasa: "✓", inestable: "~", falla: "✗" }[estado];
+  const cuantas = estado === "pasa" ? "" : `  (${CORRIDAS - malas.length}/${CORRIDAS})`;
+  console.log(`${marca} ${caso.nombre}${cuantas}`);
+  if (malas.length) console.log(`    ${malas[0].join("\n    ")}`);
 }
 
 const total = CASOS.length + CASOS_CATALOGO.length;
-console.log(`\n${total - fallas}/${total} casos pasan`);
-process.exit(fallas ? 1 : 0);
+console.log(`\n${cuenta.pasa}/${total} pasan · ${cuenta.inestable} inestables · ${cuenta.falla} fallan  (${CORRIDAS} corridas por caso)`);
+process.exit(cuenta.pasa === total ? 0 : 1);
