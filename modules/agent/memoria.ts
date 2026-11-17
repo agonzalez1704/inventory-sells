@@ -32,6 +32,18 @@ export async function cargarHistorial(
   }));
 }
 
+// How many messages this number sent in the last `minutos`. 0 when the read
+// fails: a counting error must not cut a customer off.
+export async function mensajesDelCliente(numero: string, minutos: number): Promise<number> {
+  const desde = new Date(Date.now() - minutos * 60_000).toISOString();
+  const { count } = await DB.from("wa_mensajes")
+    .select("id", { count: "exact", head: true })
+    .eq("numero", numero)
+    .eq("rol", "user")
+    .gte("created_at", desde);
+  return Number(count ?? 0);
+}
+
 export async function guardarMensaje(
   numero: string,
   role: Rol,

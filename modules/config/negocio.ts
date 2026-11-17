@@ -143,6 +143,17 @@ export async function piezaFueraActiva(): Promise<boolean> {
   return (data as { pieza_fuera: boolean } | null)?.pieza_fuera ?? false;
 }
 
+/** Turn the WhatsApp agent on or off. Admin only. */
+export async function setAgenteActivo(valor: boolean): Promise<void> {
+  const { userId } = await auth();
+  if (!userId) throw new Error("No autenticado");
+  const profile = await getProfile(userId);
+  if (profile?.role !== "admin") throw new Error("Solo administradores");
+  const insforge = await createInsForgeServerClient();
+  const { error } = await insforge.database.from("config_negocio").update({ agente_activo: valor }).eq("id", 1);
+  if (error) throw new Error(error.message ?? "No se pudo guardar");
+}
+
 /** Turn "Pieza de fuera" on or off for the whole shop. Admin only. */
 export async function setPiezaFueraActiva(valor: boolean): Promise<void> {
   const { userId } = await auth();

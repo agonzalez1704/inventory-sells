@@ -30,6 +30,18 @@ export async function getAsesores(): Promise<string[]> {
     .filter((s) => s.length >= 8);
 }
 
+// Is the WhatsApp agent answering? Anything but an explicit false counts as
+// on: a failed read, or code deployed before the migration, must not silence
+// the agent by accident.
+export async function getAgenteActivo(): Promise<boolean> {
+  const { data } = await insforgeAdmin.database
+    .from("config_negocio")
+    .select("agente_activo")
+    .eq("id", 1)
+    .maybeSingle();
+  return (data as { agente_activo?: boolean } | null)?.agente_activo !== false;
+}
+
 // Raw asesores string for the config form.
 export async function getAsesoresRaw(): Promise<string> {
   const { data } = await insforgeAdmin.database

@@ -1,6 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { getProfile } from "@/lib/auth/profile";
-import { getNegocioInfo, getAsesoresRaw, getValorBase, getTiendaInfo } from "@/modules/config/lib";
+import { getNegocioInfo, getAsesoresRaw, getValorBase, getTiendaInfo, getAgenteActivo } from "@/modules/config/lib";
 import { fiadoExigeCliente, posClickAbreDetalle, comprobanteObligatorio, piezaFueraActiva } from "@/modules/config/negocio";
 import { ConfigView } from "@/modules/config/ConfigView";
 import { Card } from "@/components/ui/card";
@@ -23,6 +23,7 @@ import { PosPrefs } from "@/modules/sales/PosPrefs";
 import { PosModoClick } from "@/modules/config/PosModoClick";
 import { ComprobanteToggle } from "@/modules/config/ComprobanteToggle";
 import { PiezaFueraToggle } from "@/modules/config/PiezaFueraToggle";
+import { AgenteToggle } from "@/modules/config/AgenteToggle";
 import { hayVehiculos } from "@/modules/vehiculos/actions";
 import { VersionesConfig } from "@/modules/vehiculos/VersionesConfig";
 
@@ -40,7 +41,7 @@ export default async function ConfiguracionPage() {
   const verCostos = Boolean(
     perms && (perms.has("admin_total") || perms.has("costos_ver")),
   );
-  const [info, asesores, valorBase, tienda, fiadoExige, posDetalle, comprobanteOblig, notifRoles, precioBasePos, piezaFuera] = await Promise.all([
+  const [info, asesores, valorBase, tienda, fiadoExige, posDetalle, comprobanteOblig, notifRoles, precioBasePos, piezaFuera, agenteActivo] = await Promise.all([
     getNegocioInfo(),
     getAsesoresRaw(),
     getValorBase(),
@@ -51,6 +52,7 @@ export default async function ConfiguracionPage() {
     puedeGestionarUsuarios ? notificacionesPorRol() : null,
     getPrecioBasePos(),
     piezaFueraActiva(),
+    getAgenteActivo(),
   ]);
 
   // AliExpress connection status + authorize link. Only offered when the app
@@ -151,6 +153,10 @@ export default async function ConfiguracionPage() {
                 Piezas de fuera: comprar al vecino con efectivo del cajón desde el POS.
               </p>
               <PiezaFueraToggle inicial={piezaFuera} />
+              <p className="mb-2 mt-4 text-xs text-muted-foreground">
+                Asistente de WhatsApp: apágalo si está contestando mal; la bandeja sigue recibiendo.
+              </p>
+              <AgenteToggle inicial={agenteActivo} />
             </div>
           )}
           {verCostos && (
