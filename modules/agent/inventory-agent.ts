@@ -78,7 +78,8 @@ const REGLAS_AUTOPARTES = `- TU PÚBLICO SON MECÁNICOS: hablan coloquial, con m
 - Los resultados traen "compatible_con": los vehículos y años a los que aplica cada pieza según NUESTRO catálogo. Entre paréntesis puede venir la VERSIÓN (V-Drive, 2ª generación), luego la CILINDRADA del motor (1.6L) y después de "—" una CONDICIÓN (CON ABS, DERECHA): si la pieza tiene condición, confírmala con el cliente antes de darla por buena; si hay versiones o cilindradas distintas para su año, pregúntale cuál es su carro ("¿es 1.6 o 2.0?"). Es LA ÚNICA fuente de compatibilidad: puedes citarla, pero PROHIBIDO afirmar que una pieza le queda a un vehículo que no aparezca ahí. El año del cliente debe caer DENTRO del rango; si cae fuera, dilo y ofrece verificar con un asesor.
 - Abreviaturas en nombres: DEL. = delantero · TRAS. = trasero · DER. = derecho · IZQ. = izquierda · SUSP. = suspensión · JGO = juego (par/kit completo) · CREM. = cremallera (caja de dirección) · REP. = kit de reparación, NO la pieza completa: NUNCA lo ofrezcas si no pidió repuesto, reparación o kit. Al hablarle al cliente, dilas completas.
 - Muchas piezas van por LADO (derecha/izquierda) o POSICIÓN (delantera/trasera). Si el cliente no lo dijo y las coincidencias difieren en eso, pregúntale cuál necesita — en sus palabras ("¿del lado del chofer o del copiloto?").
-- "demasiados" resultados = falta el vehículo o el año: pregúntalos, no listes.`;
+- "demasiados" resultados = falta el vehículo o el año: pregúntalos, no listes.
+- FOTO AL ENCONTRAR: cuando des precio de una pieza CONCRETA disponible ("tiene_foto": true), llama mandar_foto con su SKU en ese MISMO turno, sin que te la pida: la foto le llega en el siguiente mensaje. Si ofreces varias, manda la de cada una que nombres (máximo 3). No digas "te mando la foto" si mandar_foto no respondió enviada: true.`;
 
 // Fiable: a counter clerk just writes it down — asking "¿lo agrego?" sounds
 // like a bot. Ruli asked for the opposite: a quote nobody wanted clutters the
@@ -867,7 +868,15 @@ Este número no está en el registro de clientes.
           const con = alms.find((a) => a.imagen);
           if (!con)
             return { enviada: false, nota: "No tengo foto de ese producto. Díselo corto y ofrécele que un asesor se la manda." };
-          if (!fotos.some((f) => f.productId === con.product_id)) fotos.push({ productId: con.product_id, caption: con.nombre });
+          // Photos now go out unasked when a part is found: once per part per
+          // conversation, and at most 3 per reply so a list doesn't flood the chat.
+          const laPide = /\b(foto|fotos|imagen|imágenes|imagenes)\b/i.test(messages.findLast((m) => m.role === "user")?.content ?? "");
+          if (!laPide && messages.some((m) => m.role === "assistant" && m.content === `[foto] ${con.nombre}`))
+            return { enviada: false, nota: "Esa foto ya se la mandaste antes en esta conversación; no la repitas ni la menciones." };
+          if (!fotos.some((f) => f.productId === con.product_id)) {
+            if (fotos.length >= 3) return { enviada: false, nota: "Ya van 3 fotos en este mensaje; las demás solo si las pide." };
+            fotos.push({ productId: con.product_id, caption: con.nombre });
+          }
           return {
             enviada: true,
             nota: "La foto se le manda sola justo después de tu mensaje. Dile algo corto como \"Te mando la foto 👇\". NO pegues enlaces de imagen.",
