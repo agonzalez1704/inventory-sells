@@ -2,7 +2,8 @@ import { auth } from "@clerk/nextjs/server";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
 import { getPermisos } from "@/lib/auth/profile";
 import { ClientesView } from "@/modules/customers/ClientesView";
-import { CUSTOMER_COLS, type Customer } from "@/modules/customers/actions";
+import type { Customer } from "@/modules/customers/actions";
+import { CUSTOMER_COLS } from "@/modules/customers/cols";
 import { saldosDeClientes } from "@/modules/garantias/cliente-actions";
 
 

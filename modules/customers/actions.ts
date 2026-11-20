@@ -6,13 +6,11 @@ import { insforgeAdmin } from "@/lib/insforge/admin";
 import { attempt, type ActionResult } from "@/lib/errors";
 import { notifyAdmins } from "@/lib/push";
 import { getProfile } from "@/lib/auth/profile";
+import { CUSTOMER_COLS } from "./cols";
 
 export type CustomerTipo = "publico" | "mayoreo" | "tecnico";
 export type FormaPago = "contado" | "contra_entrega" | "credito";
 
-/** Columns every customer list reads. One literal so the SDK can type it. */
-export const CUSTOMER_COLS =
-  "id, numero, nombre, telefono, email, descuento_pct, tipo, notas, credito_dias, credito_limite_cents, encargado, direccion, referencias, ubicacion, inventory_id, forma_pago, bloqueo_motivo, is_active, is_system, created_at, customer_phones(id, telefono, etiqueta)";
 
 export type CustomerPhone = {
   id: string;
