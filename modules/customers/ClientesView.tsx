@@ -45,6 +45,7 @@ import {
   type CustomerTipo,
   type FormaPago,
 } from "./actions";
+import { customerInputSchema, erroresPorCampo, entero, decimal, pesosACentavos } from "./schema";
 
 // Refaccionaria Ruli asked for these (customer number, delivery, who pays,
 // how they pay, manual block). Fiable keeps its shorter form.
@@ -438,7 +439,15 @@ function ClienteModal({
   const [inventoryId, setInventoryId] = useState(cliente?.inventory_id ?? "");
   const [formaPago, setFormaPago] = useState<FormaPago | "">(cliente?.forma_pago ?? "");
   const [bloqueo, setBloqueo] = useState(cliente?.bloqueo_motivo ?? "");
+  // Field → message from the schema; cleared field by field as it is edited.
+  const [errores, setErrores] = useState<Record<string, string>>({});
   const [pending, start] = useTransition();
+  const err = (k: string) =>
+    errores[k] ? <span className="mt-1 block text-xs text-red-600 dark:text-red-400">{errores[k]}</span> : null;
+  const inv = (k: string) => ({
+    "aria-invalid": errores[k] ? true : undefined,
+    onInput: () => errores[k] && setErrores(({ [k]: _, ...resto }) => resto),
+  });
   // Pending extra-phone input lives here so Guardar can flush it — typing a
   // number and hitting Guardar without pressing + must not silently drop it.
   const [telExtra, setTelExtra] = useState("");
@@ -447,17 +456,14 @@ function ClienteModal({
   function save() {
     const payload: CustomerInput = {
       nombre,
-      telefono: telefono || null,
+      telefono,
       email: email || null,
-      descuento_pct: Number(descuento.replace(",", ".")) || 0,
+      descuento_pct: decimal(descuento),
       tipo,
       notas: notas || null,
-      credito_dias: creditoDias.trim() === "" ? null : parseInt(creditoDias, 10),
-      credito_limite_cents:
-        creditoLimite.trim() === ""
-          ? null
-          : Math.round((parseFloat(creditoLimite.replace(",", ".")) || 0) * 100),
-      numero: numero.trim() === "" ? null : Number(numero.replace(/\D/g, "")),
+      credito_dias: entero(creditoDias),
+      credito_limite_cents: pesosACentavos(creditoLimite),
+      numero: entero(numero),
       encargado,
       direccion,
       referencias,
@@ -466,12 +472,13 @@ function ClienteModal({
       forma_pago: formaPago || null,
       bloqueo_motivo: bloqueo,
     };
-    if (!payload.nombre.trim()) return toast.error("Falta el nombre");
-    if ((payload.telefono ?? "").replace(/\D/g, "").length < 10)
-      return toast.error("Teléfono obligatorio (al menos 10 dígitos)");
-    const d = payload.descuento_pct;
-    if (!Number.isFinite(d) || d < 0 || d > 100)
-      return toast.error("Descuento inválido (0–100)");
+    const v = customerInputSchema.safeParse(payload);
+    if (!v.success) {
+      const e = erroresPorCampo(v.error);
+      setErrores(e);
+      return toast.error(Object.keys(e).length === 1 ? Object.values(e)[0] : "Revisa los campos marcados en rojo");
+    }
+    setErrores({});
 
     // A typed-but-not-added extra phone must be valid or explicitly cleared —
     // silently dropping it is how numbers get lost.
@@ -510,21 +517,23 @@ function ClienteModal({
             <label className="block">
               <span className="mb-1 block text-xs font-medium text-muted-foreground">No. cliente</span>
               <Input
-                value={numero}
+                {...inv("numero")} value={numero}
                 onChange={(e) => setNumero(e.target.value)}
                 inputMode="numeric"
                 placeholder="Auto"
               />
+              {err("numero")}
             </label>
           )}
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-muted-foreground">Nombre</span>
             <Input
-              value={nombre}
+              {...inv("nombre")} value={nombre}
               onChange={(e) => setNombre(e.target.value)}
               placeholder="Nombre o taller"
               autoFocus
             />
+            {err("nombre")}
           </label>
         </div>
         <div className="grid grid-cols-2 gap-2">
@@ -533,22 +542,24 @@ function ClienteModal({
               Teléfono / WhatsApp <span className="text-red-500">*</span>
             </span>
             <Input
-              value={telefono}
+              {...inv("telefono")} value={telefono}
               onChange={(e) => setTelefono(e.target.value)}
               inputMode="tel"
               placeholder="55 1234 5678"
             />
+            {err("telefono")}
           </label>
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-muted-foreground">
               Correo (opcional)
             </span>
             <Input
-              value={email}
+              {...inv("email")} value={email}
               onChange={(e) => setEmail(e.target.value)}
               inputMode="email"
               placeholder="cliente@correo.com"
             />
+            {err("email")}
           </label>
         </div>
         <div className="grid grid-cols-2 gap-2">
@@ -567,11 +578,12 @@ function ClienteModal({
               Descuento %
             </span>
             <Input
-              value={descuento}
+              {...inv("descuento_pct")} value={descuento}
               onChange={(e) => setDescuento(e.target.value)}
               inputMode="decimal"
               placeholder="0"
             />
+            {err("descuento_pct")}
           </label>
         </div>
         <div className="grid grid-cols-2 gap-2">
@@ -580,22 +592,24 @@ function ClienteModal({
               Días de crédito
             </span>
             <Input
-              value={creditoDias}
+              {...inv("credito_dias")} value={creditoDias}
               onChange={(e) => setCreditoDias(e.target.value)}
               inputMode="numeric"
               placeholder="Sin plazo"
             />
+            {err("credito_dias")}
           </label>
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-muted-foreground">
               Límite de crédito $
             </span>
             <Input
-              value={creditoLimite}
+              {...inv("credito_limite_cents")} value={creditoLimite}
               onChange={(e) => setCreditoLimite(e.target.value)}
               inputMode="decimal"
               placeholder="Sin límite"
             />
+            {err("credito_limite_cents")}
           </label>
         </div>
         {RULI && (
@@ -603,40 +617,46 @@ function ClienteModal({
             <div className="grid grid-cols-2 gap-2">
               <label className="block">
                 <span className="mb-1 block text-xs font-medium text-muted-foreground">Encargado (quien paga)</span>
-                <Input value={encargado} onChange={(e) => setEncargado(e.target.value)} placeholder="Dueño del taller" />
+                <Input {...inv("encargado")} value={encargado} onChange={(e) => setEncargado(e.target.value)} placeholder="Dueño del taller" />
+                {err("encargado")}
               </label>
               <label className="block">
                 <span className="mb-1 block text-xs font-medium text-muted-foreground">Cómo paga</span>
-                <Select value={formaPago} onChange={(e) => setFormaPago(e.target.value as FormaPago | "")}>
+                <Select {...inv("forma_pago")} value={formaPago} onChange={(e) => setFormaPago(e.target.value as FormaPago | "")}>
                   <option value="">Sin definir</option>
                   {FORMAS.map(([v, l]) => (
                     <option key={v} value={v}>{l}</option>
                   ))}
                 </Select>
+                {err("forma_pago")}
               </label>
             </div>
             <label className="block">
               <span className="mb-1 block text-xs font-medium text-muted-foreground">Dirección de entrega</span>
-              <Input value={direccion} onChange={(e) => setDireccion(e.target.value)} placeholder="Calle y número, colonia, ciudad" />
+              <Input {...inv("direccion")} value={direccion} onChange={(e) => setDireccion(e.target.value)} placeholder="Calle y número, colonia, ciudad" />
+              {err("direccion")}
             </label>
             <div className="grid grid-cols-2 gap-2">
               <label className="block">
                 <span className="mb-1 block text-xs font-medium text-muted-foreground">Referencias</span>
-                <Input value={referencias} onChange={(e) => setReferencias(e.target.value)} placeholder="Portón verde, junto a…" />
+                <Input {...inv("referencias")} value={referencias} onChange={(e) => setReferencias(e.target.value)} placeholder="Portón verde, junto a…" />
+                {err("referencias")}
               </label>
               <label className="block">
                 <span className="mb-1 block text-xs font-medium text-muted-foreground">Ruta / almacén</span>
-                <Select value={inventoryId} onChange={(e) => setInventoryId(e.target.value)}>
+                <Select {...inv("inventory_id")} value={inventoryId} onChange={(e) => setInventoryId(e.target.value)}>
                   <option value="">Sin asignar</option>
                   {inventarios.map((i) => (
                     <option key={i.id} value={i.id}>{i.name}</option>
                   ))}
                 </Select>
+                {err("inventory_id")}
               </label>
             </div>
             <label className="block">
               <span className="mb-1 block text-xs font-medium text-muted-foreground">Ubicación (enlace de Maps)</span>
-              <Input value={ubicacion} onChange={(e) => setUbicacion(e.target.value)} placeholder="Pega el enlace que te mandó por WhatsApp" />
+              <Input {...inv("ubicacion")} value={ubicacion} onChange={(e) => setUbicacion(e.target.value)} placeholder="Pega el enlace que te mandó por WhatsApp" />
+              {err("ubicacion")}
             </label>
           </>
         )}
@@ -646,10 +666,11 @@ function ClienteModal({
               Bloquear crédito (motivo) — solo admin
             </span>
             <Input
-              value={bloqueo}
+              {...inv("bloqueo_motivo")} value={bloqueo}
               onChange={(e) => setBloqueo(e.target.value)}
               placeholder="Vacío = sin bloqueo manual"
             />
+            {err("bloqueo_motivo")}
           </label>
         )}
         <label className="block">
@@ -657,10 +678,11 @@ function ClienteModal({
             Notas (opcional)
           </span>
           <Input
-            value={notas}
+            {...inv("notas")} value={notas}
             onChange={(e) => setNotas(e.target.value)}
             placeholder="Referencia, preferencias, historial…"
           />
+          {err("notas")}
         </label>
         {esEdit && (
           <TelefonosExtra

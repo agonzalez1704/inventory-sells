@@ -7,6 +7,7 @@ import { attempt, type ActionResult } from "@/lib/errors";
 import { notifyAdmins } from "@/lib/push";
 import { getProfile } from "@/lib/auth/profile";
 import { CUSTOMER_COLS } from "./cols";
+import { customerInputSchema } from "./schema";
 
 export type CustomerTipo = "publico" | "mayoreo" | "tecnico";
 export type FormaPago = "contado" | "contra_entrega" | "credito";
@@ -83,46 +84,29 @@ export type CustomerInput = {
   bloqueo_motivo?: string | null;
 };
 
-const txt = (v: string | null | undefined) => v?.trim() || null;
-
-// Normalize + validate the shared shape used by create/edit.
+// Normalize + validate the shared shape used by create/edit. Same schema as
+// the form, so a bypassed client meets the same rules.
 function clean(input: CustomerInput) {
-  const nombre = input.nombre.trim();
-  if (!nombre) throw new Error("Falta el nombre");
-  const telefono = input.telefono?.trim() || "";
-  if (telefono.replace(/\D/g, "").length < 10)
-    throw new Error("Teléfono obligatorio (al menos 10 dígitos)");
-  const pct = Number(input.descuento_pct);
-  if (!Number.isFinite(pct) || pct < 0 || pct > 100)
-    throw new Error("Descuento inválido (0–100)");
-  const dias = input.credito_dias;
-  if (dias != null && (!Number.isInteger(dias) || dias <= 0 || dias > 365))
-    throw new Error("Días de crédito inválidos (1–365)");
-  const limite = input.credito_limite_cents;
-  if (limite != null && (!Number.isInteger(limite) || limite <= 0))
-    throw new Error("Límite de crédito inválido");
-  const numero = input.numero;
-  if (numero != null && (!Number.isInteger(numero) || numero <= 0))
-    throw new Error("Número de cliente inválido");
-  if (input.forma_pago != null && !["contado", "contra_entrega", "credito"].includes(input.forma_pago))
-    throw new Error("Forma de pago inválida");
+  const r = customerInputSchema.safeParse(input);
+  if (!r.success) throw new Error(r.error.issues[0]?.message ?? "Datos inválidos");
+  const { numero, ...d } = r.data;
   return {
-    ...(numero != null ? { numero } : {}),
-    encargado: txt(input.encargado),
-    direccion: txt(input.direccion),
-    referencias: txt(input.referencias),
-    ubicacion: txt(input.ubicacion),
-    inventory_id: input.inventory_id || null,
-    forma_pago: input.forma_pago ?? null,
-    bloqueo_motivo: txt(input.bloqueo_motivo),
-    nombre,
-    telefono,
-    email: input.email?.trim() || null,
-    descuento_pct: Math.round(pct * 100) / 100,
-    tipo: input.tipo,
-    notas: input.notas?.trim() || null,
-    credito_dias: dias,
-    credito_limite_cents: limite,
+    ...(numero != null ? { numero } : {}), // null on edit = keep the current one
+    nombre: d.nombre,
+    telefono: d.telefono,
+    email: d.email ?? null,
+    descuento_pct: Math.round(d.descuento_pct * 100) / 100,
+    tipo: d.tipo,
+    notas: d.notas ?? null,
+    credito_dias: d.credito_dias,
+    credito_limite_cents: d.credito_limite_cents,
+    encargado: d.encargado ?? null,
+    direccion: d.direccion ?? null,
+    referencias: d.referencias ?? null,
+    ubicacion: d.ubicacion ?? null,
+    inventory_id: d.inventory_id ?? null,
+    forma_pago: d.forma_pago ?? null,
+    bloqueo_motivo: d.bloqueo_motivo ?? null,
   };
 }
 
