@@ -131,29 +131,34 @@ export async function registerLoan(
   descuentoPct?: number | null,
   /** "Importe": cash left as guarantee, at least the note's total. */
   importeCents?: number | null,
-): Promise<{ saleId: string }> {
-  const { userId } = await auth();
-  if (!userId) throw new Error("No autenticado");
-  if (items.length === 0) throw new Error("Carrito vacío");
-  // Same physical rule as a sale: a fiado moves the stock out now.
-  await assertVentaPermitida(userId, items.map((i) => i.product_id));
-  // Whether a debt can be anonymous is the shop's rule, so the check is not
-  // repeated here — the RPC reads the shop's config and its message is the one
-  // worth showing. A copy here could only drift out of step with it.
+): Promise<ActionResult<{ saleId: string }>> {
+  // Returned, not thrown: "crédito bloqueado: …" must reach the till intact
+  // (Next redacts thrown messages in production).
+  return attempt("registerLoan", async () => {
+    const { userId } = await auth();
+    if (!userId) throw new Error("No autenticado");
+    if (items.length === 0) throw new Error("Carrito vacío");
+    // Same physical rule as a sale: a fiado moves the stock out now.
+    await assertVentaPermitida(userId, items.map((i) => i.product_id));
+    // Whether a debt can be anonymous is the shop's rule, so the check is not
+    // repeated here — the RPC reads the shop's config and its message is the one
+    // worth showing. A copy here could only drift out of step with it.
 
-  const insforge = await createInsForgeServerClient();
-  const { data, error } = await insforge.database.rpc("register_loan", {
-    p_items: items.map((i) => ({ product_id: i.product_id, qty: i.qty })),
-    p_customer_id: customerId ?? null,
-    p_note: note?.trim() || null,
-    ...(descuentoPct != null ? { p_descuento_pct: descuentoPct } : {}),
-    ...(importeCents ? { p_importe_cents: Math.round(importeCents) } : {}),
+    const insforge = await createInsForgeServerClient();
+    const { data, error } = await insforge.database.rpc("register_loan", {
+      p_items: items.map((i) => ({ product_id: i.product_id, qty: i.qty })),
+      p_customer_id: customerId ?? null,
+      p_note: note?.trim() || null,
+      ...(descuentoPct != null ? { p_descuento_pct: descuentoPct } : {}),
+      ...(importeCents ? { p_importe_cents: Math.round(importeCents) } : {}),
+    });
+
+    if (error)
+      throw new Error(error.message ?? "Error al registrar la nota de crédito");
+    const saleId = String(data);
+    after(() => notifyNuevaVenta(saleId, "fiado"));
+    return { saleId };
   });
-
-  if (error) throw new Error(error.message ?? "Error al registrar la nota de crédito");
-  const saleId = String(data);
-  after(() => notifyNuevaVenta(saleId, "fiado"));
-  return { saleId };
 }
 
 // Attach (or change) the customer on a fiado/sale — used from Fiados when
@@ -197,11 +202,15 @@ export async function abonarFiado(
  * The customer keeps the part: the importe they left pays the note and the
  * difference goes back to them. Returns that change, in cents.
  */
-export async function aplicarImporte(saleId: string): Promise<{ cambioCents: number }> {
+export async function aplicarImporte(
+  saleId: string,
+): Promise<{ cambioCents: number }> {
   const { userId } = await auth();
   if (!userId) throw new Error("No autenticado");
   const insforge = await createInsForgeServerClient();
-  const { data, error } = await insforge.database.rpc("aplicar_importe", { p_sale_id: saleId });
+  const { data, error } = await insforge.database.rpc("aplicar_importe", {
+    p_sale_id: saleId,
+  });
   if (error) throw new Error(error.message ?? "No se pudo aplicar el importe");
   after(() => notifyAbono(saleId));
   return { cambioCents: Number(data ?? 0) };
@@ -247,9 +256,7 @@ export async function editarVenta(
     p_customer_name: customerName?.trim() || null,
     // The RPC's sentinel for "leave it alone" — NULL is a real value here, it
     // is how a sale is detached from its customer.
-    ...(customerId === undefined
-      ? {}
-      : { p_customer_id: customerId }),
+    ...(customerId === undefined ? {} : { p_customer_id: customerId }),
   });
   if (error) throw new Error(error.message ?? "Error al editar la venta");
 }
@@ -275,7 +282,8 @@ export async function devolverItems(
     p_metodo: metodo,
     p_motivo: motivo?.trim() || null,
   });
-  if (error) throw new Error(error.message ?? "Error al registrar la devolución");
+  if (error)
+    throw new Error(error.message ?? "Error al registrar la devolución");
 }
 
 // Change the product(s) on a registered sale (customer swapped models). Old
@@ -311,7 +319,8 @@ export async function cambiarFiado(
     p_sale_id: saleId,
     p_items: items.map((i) => ({ product_id: i.product_id, qty: i.qty })),
   });
-  if (error) throw new Error(error.message ?? "Error al cambiar la nota de crédito");
+  if (error)
+    throw new Error(error.message ?? "Error al cambiar la nota de crédito");
 }
 
 // Void a completed sale (e.g. a duplicate). Admin only: restores stock, removes
@@ -345,7 +354,8 @@ export async function convertirAFiado(
     p_sale_id: saleId,
     p_note: note?.trim() || null,
   });
-  if (error) throw new Error(error.message ?? "Error al convertir a nota de crédito");
+  if (error)
+    throw new Error(error.message ?? "Error al convertir a nota de crédito");
 }
 
 // Cancel a pending loan: item returned without payment → stock restored.

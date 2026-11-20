@@ -134,6 +134,37 @@ export async function setComprobanteObligatorio(valor: boolean): Promise<void> {
   if (error) throw new Error(error.message ?? "No se pudo guardar");
 }
 
+/**
+ * Does a note past its customer's plazo stop new credit for them? Off by
+ * default; the limit applies either way. An admin can release a customer for
+ * the day.
+ */
+export async function creditoBloqueaVencidas(): Promise<boolean> {
+  const { userId } = await auth();
+  if (!userId) return false;
+  const insforge = await createInsForgeServerClient();
+  const { data } = await insforge.database
+    .from("config_negocio")
+    .select("credito_bloquea_vencidas")
+    .eq("id", 1)
+    .maybeSingle();
+  return (data as { credito_bloquea_vencidas: boolean } | null)?.credito_bloquea_vencidas ?? false;
+}
+
+/** Flip the overdue-blocks-credit rule. Admin only; applies to everyone. */
+export async function setCreditoBloqueaVencidas(valor: boolean): Promise<void> {
+  const { userId } = await auth();
+  if (!userId) throw new Error("No autenticado");
+  const profile = await getProfile(userId);
+  if (profile?.role !== "admin") throw new Error("Solo administradores");
+  const insforge = await createInsForgeServerClient();
+  const { error } = await insforge.database
+    .from("config_negocio")
+    .update({ credito_bloquea_vencidas: valor })
+    .eq("id", 1);
+  if (error) throw new Error(error.message ?? "No se pudo guardar");
+}
+
 /** Does the register offer "Pieza de fuera" (buying next door with drawer cash)? */
 export async function piezaFueraActiva(): Promise<boolean> {
   const { userId } = await auth();

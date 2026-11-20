@@ -4,8 +4,15 @@ import { auth } from "@clerk/nextjs/server";
 import { createInsForgeServerClient } from "@/lib/insforge/server";
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { attempt, type ActionResult } from "@/lib/errors";
+import { notifyAdmins } from "@/lib/push";
+import { getProfile } from "@/lib/auth/profile";
 
 export type CustomerTipo = "publico" | "mayoreo" | "tecnico";
+export type FormaPago = "contado" | "contra_entrega" | "credito";
+
+/** Columns every customer list reads. One literal so the SDK can type it. */
+export const CUSTOMER_COLS =
+  "id, numero, nombre, telefono, email, descuento_pct, tipo, notas, credito_dias, credito_limite_cents, encargado, direccion, referencias, ubicacion, inventory_id, forma_pago, bloqueo_motivo, is_active, is_system, created_at, customer_phones(id, telefono, etiqueta)";
 
 export type CustomerPhone = {
   id: string;
@@ -25,6 +32,19 @@ export type Customer = {
   credito_dias: number | null;
   /** Tope de deuda en notas de crédito. Null = sin tope. */
   credito_limite_cents: number | null;
+  /** Número de cliente del negocio (automático, editable). Null en Mostrador. */
+  numero?: number | null;
+  /** Quien paga, cuando no es quien pide (taller: el dueño). */
+  encargado?: string | null;
+  direccion?: string | null;
+  referencias?: string | null;
+  /** Enlace de Maps o "lat,lng". */
+  ubicacion?: string | null;
+  /** Ruta o almacén que lo surte. */
+  inventory_id?: string | null;
+  forma_pago?: FormaPago | null;
+  /** Bloqueo manual de crédito (solo admin). */
+  bloqueo_motivo?: string | null;
   is_active: boolean;
   is_system: boolean;
   created_at: string;
@@ -54,7 +74,18 @@ export type CustomerInput = {
   notas: string | null;
   credito_dias: number | null;
   credito_limite_cents: number | null;
+  /** Null on create = the next number. Null on edit = keep the current one. */
+  numero?: number | null;
+  encargado?: string | null;
+  direccion?: string | null;
+  referencias?: string | null;
+  ubicacion?: string | null;
+  inventory_id?: string | null;
+  forma_pago?: FormaPago | null;
+  bloqueo_motivo?: string | null;
 };
+
+const txt = (v: string | null | undefined) => v?.trim() || null;
 
 // Normalize + validate the shared shape used by create/edit.
 function clean(input: CustomerInput) {
@@ -72,7 +103,20 @@ function clean(input: CustomerInput) {
   const limite = input.credito_limite_cents;
   if (limite != null && (!Number.isInteger(limite) || limite <= 0))
     throw new Error("Límite de crédito inválido");
+  const numero = input.numero;
+  if (numero != null && (!Number.isInteger(numero) || numero <= 0))
+    throw new Error("Número de cliente inválido");
+  if (input.forma_pago != null && !["contado", "contra_entrega", "credito"].includes(input.forma_pago))
+    throw new Error("Forma de pago inválida");
   return {
+    ...(numero != null ? { numero } : {}),
+    encargado: txt(input.encargado),
+    direccion: txt(input.direccion),
+    referencias: txt(input.referencias),
+    ubicacion: txt(input.ubicacion),
+    inventory_id: input.inventory_id || null,
+    forma_pago: input.forma_pago ?? null,
+    bloqueo_motivo: txt(input.bloqueo_motivo),
     nombre,
     telefono,
     email: input.email?.trim() || null,
@@ -92,6 +136,11 @@ export type ResumenCliente = {
   notas_pendientes: number;
   credito_dias: number | null;
   credito_limite_cents: number | null;
+  vencido_cents: number;
+  notas_vencidas: number;
+  dias_mas_vieja: number;
+  liberado_hoy: boolean;
+  bloqueo_motivo: string | null;
 };
 
 /** Everything one customer's numbers say: bought, owed, and how many notes. */
@@ -99,17 +148,21 @@ export async function resumenCliente(customerId: string): Promise<ResumenCliente
   const { userId } = await auth();
   if (!userId) throw new Error("No autenticado");
   const insforge = await createInsForgeServerClient();
-  const [{ data, error }, { data: cust }] = await Promise.all([
+  const [{ data, error }, { data: cust }, { data: est }] = await Promise.all([
     insforge.database.rpc("resumen_cliente", { p_customer_id: customerId }),
     insforgeAdmin.database
       .from("customers")
       .select("credito_dias, credito_limite_cents")
       .eq("id", customerId)
       .single(),
+    insforge.database.rpc("credito_estado", { p_customer_id: customerId }),
   ]);
   if (error) throw new Error(error.message ?? "No se pudo leer el resumen");
   const r = (Array.isArray(data) ? data[0] : data) as Partial<ResumenCliente> | undefined;
   const c = cust as { credito_dias: number | null; credito_limite_cents: number | null } | null;
+  const e = (Array.isArray(est) ? est[0] : est) as
+    | { vencido_cents: number; notas_vencidas: number; dias_mas_vieja: number; liberado_hoy: boolean; bloqueo_motivo: string | null }
+    | undefined;
   return {
     comprado_cents: Number(r?.comprado_cents ?? 0),
     compras: Number(r?.compras ?? 0),
@@ -118,46 +171,84 @@ export async function resumenCliente(customerId: string): Promise<ResumenCliente
     notas_pendientes: Number(r?.notas_pendientes ?? 0),
     credito_dias: c?.credito_dias ?? null,
     credito_limite_cents: c?.credito_limite_cents != null ? Number(c.credito_limite_cents) : null,
+    vencido_cents: Number(e?.vencido_cents ?? 0),
+    notas_vencidas: Number(e?.notas_vencidas ?? 0),
+    dias_mas_vieja: Number(e?.dias_mas_vieja ?? 0),
+    liberado_hoy: !!e?.liberado_hoy,
+    bloqueo_motivo: e?.bloqueo_motivo ?? null,
   };
 }
 
-export async function crearCliente(input: CustomerInput): Promise<{ id: string }> {
-  const { userId } = await auth();
-  if (!userId) throw new Error("No autenticado");
-
-  const insforge = await createInsForgeServerClient();
-  const { data, error } = await insforge.database
-    .from("customers")
-    .insert([clean(input)])
-    .select("id")
-    .single();
-
-  if (error) {
-    if (/duplicate|unique/i.test(error.message ?? ""))
-      throw new Error("Ya existe un cliente con ese teléfono");
-    throw new Error(error.message ?? "Error al crear el cliente");
-  }
-  return { id: (data as { id: string }).id };
+/** Admin: this customer may take credit until midnight (Mexico time). */
+export async function liberarCreditoHoy(customerId: string): Promise<ActionResult> {
+  return attempt("liberarCreditoHoy", async () => {
+    const { userId } = await auth();
+    if (!userId) throw new Error("No autenticado");
+    const insforge = await createInsForgeServerClient();
+    const { error } = await insforge.database.rpc("liberar_credito_hoy", { p_customer_id: customerId });
+    if (error) throw new Error(error.message ?? "No se pudo liberar");
+    return null;
+  });
 }
 
-export async function editarCliente(
-  id: string,
-  input: CustomerInput,
-): Promise<void> {
-  const { userId } = await auth();
-  if (!userId) throw new Error("No autenticado");
+/** Non-admin at the till: ask the admins to release this customer for today. */
+export async function pedirLiberacion(customerId: string, motivo: string): Promise<ActionResult> {
+  return attempt("pedirLiberacion", async () => {
+    const { userId } = await auth();
+    if (!userId) throw new Error("No autenticado");
+    const [{ data: c }, quien] = await Promise.all([
+      insforgeAdmin.database.from("customers").select("numero, nombre").eq("id", customerId).maybeSingle(),
+      getProfile(userId),
+    ]);
+    const cli = c as { numero: number | null; nombre: string } | null;
+    if (!cli) throw new Error("Cliente no encontrado");
+    await notifyAdmins("fiado", {
+      title: `Liberar crédito: ${cli.numero != null ? `#${cli.numero} ` : ""}${cli.nombre}`,
+      body: `${quien?.full_name || "Caja"} lo pide. ${motivo}`.slice(0, 180),
+      url: `/clientes?q=${encodeURIComponent(cli.numero != null ? String(cli.numero) : cli.nombre)}`,
+    });
+    return null;
+  });
+}
 
-  const insforge = await createInsForgeServerClient();
-  await assertNotSystem(insforge, id);
-  const { error } = await insforge.database
-    .from("customers")
-    .update(clean(input))
-    .eq("id", id);
-  if (error) {
-    if (/duplicate|unique/i.test(error.message ?? ""))
-      throw new Error("Ya existe un cliente con ese teléfono");
-    throw new Error(error.message ?? "Error al guardar el cliente");
-  }
+// The unique index on numero and the phone triggers both say "duplicate".
+function mensajeGuardar(msg: string | undefined, fallback: string): string {
+  if (/customers_numero_key/i.test(msg ?? "")) return "Ese número de cliente ya lo tiene otro cliente";
+  if (/duplicate|unique/i.test(msg ?? "")) return "Ya existe un cliente con ese teléfono";
+  return msg || fallback;
+}
+
+export async function crearCliente(input: CustomerInput): Promise<ActionResult<{ id: string }>> {
+  return attempt("crearCliente", async () => {
+    const { userId } = await auth();
+    if (!userId) throw new Error("No autenticado");
+
+    const insforge = await createInsForgeServerClient();
+    const { data, error } = await insforge.database
+      .from("customers")
+      .insert([clean(input)])
+      .select("id")
+      .single();
+
+    if (error) throw new Error(mensajeGuardar(error.message, "Error al crear el cliente"));
+    return { id: (data as { id: string }).id };
+  });
+}
+
+export async function editarCliente(id: string, input: CustomerInput): Promise<ActionResult> {
+  return attempt("editarCliente", async () => {
+    const { userId } = await auth();
+    if (!userId) throw new Error("No autenticado");
+
+    const insforge = await createInsForgeServerClient();
+    await assertNotSystem(insforge, id);
+    const { error } = await insforge.database
+      .from("customers")
+      .update(clean(input))
+      .eq("id", id);
+    if (error) throw new Error(mensajeGuardar(error.message, "Error al guardar el cliente"));
+    return null;
+  });
 }
 
 // Soft archive / restore (keeps history intact).
@@ -221,9 +312,7 @@ export async function buscarClientes(q: string): Promise<Customer[]> {
   const insforge = await createInsForgeServerClient();
   const { data } = await insforge.database
     .from("customers")
-    .select(
-      "id, nombre, telefono, email, descuento_pct, tipo, notas, credito_dias, credito_limite_cents, is_active, is_system, created_at, customer_phones(id, telefono, etiqueta)",
-    )
+    .select(CUSTOMER_COLS)
     .eq("is_active", true)
     .order("nombre", { ascending: true })
     .limit(500);
@@ -233,9 +322,13 @@ export async function buscarClientes(q: string): Promise<Customer[]> {
   const tokens = query.split(/\s+/).filter(Boolean);
   return rows.filter((c) => {
     const extras = (c.customer_phones ?? []).map((p) => p.telefono).join(" ");
-    const hay = `${c.nombre} ${c.telefono ?? ""} ${extras} ${c.email ?? ""}`.toLowerCase();
-    return tokens.every((t) => hay.includes(t));
+    return tokens.every((t) => textoBusqueda(c, extras).includes(t));
   });
+}
+
+/** What a customer search matches on: number, name, phones, email. */
+function textoBusqueda(c: Customer, extras: string): string {
+  return `${c.numero != null ? `#${c.numero} ${c.numero}` : ""} ${c.nombre} ${c.telefono ?? ""} ${extras} ${c.email ?? ""}`.toLowerCase();
 }
 
 export type ResultadoFusion = {

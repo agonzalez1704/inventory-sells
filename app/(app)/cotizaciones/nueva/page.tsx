@@ -29,7 +29,7 @@ export default async function NuevaCotizacionPage() {
       .limit(24),
     insforge.database
       .from("customers")
-      .select("id, nombre, telefono, is_system")
+      .select("id, numero, nombre, telefono, is_system")
       .eq("is_active", true)
       .order("is_system", { ascending: false })
       .order("nombre", { ascending: true }),

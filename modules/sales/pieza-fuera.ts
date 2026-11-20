@@ -185,7 +185,8 @@ export async function registrarPiezaDeFuera(input: PiezaFueraInput): Promise<Act
     let saleId: string | null = null;
     if (input.entrega === "nota") {
       const r = await registerLoan([{ product_id: productId, qty }], input.customerId, `Pieza de fuera · ${vecino}`);
-      saleId = r.saleId;
+      if (!r.ok) throw new Error(r.error);
+      saleId = r.data.saleId;
     }
 
     // 4. The withdrawal, last: a failure here never undoes the sale — the

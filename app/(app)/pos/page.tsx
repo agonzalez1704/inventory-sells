@@ -38,7 +38,7 @@ export default async function PosPage() {
       insforge.database.from("inventories").select("id, name, sucursales(nombre)").order("created_at", { ascending: true }),
       insforge.database
         .from("customers")
-        .select("id, nombre, telefono, is_system, descuento_pct")
+        .select("id, numero, nombre, telefono, is_system, descuento_pct")
         .eq("is_active", true)
         .order("is_system", { ascending: false })
         .order("nombre", { ascending: true }),

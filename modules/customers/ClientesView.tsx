@@ -16,7 +16,11 @@ import {
   Wallet,
   CreditCard,
   Merge,
+  MapPin,
+  Lock,
 } from "lucide-react";
+import { MARCA } from "@/lib/marca";
+import { unwrap } from "@/lib/errors";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -39,7 +43,26 @@ import {
   type CustomerInput,
   type CustomerPhone,
   type CustomerTipo,
+  type FormaPago,
 } from "./actions";
+
+// Refaccionaria Ruli asked for these (customer number, delivery, who pays,
+// how they pay, manual block). Fiable keeps its shorter form.
+const RULI = MARCA.id === "ruli";
+
+const FORMAS: [FormaPago, string][] = [
+  ["contado", "Contado"],
+  ["contra_entrega", "Contra entrega"],
+  ["credito", "Crédito"],
+];
+const FORMA_LABEL = Object.fromEntries(FORMAS) as Record<FormaPago, string>;
+
+export type InventarioOpcion = { id: string; name: string };
+
+/** A Maps link for whatever was saved: a URL as-is, anything else searched. */
+function mapsUrl(u: string): string {
+  return /^https?:\/\//i.test(u) ? u : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(u)}`;
+}
 
 const TIPOS: [CustomerTipo, string][] = [
   ["publico", "Público"],
@@ -62,8 +85,14 @@ export function ClientesView({
   initial,
   saldos = {},
   isAdmin = false,
+  inventarios = [],
+  initialQuery = "",
 }: {
   initial: Customer[];
+  /** Routes / almacenes a customer can be assigned to. */
+  inventarios?: InventarioOpcion[];
+  /** Prefills the search (a push "liberar a #1043" lands here). */
+  initialQuery?: string;
   /** Store credit by customer id — only those who are owed something. */
   saldos?: Record<string, number>;
   /** Merging moves history between records, so it is the admin's call. */
@@ -71,7 +100,7 @@ export function ClientesView({
 }) {
   const [verSaldo, setVerSaldo] = useState<Customer | null>(null);
   const totalSaldo = Object.values(saldos).reduce((s, n) => s + n, 0);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(initialQuery);
   const [nuevo, setNuevo] = useState(false);
   const [editar, setEditar] = useState<Customer | null>(null);
   const [fusionar, setFusionar] = useState<Customer | null>(null);
@@ -82,10 +111,11 @@ export function ClientesView({
     const tokens = q.split(/\s+/).filter(Boolean);
     return initial.filter((c) => {
       const extras = (c.customer_phones ?? []).map((p) => p.telefono).join(" ");
-      const hay = `${c.nombre} ${c.telefono ?? ""} ${extras} ${c.email ?? ""}`.toLowerCase();
+      const hay = `${c.numero != null ? `#${c.numero} ${c.numero}` : ""} ${c.nombre} ${c.telefono ?? ""} ${extras} ${c.email ?? ""}`.toLowerCase();
       return tokens.every((t) => hay.includes(t));
     });
   }, [initial, query]);
+  const invNombre = useMemo(() => new Map(inventarios.map((i) => [i.id, i.name])), [inventarios]);
 
   return (
     <section className="space-y-6">
@@ -127,7 +157,7 @@ export function ClientesView({
         <Input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Buscar por nombre, teléfono o correo…"
+          placeholder={RULI ? "Buscar por número, nombre, teléfono o correo…" : "Buscar por nombre, teléfono o correo…"}
           className="h-10 pl-9"
         />
       </div>
@@ -149,6 +179,8 @@ export function ClientesView({
               key={c.id}
               c={c}
               saldo={saldos[c.id] ?? 0}
+              ruta={c.inventory_id ? invNombre.get(c.inventory_id) ?? null : null}
+              puedeLiberar={isAdmin}
               onEdit={() => setEditar(c)}
               onVerSaldo={() => setVerSaldo(c)}
               onFusionar={isAdmin ? () => setFusionar(c) : undefined}
@@ -165,9 +197,9 @@ export function ClientesView({
           onClose={() => setVerSaldo(null)}
         />
       )}
-      {nuevo && <ClienteModal onClose={() => setNuevo(false)} />}
+      {nuevo && <ClienteModal inventarios={inventarios} isAdmin={isAdmin} onClose={() => setNuevo(false)} />}
       {editar && (
-        <ClienteModal cliente={editar} onClose={() => setEditar(null)} />
+        <ClienteModal cliente={editar} inventarios={inventarios} isAdmin={isAdmin} onClose={() => setEditar(null)} />
       )}
       {fusionar && (
         <FusionModal
@@ -183,12 +215,17 @@ export function ClientesView({
 function ClienteRow({
   c,
   saldo,
+  ruta,
+  puedeLiberar,
   onEdit,
   onVerSaldo,
   onFusionar,
 }: {
   c: Customer;
   saldo: number;
+  /** Name of the route/almacén assigned to this customer. */
+  ruta: string | null;
+  puedeLiberar: boolean;
   onEdit: () => void;
   onVerSaldo: () => void;
   /** Undefined for anyone who may not merge. */
@@ -226,7 +263,19 @@ function ClienteRow({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <p className="font-medium">{c.nombre}</p>
+            <p className="font-medium">
+              {RULI && c.numero != null && (
+                <span className="mr-1.5 font-mono text-sm text-muted-foreground">#{c.numero}</span>
+              )}
+              {c.nombre}
+            </p>
+            {c.bloqueo_motivo && (
+              <span title={c.bloqueo_motivo} className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/20 dark:bg-red-950/40 dark:text-red-300">
+                <Lock className="h-3 w-3" />
+                Bloqueado
+              </span>
+            )}
+            {RULI && c.forma_pago && <Badge tone="neutral">{FORMA_LABEL[c.forma_pago]}</Badge>}
             {c.is_system ? (
               <Badge tone="neutral">Sistema</Badge>
             ) : (
@@ -294,6 +343,25 @@ function ClienteRow({
               </span>
             )}
           </div>
+          {RULI && (c.encargado || c.direccion || ruta) && (
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+              {c.encargado && <span>Paga: {c.encargado}</span>}
+              {c.direccion && (
+                c.ubicacion ? (
+                  <a href={mapsUrl(c.ubicacion)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 hover:text-foreground">
+                    <MapPin className="h-3.5 w-3.5" />
+                    {c.direccion}
+                  </a>
+                ) : (
+                  <span className="inline-flex items-center gap-1">
+                    <MapPin className="h-3.5 w-3.5" />
+                    {c.direccion}
+                  </span>
+                )
+              )}
+              {ruta && <span>Ruta: {ruta}</span>}
+            </div>
+          )}
           {c.notas && (
             <p className="mt-1.5 text-xs text-muted-foreground">{c.notas}</p>
           )}
@@ -306,7 +374,7 @@ function ClienteRow({
               {verResumen ? "Ocultar resumen" : "Ver compras y deuda"}
             </button>
           )}
-          {verResumen && <ResumenClienteChip customerId={c.id} className="mt-1.5" />}
+          {verResumen && <ResumenClienteChip customerId={c.id} puedeLiberar={puedeLiberar} className="mt-1.5" />}
         </div>
         {!c.is_system && (
           <div className="flex items-center gap-1">
@@ -337,9 +405,13 @@ function ClienteRow({
 
 function ClienteModal({
   cliente,
+  inventarios,
+  isAdmin,
   onClose,
 }: {
   cliente?: Customer;
+  inventarios: InventarioOpcion[];
+  isAdmin: boolean;
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -358,6 +430,14 @@ function ClienteModal({
   const [creditoLimite, setCreditoLimite] = useState(
     cliente?.credito_limite_cents != null ? String(cliente.credito_limite_cents / 100) : "",
   );
+  const [numero, setNumero] = useState(cliente?.numero != null ? String(cliente.numero) : "");
+  const [encargado, setEncargado] = useState(cliente?.encargado ?? "");
+  const [direccion, setDireccion] = useState(cliente?.direccion ?? "");
+  const [referencias, setReferencias] = useState(cliente?.referencias ?? "");
+  const [ubicacion, setUbicacion] = useState(cliente?.ubicacion ?? "");
+  const [inventoryId, setInventoryId] = useState(cliente?.inventory_id ?? "");
+  const [formaPago, setFormaPago] = useState<FormaPago | "">(cliente?.forma_pago ?? "");
+  const [bloqueo, setBloqueo] = useState(cliente?.bloqueo_motivo ?? "");
   const [pending, start] = useTransition();
   // Pending extra-phone input lives here so Guardar can flush it — typing a
   // number and hitting Guardar without pressing + must not silently drop it.
@@ -377,6 +457,14 @@ function ClienteModal({
         creditoLimite.trim() === ""
           ? null
           : Math.round((parseFloat(creditoLimite.replace(",", ".")) || 0) * 100),
+      numero: numero.trim() === "" ? null : Number(numero.replace(/\D/g, "")),
+      encargado,
+      direccion,
+      referencias,
+      ubicacion,
+      inventory_id: inventoryId || null,
+      forma_pago: formaPago || null,
+      bloqueo_motivo: bloqueo,
     };
     if (!payload.nombre.trim()) return toast.error("Falta el nombre");
     if ((payload.telefono ?? "").replace(/\D/g, "").length < 10)
@@ -394,11 +482,11 @@ function ClienteModal({
     start(async () => {
       try {
         if (esEdit) {
-          await editarCliente(cliente!.id, payload);
+          unwrap(await editarCliente(cliente!.id, payload));
           if (extraPendiente)
             await agregarTelefono(cliente!.id, extraPendiente, etiquetaExtra || null);
         } else {
-          await crearCliente(payload);
+          unwrap(await crearCliente(payload));
         }
         toast.success(esEdit ? "Cliente actualizado" : "Cliente registrado");
         onClose();
@@ -414,18 +502,31 @@ function ClienteModal({
       open
       onClose={onClose}
       title={esEdit ? "Editar cliente" : "Nuevo cliente"}
-      className="max-w-md"
+      className={RULI ? "max-w-lg" : "max-w-md"}
     >
       <div className="space-y-3">
-        <label className="block">
-          <span className="mb-1 block text-xs font-medium text-muted-foreground">Nombre</span>
-          <Input
-            value={nombre}
-            onChange={(e) => setNombre(e.target.value)}
-            placeholder="Nombre o taller"
-            autoFocus
-          />
-        </label>
+        <div className={cn(RULI && "grid grid-cols-[7rem_1fr] gap-2")}>
+          {RULI && (
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-muted-foreground">No. cliente</span>
+              <Input
+                value={numero}
+                onChange={(e) => setNumero(e.target.value)}
+                inputMode="numeric"
+                placeholder="Auto"
+              />
+            </label>
+          )}
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-muted-foreground">Nombre</span>
+            <Input
+              value={nombre}
+              onChange={(e) => setNombre(e.target.value)}
+              placeholder="Nombre o taller"
+              autoFocus
+            />
+          </label>
+        </div>
         <div className="grid grid-cols-2 gap-2">
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-muted-foreground">
@@ -497,6 +598,60 @@ function ClienteModal({
             />
           </label>
         </div>
+        {RULI && (
+          <>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="block">
+                <span className="mb-1 block text-xs font-medium text-muted-foreground">Encargado (quien paga)</span>
+                <Input value={encargado} onChange={(e) => setEncargado(e.target.value)} placeholder="Dueño del taller" />
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-xs font-medium text-muted-foreground">Cómo paga</span>
+                <Select value={formaPago} onChange={(e) => setFormaPago(e.target.value as FormaPago | "")}>
+                  <option value="">Sin definir</option>
+                  {FORMAS.map(([v, l]) => (
+                    <option key={v} value={v}>{l}</option>
+                  ))}
+                </Select>
+              </label>
+            </div>
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-muted-foreground">Dirección de entrega</span>
+              <Input value={direccion} onChange={(e) => setDireccion(e.target.value)} placeholder="Calle y número, colonia, ciudad" />
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="block">
+                <span className="mb-1 block text-xs font-medium text-muted-foreground">Referencias</span>
+                <Input value={referencias} onChange={(e) => setReferencias(e.target.value)} placeholder="Portón verde, junto a…" />
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-xs font-medium text-muted-foreground">Ruta / almacén</span>
+                <Select value={inventoryId} onChange={(e) => setInventoryId(e.target.value)}>
+                  <option value="">Sin asignar</option>
+                  {inventarios.map((i) => (
+                    <option key={i.id} value={i.id}>{i.name}</option>
+                  ))}
+                </Select>
+              </label>
+            </div>
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-muted-foreground">Ubicación (enlace de Maps)</span>
+              <Input value={ubicacion} onChange={(e) => setUbicacion(e.target.value)} placeholder="Pega el enlace que te mandó por WhatsApp" />
+            </label>
+          </>
+        )}
+        {isAdmin && (
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-muted-foreground">
+              Bloquear crédito (motivo) — solo admin
+            </span>
+            <Input
+              value={bloqueo}
+              onChange={(e) => setBloqueo(e.target.value)}
+              placeholder="Vacío = sin bloqueo manual"
+            />
+          </label>
+        )}
         <label className="block">
           <span className="mb-1 block text-xs font-medium text-muted-foreground">
             Notas (opcional)

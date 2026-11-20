@@ -16,12 +16,19 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { PhoneField } from "./PhoneField";
 import { crearCliente } from "./actions";
+import { unwrap } from "@/lib/errors";
+import { MARCA } from "@/lib/marca";
+
+// Customer numbers are Refaccionaria Ruli's way of naming clients.
+const RULI = MARCA.id === "ruli";
 
 export type PickerCustomer = {
   id: string;
   nombre: string;
   telefono: string;
   is_system: boolean;
+  /** Número de cliente; the list is searchable by it when the page selects it. */
+  numero?: number | null;
 };
 
 // Sale customer selector: defaults to the walk-in "Mostrador", searches
@@ -111,7 +118,7 @@ export function CustomerPicker({
     if (!s) return base;
     const tokens = s.split(/\s+/).filter(Boolean);
     return base.filter((c) => {
-      const hay = `${c.nombre} ${c.telefono}`.toLowerCase();
+      const hay = `${c.numero != null ? `#${c.numero} ${c.numero} ` : ""}${c.nombre} ${c.telefono}`.toLowerCase();
       return tokens.every((t) => hay.includes(t));
     });
   }, [q, list, excludeSystem]);
@@ -191,7 +198,7 @@ export function CustomerPicker({
                   <Input
                     value={q}
                     onChange={(e) => setQ(e.target.value)}
-                    placeholder="Buscar cliente por nombre o teléfono…"
+                    placeholder="Buscar por número, nombre o teléfono…"
                     className="h-9 pl-8"
                     autoFocus
                   />
@@ -216,7 +223,12 @@ export function CustomerPicker({
                         <Store className="h-3.5 w-3.5" />
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate font-medium">{c.nombre}</span>
+                        <span className="block truncate font-medium">
+                          {RULI && c.numero != null && (
+                            <span className="mr-1.5 font-mono text-xs text-muted-foreground">#{c.numero}</span>
+                          )}
+                          {c.nombre}
+                        </span>
                         {c.telefono && !c.is_system && (
                           <span className="block truncate text-xs text-muted-foreground">
                             {c.telefono}
@@ -284,7 +296,7 @@ function NewCustomerForm({
       return toast.error("Teléfono: al menos 10 dígitos");
     start(async () => {
       try {
-        const { id } = await crearCliente({
+        const { id } = unwrap(await crearCliente({
           nombre,
           telefono,
           email: null,
@@ -293,7 +305,7 @@ function NewCustomerForm({
           notas: null,
           credito_dias: null,
           credito_limite_cents: null,
-        });
+        }));
         toast.success("Cliente registrado");
         onCreated({ id, nombre: nombre.trim(), telefono, is_system: false });
       } catch (e) {

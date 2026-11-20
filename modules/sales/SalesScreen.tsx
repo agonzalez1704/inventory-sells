@@ -61,6 +61,9 @@ import { CategoriaSheet } from "./CategoriaSheet";
 import { useLongPress } from "./useLongPress";
 import type { PrecioBase } from "./pos-prefs";
 import { registerSale, registerLoan, type PagoSplit } from "./actions";
+import { liberarCreditoHoy, pedirLiberacion } from "@/modules/customers/actions";
+import { unwrap } from "@/lib/errors";
+import { Modal } from "@/components/ui/modal";
 
 export type SalesProduct = Pick<
   Product,
@@ -365,6 +368,9 @@ export function SalesScreen({
   const [categoria, setCategoria] = useState<string | null>(null);
   const [cart, setCart] = useState<Record<string, number>>({});
   const [mode, setMode] = useState<"venta" | "prestamo">("venta");
+  /** Why the credit note was refused (credit blocked / overdue / limit). */
+  const [bloqueo, setBloqueo] = useState<string | null>(null);
+  const [enBloqueo, startBloqueo] = useTransition();
   const [customer, setCustomer] = useState<PosCustomer>(mostrador);
   const [note, setNote] = useState("");
   // "Importe": cash guarantee left with a credit note. Pesos as typed.
@@ -843,7 +849,7 @@ export function SalesScreen({
     startTransition(async () => {
       try {
         const { saleId } = esFiado
-          ? await registerLoan(items, customer.is_system ? null : customer.id, note, manual, importeCents || null)
+          ? unwrap(await registerLoan(items, customer.is_system ? null : customer.id, note, manual, importeCents || null))
           : await registerSale(items, pm, customer.id, pagos, manual);
 
         // Transfer proof rides AFTER the sale: its failure downgrades a toast,
@@ -873,8 +879,29 @@ export function SalesScreen({
         setCarritoOpen(false);
         router.refresh();
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Error al registrar");
+        const msg = err instanceof Error ? err.message : "Error al registrar";
+        // The credit rule said no: explain it and offer the ways out instead
+        // of a toast that vanishes.
+        if (esFiado && /^crédito bloqueado:/i.test(msg)) setBloqueo(msg.replace(/^crédito bloqueado:\s*/i, ""));
+        else toast.error(msg);
       }
+    });
+  }
+
+  function liberarYGuardar() {
+    startBloqueo(async () => {
+      const r = await liberarCreditoHoy(customer.id);
+      if (!r.ok) return void toast.error(r.error);
+      setBloqueo(null);
+      submit();
+    });
+  }
+
+  function pedirAlAdmin() {
+    startBloqueo(async () => {
+      const r = await pedirLiberacion(customer.id, `${bloqueo ?? ""} · nota de ${formatMXN(total)}`);
+      if (!r.ok) return void toast.error(r.error);
+      toast.success("Aviso enviado al admin. Cuando lo libere, toca Reintentar.");
     });
   }
 
@@ -1014,7 +1041,7 @@ export function SalesScreen({
 
         <div className="space-y-2.5 px-4 pt-1 pb-3">
           <CustomerPicker customers={customers} value={customer} onChange={(c) => setCustomer(c as PosCustomer)} />
-          {!customer.is_system && <ResumenClienteChip customerId={customer.id} />}
+          {!customer.is_system && <ResumenClienteChip customerId={customer.id} puedeLiberar={esAdmin} />}
           {mode === "prestamo" && (
             <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-900 dark:bg-amber-950/30">
               <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">Se registra como nota de crédito</p>
@@ -1624,6 +1651,48 @@ export function SalesScreen({
           setPaymentOpen(true);
         }}
       />
+
+      {bloqueo && (
+        <Modal open onClose={() => setBloqueo(null)} title="No se puede dejar a crédito" className="max-w-md">
+          <div className="space-y-3">
+            <p className="text-sm font-medium">{customer.nombre}</p>
+            <p className="rounded-lg bg-red-50 p-3 text-sm text-red-800 dark:bg-red-950/40 dark:text-red-200">{bloqueo}</p>
+            <div className="flex flex-col gap-2">
+              <Button
+                onClick={() => {
+                  setBloqueo(null);
+                  setMode("venta");
+                  setPaymentOpen(true);
+                }}
+                disabled={enBloqueo}
+              >
+                Cobrar de contado
+              </Button>
+              {esAdmin ? (
+                <Button variant="secondary" onClick={liberarYGuardar} loading={enBloqueo}>
+                  Liberar por hoy y guardar la nota
+                </Button>
+              ) : (
+                <>
+                  <Button variant="secondary" onClick={pedirAlAdmin} loading={enBloqueo}>
+                    Pedir liberación al admin
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      setBloqueo(null);
+                      submit();
+                    }}
+                    disabled={enBloqueo}
+                  >
+                    Ya lo liberó: reintentar
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
+        </Modal>
+      )}
 
       {escaneando && (
         <EscanerQR

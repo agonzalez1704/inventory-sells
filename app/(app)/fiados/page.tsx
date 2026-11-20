@@ -49,7 +49,7 @@ export default async function FiadosPage({
     insforge.database.from("profiles").select("id, full_name"),
     insforge.database
       .from("customers")
-      .select("id, nombre, telefono, is_system")
+      .select("id, numero, nombre, telefono, is_system")
       .eq("is_active", true)
       .order("is_system", { ascending: false })
       .order("nombre", { ascending: true }),

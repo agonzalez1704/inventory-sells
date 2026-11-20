@@ -26,7 +26,7 @@ export default async function GarantiasPage({
     // For the claim on a Mostrador sale: it gets a person before it is filed.
     insforge.database
       .from("customers")
-      .select("id, nombre, telefono, is_system")
+      .select("id, numero, nombre, telefono, is_system")
       .eq("is_active", true)
       .order("nombre", { ascending: true }),
   ]);
