@@ -127,6 +127,7 @@ export function CatalogoView({
           onChange={(v) => set({ marca: v || null })}
           opciones={opciones.marcas.map((m) => ({ value: m, label: m }))}
         />
+        {autopartes && <FiltroCarro f={f} set={set} opciones={opciones} />}
         <label className="flex min-w-0 flex-1 basis-64 flex-col gap-1">
           <span className="text-xs font-semibold text-muted-foreground">Buscar</span>
           <span className="flex h-10 items-center gap-2 rounded-lg border border-border bg-background px-3 focus-within:border-ring">
@@ -345,6 +346,82 @@ function Filtro({ label, valor, onChange, opciones }: { label: string; valor: st
     <div className="flex w-[calc(50%-0.4rem)] flex-col gap-1 sm:w-52">
       <span className="text-xs font-semibold text-muted-foreground">{label}</span>
       <ComboSelect aria-label={label} valor={valor} onChange={onChange} vacio="Todas" opciones={opciones} />
+    </div>
+  );
+}
+
+/**
+ * "Carro": review every part of one car and edit it in place — Armadora →
+ * Modelo, then Versión (when the model has named ones) and Año, both optional.
+ */
+function FiltroCarro({
+  f,
+  set,
+  opciones,
+}: {
+  f: FiltrosCatalogo;
+  set: (p: Partial<FiltrosCatalogo>) => void;
+  opciones: OpcionesCatalogo;
+}) {
+  const modelos = f.vmarca ? opciones.vehiculos[f.vmarca] ?? [] : [];
+  const versiones = f.vmarca && f.vmodelo ? opciones.versiones[`${f.vmarca}|${f.vmodelo}`] ?? [] : [];
+  const [anio, setAnio] = useState(f.anio ? String(f.anio) : "");
+  const op = (xs: string[]) => xs.map((x) => ({ value: x, label: x }));
+  return (
+    <div className="flex w-full flex-wrap items-end gap-2.5 rounded-xl border border-sky-200 bg-sky-50/60 p-2.5 dark:border-sky-900 dark:bg-sky-950/20 sm:w-auto">
+      <div className="flex w-[calc(50%-0.4rem)] flex-col gap-1 sm:w-40">
+        <span className="text-xs font-semibold text-muted-foreground">Carro: armadora</span>
+        <ComboSelect
+          aria-label="Armadora"
+          valor={f.vmarca ?? ""}
+          onChange={(v) => {
+            setAnio("");
+            set({ vmarca: v || null, vmodelo: null, version: null, anio: null });
+          }}
+          vacio="Todas"
+          opciones={op(Object.keys(opciones.vehiculos).sort((a, b) => a.localeCompare(b, "es")))}
+        />
+      </div>
+      <div className="flex w-[calc(50%-0.4rem)] flex-col gap-1 sm:w-40">
+        <span className="text-xs font-semibold text-muted-foreground">Modelo</span>
+        <ComboSelect
+          aria-label="Modelo"
+          valor={f.vmodelo ?? ""}
+          onChange={(v) => set({ vmodelo: v || null, version: null })}
+          vacio="Todos"
+          disabled={!f.vmarca}
+          opciones={op(modelos)}
+        />
+      </div>
+      {versiones.length > 0 && (
+        <div className="flex w-[calc(50%-0.4rem)] flex-col gap-1 sm:w-36">
+          <span className="text-xs font-semibold text-muted-foreground">Versión</span>
+          <ComboSelect
+            aria-label="Versión"
+            valor={f.version ?? ""}
+            onChange={(v) => set({ version: v || null })}
+            vacio="Todas"
+            opciones={op(versiones)}
+          />
+        </div>
+      )}
+      <label className="flex w-[calc(50%-0.4rem)] flex-col gap-1 sm:w-24">
+        <span className="text-xs font-semibold text-muted-foreground">Año</span>
+        <input
+          value={anio}
+          disabled={!f.vmarca}
+          inputMode="numeric"
+          maxLength={4}
+          placeholder="Todos"
+          onChange={(e) => {
+            const v = e.target.value.replace(/\D/g, "").slice(0, 4);
+            setAnio(v);
+            // Filter once a whole year is typed; clearing drops the filter.
+            if (v.length === 4 || v === "") set({ anio: v ? Number(v) : null });
+          }}
+          className="h-10 rounded-lg border border-border bg-background px-3 text-base outline-hidden focus:border-ring disabled:opacity-50 lg:text-sm"
+        />
+      </label>
     </div>
   );
 }

@@ -48,6 +48,11 @@ export type FiltrosCatalogo = {
   familia?: string | null;
   marca?: string | null;
   falta?: "carros" | "refaccion" | "sistema" | null;
+  /** A car: armadora → modelo (→ versión, año). Same matching as the POS. */
+  vmarca?: string | null;
+  vmodelo?: string | null;
+  version?: string | null;
+  anio?: number | null;
 };
 
 export async function buscarCatalogo(
@@ -64,6 +69,10 @@ export async function buscarCatalogo(
       p_falta: f.falta || null,
       p_limit: 50,
       p_offset: offset,
+      // Only sent when a car is picked: the call stays the same otherwise.
+      ...(f.vmarca
+        ? { p_vmarca: f.vmarca, p_vmodelo: f.vmodelo || null, p_version: f.version || null, p_anio: f.anio ?? null }
+        : {}),
     });
     if (error) throw new Error(error.message ?? "No se pudo buscar");
     const filas = (data ?? []) as (FilaCatalogo & { total: number | string })[];
