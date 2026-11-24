@@ -201,11 +201,19 @@ export function InventoryView({
   const [stats, setStats] = useState(statsIniciales);
   const [categorias, setCategorias] = useState<CategoriaConteo[]>([]);
   const [cargando, setCargando] = useState(false);
+  // Which search the rows on screen answer. When the filter or query changes,
+  // the old rows stay up until the new page arrives — and a row tagged CEDIS
+  // LEÓN sitting under "Todos" reads as an answer to the new question, then
+  // vanishes. Rows for a different question are shown as stale, not as results.
+  const claveConsulta = JSON.stringify([query, filtros, page]);
+  const [claveMostrada, setClaveMostrada] = useState(claveConsulta);
+  const desactualizado = claveMostrada !== claveConsulta;
 
   useEffect(() => setPage(1), [query, filtros]);
 
   useEffect(() => {
     let cancelado = false;
+    const clave = claveConsulta;
     setCargando(true);
     const t = setTimeout(async () => {
       try {
@@ -213,8 +221,12 @@ export function InventoryView({
         if (cancelado) return;
         setPaged(r.rows);
         setTotal(r.total);
+        setClaveMostrada(clave);
       } catch {
-        if (!cancelado) setPaged([]);
+        if (!cancelado) {
+          setPaged([]);
+          setClaveMostrada(clave);
+        }
       } finally {
         if (!cancelado) setCargando(false);
       }
@@ -226,6 +238,7 @@ export function InventoryView({
     // `products` is a dependency on purpose: modals call router.refresh() after
     // an import, an edit or a stock adjustment, which hands down a NEW array —
     // the signal to read the page again.
+    // claveConsulta is derived from query/filtros/page, already listed.
   }, [query, filtros, page, products]);
 
   // Header numbers and alert counts follow the inventory, not the search: they
@@ -413,7 +426,14 @@ export function InventoryView({
       <div className="lg:grid lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-6">
         <aside className="hidden lg:sticky lg:top-4 lg:block lg:self-start">{panelFiltros}</aside>
 
-        <Card className={cn("overflow-hidden transition-opacity", cargando && "opacity-70")}>
+        <Card
+          aria-busy={cargando}
+          className={cn(
+            "overflow-hidden transition-opacity",
+            cargando && "opacity-70",
+            desactualizado && "pointer-events-none opacity-40",
+          )}
+        >
           {stats.productos === 0 && !inv ? (
             <div className="p-6">
               <EmptyState

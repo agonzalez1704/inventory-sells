@@ -159,6 +159,9 @@ function unirCodigo(tokens: string[]): string | null {
   return /^[a-z]+$/.test(a) && /^\d+$/.test(b) ? a + b : null;
 }
 
+/** Score of a product whose SKU is exactly the query. Above anything else can sum. */
+export const CLAVE_EXACTA = 100;
+
 // Score one query token against a product. 0 = no match.
 function tokenScore(token: string, idx: Index): number {
   for (const term of expand(token)) {
@@ -206,6 +209,15 @@ export function scoreProduct(p: Searchable, query: string): number {
   if (!tokens.length) return 0;
 
   const idx = buildIndex(p);
+
+  // The whole query IS this product's code ("10-009", "10 009", "10009"):
+  // nothing else can outrank it. Without this, a code split into two common
+  // numbers scored 2+2 on the SKU while any part with both numbers in its NAME
+  // (model years, ranges) scored 3+3 and buried it. Same rule as the ORDER BY
+  // in buscar_productos_candidatos, so the row the SQL keeps is the row shown.
+  const qCompact = q.replace(/ /g, "");
+  if (idx.sku && idx.sku.replace(/ /g, "") === qCompact) return CLAVE_EXACTA;
+
   let score = 0;
   let falla = false;
   for (const token of tokens) {
@@ -242,7 +254,6 @@ export function scoreProduct(p: Searchable, query: string): number {
   }
 
   // Reward the whole query appearing in the model name, and an exact name.
-  const qCompact = q.replace(/ /g, "");
   if (idx.nameCompact.includes(qCompact)) score += 5;
   if (idx.name === q) score += 10;
   return score;
