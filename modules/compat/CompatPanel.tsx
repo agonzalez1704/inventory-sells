@@ -6,6 +6,7 @@ import type { Searchable } from "@/lib/search";
 import { Button } from "@/components/ui/button";
 import { compatiblesStaff } from "./actions";
 import { useCompat } from "./useCompat";
+import { MARCA } from "@/lib/marca";
 
 // Shown in Inventario / Ventas when a search returns nothing. The AI lookup is
 // MANUAL: firing it per keystroke would cost a model call for every partial
@@ -63,7 +64,7 @@ export function CompatPanel<T extends Searchable & { id: string }>({
     return (
       <div className="mt-4 flex flex-col items-center gap-2 rounded-xl border border-dashed border-border px-4 py-4 text-center">
         <p className="text-xs text-muted-foreground">
-          ¿Buscas un modelo que no manejamos? Puede haber pantallas compatibles.
+          ¿Buscas un modelo que no manejamos? Puede haber {MARCA.id === "ruli" ? "refacciones" : "pantallas"} compatibles.
         </p>
         <Button variant="secondary" size="sm" onClick={run}>
           <Sparkles className="h-4 w-4" />

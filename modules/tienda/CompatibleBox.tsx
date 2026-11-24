@@ -4,11 +4,17 @@ import { Sparkles, Loader2, Info, RefreshCw } from "lucide-react";
 import { useCompat } from "@/modules/compat/useCompat";
 import { buscarCompatibles, type CompatResult } from "./actions";
 import { ProductCard } from "./TiendaView";
+import { MARCA } from "@/lib/marca";
+
+// Fiable sells phone screens, Ruli sells car parts: the same "compatible
+// models" pitch has to name the right thing, or Ruli's store tells a driver
+// their "equipo" might take one of our "pantallas".
+const RULI = MARCA.id === "ruli";
 
 // The lookup failed, so we don't know the model — hand the customer to a human
 // with their search already written out.
 function waHref(query: string, whatsapp: string | null) {
-  const text = encodeURIComponent(`Hola, busco pantalla para: ${query}`);
+  const text = encodeURIComponent(`Hola, busco ${RULI ? "la pieza" : "pantalla"} para: ${query}`);
   return whatsapp ? `https://wa.me/${whatsapp}?text=${text}` : `https://wa.me/?text=${text}`;
 }
 
@@ -34,8 +40,9 @@ export function CompatibleBox({
     return (
       <div className="mx-auto mt-8 max-w-lg rounded-2xl border border-dashed border-tienda-200 dark:border-tienda-900 bg-tienda-50/40 dark:bg-tienda-950/40 p-5 text-center">
         <p className="text-sm text-foreground">
-          Muchas pantallas son <span className="font-medium">iguales entre modelos</span>.
-          Podemos revisar si alguna que sí tenemos le queda a tu equipo.
+          Muchas {RULI ? "refacciones" : "pantallas"} son{" "}
+          <span className="font-medium">iguales entre modelos</span>.
+          Podemos revisar si alguna que sí tenemos le queda a tu {RULI ? "vehículo" : "equipo"}.
         </p>
         <button
           onClick={run}
