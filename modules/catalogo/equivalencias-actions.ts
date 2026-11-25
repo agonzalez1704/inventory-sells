@@ -67,3 +67,13 @@ export async function aplicarEquivalencias(despues: string | null): Promise<Acti
     return paso;
   });
 }
+
+/** How many product rows the linking pass will walk: the progress bar's total. */
+export async function contarProductos(): Promise<ActionResult<number>> {
+  return attempt("contarProductos", async () => {
+    await assertPermiso("inventario_gestionar");
+    const { count, error } = await DB.from("products").select("id", { count: "exact", head: true });
+    if (error) throw new Error(error.message ?? "No se pudo contar");
+    return count ?? 0;
+  });
+}
