@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Search, Loader2, Pencil } from "lucide-react";
+import { Search, Loader2, Pencil, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ComboSelect, type Opcion } from "@/components/ui/combo-select";
 import { cn } from "@/lib/utils";
@@ -76,6 +76,14 @@ export function CatalogoView({
     return n;
   });
   const refrescar = () => cargar({ ...f, q });
+  const hayFiltros = Boolean(q || f.sistema || f.familia || f.marca || f.vmarca || f.falta);
+  // FiltroCarro keeps the typed year itself: remount it to clear that too.
+  const [limpiezas, setLimpiezas] = useState(0);
+  const limpiar = () => {
+    setQ("");
+    set({ sistema: null, familia: null, marca: null, vmarca: null, vmodelo: null, version: null, anio: null, falta: null });
+    setLimpiezas((n) => n + 1);
+  };
 
   const pend = opciones.pendientes;
   const chips: { falta: NonNullable<FiltrosCatalogo["falta"]>; label: string; n: number }[] = [
@@ -86,35 +94,74 @@ export function CatalogoView({
 
   return (
     <div className="space-y-4 pb-24">
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="min-w-0 flex-1 basis-72">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="min-w-0 basis-72">
           <h1 className="text-2xl font-semibold tracking-tight">Catálogo</h1>
           <p className="mt-0.5 text-sm text-muted-foreground">
             {autopartes ? "Carros, refacción" : "Refacción"} y conversiones de cada pieza. Lo que cambies aquí lo usan el POS, la tienda y el agente.
           </p>
         </div>
-        {puedeEditar && <HerramientasCatalogo opciones={opciones} onListo={refrescar} />}
-        {puedeEditar && autopartes && <ImportarEquivalencias onListo={refrescar} />}
-        {puedePrecios && (
-          <Link href="/catalogo/precios" className="inline-flex h-10 items-center rounded-lg border border-border bg-background px-4 text-sm font-medium hover:bg-muted">
-            Importar precios del SAE
-          </Link>
+        {(puedeEditar || puedePrecios) && (
+          // One bar for the file tools: they read as a set, not five loose buttons.
+          <div className="flex flex-wrap items-stretch divide-x divide-border overflow-hidden rounded-lg border border-border bg-background">
+            {puedeEditar && <HerramientasCatalogo opciones={opciones} onListo={refrescar} />}
+            {puedeEditar && autopartes && <ImportarEquivalencias onListo={refrescar} />}
+            {puedePrecios && (
+              <Link href="/catalogo/precios" className="inline-flex h-9 items-center whitespace-nowrap px-3 text-sm font-medium transition-colors hover:bg-muted">
+                Importar precios del SAE
+              </Link>
+            )}
+          </div>
         )}
       </div>
 
-      <div className="flex flex-wrap items-end gap-2.5">
-        <Filtro
-          label="Sistema"
-          valor={f.sistema ?? ""}
-          onChange={(v) => set({ sistema: v || null, familia: null })}
-          opciones={opciones.sistemas.map((s) => ({ value: s.id, label: s.nombre }))}
-        />
-        <Filtro
-          label="Refacción"
-          valor={f.familia ?? ""}
-          onChange={(v) => set({ familia: v || null })}
-          opciones={familiasVisibles.map((x) => ({ value: x.id, label: x.nombre }))}
-        />
+      <section aria-label="Filtros" className="space-y-3 rounded-xl border border-border bg-background p-3 sm:p-4">
+        <div className="flex gap-2">
+          <label className="flex h-11 min-w-0 flex-1 items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 focus-within:border-ring focus-within:bg-background">
+            <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <span className="sr-only">Buscar</span>
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder={autopartes ? "Buscar por clave, descripción o carro" : "Buscar por clave o descripción"}
+              className="h-full w-0 min-w-0 flex-1 bg-transparent text-base outline-hidden lg:text-sm"
+            />
+          </label>
+          {hayFiltros && (
+            <Button type="button" variant="ghost" className="h-11 shrink-0" onClick={limpiar}>
+              <X className="h-4 w-4" /> Limpiar
+            </Button>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+          <Grupo titulo="Pieza">
+            <Filtro
+              label="Sistema"
+              valor={f.sistema ?? ""}
+              onChange={(v) => set({ sistema: v || null, familia: null })}
+              opciones={opciones.sistemas.map((s) => ({ value: s.id, label: s.nombre }))}
+            />
+            <Filtro
+              label="Refacción"
+              valor={f.familia ?? ""}
+              onChange={(v) => set({ familia: v || null })}
+              opciones={familiasVisibles.map((x) => ({ value: x.id, label: x.nombre }))}
+            />
+            <Filtro
+              label="Marca"
+              valor={f.marca ?? ""}
+              onChange={(v) => set({ marca: v || null })}
+              opciones={opciones.marcas.map((m) => ({ value: m, label: m }))}
+            />
+          </Grupo>
+          {autopartes && (
+            <Grupo titulo="Carro" className="lg:border-l lg:border-border lg:pl-4">
+              <FiltroCarro key={limpiezas} f={f} set={set} opciones={opciones} />
+            </Grupo>
+          )}
+        </div>
+
         {puedeEditar && f.familia && (
           <RenombrarFamilia
             key={f.familia}
@@ -123,26 +170,7 @@ export function CatalogoView({
             onListo={refrescar}
           />
         )}
-        <Filtro
-          label="Marca"
-          valor={f.marca ?? ""}
-          onChange={(v) => set({ marca: v || null })}
-          opciones={opciones.marcas.map((m) => ({ value: m, label: m }))}
-        />
-        {autopartes && <FiltroCarro f={f} set={set} opciones={opciones} />}
-        <label className="flex min-w-0 flex-1 basis-64 flex-col gap-1">
-          <span className="text-xs font-semibold text-muted-foreground">Buscar</span>
-          <span className="flex h-10 items-center gap-2 rounded-lg border border-border bg-background px-3 focus-within:border-ring">
-            <Search className="h-4 w-4 text-muted-foreground" />
-            <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder={autopartes ? "Clave, descripción o carro" : "Clave o descripción"}
-              className="h-full w-0 min-w-0 flex-1 bg-transparent text-base outline-hidden lg:text-sm"
-            />
-          </span>
-        </label>
-      </div>
+      </section>
 
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-xs font-semibold text-muted-foreground">Por completar:</span>
@@ -343,10 +371,20 @@ function RenombrarFamilia({ id, nombre, onListo }: { id: string; nombre: string;
   );
 }
 
+/** A labelled set of filters: "Pieza" (what it is) or "Carro" (what it fits). */
+function Grupo({ titulo, className, children }: { titulo: string; className?: string; children: React.ReactNode }) {
+  return (
+    <fieldset className={cn("min-w-0", className)}>
+      <legend className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{titulo}</legend>
+      <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">{children}</div>
+    </fieldset>
+  );
+}
+
 function Filtro({ label, valor, onChange, opciones }: { label: string; valor: string; onChange: (v: string) => void; opciones: Opcion[] }) {
   return (
-    <div className="flex w-[calc(50%-0.4rem)] flex-col gap-1 sm:w-52">
-      <span className="text-xs font-semibold text-muted-foreground">{label}</span>
+    <div className="flex min-w-0 flex-col gap-1 sm:w-44">
+      <span className="text-xs text-muted-foreground">{label}</span>
       <ComboSelect aria-label={label} valor={valor} onChange={onChange} vacio="Todas" opciones={opciones} />
     </div>
   );
@@ -370,9 +408,9 @@ function FiltroCarro({
   const [anio, setAnio] = useState(f.anio ? String(f.anio) : "");
   const op = (xs: string[]) => xs.map((x) => ({ value: x, label: x }));
   return (
-    <div className="flex w-full flex-wrap items-end gap-2.5 rounded-xl border border-sky-200 bg-sky-50/60 p-2.5 dark:border-sky-900 dark:bg-sky-950/20 sm:w-auto">
-      <div className="flex w-[calc(50%-0.4rem)] flex-col gap-1 sm:w-40">
-        <span className="text-xs font-semibold text-muted-foreground">Carro: armadora</span>
+    <>
+      <div className="flex min-w-0 flex-col gap-1 sm:w-40">
+        <span className="text-xs text-muted-foreground">Armadora</span>
         <ComboSelect
           aria-label="Armadora"
           valor={f.vmarca ?? ""}
@@ -384,8 +422,8 @@ function FiltroCarro({
           opciones={op(Object.keys(opciones.vehiculos).sort((a, b) => a.localeCompare(b, "es")))}
         />
       </div>
-      <div className="flex w-[calc(50%-0.4rem)] flex-col gap-1 sm:w-40">
-        <span className="text-xs font-semibold text-muted-foreground">Modelo</span>
+      <div className="flex min-w-0 flex-col gap-1 sm:w-40">
+        <span className="text-xs text-muted-foreground">Modelo</span>
         <ComboSelect
           aria-label="Modelo"
           valor={f.vmodelo ?? ""}
@@ -396,8 +434,8 @@ function FiltroCarro({
         />
       </div>
       {versiones.length > 0 && (
-        <div className="flex w-[calc(50%-0.4rem)] flex-col gap-1 sm:w-36">
-          <span className="text-xs font-semibold text-muted-foreground">Versión</span>
+        <div className="flex min-w-0 flex-col gap-1 sm:w-36">
+          <span className="text-xs text-muted-foreground">Versión</span>
           <ComboSelect
             aria-label="Versión"
             valor={f.version ?? ""}
@@ -407,8 +445,8 @@ function FiltroCarro({
           />
         </div>
       )}
-      <label className="flex w-[calc(50%-0.4rem)] flex-col gap-1 sm:w-24">
-        <span className="text-xs font-semibold text-muted-foreground">Año</span>
+      <label className="flex min-w-0 flex-col gap-1 sm:w-24">
+        <span className="text-xs text-muted-foreground">Año</span>
         <input
           value={anio}
           disabled={!f.vmarca}
@@ -424,7 +462,7 @@ function FiltroCarro({
           className="h-10 rounded-lg border border-border bg-background px-3 text-base outline-hidden focus:border-ring disabled:opacity-50 lg:text-sm"
         />
       </label>
-    </div>
+    </>
   );
 }
 

@@ -12,7 +12,7 @@ import { armarTabla, leerEquivalencias, type FilaEquivalencia, type Resumen } fr
 import { aplicarEquivalencias, equivalenciasActuales, publicarEquivalencias, subirEquivalencias, type PasoAplicar } from "./equivalencias-actions";
 
 const boton =
-  "inline-flex h-10 cursor-pointer items-center gap-2 rounded-lg border border-border bg-background px-4 text-sm font-medium transition-colors hover:bg-muted";
+  "inline-flex h-9 cursor-pointer items-center gap-2 whitespace-nowrap px-3 text-sm font-medium transition-colors hover:bg-muted disabled:cursor-wait disabled:opacity-60";
 const n = (x: number) => x.toLocaleString("es-MX");
 
 type Listo = { archivo: string; marcas: string[]; filas: FilaEquivalencia[]; resumen: Resumen };
