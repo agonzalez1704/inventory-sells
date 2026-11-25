@@ -222,8 +222,11 @@ export default async function ProductoPage({
       const m = [...porId.entries()].find(([vid]) => ids.get(vid) === c.sku)?.[1];
       c.opciones = (m?.variantes ?? [])
         .filter((v) => v.disponible && v.precio_cents > 0)
-        .sort((a, b) => (a.entrega_dias ?? 0) - (b.entrega_dias ?? 0));
+        .sort((a, b) => (a.entrega_dias ?? 0) - (b.entrega_dias ?? 0))
+        .map((v) => ({ ...v, sku: null }));
     }
+    // The page's props are readable in its source: no part numbers there either.
+    for (const c of conversiones) c.sku = "";
   }
   // Other brands' numbers it doesn't carry: shown so a customer holding one
   // finds the part. Not in Ruli's shop: the owner keeps part numbers to himself
