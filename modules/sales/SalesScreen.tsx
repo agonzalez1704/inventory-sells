@@ -227,7 +227,7 @@ function ProductCard({
               </span>
             )}
           </p>
-          <p className="line-clamp-2 pt-0.5 text-[13px] leading-snug font-bold text-slate-900">{p.name}</p>
+          <p className="line-clamp-3 pt-0.5 text-[13px] leading-snug font-bold text-slate-900" title={p.name}>{p.name}</p>
           {(p.category || compat) && (
             <p className="truncate text-[11px] leading-tight text-slate-500">
               {p.category && <span className="capitalize">{p.category}</span>}
@@ -377,7 +377,9 @@ export function SalesScreen({
   const [importe, setImporte] = useState("");
   const [descManual, setDescManual] = useState<number | null>(null);
   const [editDesc, setEditDesc] = useState(false);
-  const [detalle, setDetalle] = useState<{ p: SalesProduct; filas: SalesProduct[] } | null>(null);
+  // `previo`: the part this one was opened from (a conversión), to go back to.
+  type Detalle = { p: SalesProduct; filas: SalesProduct[]; previo?: Detalle | null };
+  const [detalle, setDetalle] = useState<Detalle | null>(null);
   const [saldo, setSaldo] = useState(0);
   const [catsAbiertas, setCatsAbiertas] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
@@ -1721,6 +1723,11 @@ export function SalesScreen({
         onAgregar={(p) => {
           add(p);
         }}
+        agrupar={agrupar}
+        esPedido={(p) => !!inventariosConsulta[p.inventory_id ?? ""]}
+        onAbrir={(p, filas) => setDetalle((d) => ({ p, filas, previo: d }))}
+        volverA={detalle?.previo?.p.name ?? null}
+        onVolver={() => setDetalle((d) => d?.previo ?? null)}
         onAnotarDemanda={(p) => {
           setDetalle(null);
           setAnotar({ texto: p.name, productId: p.id });

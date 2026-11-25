@@ -1,9 +1,11 @@
 import Link from "next/link";
-import { Smartphone } from "lucide-react";
+import { ChevronRight, Smartphone } from "lucide-react";
 import { foto } from "@/lib/foto";
 import { formatPrecio } from "@/lib/money";
 import { cn } from "@/lib/utils";
-import type { ModeloTienda } from "@/lib/calidades";
+import type { ModeloTienda, VarianteModelo } from "@/lib/calidades";
+import { MARCA } from "@/lib/marca";
+import { OpcionAlmacen } from "./TiendaView";
 import { ModeloCompra } from "./ModeloCompra";
 import { RielPedido } from "./RielPedido";
 
@@ -15,6 +17,9 @@ export type RelacionadoProducto = {
   disponible: boolean;
   imagen: string | null;
 };
+
+/** An equivalent part; Ruli's carry their línea and one buy option per almacén. */
+export type Conversion = RelacionadoProducto & { sku: string; linea?: string | null; opciones?: VarianteModelo[] };
 
 export function ProductoDetalle({
   modelo,
@@ -37,7 +42,7 @@ export function ProductoDetalle({
   /** Products sharing a compatibility tag — the strongest recommendation. */
   compatibles?: RelacionadoProducto[];
   /** Equivalent parts the shop carries. */
-  conversiones?: (RelacionadoProducto & { sku: string })[];
+  conversiones?: Conversion[];
   /** Other brands' numbers for this part, not carried. */
   otrasMarcas?: string[];
   /** The cars it fits: "Nissan Versa V-Drive 2012–2025 1.6L". */
@@ -97,14 +102,57 @@ function Conversiones({
   items,
   otrasMarcas,
 }: {
-  items: (RelacionadoProducto & { sku: string })[];
+  items: Conversion[];
   otrasMarcas: string[];
 }) {
   return (
     <section className="mt-8 max-w-prose lg:max-w-none">
       <h2 className="text-base font-semibold tracking-tight text-foreground">Conversiones</h2>
-      <p className="mt-0.5 text-sm text-muted-foreground">Piezas equivalentes que te sirven igual.</p>
-      {items.length > 0 && (
+      <p className="mt-0.5 text-sm text-muted-foreground">
+        {MARCA.id === "ruli"
+          ? "La misma pieza en otras marcas. Agrégala aquí o ábrela para verla."
+          : "Piezas equivalentes que te sirven igual."}
+      </p>
+      {items.length > 0 && MARCA.id === "ruli" ? (
+        <ul className="mt-3 space-y-3">
+          {items.map((c) => (
+            <li key={c.id} className="rounded-2xl border border-border bg-background p-3">
+              <Link
+                href={`/tienda/${c.id}`}
+                className="-m-1 flex items-center gap-3 rounded-xl p-1 transition-colors duration-150 ease-out hover:bg-muted/60 active:bg-muted"
+              >
+                {/* Brand and line only: the owner keeps the other brands'
+                    part numbers off the public shop. */}
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[15px] font-bold text-foreground">{c.marca ?? "Otra marca"}</p>
+                  {c.linea && <p className="truncate text-xs text-muted-foreground">{c.linea}</p>}
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="text-[15px] font-bold tabular-nums text-foreground">
+                    {c.precio_cents > 0 ? formatPrecio(c.precio_cents) : "A cotizar"}
+                  </p>
+                  <p
+                    className={cn(
+                      "text-xs font-medium",
+                      c.disponible ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground",
+                    )}
+                  >
+                    {c.disponible ? "Disponible" : "Agotada"}
+                  </p>
+                </div>
+                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+              </Link>
+              {!!c.opciones?.length && (
+                <div className="mt-3 flex flex-col gap-2">
+                  {c.opciones.map((v, i) => (
+                    <OpcionAlmacen key={v.id} v={v} imagen={v.imagen ?? c.imagen} principal={i === 0} />
+                  ))}
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      ) : items.length > 0 && (
         <ul className="mt-3 divide-y divide-border overflow-hidden rounded-2xl border border-border bg-background">
           {items.map((c) => (
             <li key={c.id}>

@@ -173,6 +173,17 @@ export async function productosPorId(ids: string[]): Promise<ProductoBuscado[]> 
   return conNombreDeInventario(await sinCostosSiNoPuede((data ?? []) as ProductoBuscado[]));
 }
 
+/** Every almacén's row of one part number: a compatible opened from the POS
+ *  sheet shows its stock per almacén like any card does. */
+export async function filasDeSku(sku: string): Promise<ProductoBuscado[]> {
+  await assertVerCatalogo();
+  const clave = sku.trim();
+  if (!clave) return [];
+  const insforge = await createInsForgeServerClient();
+  const { data } = await insforge.database.from("products").select(COLS).eq("sku", clave).eq("is_active", true);
+  return conNombreDeInventario(await sinCostosSiNoPuede((data ?? []) as ProductoBuscado[]));
+}
+
 export type OrdenInventario = { key: string; dir: "asc" | "desc" } | null;
 
 // The table's sort keys are not column names — "price" is price_cents, "ventas"

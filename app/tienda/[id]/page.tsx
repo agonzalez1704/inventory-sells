@@ -4,7 +4,9 @@ import { notFound } from "next/navigation";
 import { insforgeAdmin } from "@/lib/insforge/admin";
 import { MARCA } from "@/lib/marca";
 import { inventariosSoloConsulta } from "@/modules/inventory/solo-consulta";
-import type { ModeloTienda } from "@/lib/calidades";
+import type { ModeloTienda, VarianteModelo } from "@/lib/calidades";
+import { lineaDeSku } from "@/lib/linea";
+import { nombrarAlmacenes } from "@/modules/tienda/lecturas";
 import { ProductoDetalle, type RelacionadoProducto } from "@/modules/tienda/ProductoDetalle";
 
 // Without this every product page carries the root title, which is indexed but
@@ -197,12 +199,36 @@ export default async function ProductoPage({
     .map(aRelacionado);
   // One row per part number: the same part lives once per inventario.
   const vistos = new Set([row.sku]);
-  const conversiones = ((convData.data ?? []) as (Mini & { sku: string | null })[])
-    .filter((c) => c.sku && visible(c) && !propios.has(c.id) && !vistos.has(c.sku) && vistos.add(c.sku))
-    .map((c) => ({ ...aRelacionado(c), sku: c.sku as string }));
+  const convFilas = (convData.data ?? []) as (Mini & { sku: string | null })[];
+  const conversiones: (RelacionadoProducto & { sku: string; linea?: string | null; opciones?: VarianteModelo[] })[] =
+    convFilas
+      .filter((c) => c.sku && visible(c) && !propios.has(c.id) && !vistos.has(c.sku) && vistos.add(c.sku))
+      .map((c) => ({ ...aRelacionado(c), sku: c.sku as string, linea: lineaDeSku(c.sku as string) }));
+  // Ruli: each conversión is bought right here, one button per almacén like
+  // the listing's cards, instead of a trip to its page and back.
+  if (MARCA.id === "ruli" && conversiones.length) {
+    const convIds = convFilas.filter((c) => c.sku && c.sku !== row.sku).map((c) => c.id);
+    const { data: cm } = await insforgeAdmin.database.rpc("tienda_catalogo", {
+      p_f: {},
+      p_ids: convIds,
+      p_limit: 20,
+      p_offset: 0,
+    });
+    const modelos = (cm ?? []) as ModeloTienda[];
+    await nombrarAlmacenes(modelos);
+    const porId = new Map(modelos.flatMap((m) => m.variantes.map((v) => [v.id, m] as const)));
+    const ids = new Map(convFilas.map((c) => [c.id, c.sku]));
+    for (const c of conversiones) {
+      const m = [...porId.entries()].find(([vid]) => ids.get(vid) === c.sku)?.[1];
+      c.opciones = (m?.variantes ?? [])
+        .filter((v) => v.disponible && v.precio_cents > 0)
+        .sort((a, b) => (a.entrega_dias ?? 0) - (b.entrega_dias ?? 0));
+    }
+  }
   // Other brands' numbers it doesn't carry: shown so a customer holding one
-  // finds the part.
-  const otrasMarcas = (row.numeros_originales ?? []).filter((n) => !vistos.has(n));
+  // finds the part. Not in Ruli's shop: the owner keeps part numbers to himself
+  // (search still finds them).
+  const otrasMarcas = MARCA.id === "ruli" ? [] : (row.numeros_originales ?? []).filter((n) => !vistos.has(n));
   // Which cars it fits, spelled out: the description says only the part
   // ("Amortiguador del. der."), so a customer who arrived by part number
   // learns the cars here.

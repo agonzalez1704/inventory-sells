@@ -53,8 +53,10 @@ const aniosDeVersion = (v: VersionVehiculo) =>
     : (v.anio_min ?? v.anio_max ?? "").toString();
 
 /**
- * "¿Qué carro trae?" — the model, the year, and the version only when that
- * year has more than one.
+ * "¿Qué carro trae?" — the model, then the year and the version in either
+ * order: a model with two or more named versions shows them above the years
+ * ("Jetta A4" leaves 1999–2007), and a year picked first asks for the version
+ * only when that year has more than one.
  *
  * The make is not asked for: the counter says "un Versa", and model names are
  * nearly unique across the catalog, so the make rides along as context instead
@@ -82,6 +84,8 @@ export function VehiculoPicker({
   const [anios, setAnios] = useState<{ anio: number; piezas: number }[]>([]);
   // The year picked when that year has two or more versions to choose from.
   const [anioDudoso, setAnioDudoso] = useState<number | null>(null);
+  // A version picked before the year ("Jetta A4"): the year grid shrinks to it.
+  const [version, setVersion] = useState<VersionVehiculo | null>(null);
   const [cargando, setCargando] = useState(true);
   const [recientes, setRecientes] = useState<Vehiculo[]>([]);
 
@@ -113,6 +117,7 @@ export function VehiculoPicker({
     let vivo = true;
     setCargando(true);
     setAnioDudoso(null);
+    setVersion(null);
     Promise.all([
       versionesDeModelo(elegido.marca, elegido.modelo).catch(() => []),
       aniosDeModelo(elegido.marca, elegido.modelo).catch(() => []),
@@ -139,10 +144,16 @@ export function VehiculoPicker({
   const versionesDe = (anio: number) =>
     nombradas.filter((v) => (v.anio_min ?? -Infinity) <= anio && anio <= (v.anio_max ?? Infinity));
   const pasoVersion = anioDudoso !== null;
+  const enRango = (v: VersionVehiculo, anio: number) =>
+    (v.anio_min ?? -Infinity) <= anio && anio <= (v.anio_max ?? Infinity);
+  // Version first or year first, like the store's filter: the version chips
+  // show whenever the model has two or more, and picking one keeps its years.
+  const aniosVisibles = version ? anios.filter((a) => enRango(version, a.anio)) : anios;
 
   function elegirAnio(anio: number) {
     if (!elegido) return;
-    if (versionesDe(anio).length >= 2) setAnioDudoso(anio);
+    if (version) elegir({ marca: elegido.marca, modelo: elegido.modelo, anio, version: version.version });
+    else if (versionesDe(anio).length >= 2) setAnioDudoso(anio);
     else elegir({ marca: elegido.marca, modelo: elegido.modelo, anio });
   }
 
@@ -231,13 +242,24 @@ export function VehiculoPicker({
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
-              onClick={() => { setElegido(null); setQ(""); }}
+              onClick={() => { setElegido(null); setQ(""); setVersion(null); }}
               className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-full border border-border px-4 text-sm hover:bg-muted"
             >
               <span className="font-semibold">{elegido.modelo}</span>
               <span className="text-muted-foreground">{elegido.marca}</span>
               <X className="h-3.5 w-3.5 text-muted-foreground" />
             </button>
+            {version && !pasoVersion && (
+              <button
+                type="button"
+                onClick={() => setVersion(null)}
+                className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-full border border-primary bg-muted px-4 text-sm font-semibold hover:bg-muted/70"
+              >
+                {version.version}
+                {aniosDeVersion(version) && <span className="font-normal text-muted-foreground tabular-nums">{aniosDeVersion(version)}</span>}
+                <X className="h-3.5 w-3.5 text-muted-foreground" />
+              </button>
+            )}
             {anioDudoso !== null && (
               <button
                 type="button"
@@ -281,6 +303,38 @@ export function VehiculoPicker({
             </>
           ) : (
             <>
+              {nombradas.length >= 2 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Versión</p>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+                    {nombradas.map((v) => {
+                      const sel = version?.version === v.version;
+                      return (
+                        <button
+                          key={v.version}
+                          type="button"
+                          aria-pressed={sel}
+                          onClick={() => setVersion(sel ? null : v)}
+                          className={cn(
+                            "flex cursor-pointer flex-col gap-0.5 rounded-xl border px-3 py-2 text-left hover:border-primary hover:bg-muted",
+                            sel ? "border-primary bg-muted ring-1 ring-primary" : "border-border",
+                          )}
+                        >
+                          <span className="truncate text-sm font-semibold">{v.version}</span>
+                          {aniosDeVersion(v) && (
+                            <span className="text-xs text-muted-foreground tabular-nums">{aniosDeVersion(v)}</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              {nombradas.length >= 2 && (
+                <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                  {version ? `Año · solo los de ${version.version}` : "Año"}
+                </p>
+              )}
               <div className="grid grid-cols-4 gap-2 sm:grid-cols-8">
                 {cargando && anios.length === 0 ? (
                   <p className="col-span-full py-6 text-center text-sm text-muted-foreground">Cargando años…</p>
@@ -289,7 +343,7 @@ export function VehiculoPicker({
                     No hay piezas registradas para ese modelo.
                   </p>
                 ) : (
-                  anios.map((a) => (
+                  aniosVisibles.map((a) => (
                     <button
                       key={a.anio}
                       type="button"

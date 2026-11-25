@@ -753,7 +753,7 @@ export function ModeloCard({
  * Once in the order either becomes its own − qty + control. Adding never opens
  * the cart: the next part is the next tap.
  */
-function OpcionAlmacen({ v, imagen, principal }: { v: VarianteModelo; imagen: string | null; principal: boolean }) {
+export function OpcionAlmacen({ v, imagen, principal }: { v: VarianteModelo; imagen: string | null; principal: boolean }) {
   const { add, items, setQty } = useCart();
   const qty = items.find((i) => i.id === v.id)?.qty ?? 0;
   const tope = v.tope ?? MAX_POR_PRODUCTO;

@@ -536,26 +536,34 @@ export async function descripcionDe(productId: string): Promise<string | null> {
  *  brands' numbers it doesn't carry. */
 export async function conversionesDe(
   productId: string,
-): Promise<{ conversiones: PiezaDetalle["conversiones"]; numeros: string[] }> {
+): Promise<{ conversiones: PiezaDetalle["conversiones"]; numeros: string[]; ids: string[] }> {
   await puedeVer();
   const { data } = await DB.from("products")
     .select("sku, conversion_grupo, numeros_originales")
     .eq("id", productId)
     .maybeSingle();
   const p = data as { sku: string; conversion_grupo: string | null; numeros_originales: string[] | null } | null;
-  if (!p) return { conversiones: [], numeros: [] };
+  if (!p) return { conversiones: [], numeros: [], ids: [] };
   let conversiones: PiezaDetalle["conversiones"] = [];
+  // Every row of every equivalent part, one per almacén: the sheet groups them
+  // by part number and sells or orders from the right one.
+  let ids: string[] = [];
   if (p.conversion_grupo) {
     const { data: otros } = await DB.from("products")
-      .select("sku, name, price_cents, quantity")
+      .select("id, sku, name, price_cents, quantity")
       .eq("conversion_grupo", p.conversion_grupo)
+      .eq("is_active", true)
       .neq("sku", p.sku)
       .order("quantity", { ascending: false });
+    const filas = (otros ?? []) as (PiezaDetalle["conversiones"][number] & { id: string })[];
+    ids = filas.map((o) => o.id);
     const ya = new Set<string>();
-    conversiones = ((otros ?? []) as PiezaDetalle["conversiones"]).filter((o) => !ya.has(o.sku) && ya.add(o.sku));
+    conversiones = filas
+      .filter((o) => !ya.has(o.sku) && ya.add(o.sku))
+      .map(({ sku, name, price_cents, quantity }) => ({ sku, name, price_cents, quantity }));
   }
   const propios = new Set([p.sku, ...conversiones.map((c) => c.sku)]);
-  return { conversiones, numeros: (p.numeros_originales ?? []).filter((n) => !propios.has(n)) };
+  return { conversiones, numeros: (p.numeros_originales ?? []).filter((n) => !propios.has(n)), ids };
 }
 
 // ---------------------------------------------------------------------------
