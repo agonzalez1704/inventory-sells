@@ -6,6 +6,20 @@ import { Camera, Boxes, ShoppingCart, ArrowRight } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { HeaderPublico } from "@/components/app-shell";
 import { rutaDeInicio } from "@/modules/dashboards/inicio";
+import { MARCA } from "@/lib/marca";
+import { LandingRuli } from "@/modules/landing/LandingRuli";
+import type { Metadata } from "next";
+
+// Ruli's home is its storefront's front door, so it introduces the shop the
+// way /tienda does. Fiable's stays the app's own landing.
+export const metadata: Metadata =
+  MARCA.id === "ruli"
+    ? {
+        title: `${MARCA.tienda.nombre} — ${MARCA.tienda.tagline}`,
+        description: MARCA.tienda.descripcion,
+        openGraph: { images: ["/landing/ruli-carro.webp"] },
+      }
+    : {};
 
 const features = [
   {
@@ -41,6 +55,16 @@ async function RedirigirSiEntrado() {
 }
 
 export default function Home() {
+  if (MARCA.id === "ruli") {
+    return (
+      <>
+        <Suspense fallback={null}>
+          <RedirigirSiEntrado />
+        </Suspense>
+        <LandingRuli />
+      </>
+    );
+  }
   return (
     <>
     <Suspense fallback={null}>
