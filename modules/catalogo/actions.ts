@@ -491,20 +491,18 @@ export async function aplicarCarros(
   });
 }
 
-/** Link two parts as the same part. Groups merge: A=B and B=C makes A=C. */
+/** Link two parts as the same part. Groups merge: A=B and B=C makes A=C.
+ *  Kept in the equivalencias table as a manual link, so reloading the Excel
+ *  doesn't undo it. */
 export async function ligarConversion(sku: string, otro: string): Promise<ActionResult<null>> {
   return attempt("ligarConversion", async () => {
     await assertPermiso("inventario_gestionar");
     sku = claveSku(sku);
     otro = claveSku(otro);
     if (sku === otro) throw new Error("Es la misma pieza");
-    const { data } = await DB.from("products").select("sku, conversion_grupo").in("sku", [sku, otro]);
-    const filas = (data ?? []) as { sku: string; conversion_grupo: string | null }[];
-    if (!filas.some((f) => f.sku === otro)) throw new Error("No encontré esa clave");
-    const grupos = [...new Set(filas.map((f) => f.conversion_grupo).filter(Boolean))] as string[];
-    const grupo = grupos[0] ?? crypto.randomUUID();
-    await DB.from("products").update({ conversion_grupo: grupo }).in("sku", [sku, otro]);
-    for (const g of grupos.slice(1)) await DB.from("products").update({ conversion_grupo: grupo }).eq("conversion_grupo", g);
+    const { error } = await DB.rpc("equivalencias_ligar", { p_sku: sku, p_otro: otro });
+    if (error) throw new Error(error.message ?? "No se pudo ligar");
+    updateTag("tienda");
     return null;
   });
 }
@@ -512,15 +510,9 @@ export async function ligarConversion(sku: string, otro: string): Promise<Action
 export async function desligarConversion(sku: string, otro: string): Promise<ActionResult<null>> {
   return attempt("desligarConversion", async () => {
     await assertPermiso("inventario_gestionar");
-    await DB.from("products").update({ conversion_grupo: null }).eq("sku", otro);
-    // A group of one is no group.
-    const { data } = await DB.from("products").select("sku, conversion_grupo").eq("sku", sku).maybeSingle();
-    const g = (data as { conversion_grupo: string | null } | null)?.conversion_grupo;
-    if (g) {
-      const { data: resto } = await DB.from("products").select("sku").eq("conversion_grupo", g);
-      if (new Set(((resto ?? []) as { sku: string }[]).map((r) => r.sku)).size < 2)
-        await DB.from("products").update({ conversion_grupo: null }).eq("conversion_grupo", g);
-    }
+    const { error } = await DB.rpc("equivalencias_desligar", { p_sku: claveSku(sku), p_otro: claveSku(otro) });
+    if (error) throw new Error(error.message ?? "No se pudo desligar");
+    updateTag("tienda");
     return null;
   });
 }

@@ -15,6 +15,7 @@ import { PiezaPanel } from "./PiezaPanel";
 import { AplicarCarros } from "./AplicarCarros";
 import { AsignarLote } from "./AsignarLote";
 import { HerramientasCatalogo } from "./HerramientasCatalogo";
+import { ImportarEquivalencias } from "./ImportarEquivalencias";
 
 /**
  * "Catálogo": the owner's sheet, in the app. Filter Sistema → Refacción →
@@ -93,6 +94,7 @@ export function CatalogoView({
           </p>
         </div>
         {puedeEditar && <HerramientasCatalogo opciones={opciones} onListo={refrescar} />}
+        {puedeEditar && autopartes && <ImportarEquivalencias onListo={refrescar} />}
         {puedePrecios && (
           <Link href="/catalogo/precios" className="inline-flex h-10 items-center rounded-lg border border-border bg-background px-4 text-sm font-medium hover:bg-muted">
             Importar precios del SAE
