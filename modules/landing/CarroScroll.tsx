@@ -5,12 +5,22 @@ import { useEffect, useRef } from "react";
 // Ruli's landing hero: a coupé over "RULI" that comes apart into its
 // refacciones and ends on the shock absorber, driven by the page scroll.
 //
-// The scroll scrubs a video (Seedance, two clips joined; the explosion slowed
-// 3x so it doesn't jump). Encoded with a keyframe every 4 frames and no
-// B-frames, so a seek decodes at most 3 frames and keeps up with the wheel.
+// The scroll picks a frame of a pre-rendered sequence (Seedance, two clips
+// joined, the explosion slowed 3x, upscaled to 2K) and paints it on a canvas.
+// Not a <video> scrubbed by currentTime: a phone in Low Power Mode never lets
+// it play, and then iOS paints no frame for a seek, so the car never moved.
+// Frames load coarse-to-fine (every 16th, then 8th, …) and the nearest one
+// already loaded is painted, so the scroll works before the last one lands.
 //
-// Everything per-frame is written straight to the elements' style from one
-// rAF per scroll — no React state, so scrolling never re-renders.
+// Everything per-frame is written straight to the elements from one rAF per
+// scroll — no React state, so scrolling never re-renders.
+
+const FRAMES = 113;
+const frame = (dir: "d" | "m", i: number) => `/landing/carro/${dir}/${String(i).padStart(3, "0")}.webp`;
+/** Every 16th frame first, then the gaps: a coarse scrub is usable at once. */
+const ORDEN = [16, 8, 4, 2, 1].flatMap((paso, k, pasos) =>
+  Array.from({ length: FRAMES }, (_, i) => i).filter((i) => i % paso === 0 && (k === 0 || i % pasos[k - 1] !== 0)),
+);
 
 const clamp = (x: number) => Math.min(1, Math.max(0, x));
 /** 0 → 1 between a and b, eased so each change starts and lands softly. */
@@ -33,7 +43,7 @@ export function CarroScroll({
   final: React.ReactNode;
 }) {
   const seccion = useRef<HTMLElement>(null);
-  const video = useRef<HTMLVideoElement>(null);
+  const lienzo = useRef<HTMLCanvasElement>(null);
   const tipo = useRef<HTMLDivElement>(null);
   const c1 = useRef<HTMLDivElement>(null);
   const c2 = useRef<HTMLDivElement>(null);
@@ -43,9 +53,54 @@ export function CarroScroll({
 
   useEffect(() => {
     const s = seccion.current;
-    const v = video.current;
-    if (!s || !v) return;
+    const c = lienzo.current;
+    const ctx = c?.getContext("2d");
+    if (!s || !c || !ctx) return;
     let raf = 0;
+    let vivo = true;
+    let pintado = -1;
+    let quiero = 0;
+    const cuadros: (HTMLImageElement | undefined)[] = [];
+    const dir = matchMedia("(max-width: 767px)").matches ? "m" : "d";
+
+    /** The loaded frame nearest to i (they arrive coarse-to-fine). */
+    const cercano = (i: number) => {
+      for (let d = 0; d < FRAMES; d++) {
+        if (cuadros[i - d]) return i - d;
+        if (cuadros[i + d]) return i + d;
+      }
+      return -1;
+    };
+    const dibujar = () => {
+      const i = cercano(quiero);
+      const img = cuadros[i];
+      if (!img || i === pintado) return;
+      if (c.width !== img.naturalWidth) {
+        c.width = img.naturalWidth;
+        c.height = img.naturalHeight;
+      }
+      ctx.drawImage(img, 0, 0);
+      pintado = i;
+    };
+
+    // Six at a time, in ORDEN; each one repaints if it is nearer than what's up.
+    let siguiente = 0;
+    const cargar = () => {
+      if (!vivo || siguiente >= ORDEN.length) return;
+      const i = ORDEN[siguiente++];
+      const img = new Image();
+      img.src = frame(dir, i);
+      img
+        .decode()
+        .then(() => {
+          if (!vivo) return;
+          cuadros[i] = img;
+          dibujar();
+        })
+        .catch(() => {})
+        .finally(cargar);
+    };
+    for (let k = 0; k < 6; k++) cargar();
 
     const pintar = () => {
       raf = 0;
@@ -55,9 +110,9 @@ export function CarroScroll({
 
       // The first and last 4% of the scroll hold still, so the page settles
       // on the whole car and on the part before moving on.
-      const dur = Number.isFinite(v.duration) ? v.duration : 0;
-      const t = dur * clamp((p - 0.04) / 0.92);
-      if (dur && !v.seeking && Math.abs(v.currentTime - t) > 0.02) v.currentTime = t;
+      const f = clamp((p - 0.04) / 0.92);
+      quiero = Math.round(f * (FRAMES - 1));
+      dibujar();
 
       const opacidad = (el: HTMLElement | null, o: number) => {
         if (!el) return;
@@ -74,7 +129,8 @@ export function CarroScroll({
       opacidad(c3.current, tramo(p, 0.86, 0.94));
       opacidad(pista.current, 1 - tramo(p, 0, 0.04));
 
-      const etapa = t < 0.6 ? 0 : t < 4.6 ? 1 : 2;
+      // Whole car, then coming apart, then the shock absorber.
+      const etapa = f < 0.064 ? 0 : f < 0.49 ? 1 : 2;
       pasos.current?.querySelectorAll("li").forEach((li, i) => {
         li.dataset.activo = String(i === etapa);
       });
@@ -85,19 +141,13 @@ export function CarroScroll({
 
     window.addEventListener("scroll", pedir, { passive: true });
     window.addEventListener("resize", pedir);
-    v.addEventListener("loadedmetadata", pedir);
-    // A seek skipped while another was in flight catches up here.
-    v.addEventListener("seeked", pedir);
-    // iOS paints no frame for a seek until the video has played once.
-    v.play().then(() => v.pause()).catch(() => {});
     pintar();
 
     return () => {
+      vivo = false;
       cancelAnimationFrame(raf);
       window.removeEventListener("scroll", pedir);
       window.removeEventListener("resize", pedir);
-      v.removeEventListener("loadedmetadata", pedir);
-      v.removeEventListener("seeked", pedir);
     };
   }, []);
 
@@ -115,18 +165,15 @@ export function CarroScroll({
         {/* Lighten: the car's black studio drops out and "RULI" shows through
             behind it. On a phone it keeps its 16:9 at full width, tucked under the
             letters, so the whole car fits instead of being cropped to a wheel. */}
-        <video
-          ref={video}
-          muted
-          playsInline
-          preload="auto"
-          poster="/landing/ruli-carro.webp"
+        <canvas
+          ref={lienzo}
+          width={1920}
+          height={1080}
+          role="img"
           aria-label="Un coupé se desarma en refacciones y termina en el amortiguador"
-          className="absolute inset-x-0 top-[24svh] w-full origin-top scale-[1.15] mix-blend-lighten [mask-image:linear-gradient(transparent,black_15%,black_85%,transparent)] md:inset-0 md:[mask-image:none] md:top-0 md:h-full md:scale-100 md:object-cover"
-        >
-          <source src="/landing/ruli-carro-movil.mp4" type="video/mp4" media="(max-width: 767px)" />
-          <source src="/landing/ruli-carro.mp4" type="video/mp4" />
-        </video>
+          style={{ backgroundImage: "url(/landing/ruli-carro.webp)" }}
+          className="absolute inset-x-0 top-[24svh] aspect-video w-full origin-top scale-[1.15] bg-cover bg-center mix-blend-lighten [mask-image:linear-gradient(transparent,black_15%,black_85%,transparent)] md:inset-0 md:top-0 md:aspect-auto md:h-full md:scale-100 md:object-cover md:[mask-image:none]"
+        />
         {/* Scrims: the copy and the nav sit on the footage, and the last frame
             is a bright red spring. */}
         <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-linear-to-b from-[#0f0f10]/70 to-transparent" />
