@@ -79,6 +79,7 @@ const GRUPOS: {
       { href: "/inventario", label: "Inventario", icon: Boxes, permiso: "inventario_ver" },
       { href: "/catalogo", label: "Catálogo", icon: Library, permiso: "inventario_ver" },
       { href: "/traspasos", label: "Traspasos", icon: ArrowLeftRight, permiso: "inventario_gestionar" },
+      { href: "/conteos", label: "Conteos", icon: ClipboardList, permiso: "inventario_ver" },
       { href: "/proveedores", label: "Proveedores", icon: Truck, permiso: "abastecer" },
       { href: "/compras", label: "Compras", icon: ShoppingBag, permiso: "abastecer" },
       { href: "/garantias", label: "Garantías", icon: ShieldAlert, permiso: "inventario_gestionar" },
