@@ -28,6 +28,8 @@ const QUERIES = [
   "note12",
   "iphone 13",
   "sam a05",
+  "sam a0",
+  "a0",
   "samsung a05",
   "galaxy a05",
   "xiaomi note 12 pro",

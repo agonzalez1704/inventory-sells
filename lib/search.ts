@@ -175,8 +175,10 @@ function tokenScore(token: string, idx: Index): number {
     if (/^\d+$/.test(term)) continue;
 
     // Short aliases ("mi", "iph") only count as exact tokens — a prefix match
-    // would hit far too much.
-    if (term.length < 3) continue;
+    // would hit far too much. Two characters that already carry a digit are
+    // different: "a0" is how the counter asks for the whole A01…A09 row, "g4"
+    // for every G4x, and nothing else starts that way.
+    if (term.length < 3 && !(term.length === 2 && /\d/.test(term))) continue;
 
     // Prefix of a stored token: "moto" → "motorola".
     for (const t of idx.tokens) {

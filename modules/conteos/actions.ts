@@ -85,6 +85,8 @@ export type ConteoDetalle = {
   cerrado_at: string | null;
   aplicado_at: string | null;
   inventario: string;
+  /** Null when the count spans the whole store. */
+  inventory_id: string | null;
   items: ConteoItem[];
 };
 
@@ -93,7 +95,7 @@ export async function getConteo(id: string): Promise<ConteoDetalle | null> {
   if (!userId) return null;
   const { data: c } = await insforgeAdmin.database
     .from("conteos")
-    .select("id, nombre, motivo, estado, created_at, cerrado_at, aplicado_at, inventories(name)")
+    .select("id, nombre, motivo, estado, created_at, cerrado_at, aplicado_at, inventory_id, inventories(name)")
     .eq("id", id)
     .maybeSingle();
   if (!c) return null;
@@ -131,7 +133,8 @@ export async function getConteo(id: string): Promise<ConteoDetalle | null> {
 
   const h = c as unknown as {
     id: string; nombre: string; motivo: string | null; estado: EstadoConteo; created_at: string;
-    cerrado_at: string | null; aplicado_at: string | null; inventories: { name: string } | null;
+    cerrado_at: string | null; aplicado_at: string | null; inventory_id: string | null;
+    inventories: { name: string } | null;
   };
   return {
     id: h.id,
@@ -142,6 +145,7 @@ export async function getConteo(id: string): Promise<ConteoDetalle | null> {
     cerrado_at: h.cerrado_at,
     aplicado_at: h.aplicado_at,
     inventario: h.inventories?.name ?? "Toda la tienda",
+    inventory_id: h.inventory_id,
     items,
   };
 }

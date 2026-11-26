@@ -101,7 +101,7 @@ export function ConteoView({ conteo, puedeGestionar }: { conteo: ConteoDetalle; 
     setBuscando(true);
     const t = setTimeout(async () => {
       try {
-        const r = await buscarProductos({ query: texto, limit: 40 });
+        const r = await buscarProductos({ query: texto, inventoryId: conteo.inventory_id, limit: 40 });
         if (cancelado) return;
         // A product created after the count opened still has to be countable:
         // it joins the list here and the save inserts it.
@@ -133,7 +133,7 @@ export function ConteoView({ conteo, puedeGestionar }: { conteo: ConteoDetalle; 
       cancelado = true;
       clearTimeout(t);
     };
-  }, [q]);
+  }, [q, conteo.inventory_id]);
 
   // Flush what a previous visit could not send.
   useEffect(() => {
