@@ -33,7 +33,8 @@ export function ConteosView({
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
-  const [inventario, setInventario] = useState(inventarios[0]?.id ?? "");
+  // Empty = the whole store: the shelf is detected from each product.
+  const [inventario, setInventario] = useState("");
   const [nombre, setNombre] = useState("");
   const [motivo, setMotivo] = useState("");
 
@@ -41,7 +42,7 @@ export function ConteosView({
     if (!nombre.trim()) return toast.error("Ponle nombre al conteo");
     start(async () => {
       try {
-        const id = unwrap(await iniciarConteo(inventario, nombre.trim(), motivo.trim() || null));
+        const id = unwrap(await iniciarConteo(inventario || null, nombre.trim(), motivo.trim() || null));
         router.push(`/conteos/${id}`);
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "No se pudo abrir el conteo");
@@ -67,6 +68,7 @@ export function ConteosView({
             <label className="block">
               <span className="mb-1 block text-xs font-medium text-muted-foreground">Inventario</span>
               <Select value={inventario} onChange={(e) => setInventario(e.target.value)}>
+                <option value="">Toda la tienda</option>
                 {inventarios.map((i) => (
                   <option key={i.id} value={i.id}>{i.name}</option>
                 ))}
@@ -82,10 +84,10 @@ export function ConteosView({
             </label>
           </div>
           <p className="text-xs text-muted-foreground">
-            Toma la foto del sistema al abrir. Si el inventario ya tiene un conteo en curso, sigue ese.
+            Toma la foto del sistema al abrir. Al contar buscas por modelo y cada pieza sale con el inventario donde está.
           </p>
           <div className="flex justify-end">
-            <Button onClick={abrir} loading={pending} disabled={!inventario}>
+            <Button onClick={abrir} loading={pending}>
               <Plus className="h-4 w-4" />
               Abrir conteo
             </Button>

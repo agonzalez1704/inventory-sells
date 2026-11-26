@@ -16,15 +16,13 @@ import { cn } from "@/lib/utils";
 import { unwrap } from "@/lib/errors";
 import { formatMXN } from "@/lib/money";
 import { EscanerQR } from "@/modules/inventory/EscanerQR";
+import { buscarProductos } from "@/modules/inventory/buscar";
 import { idDeCodigo } from "@/modules/inventory/qr";
 import type { MotivoAjuste } from "@/modules/inventory/panel-actions";
 import { aplicarConteo, cerrarConteo, contarItem, type ConteoDetalle, type ConteoItem } from "./actions";
 
 type Guardado = "idle" | "saving" | "saved" | "error";
 type Filtro = "todos" | "sin" | "contados" | "dif";
-
-const norm = (s: string) =>
-  s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
 const fecha = (iso: string) =>
   new Date(iso).toLocaleString("es-MX", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
@@ -59,6 +57,10 @@ export function ConteoView({ conteo, puedeGestionar }: { conteo: ConteoDetalle; 
   const [estado, setEstado] = useState<Record<string, Guardado>>({});
   const [q, setQ] = useState("");
   const [filtro, setFiltro] = useState<Filtro>(conteo.estado === "abierto" ? "sin" : "dif");
+  // The catalog search the register uses: "samsung a06" finds that model's
+  // screens, whichever shelf they sit on. Null while there is no query.
+  const [resultados, setResultados] = useState<string[] | null>(null);
+  const [buscando, setBuscando] = useState(false);
   const [escaneando, setEscaneando] = useState(false);
   const [motivo, setMotivo] = useState<MotivoAjuste>(conteo.motivo?.toLowerCase().includes("sustra") || conteo.motivo?.toLowerCase().includes("robo") ? "robo" : "conteo");
   const inputs = useRef(new Map<string, HTMLInputElement>());
@@ -87,6 +89,51 @@ export function ConteoView({ conteo, puedeGestionar }: { conteo: ConteoDetalle; 
     },
     [conteo.id],
   );
+
+  useEffect(() => {
+    const texto = q.trim();
+    if (texto.length < 2) {
+      setResultados(null);
+      setBuscando(false);
+      return;
+    }
+    let cancelado = false;
+    setBuscando(true);
+    const t = setTimeout(async () => {
+      try {
+        const r = await buscarProductos({ query: texto, limit: 40 });
+        if (cancelado) return;
+        // A product created after the count opened still has to be countable:
+        // it joins the list here and the save inserts it.
+        setItems((prev) => {
+          const vistos = new Set(prev.map((i) => i.product_id));
+          const nuevos = r
+            .filter((p) => !vistos.has(p.id))
+            .map((p) => ({
+              product_id: p.id,
+              nombre: p.name,
+              sku: p.sku,
+              inventario: p.inventory_name ?? "",
+              esperado: p.quantity,
+              contado: null,
+              cost_cents: p.cost_cents,
+              price_cents: p.price_cents,
+              contado_at: null,
+            }));
+          return nuevos.length ? [...prev, ...nuevos] : prev;
+        });
+        setResultados(r.map((p) => p.id));
+      } catch {
+        if (!cancelado) setResultados([]);
+      } finally {
+        if (!cancelado) setBuscando(false);
+      }
+    }, 250);
+    return () => {
+      cancelado = true;
+      clearTimeout(t);
+    };
+  }, [q]);
 
   // Flush what a previous visit could not send.
   useEffect(() => {
@@ -121,8 +168,7 @@ export function ConteoView({ conteo, puedeGestionar }: { conteo: ConteoDetalle; 
     const id = idDeCodigo(texto);
     const it = id ? items.find((i) => i.product_id === id) : null;
     setEscaneando(false);
-    if (!it) return toast.error("Esa etiqueta no es de este inventario");
-    setFiltro("todos");
+    if (!it) return toast.error("Esa etiqueta no es de este conteo");
     setQ(it.sku);
     setTimeout(() => inputs.current.get(it.product_id)?.focus(), 50);
   }
@@ -150,15 +196,18 @@ export function ConteoView({ conteo, puedeGestionar }: { conteo: ConteoDetalle; 
   }, [diferencias]);
 
   const visibles = useMemo(() => {
-    const nq = norm(q.trim());
+    if (resultados !== null) {
+      // Search order is the ranking's, not the shelf's.
+      const porId = new Map(items.map((i) => [i.product_id, i]));
+      return resultados.map((id) => porId.get(id)).filter((i): i is ConteoItem => !!i);
+    }
     return items.filter((i) => {
       if (filtro === "sin" && i.contado !== null) return false;
       if (filtro === "contados" && i.contado === null) return false;
       if (filtro === "dif" && (i.contado === null || i.contado === i.esperado)) return false;
-      if (!nq) return true;
-      return norm(i.nombre).includes(nq) || norm(i.sku).includes(nq);
+      return true;
     });
-  }, [items, filtro, q]);
+  }, [items, filtro, resultados]);
 
   async function cerrar() {
     const faltan = total - contados;
@@ -303,10 +352,11 @@ export function ConteoView({ conteo, puedeGestionar }: { conteo: ConteoDetalle; 
             <Input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Modelo o SKU…"
+              placeholder="Modelo: samsung a06, iphone 13 pro, note 11…"
               className="pl-9 pr-9"
               autoFocus={abierto}
             />
+            {buscando && <Loader2 className="absolute right-9 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />}
             {q && (
               <button type="button" aria-label="Limpiar" onClick={() => setQ("")} className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:text-foreground">
                 <X className="h-4 w-4" />
@@ -319,7 +369,7 @@ export function ConteoView({ conteo, puedeGestionar }: { conteo: ConteoDetalle; 
             </Button>
           )}
         </div>
-        <div className="flex gap-1.5 overflow-x-auto text-xs">
+        <div className={cn("flex gap-1.5 overflow-x-auto text-xs", resultados !== null && "opacity-50")}>
           {(
             [
               ["sin", `Sin contar (${total - contados})`],
@@ -345,7 +395,10 @@ export function ConteoView({ conteo, puedeGestionar }: { conteo: ConteoDetalle; 
 
       {visibles.length === 0 ? (
         <p className="py-10 text-center text-sm text-muted-foreground">
-          {q ? `Nada coincide con “${q}”.` : filtro === "sin" ? "Todo contado." : "Sin productos aquí."}
+          {resultados !== null
+            ? buscando ? "Buscando…" : `Nada coincide con “${q}”.`
+            : q ? "Escribe al menos dos letras."
+            : filtro === "sin" ? "Todo contado." : "Sin productos aquí."}
         </p>
       ) : (
         <ul className="divide-y divide-border rounded-xl border border-border">
@@ -356,7 +409,8 @@ export function ConteoView({ conteo, puedeGestionar }: { conteo: ConteoDetalle; 
               <li key={i.product_id} className="flex items-center gap-3 px-3 py-2">
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm">{i.nombre}</span>
-                  <span className="block font-mono text-[11px] uppercase text-muted-foreground">
+                  <span className="block truncate font-mono text-[11px] uppercase text-muted-foreground">
+                    {i.inventario && <span className="font-sans normal-case">{i.inventario} · </span>}
                     {i.sku} · sistema {i.esperado}
                     {d !== null && d !== 0 && (
                       <span className={cn("ml-2 font-sans font-medium normal-case", d < 0 ? "text-red-600" : "text-emerald-600")}>

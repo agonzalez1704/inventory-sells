@@ -55,7 +55,7 @@ export async function listarConteos(): Promise<ConteoResumen[]> {
     estado: c.estado,
     created_at: c.created_at,
     cerrado_at: c.cerrado_at,
-    inventario: c.inventories?.name ?? "",
+    inventario: c.inventories?.name ?? "Toda la tienda",
     total: c.conteo_items.length,
     contados: c.conteo_items.filter((i) => i.contado !== null).length,
     autor: nombre.get(c.created_by) ?? null,
@@ -66,6 +66,8 @@ export type ConteoItem = {
   product_id: string;
   nombre: string;
   sku: string;
+  /** Where the piece lives — detected from the product, never chosen by hand. */
+  inventario: string;
   /** What the system said when this row was counted (or when the count opened). */
   esperado: number;
   contado: number | null;
@@ -101,19 +103,21 @@ export async function getConteo(id: string): Promise<ConteoDetalle | null> {
   for (let desde = 0; ; desde += 1000) {
     const { data } = await insforgeAdmin.database
       .from("conteo_items")
-      .select("product_id, esperado, contado, cost_cents, price_cents, contado_at, products(name, sku)")
+      .select("product_id, esperado, contado, cost_cents, price_cents, contado_at, products(name, sku, inventories(name))")
       .eq("conteo_id", id)
       .order("product_id")
       .range(desde, desde + 999);
     const page = (data ?? []) as unknown as {
       product_id: string; esperado: number; contado: number | null; cost_cents: number;
-      price_cents: number; contado_at: string | null; products: { name: string; sku: string } | null;
+      price_cents: number; contado_at: string | null;
+      products: { name: string; sku: string; inventories: { name: string } | null } | null;
     }[];
     for (const r of page) {
       items.push({
         product_id: r.product_id,
         nombre: r.products?.name ?? "Producto",
         sku: r.products?.sku ?? "",
+        inventario: r.products?.inventories?.name ?? "",
         esperado: Number(r.esperado),
         contado: r.contado === null ? null : Number(r.contado),
         cost_cents: Number(r.cost_cents),
@@ -137,13 +141,14 @@ export async function getConteo(id: string): Promise<ConteoDetalle | null> {
     created_at: h.created_at,
     cerrado_at: h.cerrado_at,
     aplicado_at: h.aplicado_at,
-    inventario: h.inventories?.name ?? "",
+    inventario: h.inventories?.name ?? "Toda la tienda",
     items,
   };
 }
 
 export async function iniciarConteo(
-  inventoryId: string,
+  /** Null counts every physical inventory. */
+  inventoryId: string | null,
   nombre: string,
   motivo: string | null,
 ): Promise<ActionResult<string>> {
@@ -151,7 +156,7 @@ export async function iniciarConteo(
     await assertPermiso("inventario_gestionar");
     const insforge = await createInsForgeServerClient();
     const { data, error } = await insforge.database.rpc("iniciar_conteo", {
-      p_inventory: inventoryId,
+      p_inventory: inventoryId || null,
       p_nombre: nombre,
       p_motivo: motivo,
     });
