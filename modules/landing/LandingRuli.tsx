@@ -92,10 +92,14 @@ export async function LandingRuli() {
               <img src="/landing/ruli-logo-blanco.webp" alt="Refaccionaria Ruli" width={640} height={320} className="h-8 w-auto sm:h-9" />
             </Link>
             <span className="flex-1" />
-            <nav aria-label="Principal" className="flex gap-7 text-[15px] font-medium">
+            <nav aria-label="Principal" className="flex items-center gap-5 text-[15px] font-medium sm:gap-7">
               <Link href="/tienda" className="hover:text-white">Catálogo</Link>
               <a href="#carro" className="hidden hover:text-white sm:inline">Buscar por carro</a>
               <a href="#comprar" className="hidden hover:text-white sm:inline">Cómo comprar</a>
+              {/* Staff land here too: the way in must be on screen, not after the whole page. */}
+              <SignInButton mode="modal" forceRedirectUrl="/inicio">
+                <button className="cursor-pointer hover:text-white">Entrar</button>
+              </SignInButton>
             </nav>
             <a
               href={wa}
@@ -339,7 +343,7 @@ export async function LandingRuli() {
             <a href={wa} target="_blank" rel="noopener noreferrer" className="hover:text-white">
               WhatsApp{tel ? ` ${tel}` : ""}
             </a>
-            <SignInButton mode="modal">
+            <SignInButton mode="modal" forceRedirectUrl="/inicio">
               <button className="cursor-pointer text-left hover:text-white">Entrar (personal)</button>
             </SignInButton>
           </div>
