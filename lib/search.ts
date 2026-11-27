@@ -338,6 +338,32 @@ export function soloModeloExacto<T>(rows: T[], consulta: string, nombre: (r: T) 
   return exactos.length ? exactos : null;
 }
 
+/**
+ * Part codes in a query: "DENV0120 tienes?" → ["denv0120"], "10-367" →
+ * ["10367"]. A word counts when, without spaces or dashes, it is 5+ characters
+ * with 3+ digits — a model ("iphone15", "a3", "2009") does not qualify.
+ *
+ * A code search asks for THAT part, so the exact-model filter (which looks for
+ * the asked numbers in the NAME) must not run: DENV0120's name has no "0120",
+ * and the agent told a customer it didn't have the part it had four of.
+ */
+export function codigosEn(consulta: string): string[] {
+  return [
+    ...new Set(
+      consulta
+        .split(/\s+/)
+        .map((w) => normalize(w).replace(/[\s-]/g, ""))
+        .filter((w) => w.length >= 5 && (w.match(/\d/g)?.length ?? 0) >= 3 && !/^(19|20)\d{2}$/.test(w)),
+    ),
+  ];
+}
+
+/** The rows whose SKU is one of `codigos` (compact), or null when none is. */
+export function porCodigo<T>(rows: T[], codigos: string[], sku: (r: T) => string): T[] | null {
+  const hits = rows.filter((r) => codigos.includes(normalize(sku(r)).replace(/[\s-]/g, "")));
+  return hits.length ? hits : null;
+}
+
 /** Product-type nouns a customer says that an uncategorized row cannot match. */
 export const PALABRAS_TIPO = /\b(pantallas?|displays?|modulos?|módulos?)\b/gi;
 

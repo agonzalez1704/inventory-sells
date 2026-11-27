@@ -3,7 +3,7 @@ import { generateText, tool, stepCountIs } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { z } from "zod";
 import { buscarProducto } from "@/modules/analytics/queries";
-import { PALABRAS_CALIDAD, PALABRAS_TIPO, aniosEnNombre, aplicarSinonimos, normalize, soloModeloExacto, type Sinonimo } from "@/lib/search";
+import { PALABRAS_CALIDAD, PALABRAS_TIPO, aniosEnNombre, aplicarSinonimos, codigosEn, normalize, porCodigo, soloModeloExacto, type Sinonimo } from "@/lib/search";
 import { modelosCompatibles } from "@/lib/compat";
 import { anotarDemandaAgente } from "@/modules/demanda/agente";
 import { getNegocioInfo } from "@/modules/config/lib";
@@ -33,6 +33,9 @@ const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 // frames; auto parts have vehicles, years and sides — but security, quoting
 // and WhatsApp manners are shared.
 const ES_AUTOPARTES = MARCA.id === "ruli";
+// "¿Tienes dos?", "hay 3 en mostrador", "¿cuántas tienes?", "me das un par".
+const PIDE_CANTIDAD =
+  /\b(?:tienes|tienen|tiene|hay|habr[aá]|quedan?|ocupo|necesito|quiero|dame|me das|me vendes|son)\s+(?:\d+|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|un par)\b|\bcu[aá]nt[oa]s\s+(?:tienes|tienen|hay|quedan|te quedan|manejas)\b|\b(?:\d+|dos|tres|cuatro|cinco|seis|ocho|diez)\s+(?:piezas|pzas?|juegos)\b/i;
 const MODEL =
   process.env.OPENAI_AGENT_MODEL ??
   process.env.OPENAI_CHAT_MODEL ??
@@ -112,6 +115,7 @@ Reglas de productos:
 - Disponibilidad: campo "disponible". No digas cuántas hay si el cliente no pide una cantidad.
 - CANTIDADES Y ALMACENES: cada resultado disponible trae "almacenes" (dónde hay, cuántas, precio y entrega) en orden de prioridad; el PRIMERO manda (normalmente Mostrador) y su precio es "precio_mxn". Si en el primero no hay, dile de qué almacén saldría, su precio y su "entrega".
 - Si pide MÁS piezas de las que hay en mostrador, agregar_al_pedido NO las agrega: te las regresa en "por_confirmar". Dile cuántas tienes en mostrador y que las demás serían sobrepedido (regla SOBREPEDIDO). Si quiere solo las de mostrador, llama agregar_al_pedido con esa cantidad.
+- Si pregunta si tienes N piezas o cuántas hay ("¿tienes dos?", "¿hay 4 en mostrador?"), contesta SOLO con la "existencia" de "almacenes" que te dio buscar_producto en ESTE turno (búscala por el SKU de la nota ⟦productos: …⟧ de la pieza de la que habla). NUNCA digas una cantidad de memoria. Si el primer almacén tiene N o más, dile que sí, que tienes las N.
 - Si pide más de las que hay EN TOTAL, dile cuántas tienes en total (y dónde). NUNCA anotes más piezas de las que hay.
 - SOBREPEDIDO: lo que no está en mostrador sale de otro almacén (ej. Guadalajara) en OTRA cotización, a SU precio (dilo si es distinto). Esas piezas traen "opciones_entrega" y el CLIENTE ESCOGE: ruta (sin costo, llega el día de ruta si pide antes del corte) o exprés (llega antes, con el cargo que diga). Dile ambas con su fecha en pocas palabras y anota según lo que elija (agregar_al_pedido con entrega). NUNCA escojas tú. Si solo hay una opción, dila. Si la pieza NO trae "opciones_entrega", NO menciones ruta ni exprés ni inventes fechas o cargos: dile su "entrega" tal cual (ej. "tiempo de entrega por confirmar") y que un asesor le confirma cuándo llega.
 - FOTOS: si el cliente pide foto o imagen, usa mandar_foto con el SKU de cada producto que le ofreciste (la foto se le manda sola). Los SKUs de lo que ofreciste antes están en la nota ⟦productos: …⟧ al final de tus mensajes anteriores; si no está ahí, llama antes buscar_producto con lo que pidió (carro y año). NUNCA digas que no tienes foto sin que mandar_foto te lo haya dicho.
@@ -254,7 +258,12 @@ Este número no está en el registro de clientes.
     // Quality words too: "diagnóstico" or "oled" alone answers a list the
     // model gave, and without a search it invents the product it names.
     : /\b(display|pantalla|bateria|batería|cargador|mica|flex|camara|cámara|moto|motorola|iphone|samsung|xiaomi|redmi|huawei|honor|oppo|realme|zte|diagn[oó]stico|oled|incell|original|org|lcd|precios?|cu[aá]nto|cuestan?|valen?|vale)\b/i
-  ).test(ultimoTraducido);
+  ).test(ultimoTraducido) ||
+    // A part code ("DENV0120 tienes?") or a quantity ("¿tienes dos?", "¿cuántas
+    // hay?"): neither names a part type, and answered from the text-only
+    // history the model guessed — a part it had 4 of became "solo tengo una".
+    codigosEn(ultimoMensaje).length > 0 ||
+    PIDE_CANTIDAD.test(ultimoMensaje);
   // A goodbye triggers no tool on its own, so the model answers from the
   // text-only history — where the folio and link don't exist. A customer who
   // says "gracias" would walk away never knowing where their quote lives.
@@ -401,7 +410,13 @@ Este número no está en el registro de clientes.
           }
           // Only the exact model asked about: "iPhone 16" is not the 16 Pro.
           // When the exact one does not exist, the variants stay, labeled.
-          const exactos = soloModeloExacto(rows, q || consulta, (r) => r.nombre);
+          // A part code asks for that part: its own row when we carry it,
+          // else what the search found through its conversions. Never the
+          // name-based model filter, which can't see a code.
+          const codigos = codigosEn(q || consulta);
+          const exactos = codigos.length
+            ? (porCodigo(rows, codigos, (r) => r.sku) ?? (rows.length ? rows : null))
+            : soloModeloExacto(rows, q || consulta, (r) => r.nombre);
           const soloVariantes = exactos === null && rows.length > 0 && /\d/.test(q || consulta);
           if (exactos) rows = exactos;
           // What we could not sell goes on "Piden y no hay", like the counter
