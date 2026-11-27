@@ -211,19 +211,29 @@ export function ConteoView({ conteo, puedeGestionar }: { conteo: ConteoDetalle; 
 
   async function cerrar() {
     const faltan = total - contados;
+    const ajuste =
+      diferencias.length > 0
+        ? ` ${diferencias.length} productos se ajustan a lo contado con motivo "${MOTIVOS[motivo]}".`
+        : " No hay diferencias que ajustar.";
     const ok = await confirmar({
-      title: "¿Cerrar el conteo?",
+      title: "¿Cerrar el conteo y ajustar el inventario?",
       description:
-        faltan > 0
-          ? `Hay ${faltan} productos sin contar: quedan fuera del reporte, no cuentan como cero. Ya no se podrá capturar nada.`
-          : "Ya no se podrá capturar nada. El reporte queda como está.",
-      confirmLabel: "Cerrar conteo",
+        (faltan > 0
+          ? `Hay ${faltan} productos sin contar: quedan fuera, no cuentan como cero.`
+          : "Ya no se podrá capturar nada.") + ajuste,
+      confirmLabel: "Cerrar y ajustar",
+      tone: diferencias.length > 0 ? "danger" : undefined,
     });
     if (!ok) return;
     start(async () => {
       try {
         unwrap(await cerrarConteo(conteo.id));
-        toast.success("Conteo cerrado");
+        if (diferencias.length > 0) {
+          const r = unwrap(await aplicarConteo(conteo.id, motivo));
+          toast.success(`Conteo cerrado: ${r.ajustados} productos ajustados`);
+        } else {
+          toast.success("Conteo cerrado");
+        }
         router.refresh();
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "No se pudo cerrar");
@@ -322,23 +332,24 @@ export function ConteoView({ conteo, puedeGestionar }: { conteo: ConteoDetalle; 
               <Download className="h-4 w-4" />
               Exportar CSV
             </Button>
-            {puedeGestionar && abierto && (
-              <Button variant="secondary" size="sm" onClick={cerrar} loading={pending}>
-                <Lock className="h-4 w-4" />
-                Cerrar conteo
-              </Button>
-            )}
-            {puedeGestionar && conteo.estado === "cerrado" && diferencias.length > 0 && (
+            {puedeGestionar && (abierto || (conteo.estado === "cerrado" && diferencias.length > 0)) && (
               <div className="flex items-center gap-2">
                 <Select value={motivo} onChange={(e) => setMotivo(e.target.value as MotivoAjuste)} className="h-9 w-40">
                   {(Object.keys(MOTIVOS) as MotivoAjuste[]).map((m) => (
                     <option key={m} value={m}>{MOTIVOS[m]}</option>
                   ))}
                 </Select>
-                <Button size="sm" onClick={aplicar} loading={pending}>
-                  <Wand2 className="h-4 w-4" />
-                  Ajustar inventario ({diferencias.length})
-                </Button>
+                {abierto ? (
+                  <Button size="sm" onClick={cerrar} loading={pending}>
+                    <Lock className="h-4 w-4" />
+                    Cerrar y ajustar ({diferencias.length})
+                  </Button>
+                ) : (
+                  <Button size="sm" onClick={aplicar} loading={pending}>
+                    <Wand2 className="h-4 w-4" />
+                    Ajustar inventario ({diferencias.length})
+                  </Button>
+                )}
               </div>
             )}
           </div>
